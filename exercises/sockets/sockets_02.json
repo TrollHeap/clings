@@ -1,0 +1,132 @@
+{
+  "id": "sockets-02",
+  "subject": "sockets",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Conversions réseau : ntohs, inet_ntop, INET_ADDRSTRLEN",
+  "description": "NSY103 — ntohs() est l'inverse de htons() pour lire sin_port en format lisible. INET_ADDRSTRLEN (16) est la taille suffisante pour une adresse IPv4 dotted-decimal. Une fonction print_addr réutilisable simplifie l'affichage.\n\nCréez deux adresses serveur/client et affichez-les avec une fonction dédiée.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
+  "starter_code": "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    char ip[____];                                   // INET_ADDRSTRLEN\n    inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip));\n    printf(\"%s: %s:%d\\n\", label, ip, ____(a->sin_port));  // ntohs\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    memset(&server, 0, sizeof(server));\n    memset(&client, 0, sizeof(client));\n    server.sin_family = AF_INET;\n    server.sin_port = htons(8080);\n    inet_pton(AF_INET, \"192.168.1.1\", &server.sin_addr);\n    client.sin_family = AF_INET;\n    client.sin_port = htons(3000);\n    inet_pton(AF_INET, \"10.0.0.1\", &client.sin_addr);\n    print_addr(\"Server\", &server);\n    print_addr(\"Client\", &client);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    char ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip));\n    printf(\"%s: %s:%d\\n\", label, ip, ntohs(a->sin_port));\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    memset(&server, 0, sizeof(server));\n    memset(&client, 0, sizeof(client));\n    server.sin_family = AF_INET;\n    server.sin_port = htons(8080);\n    inet_pton(AF_INET, \"192.168.1.1\", &server.sin_addr);\n    client.sin_family = AF_INET;\n    client.sin_port = htons(3000);\n    inet_pton(AF_INET, \"10.0.0.1\", &client.sin_addr);\n    print_addr(\"Server\", &server);\n    print_addr(\"Client\", &client);\n    return 0;\n}",
+  "hints": [
+    "INET_ADDRSTRLEN = 16 : assez pour 'xxx.xxx.xxx.xxx\\0' (15 chars + null)",
+    "ntohs(sin_port) reconvertit le port big-endian en valeur lisible (hôte)",
+    "inet_ntop(AF_INET, &sin_addr, buf, INET_ADDRSTRLEN) — toujours utiliser pour afficher une IP"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Server: 192.168.1.1:8080\nClient: 10.0.0.1:3000\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "htons(8080) → server.sin_port ; inet_pton → server.sin_addr",
+        "nodes": [
+          {
+            "id": "port",
+            "label": "port 8080\n(host order)"
+          },
+          {
+            "id": "ip",
+            "label": "'192.168.1.1'"
+          },
+          {
+            "id": "srv",
+            "label": "server\n(sockaddr_in)"
+          }
+        ],
+        "edges": [
+          {
+            "source": "port",
+            "target": "srv",
+            "label": "htons()"
+          },
+          {
+            "source": "ip",
+            "target": "srv",
+            "label": "inet_pton()"
+          }
+        ]
+      },
+      {
+        "label": "print_addr('Server') : inet_ntop + ntohs → '192.168.1.1:8080'",
+        "nodes": [
+          {
+            "id": "srv",
+            "label": "server\n(sockaddr_in)"
+          },
+          {
+            "id": "out",
+            "label": "'192.168.1.1:8080'"
+          }
+        ],
+        "edges": [
+          {
+            "source": "srv",
+            "target": "out",
+            "label": "inet_ntop + ntohs"
+          }
+        ]
+      },
+      {
+        "label": "print_addr('Client') : inet_ntop + ntohs → '10.0.0.1:3000'",
+        "nodes": [
+          {
+            "id": "cli",
+            "label": "client\n(sockaddr_in)"
+          },
+          {
+            "id": "out",
+            "label": "'10.0.0.1:3000'"
+          }
+        ],
+        "edges": [
+          {
+            "source": "cli",
+            "target": "out",
+            "label": "inet_ntop + ntohs"
+          }
+        ]
+      }
+    ]
+  },
+  "prerequisites": [
+    "sockets-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "ntohs() pour lire sin_port ; INET_ADDRSTRLEN = 16 = taille max 'xxx.xxx.xxx.xxx\\0' ; inet_ntop toujours pour afficher sin_addr",
+  "common_mistake": "Utiliser printf('%d', addr.sin_port) sans ntohs() → affiche la valeur big-endian (ex: 20480 au lieu de 80)",
+  "kc_ids": [
+    "KC-C14"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    char ip[INET_ADDRSTRLEN];              // ★ taille exacte pour IPv4 dotted-decimal\n    inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip)); // ★ binaire → string\n    printf(\"%s: %s:%d\\n\", label, ip, ntohs(a->sin_port)); // ★ ntohs pour afficher le port\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    memset(&server, 0, sizeof(server));    // ★ zéro-init obligatoire (sin_zero[])\n    memset(&client, 0, sizeof(client));\n    server.sin_family = AF_INET;\n    server.sin_port = htons(8080);         // ★ htons pour stocker\n    inet_pton(AF_INET, \"192.168.1.1\", &server.sin_addr);\n    client.sin_family = AF_INET;\n    client.sin_port = htons(3000);\n    inet_pton(AF_INET, \"10.0.0.1\", &client.sin_addr);\n    print_addr(\"Server\", &server);\n    print_addr(\"Client\", &client);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    char ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip));\n    printf(\"%s: %s:%d\\n\", label, ip, ____(a->sin_port));  // convertir le port?\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    memset(&server, 0, sizeof(server));\n    memset(&client, 0, sizeof(client));\n    server.sin_family = AF_INET;\n    server.sin_port = htons(8080);\n    inet_pton(AF_INET, \"192.168.1.1\", &server.sin_addr);\n    client.sin_family = AF_INET;\n    client.sin_port = htons(3000);\n    inet_pton(AF_INET, \"10.0.0.1\", &client.sin_addr);\n    print_addr(\"Server\", &server);\n    print_addr(\"Client\", &client);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    char ip[____];                                   // INET_ADDRSTRLEN\n    inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip));\n    printf(\"%s: %s:%d\\n\", label, ip, ____(a->sin_port));  // ntohs\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    memset(&server, 0, sizeof(server));\n    memset(&client, 0, sizeof(client));\n    server.sin_family = AF_INET;\n    server.sin_port = htons(8080);\n    inet_pton(AF_INET, \"192.168.1.1\", &server.sin_addr);\n    client.sin_family = AF_INET;\n    client.sin_port = htons(3000);\n    inet_pton(AF_INET, \"10.0.0.1\", &client.sin_addr);\n    print_addr(\"Server\", &server);\n    print_addr(\"Client\", &client);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <string.h>\n\nvoid print_addr(const char *label, struct sockaddr_in *a) {\n    // Affichez label + IP (via inet_ntop) + port (via ntohs) au format \"label: IP:port\"\n}\n\nint main(void) {\n    struct sockaddr_in server, client;\n    // Configurez server: 192.168.1.1:8080, client: 10.0.0.1:3000\n    // Appelez print_addr pour chacun\n    return 0;\n}",
+    "#include <stdio.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\nint main(void) {\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "nordcloud",
+    "clientName": "NordCloud",
+    "contactEmail": "arch@nordcloud.sys",
+    "tier": 3,
+    "receivedTime": "09:35",
+    "subject": "Affichage adresses réseau — ntohs + inet_ntop réutilisables",
+    "incidentEmail": "Architecte,\n\nNos outils de diagnostic réseau affichent des ports illisibles (big-endian raw). Nous avons besoin d'une fonction print_addr réutilisable qui affiche IP:port correctement via inet_ntop + ntohs.\n\nConfigurez server:192.168.1.1:8080 et client:10.0.0.1:3000, affichez les deux.\n\nArch @ NordCloud",
+    "payout": 280,
+    "successEmail": "Diagnostic validé. Server:192.168.1.1:8080 Client:10.0.0.1:3000 — les ports sont lisibles grâce à ntohs().\n\nNordCloud Architecture",
+    "failureEmail": "Les ports s'affichent incorrectement. N'oublie pas ntohs() pour convertir sin_port en valeur lisible (hôte-endian).\n\nArch @ NordCloud",
+    "syscallsInvolved": [
+      "inet_ntop",
+      "ntohs",
+      "htons",
+      "inet_pton"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": [
+      "sockets-01"
+    ]
+  }
+}

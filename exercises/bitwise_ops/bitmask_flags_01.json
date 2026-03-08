@@ -1,0 +1,56 @@
+{
+  "id": "bitmask-flags-01",
+  "subject": "bitwise_ops",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Bitmask — flags de permissions",
+  "description": "NSY103 — Les bitmasks permettent de stocker plusieurs flags booléens dans un seul entier. Chaque flag occupe un bit.\n\nImplémentez un système de permissions UNIX-style : READ=4, WRITE=2, EXEC=1. Fonctions : `set_flag`, `clear_flag`, `has_flag`.",
+  "starter_code": "#include <stdio.h>\n\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\nint set_flag(int flags, int bit)   { return ____; }\nint clear_flag(int flags, int bit) { return ____; }\nint has_flag(int flags, int bit)   { return ____; }\n\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\n\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms);\n    perms = set_flag(perms, EXEC);\n    print_perms(perms);\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms);\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#define READ  4\n#define WRITE 2\n#define EXEC  1\nint set_flag(int flags, int bit)   { return flags | bit; }\nint clear_flag(int flags, int bit) { return flags & ~bit; }\nint has_flag(int flags, int bit)   { return (flags & bit) != 0; }\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms);\n    perms = set_flag(perms, EXEC);\n    print_perms(perms);\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms);\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+  "hints": [
+    "set_flag: `return flags | bit;` — OR active le bit",
+    "clear_flag: `return flags & ~bit;` — AND avec NOT efface le bit",
+    "has_flag: `return (flags & bit) != 0;` — éviter `== 1` qui échouerait si bit > 1"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "rw-\nrwx\nr-x\nHas READ: 1\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "set_flag(READ|WRITE) : perms=6 (110b)",
+        "stack": [
+          {"name": "perms", "value": "0b110 (rw-)"},
+          {"name": "READ=4", "value": "0b100"},
+          {"name": "WRITE=2", "value": "0b010"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "clear_flag(WRITE) : perms=5 (101b)",
+        "stack": [
+          {"name": "perms", "value": "0b101 (r-x)"},
+          {"name": "~WRITE", "value": "0b...101"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": ["bitwise-ops-01"],
+  "exercise_type": "complete",
+  "key_concept": "set: flags|=bit, clear: flags&=~bit, check: (flags&bit)!=0",
+  "common_mistake": "Utiliser == au lieu de != 0 pour vérifier : `if (flags & EXEC)` fonctionne, mais `if ((flags & EXEC) == 1)` est faux si EXEC != 1",
+  "kc_ids": ["KC-C04"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\nint set_flag(int flags, int bit)   { return flags | bit; }    // ★ OR active\nint clear_flag(int flags, int bit) { return flags & ~bit; }   // ★ AND NOT efface\nint has_flag(int flags, int bit)   { return (flags & bit) != 0; } // ★ != 0 pas == 1\n\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms); // rw-\n    perms = set_flag(perms, EXEC);\n    print_perms(perms); // rwx\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms); // r-x\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\nint set_flag(int flags, int bit)   { return flags | bit; }\nint clear_flag(int flags, int bit) { return ____; } // AND avec NOT du bit\nint has_flag(int flags, int bit)   { return ____; } // != 0\n\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms);\n    perms = set_flag(perms, EXEC);\n    print_perms(perms);\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms);\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\nint set_flag(int flags, int bit)   { return ____; }\nint clear_flag(int flags, int bit) { return ____; }\nint has_flag(int flags, int bit)   { return ____; }\n\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\n\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms);\n    perms = set_flag(perms, EXEC);\n    print_perms(perms);\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms);\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\n// Implémentez set_flag (|), clear_flag (&~), has_flag (!=0)\n// Sortie attendue: \"rw-\\nrwx\\nr-x\\nHas READ: 1\\n\"\nint set_flag(int flags, int bit)   { return 0; }\nint clear_flag(int flags, int bit) { return 0; }\nint has_flag(int flags, int bit)   { return 0; }\n\nvoid print_perms(int flags) {\n    printf(\"%c%c%c\\n\",\n        has_flag(flags, READ)  ? 'r' : '-',\n        has_flag(flags, WRITE) ? 'w' : '-',\n        has_flag(flags, EXEC)  ? 'x' : '-');\n}\nint main(void) {\n    int perms = 0;\n    perms = set_flag(perms, READ | WRITE);\n    print_perms(perms);\n    perms = set_flag(perms, EXEC);\n    print_perms(perms);\n    perms = clear_flag(perms, WRITE);\n    print_perms(perms);\n    printf(\"Has READ: %d\\n\", has_flag(perms, READ));\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define READ  4\n#define WRITE 2\n#define EXEC  1\n\nint set_flag(int flags, int bit)   { return 0; }\nint clear_flag(int flags, int bit) { return 0; }\nint has_flag(int flags, int bit)   { return 0; }\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "struct-ptr-01",
+  "subject": "structs",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Struct sur le tas et opérateur ->",
+  "description": "NSY103 — Quand une struct est allouée dynamiquement, on accède à ses champs via `->` (équivalent de `(*ptr).champ`).\n\nAllouez un `Rectangle` sur le tas, calculez son aire et périmètre via pointeur.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct { float width; float height; } Rectangle;\n\nint main(void) {\n    Rectangle *r = ____;\n    if (!r) return 1;\n    ____->width  = 5.0f;\n    ____->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", ____->width);\n    printf(\"Hauteur : %.1f\\n\", ____->height);\n    printf(\"Aire : %.1f\\n\", ____->width * ____->height);\n    printf(\"Perimetre : %.1f\\n\", 2.0f * (____->width + ____->height));\n    free(r);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { float width; float height; } Rectangle;\nint main(void) {\n    Rectangle *r = malloc(sizeof(Rectangle));\n    if (!r) return 1;\n    r->width  = 5.0f;\n    r->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", r->width);\n    printf(\"Hauteur : %.1f\\n\", r->height);\n    printf(\"Aire : %.1f\\n\", r->width * r->height);\n    printf(\"Perimetre : %.1f\\n\", 2.0f * (r->width + r->height));\n    free(r);\n    return 0;\n}",
+  "hints": [
+    "`Rectangle *r = malloc(sizeof(Rectangle));`",
+    "`r->width = 5.0f;` pour assigner via pointeur (équivalent à `(*r).width = 5.0f;`)",
+    "N'oubliez pas `free(r);` en fin de programme"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Largeur : 5.0\nHauteur : 3.0\nAire : 15.0\nPerimetre : 16.0\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "malloc(sizeof(Rectangle))",
+        "stack": [{"name": "r", "value": "→heap:Rectangle"}],
+        "heap": [
+          {"address": "Rectangle", "value": "{width:5.0, height:3.0}"}
+        ],
+        "arrows": [{"from": "r", "to": "Rectangle"}]
+      },
+      {
+        "label": "Calcul via r->",
+        "stack": [
+          {"name": "r", "value": "→heap:Rectangle"},
+          {"name": "aire", "value": "15.0"},
+          {"name": "périm.", "value": "16.0"}
+        ],
+        "heap": [
+          {"address": "Rectangle", "value": "{width:5.0, height:3.0}"}
+        ],
+        "arrows": [{"from": "r", "to": "Rectangle", "label": "r->"}]
+      }
+    ]
+  },
+  "prerequisites": ["struct-point-01"],
+  "exercise_type": "complete",
+  "key_concept": "ptr->champ == (*ptr).champ",
+  "common_mistake": "Utiliser . au lieu de -> sur un pointeur",
+  "kc_ids": ["KC-C03"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdlib.h>\n\n// ★ Stage 0 — Exemple complet\ntypedef struct { float width; float height; } Rectangle;\n\nint main(void) {\n    Rectangle *r = malloc(sizeof(Rectangle)); // ★ alloc sur le tas\n    if (!r) return 1;\n    r->width  = 5.0f; // ★ -> équivalent à (*r).width\n    r->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", r->width);\n    printf(\"Hauteur : %.1f\\n\", r->height);\n    printf(\"Aire : %.1f\\n\", r->width * r->height);\n    printf(\"Perimetre : %.1f\\n\", 2.0f * (r->width + r->height));\n    free(r);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct { float width; float height; } Rectangle;\n\nint main(void) {\n    Rectangle *r = malloc(sizeof(Rectangle));\n    if (!r) return 1;\n    r->width  = 5.0f;\n    r->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", ____); // accès via ->\n    printf(\"Hauteur : %.1f\\n\", ____);\n    printf(\"Aire : %.1f\\n\", ____);\n    printf(\"Perimetre : %.1f\\n\", 2.0f * (r->width + r->height));\n    free(r);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct { float width; float height; } Rectangle;\n\nint main(void) {\n    Rectangle *r = ____;\n    if (!r) return 1;\n    ____->width  = 5.0f;\n    ____->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", ____->width);\n    printf(\"Hauteur : %.1f\\n\", ____->height);\n    printf(\"Aire : %.1f\\n\", ____->width * ____->height);\n    printf(\"Perimetre : %.1f\\n\", 2.0f * (____->width + ____->height));\n    free(r);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct { float width; float height; } Rectangle;\n\n// Allouez Rectangle sur le tas (width=5, height=3)\n// Affichez largeur, hauteur, aire (15.0), périmètre (16.0)\n// Libérez en fin de programme\nint main(void) {\n    // TODO\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct { float width; float height; } Rectangle;\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

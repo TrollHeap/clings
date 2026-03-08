@@ -1,0 +1,113 @@
+{
+  "id": "malloc-array-01",
+  "subject": "memory_allocation",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Tableau dynamique avec malloc",
+  "description": "NSY103 — `malloc(n * sizeof(type))` alloue `n` éléments sur le tas. Toujours vérifier le retour (NULL si échec) et libérer avec `free()` en fin d'usage.\n\nAllouez un tableau de 5 entiers, remplissez-le (valeurs 1..5), affichez-le, puis libérez-le.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int n = 5;\n    int *arr = ____;\n    if (!arr) {\n        fprintf(stderr, \"malloc echoue\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____;\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n    ____;\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n    int n = 5;\n    int *arr = malloc(n * sizeof(int));\n    if (!arr) {\n        fprintf(stderr, \"malloc echoue\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        arr[i] = i + 1;\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n    free(arr);\n    return 0;\n}",
+  "hints": [
+    "`int *arr = malloc(5 * sizeof(int));` puis vérifier `if (!arr) { ... }`",
+    "Remplir avec `arr[i] = i + 1;` dans une boucle",
+    "Libérer avec `free(arr);` après usage"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "1 2 3 4 5 \n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Avant malloc",
+        "stack": [
+          {
+            "name": "n",
+            "value": "5"
+          },
+          {
+            "name": "arr",
+            "value": "NULL"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "arr est déclaré sur la pile mais non initialisé. malloc n'a pas encore été appelé — aucun bloc heap n'existe.",
+        "step_label": "Avant malloc — arr non initialisé"
+      },
+      {
+        "label": "Après malloc(5*sizeof(int)) et remplissage",
+        "stack": [
+          {
+            "name": "n",
+            "value": "5"
+          },
+          {
+            "name": "arr",
+            "value": "→heap[0]"
+          }
+        ],
+        "heap": [
+          {
+            "address": "[0]",
+            "value": "1"
+          },
+          {
+            "address": "[1]",
+            "value": "2"
+          },
+          {
+            "address": "[2]",
+            "value": "3"
+          },
+          {
+            "address": "[3]",
+            "value": "4"
+          },
+          {
+            "address": "[4]",
+            "value": "5"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "arr",
+            "to": "[0]"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "malloc(5 * sizeof(int)) = 20 octets sur le heap. arr reçoit l'adresse de [0]. Les indices 1..5 sont écrits via la boucle, puis libérés par free(arr).",
+        "step_label": "malloc(5*sizeof(int)) — arr → heap"
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "malloc retourne void*, toujours vérifier NULL et appeler free()",
+  "common_mistake": "Oublier free() → fuite mémoire. Ne pas vérifier NULL → segfault potentiel.",
+  "kc_ids": [
+    "KC-C02"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdlib.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int n = 5;\n    int *arr = malloc(n * sizeof(int)); // ★ allocation sur le tas\n    if (!arr) {                          // ★ toujours vérifier NULL\n        fprintf(stderr, \"malloc echoue\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        arr[i] = i + 1; // ★ remplissage\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n    free(arr); // ★ libération obligatoire\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int n = 5;\n    int *arr = malloc(n * sizeof(int));\n    if (!arr) {\n        fprintf(stderr, \"malloc echoue\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____; // valeur i+1\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n    ____; // libération\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int n = 5;\n    int *arr = ____;\n    if (!arr) {\n        fprintf(stderr, \"malloc echoue\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____;\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n    ____;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\n// Allouez un tableau de 5 ints, remplissez avec 1..5\n// Affichez: \"1 2 3 4 5 \\n\", puis libérez\nint main(void) {\n    // TODO\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

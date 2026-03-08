@@ -1,0 +1,120 @@
+{
+  "id": "sem-01",
+  "subject": "semaphores",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Sémaphore non nommé : init, wait, post, getvalue",
+  "description": "NSY103 — Un sémaphore est un compteur entier ≥ 0. sem_wait() décrémente (bloque si 0), sem_post() incrémente. sem_init(s, pshared, valeur) initialise avec une valeur initiale.\n\nCréez un sémaphore de valeur 3, effectuez un wait (−1) puis un post (+1), affichez la valeur à chaque étape.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
+  "starter_code": "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t s;\n    sem_init(&s, 0, ____);\n    int val;\n    sem_getvalue(&s, &val);\n    printf(\"Initial: %d\\n\", val);\n    ____(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After wait: %d\\n\", val);\n    ____(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After post: %d\\n\", val);\n    sem_destroy(&s);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <semaphore.h>\nint main(void) {\n    sem_t s;\n    sem_init(&s, 0, 3);\n    int val;\n    sem_getvalue(&s, &val);\n    printf(\"Initial: %d\\n\", val);\n    sem_wait(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After wait: %d\\n\", val);\n    sem_post(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After post: %d\\n\", val);\n    sem_destroy(&s);\n    return 0;\n}",
+  "hints": [
+    "sem_init(&s, 0, 3) — 0=non partagé entre processus, valeur initiale=3",
+    "sem_wait(&s) décrémente le compteur (−1)",
+    "sem_post(&s) incrémente le compteur (+1)"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Initial: 3\nAfter wait: 2\nAfter post: 3\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "sem_init(&s, 0, 3) — compteur = 3",
+        "stack": [
+          {
+            "name": "s (sem_t)",
+            "value": "count=3"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "sem_init initialise le sémaphore avec pshared=0 (intra-processus) et valeur=3. Cela signifie que 3 sem_wait() peuvent réussir sans blocage avant d'épuiser le compteur.",
+        "step_label": "sem_init(&s, 0, 3) — compteur = 3"
+      },
+      {
+        "label": "sem_wait(&s) — compteur − 1 = 2",
+        "stack": [
+          {
+            "name": "s (sem_t)",
+            "value": "count=2"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "sem_wait décrémente le compteur de 1 : 3→2. Si le compteur était 0, le thread serait bloqué jusqu'à un sem_post d'un autre thread ou d'un signal.",
+        "step_label": "sem_wait(&s) — compteur − 1 = 2"
+      },
+      {
+        "label": "sem_post(&s) — compteur + 1 = 3",
+        "stack": [
+          {
+            "name": "s (sem_t)",
+            "value": "count=3"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "sem_post incrémente le compteur : 2→3. Si un thread était bloqué en sem_wait, il serait réveillé ici. sem_post peut être appelé depuis n'importe quel thread — contrairement à un mutex.",
+        "step_label": "sem_post(&s) — compteur + 1 = 3"
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "sem_wait bloque si compteur=0 ; sem_post réveille un thread en attente",
+  "common_mistake": "Oublier sem_destroy : les sémaphores non nommés doivent être détruits pour libérer les ressources",
+  "kc_ids": [
+    "KC-C11"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <semaphore.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    sem_t s;\n    sem_init(&s, 0, 3);        // ★ pshared=0 (intra-process), valeur initiale=3\n    int val;\n    sem_getvalue(&s, &val);    // ★ lire la valeur courante\n    printf(\"Initial: %d\\n\", val);\n    sem_wait(&s);              // ★ décrémente de 1 (bloque si val=0)\n    sem_getvalue(&s, &val);\n    printf(\"After wait: %d\\n\", val);\n    sem_post(&s);              // ★ incrémente de 1\n    sem_getvalue(&s, &val);\n    printf(\"After post: %d\\n\", val);\n    sem_destroy(&s);           // ★ libérer le sémaphore\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t s;\n    sem_init(&s, 0, 3);\n    int val;\n    sem_getvalue(&s, &val);\n    printf(\"Initial: %d\\n\", val);\n    sem_wait(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After wait: %d\\n\", val);\n    ____(&s);  // incrémenter le compteur\n    sem_getvalue(&s, &val);\n    printf(\"After post: %d\\n\", val);\n    sem_destroy(&s);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t s;\n    sem_init(&s, 0, ____);\n    int val;\n    sem_getvalue(&s, &val);\n    printf(\"Initial: %d\\n\", val);\n    ____(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After wait: %d\\n\", val);\n    ____(&s);\n    sem_getvalue(&s, &val);\n    printf(\"After post: %d\\n\", val);\n    sem_destroy(&s);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t s;\n    // Initialisez s à 3, affichez la valeur\n    // Effectuez un wait (−1), affichez\n    // Effectuez un post (+1), affichez\n    // Sortie attendue: \"Initial: 3\", \"After wait: 2\", \"After post: 3\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "hobbylab",
+    "clientName": "HobbyLab",
+    "contactEmail": "dave@hobbylab.sys",
+    "tier": 1,
+    "receivedTime": "08:25",
+    "subject": "Sémaphore POSIX — contrôle accès section critique",
+    "incidentEmail": "Salut,\n\nJ'ai besoin de comprendre les sémaphores POSIX non nommés. Montre-moi sem_init, sem_wait et sem_post avec une valeur initiale qui contrôle combien de threads peuvent entrer simultanément.\n\nDave @ HobbyLab",
+    "payout": 100,
+    "successEmail": "Super, je comprends maintenant le cycle init/wait/post/destroy. La valeur initiale contrôle le nombre de passages simultanés.\n\nDave",
+    "failureEmail": "La valeur du sémaphore n'est pas correcte. Vérifie sem_init avec la bonne valeur initiale et que sem_post incrémente bien.\n\nDave",
+    "syscallsInvolved": [
+      "sem_init",
+      "sem_wait",
+      "sem_post",
+      "sem_getvalue",
+      "sem_destroy"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": []
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "id": "ptr-deref-01",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Déclarer et déréférencer un pointeur",
+  "description": "NSY103 — Un pointeur est une variable qui stocke une adresse mémoire. L'opérateur `&` donne l'adresse d'une variable, `*` accède à la valeur pointée.\n\nDéclarez un entier `x = 42`, un pointeur `p` vers `x`, puis affichez la valeur via le pointeur.",
+  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    int x = 42;\n    ____ *p = ____;\n    printf(\"Valeur de x : %d\\n\", ____);\n    printf(\"Valeur via *p : %d\\n\", ____);\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nint main(void) {\n    int x = 42;\n    int *p = &x;\n    printf(\"Valeur de x : %d\\n\", x);\n    printf(\"Valeur via *p : %d\\n\", *p);\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
+  "hints": [
+    "Pour déclarer un pointeur vers int : `int *p;`",
+    "Pour obtenir l'adresse de x : `p = &x;`",
+    "Pour lire la valeur via le pointeur : `printf(\"%d\", *p);`"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Valeur de x : 42\nValeur via *p : 42\nAdresses egales : 1\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Déclaration de x",
+        "stack": [
+          {
+            "name": "x",
+            "value": "42"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "x est alloué sur la pile — variable locale automatique. Sa valeur 42 est stockée directement dans le frame de main, sans indirection.",
+        "step_label": "Déclaration de x — variable locale en stack"
+      },
+      {
+        "label": "Création du pointeur p",
+        "stack": [
+          {
+            "name": "x",
+            "value": "42"
+          },
+          {
+            "name": "p",
+            "value": "→x"
+          }
+        ],
+        "heap": [],
+        "arrows": [
+          {
+            "from": "p",
+            "to": "x",
+            "label": "→"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "int *p = &x — l'opérateur & retourne l'adresse mémoire de x. p contient cette adresse, pas la valeur 42. p et x sont deux variables distinctes sur la pile.",
+        "step_label": "int *p = &x — pointeur p pointe vers x"
+      },
+      {
+        "label": "Déréférencement *p",
+        "stack": [
+          {
+            "name": "x",
+            "value": "42"
+          },
+          {
+            "name": "p",
+            "value": "→x"
+          },
+          {
+            "name": "*p",
+            "value": "42"
+          }
+        ],
+        "heap": [],
+        "arrows": [
+          {
+            "from": "p",
+            "to": "x"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "*p suit le pointeur et lit la valeur à l'adresse contenue dans p. Puisque p == &x, *p == x == 42. Modification via *p affecterait directement x.",
+        "step_label": "*p déréférence — accès indirect à la valeur de x"
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "L'opérateur & prend une adresse, * déréférence",
+  "common_mistake": "Oublier * dans la déclaration du type pointeur (int p vs int *p)",
+  "kc_ids": [
+    "KC-C01"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int x = 42;       // ★ variable en pile\n    int *p = &x;      // ★ & = opérateur adresse, p pointe vers x\n    printf(\"Valeur de x : %d\\n\", x);\n    printf(\"Valeur via *p : %d\\n\", *p); // ★ * déréférence\n    printf(\"Adresses egales : %d\\n\", (p == &x)); // ★ p contient &x\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    int x = 42;\n    int *p = ____; // opérateur adresse\n    printf(\"Valeur de x : %d\\n\", x);\n    printf(\"Valeur via *p : %d\\n\", ____); // déréférencement\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    int x = 42;\n    ____ *p = ____;\n    printf(\"Valeur de x : %d\\n\", ____);\n    printf(\"Valeur via *p : %d\\n\", ____);\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    // Déclarez x=42, un pointeur p vers x\n    // Affichez: \"Valeur de x : 42\", \"Valeur via *p : 42\", \"Adresses egales : 1\"\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

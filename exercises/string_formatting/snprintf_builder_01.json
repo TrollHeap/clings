@@ -1,0 +1,66 @@
+{
+  "id": "snprintf-builder-01",
+  "subject": "string_formatting",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Construction sécurisée de chaîne avec snprintf",
+  "description": "NSY103 — snprintf(buf, size, fmt, ...) écrit au maximum size-1 octets et garantit le null-terminator. Préférer snprintf à sprintf pour éviter les dépassements de tampon.\n\nConstituez un message d'erreur formaté : '[ERR-404] Not found: /proc/42/status (pid=42)'",
+  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    char buf[128];\n    int code = 404;\n    char *path = \"/proc/42/status\";\n    int pid = 42;\n    int n = snprintf(____, ____, \"[ERR-%d] Not found: %s (pid=%d)\", ____, ____, ____);\n    if (n >= (int)sizeof(buf)) {\n        printf(\"TRONQUE\\n\");\n    } else {\n        printf(\"%s\\n\", buf);\n    }\n    char small[20];\n    n = snprintf(____, ____, \"pid=%d cmd=%s\", pid, \"very_long_name_here\");\n    printf(\"Tronque: %s\\n\", n >= (int)sizeof(small) ? \"oui\" : \"non\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nint main(void) {\n    char buf[128];\n    int code = 404;\n    char *path = \"/proc/42/status\";\n    int pid = 42;\n    int n = snprintf(buf, sizeof(buf), \"[ERR-%d] Not found: %s (pid=%d)\", code, path, pid);\n    if (n >= (int)sizeof(buf)) {\n        printf(\"TRONQUE\\n\");\n    } else {\n        printf(\"%s\\n\", buf);\n    }\n    char small[20];\n    n = snprintf(small, sizeof(small), \"pid=%d cmd=%s\", pid, \"very_long_name_here\");\n    printf(\"Tronque: %s\\n\", n >= (int)sizeof(small) ? \"oui\" : \"non\");\n    return 0;\n}",
+  "hints": [
+    "char buf[128]; int written = snprintf(buf, sizeof(buf), fmt, ...);",
+    "if (written >= (int)sizeof(buf)) { /* troncature */ }",
+    "Construire progressivement : snprintf(buf + offset, remaining, ...)"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "[ERR-404] Not found: /proc/42/status (pid=42)\nTronque: oui\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Buffer déclaré",
+        "stack": [
+          {"name": "buf[128]", "value": "(vide)"},
+          {"name": "code", "value": "404"},
+          {"name": "path", "value": "\"/proc/42/status\""},
+          {"name": "pid", "value": "42"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "snprintf remplit buf",
+        "stack": [
+          {"name": "buf", "value": "\"[ERR-404] Not found...\""},
+          {"name": "n", "value": "44 (< 128)"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "small[20] tronqué",
+        "stack": [
+          {"name": "small[20]", "value": "\"pid=42 cmd=very_lon\""},
+          {"name": "n", "value": "25 (>= 20)"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": ["printf-formats-01"],
+  "exercise_type": "complete",
+  "key_concept": "snprintf retourne le nombre de chars VOULUS (pas écrits) — si ≥ size, la chaîne a été tronquée",
+  "common_mistake": "Vérifier la troncature : si snprintf >= size, le buffer est insuffisant",
+  "kc_ids": ["KC-C05"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    char buf[128];\n    int code = 404;\n    char *path = \"/proc/42/status\";\n    int pid = 42;\n    // ★ snprintf(buf, sizeof(buf), fmt, ...) — écrit au max sizeof(buf)-1 chars\n    int n = snprintf(buf, sizeof(buf), \"[ERR-%d] Not found: %s (pid=%d)\", code, path, pid);\n    if (n >= (int)sizeof(buf)) { // ★ n = chars VOULUS, pas écrits\n        printf(\"TRONQUE\\n\");\n    } else {\n        printf(\"%s\\n\", buf);\n    }\n    char small[20];\n    n = snprintf(small, sizeof(small), \"pid=%d cmd=%s\", pid, \"very_long_name_here\");\n    printf(\"Tronque: %s\\n\", n >= (int)sizeof(small) ? \"oui\" : \"non\"); // ★ détection troncature\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    char buf[128];\n    int code = 404;\n    char *path = \"/proc/42/status\";\n    int pid = 42;\n    int n = snprintf(buf, sizeof(buf), \"[ERR-%d] Not found: %s (pid=%d)\", code, path, pid);\n    if (n >= (int)sizeof(buf)) {\n        printf(\"TRONQUE\\n\");\n    } else {\n        printf(\"%s\\n\", buf);\n    }\n    char small[20];\n    n = snprintf(____, ____, \"pid=%d cmd=%s\", pid, \"very_long_name_here\"); // taille = sizeof(small)\n    printf(\"Tronque: %s\\n\", n >= (int)sizeof(small) ? \"oui\" : \"non\");\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    char buf[128];\n    int code = 404;\n    char *path = \"/proc/42/status\";\n    int pid = 42;\n    int n = snprintf(____, ____, \"[ERR-%d] Not found: %s (pid=%d)\", ____, ____, ____);\n    if (n >= (int)sizeof(buf)) {\n        printf(\"TRONQUE\\n\");\n    } else {\n        printf(\"%s\\n\", buf);\n    }\n    char small[20];\n    n = snprintf(____, ____, \"pid=%d cmd=%s\", pid, \"very_long_name_here\");\n    printf(\"Tronque: %s\\n\", n >= (int)sizeof(small) ? \"oui\" : \"non\");\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    // buf[128] pour le message complet, small[20] pour le test de troncature\n    // Format : \"[ERR-404] Not found: /proc/42/status (pid=42)\"\n    // Détecter si snprintf a tronqué (retour >= size)\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

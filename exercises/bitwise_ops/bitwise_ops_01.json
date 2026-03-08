@@ -1,0 +1,57 @@
+{
+  "id": "bitwise-ops-01",
+  "subject": "bitwise_ops",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Opérations bits : AND, OR, XOR, décalages",
+  "description": "NSY103 — Les opérations bit-à-bit opèrent sur chaque bit indépendamment. Elles sont fondamentales pour les masques, flags, et manipulation de registres.\n\nCalculez et affichez les résultats de AND, OR, XOR, NOT et décalages sur 0xA5 et 0x0F.",
+  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int a = 0xA5;\n    unsigned int b = 0x0F;\n    printf(\"a        = 0x%02X\\n\", a);\n    printf(\"b        = 0x%02X\\n\", b);\n    printf(\"a AND b  = 0x%02X\\n\", ____);\n    printf(\"a OR  b  = 0x%02X\\n\", ____);\n    printf(\"a XOR b  = 0x%02X\\n\", ____);\n    printf(\"NOT a    = 0x%02X\\n\", ____);\n    printf(\"a << 2   = 0x%02X\\n\", ____);\n    printf(\"a >> 2   = 0x%02X\\n\", ____);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nint main(void) {\n    unsigned int a = 0xA5;\n    unsigned int b = 0x0F;\n    printf(\"a        = 0x%02X\\n\", a);\n    printf(\"b        = 0x%02X\\n\", b);\n    printf(\"a AND b  = 0x%02X\\n\", a & b);\n    printf(\"a OR  b  = 0x%02X\\n\", a | b);\n    printf(\"a XOR b  = 0x%02X\\n\", a ^ b);\n    printf(\"NOT a    = 0x%02X\\n\", (~a) & 0xFF);\n    printf(\"a << 2   = 0x%02X\\n\", (a << 2) & 0xFF);\n    printf(\"a >> 2   = 0x%02X\\n\", a >> 2);\n    return 0;\n}",
+  "hints": [
+    "0xA5 = 10100101b, 0x0F = 00001111b — AND garde les bits communs",
+    "NOT (~a) & 0xFF masque à 8 bits pour éviter les bits hauts de unsigned int",
+    "a << 2 décale vers la gauche (multiplie par 4), & 0xFF tronque à 8 bits"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "a        = 0xA5\nb        = 0x0F\na AND b  = 0x05\na OR  b  = 0xAF\na XOR b  = 0xAA\nNOT a    = 0x5A\na << 2   = 0x94\na >> 2   = 0x29\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Valeurs initiales en binaire",
+        "stack": [
+          {"name": "a (0xA5)", "value": "10100101b"},
+          {"name": "b (0x0F)", "value": "00001111b"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "Résultats des opérations",
+        "stack": [
+          {"name": "a & b", "value": "0x05 (00000101b)"},
+          {"name": "a | b", "value": "0xAF (10101111b)"},
+          {"name": "a ^ b", "value": "0xAA (10101010b)"},
+          {"name": "~a & 0xFF", "value": "0x5A (01011010b)"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "& AND, | OR, ^ XOR, ~ NOT, << décalage gauche, >> décalage droit",
+  "common_mistake": "Confondre & (bitwise AND) et && (logical AND)",
+  "kc_ids": ["KC-C04"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    unsigned int a = 0xA5; // ★ 10100101b\n    unsigned int b = 0x0F; // ★ 00001111b\n    printf(\"a        = 0x%02X\\n\", a);\n    printf(\"b        = 0x%02X\\n\", b);\n    printf(\"a AND b  = 0x%02X\\n\", a & b);        // ★ & = AND bit-à-bit\n    printf(\"a OR  b  = 0x%02X\\n\", a | b);        // ★ | = OR\n    printf(\"a XOR b  = 0x%02X\\n\", a ^ b);        // ★ ^ = XOR\n    printf(\"NOT a    = 0x%02X\\n\", (~a) & 0xFF);  // ★ ~ = NOT, masquer à 8 bits\n    printf(\"a << 2   = 0x%02X\\n\", (a << 2) & 0xFF); // ★ décalage gauche\n    printf(\"a >> 2   = 0x%02X\\n\", a >> 2);       // ★ décalage droit\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    unsigned int a = 0xA5;\n    unsigned int b = 0x0F;\n    printf(\"a        = 0x%02X\\n\", a);\n    printf(\"b        = 0x%02X\\n\", b);\n    printf(\"a AND b  = 0x%02X\\n\", a & b);\n    printf(\"a OR  b  = 0x%02X\\n\", a | b);\n    printf(\"a XOR b  = 0x%02X\\n\", a ^ b);\n    printf(\"NOT a    = 0x%02X\\n\", ____); // (~a) masqué à 8 bits\n    printf(\"a << 2   = 0x%02X\\n\", ____); // décalage gauche masqué\n    printf(\"a >> 2   = 0x%02X\\n\", ____);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    unsigned int a = 0xA5;\n    unsigned int b = 0x0F;\n    printf(\"a        = 0x%02X\\n\", a);\n    printf(\"b        = 0x%02X\\n\", b);\n    printf(\"a AND b  = 0x%02X\\n\", ____);\n    printf(\"a OR  b  = 0x%02X\\n\", ____);\n    printf(\"a XOR b  = 0x%02X\\n\", ____);\n    printf(\"NOT a    = 0x%02X\\n\", ____);\n    printf(\"a << 2   = 0x%02X\\n\", ____);\n    printf(\"a >> 2   = 0x%02X\\n\", ____);\n    return 0;\n}",
+    "#include <stdio.h>\n\n// a=0xA5, b=0x0F\n// Affichez: AND=0x05, OR=0xAF, XOR=0xAA, NOT=0x5A, <<2=0x94, >>2=0x29\nint main(void) {\n    unsigned int a = 0xA5;\n    unsigned int b = 0x0F;\n    // TODO: afficher les 8 lignes\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}
