@@ -1,0 +1,163 @@
+{
+  "id": "mq-03",
+  "subject": "message_queues",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "File de messages : dispatch FIFO multi-type avec compteur",
+  "description": "NSY103 — Un dispatcher traite les messages dans l'ordre FIFO mais compte par type. Enfilez task-A (t1), alert-B (t2), task-C (t1). Défilez dans l'ordre et comptez les occurrences par type.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nvoid dispatch_all(void) {\n    while (qhead < qtail) {\n        MsgBuf *m = &queue[qhead++];\n        type_count[m->____]++;\n        printf(\"[%ld] %s\\n\", m->____, m->mtext);\n    }\n}\n\nint main(void) {\n    msgsnd_sim(1, \"task-A\");\n    msgsnd_sim(2, \"alert-B\");\n    msgsnd_sim(____, \"task-C\");\n    dispatch_all();\n    printf(\"type1=%d type2=%d\\n\", type_count[1], type_count[2]);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nvoid dispatch_all(void) {\n    while (qhead < qtail) {\n        MsgBuf *m = &queue[qhead++];\n        type_count[m->mtype]++;\n        printf(\"[%ld] %s\\n\", m->mtype, m->mtext);\n    }\n}\n\nint main(void) {\n    msgsnd_sim(1, \"task-A\");\n    msgsnd_sim(2, \"alert-B\");\n    msgsnd_sim(1, \"task-C\");\n    dispatch_all();\n    printf(\"type1=%d type2=%d\\n\", type_count[1], type_count[2]);\n    return 0;\n}",
+  "hints": [
+    "Dans dispatch_all, `m->mtype` est à la fois l'index pour type_count[] et la valeur à afficher dans printf",
+    "type_count est indexé par mtype directement : type_count[m->mtype]++ incrémente le bon compteur",
+    "Le troisième message est de type 1 comme task-A — vérifiez que type1=2 dans la sortie finale"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "[1] task-A\n[2] alert-B\n[1] task-C\ntype1=2 type2=1\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "msgsnd × 3 : [t1:task-A, t2:alert-B, t1:task-C]",
+        "nodes": [
+          {
+            "id": "q",
+            "label": "queue\n[t1,t2,t1]"
+          },
+          {
+            "id": "cnt",
+            "label": "type_count\n[0,0,0]"
+          }
+        ],
+        "edges": []
+      },
+      {
+        "label": "dispatch [1] task-A — type_count[1]→1",
+        "nodes": [
+          {
+            "id": "q",
+            "label": "queue[0]\nmtype=1 task-A"
+          },
+          {
+            "id": "cnt",
+            "label": "type_count\n[0,1,0]"
+          },
+          {
+            "id": "out",
+            "label": "stdout\n[1] task-A"
+          }
+        ],
+        "edges": [
+          {
+            "source": "q",
+            "target": "cnt",
+            "label": "type_count[1]++"
+          },
+          {
+            "source": "q",
+            "target": "out",
+            "label": "printf"
+          }
+        ]
+      },
+      {
+        "label": "dispatch [2] alert-B — type_count[2]→1",
+        "nodes": [
+          {
+            "id": "q",
+            "label": "queue[1]\nmtype=2 alert-B"
+          },
+          {
+            "id": "cnt",
+            "label": "type_count\n[0,1,1]"
+          },
+          {
+            "id": "out",
+            "label": "stdout\n[2] alert-B"
+          }
+        ],
+        "edges": [
+          {
+            "source": "q",
+            "target": "cnt",
+            "label": "type_count[2]++"
+          },
+          {
+            "source": "q",
+            "target": "out",
+            "label": "printf"
+          }
+        ]
+      },
+      {
+        "label": "dispatch [1] task-C — type_count[1]→2 → printf type1=2 type2=1",
+        "nodes": [
+          {
+            "id": "q",
+            "label": "queue[2]\nmtype=1 task-C"
+          },
+          {
+            "id": "cnt",
+            "label": "type_count\n[0,2,1]"
+          },
+          {
+            "id": "out",
+            "label": "stdout\ntype1=2 type2=1"
+          }
+        ],
+        "edges": [
+          {
+            "source": "q",
+            "target": "cnt",
+            "label": "type_count[1]++"
+          },
+          {
+            "source": "cnt",
+            "target": "out",
+            "label": "type1=2 type2=1"
+          }
+        ]
+      }
+    ]
+  },
+  "prerequisites": [
+    "mq-02"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "FIFO global + comptage par type = monitoring de trafic réseau ou dispatch de tâches",
+  "common_mistake": "Implémenter un déqueue global (qhead++) sans compteur par type — perd le monitoring",
+  "kc_ids": [
+    "KC-C12"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\n// ★ Stage 0 — Exemple complet\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};  // ★ compteur indexé par mtype\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nvoid dispatch_all(void) {\n    while (qhead < qtail) {\n        MsgBuf *m = &queue[qhead++];     // ★ FIFO : avancer qhead\n        type_count[m->mtype]++;          // ★ compter par type\n        printf(\"[%ld] %s\\n\", m->mtype, m->mtext); // ★ afficher\n    }\n}\n\nint main(void) {\n    msgsnd_sim(1, \"task-A\");   // ★ type 1\n    msgsnd_sim(2, \"alert-B\");  // ★ type 2\n    msgsnd_sim(1, \"task-C\");   // ★ type 1 à nouveau\n    dispatch_all();\n    printf(\"type1=%d type2=%d\\n\", type_count[1], type_count[2]); // ★ bilan\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nvoid dispatch_all(void) {\n    while (qhead < qtail) {\n        MsgBuf *m = &queue[qhead++];\n        type_count[m->mtype]++;\n        printf(\"[%ld] %s\\n\", m->mtype, m->mtext);\n    }\n}\n\nint main(void) {\n    msgsnd_sim(1, \"task-A\");\n    msgsnd_sim(2, \"alert-B\");\n    msgsnd_sim(____, \"task-C\");  // même type que task-A\n    dispatch_all();\n    printf(\"type1=%d type2=%d\\n\", type_count[1], type_count[2]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nvoid dispatch_all(void) {\n    while (qhead < qtail) {\n        MsgBuf *m = &queue[qhead++];\n        type_count[m->____]++;\n        printf(\"[%ld] %s\\n\", m->____, m->mtext);\n    }\n}\n\nint main(void) {\n    msgsnd_sim(1, \"task-A\");\n    msgsnd_sim(2, \"alert-B\");\n    msgsnd_sim(____, \"task-C\");\n    dispatch_all();\n    printf(\"type1=%d type2=%d\\n\", type_count[1], type_count[2]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 32\n#define QUEUE_LEN 8\n#define MAX_TYPE 3\n\ntypedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\nint type_count[MAX_TYPE + 1] = {0};\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\n// Implémentez dispatch_all(void) :\n//   FIFO sur qhead<qtail, pointer sur &queue[qhead++]\n//   incrémenter type_count[m->mtype]\n//   printf \"[mtype] mtext\\n\"\n\nint main(void) {\n    // Enfilez type=1 \"task-A\", type=2 \"alert-B\", type=1 \"task-C\"\n    // Appelez dispatch_all()\n    // Affichez \"type1=X type2=Y\" avec les compteurs\n    // Sortie : \"[1] task-A\\n[2] alert-B\\n[1] task-C\\ntype1=2 type2=1\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "omnicorp",
+    "clientName": "OmniCorp",
+    "contactEmail": "cto@omnicorp.sys",
+    "tier": 4,
+    "receivedTime": "09:30",
+    "subject": "Monitoring trafic réseau — dispatch FIFO avec comptage par type",
+    "incidentEmail": "Directeur technique,\n\nNotre infrastructure de monitoring doit dispatcher les messages dans l'ordre FIFO tout en maintenant des compteurs par type pour l'analyse de trafic.\n\nImplémente dispatch_all : FIFO global (qhead++) + type_count[mtype]++ + affichage. Résultat attendu : type1=2 type2=1.\n\nCTO @ OmniCorp",
+    "payout": 400,
+    "successEmail": "Monitoring opérationnel. Le dispatch FIFO avec comptage par type est exactement ce qu'il faut pour notre système d'analyse de trafic réseau.\n\nOmniCorp CTO",
+    "failureEmail": "Les compteurs ou l'ordre FIFO ne sont pas corrects. Vérifie type_count[m->mtype]++ et que qhead avance bien dans dispatch_all.\n\nCTO @ OmniCorp",
+    "syscallsInvolved": [
+      "msgsnd",
+      "msgrcv",
+      "msgget"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": [
+      "mq-02"
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "sigset-ops-01",
+  "subject": "signals",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Manipulation de sigset_t",
+  "description": "NSY103 — sigset_t est un ensemble de signaux (bitmask). Les fonctions sigemptyset, sigfullset, sigaddset, sigdelset, sigismember permettent de manipuler cet ensemble.\n\nConstituez un masque incluant SIGINT, SIGTERM, SIGCHLD, puis testez sigismember.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
+  "starter_code": "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    ____(____);  // initialise à vide\n    ____(____,  SIGINT);\n    ____(____,  SIGTERM);\n    ____(____,  SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM);  // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <signal.h>\nint main(void) {\n    sigset_t set;\n    sigemptyset(&set);\n    sigaddset(&set, SIGINT);\n    sigaddset(&set, SIGTERM);\n    sigaddset(&set, SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    sigdelset(&set, SIGTERM);\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
+  "hints": [
+    "sigemptyset(&set); // initialise à vide — TOUJOURS faire en premier",
+    "sigaddset(&set, SIGINT); // ajoute SIGINT",
+    "sigismember(&set, SIGTERM) retourne 1 si présent, 0 sinon"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "SIGINT  membre: 1\nSIGTERM membre: 1\nSIGCHLD membre: 1\nSIGKILL membre: 0\nSIGUSR1 membre: 0\nSIGTERM apres del: 0\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "sigemptyset — set vide",
+        "stack": [
+          {"name": "set", "value": "0x0000...0000 (tous bits à 0)"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "sigaddset SIGINT(2), SIGTERM(15), SIGCHLD(17)",
+        "stack": [
+          {"name": "set", "value": "bit2=1, bit15=1, bit17=1"},
+          {"name": "SIGKILL(9)", "value": "bit9=0 → membre: 0"},
+          {"name": "SIGUSR1(10)", "value": "bit10=0 → membre: 0"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "sigdelset SIGTERM(15)",
+        "stack": [
+          {"name": "set", "value": "bit15=0 (retiré)"},
+          {"name": "SIGTERM membre", "value": "0"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": ["signal-constants-01"],
+  "exercise_type": "complete",
+  "key_concept": "sigemptyset vide l'ensemble, sigaddset ajoute, sigismember teste — ce sont des opérations bit à bit",
+  "common_mistake": "Oublier sigemptyset() avant de commencer — sigset_t non initialisée a un contenu aléatoire",
+  "kc_ids": ["KC-C08"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <signal.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    sigset_t set;\n    sigemptyset(&set);        // ★ TOUJOURS initialiser avant d'utiliser\n    sigaddset(&set, SIGINT);  // ★ ajoute SIGINT (2) au masque\n    sigaddset(&set, SIGTERM); // ★ ajoute SIGTERM (15)\n    sigaddset(&set, SIGCHLD); // ★ ajoute SIGCHLD (17)\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));  // ★ 1 = présent\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL)); // ★ 0 = absent\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    sigdelset(&set, SIGTERM); // ★ retire SIGTERM du masque\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM)); // ★ 0\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    sigemptyset(&set);\n    sigaddset(&set, SIGINT);\n    sigaddset(&set, SIGTERM);\n    sigaddset(&set, SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM); // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    ____(____);  // initialise à vide\n    ____(____,  SIGINT);\n    ____(____,  SIGTERM);\n    ____(____,  SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM);  // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    // sigset_t set; sigemptyset d'abord\n    // Ajouter SIGINT, SIGTERM, SIGCHLD\n    // Tester avec sigismember: SIGINT/SIGTERM/SIGCHLD=1, SIGKILL/SIGUSR1=0\n    // sigdelset(SIGTERM), retester SIGTERM=0\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

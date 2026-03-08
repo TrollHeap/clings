@@ -1,0 +1,136 @@
+{
+  "id": "ptr-arith-01",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Arithmétique de pointeurs sur tableau",
+  "description": "NSY103 — L'arithmétique de pointeurs permet de parcourir des tableaux efficacement. `p + i` pointe vers le i-ième élément après p.\n\nComplétez `sum_array()` qui additionne les éléments d'un tableau `int[]` via arithmétique de pointeurs (sans crochets `[]`).",
+  "starter_code": "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    int sum = ____;\n    for (int i = 0; i < ____; i++) {\n        sum += ____;\n    }\n    return sum;\n}\n\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nint sum_array(const int *arr, int n) {\n    int sum = 0;\n    for (int i = 0; i < n; i++) {\n        sum += *(arr + i);\n    }\n    return sum;\n}\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+  "hints": [
+    "Dans la boucle, utilisez `*(arr + i)` pour accéder à l'élément i",
+    "La condition d'arrêt : `i < n`",
+    "Initialisez `sum = 0` avant la boucle"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Somme : 150\nElement 2 : 30\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Tableau nums en mémoire",
+        "stack": [
+          {
+            "name": "nums[0]",
+            "value": "10"
+          },
+          {
+            "name": "nums[1]",
+            "value": "20"
+          },
+          {
+            "name": "nums[2]",
+            "value": "30"
+          },
+          {
+            "name": "nums[3]",
+            "value": "40"
+          },
+          {
+            "name": "nums[4]",
+            "value": "50"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "nums[] est un tableau local de 5 ints contigus sur la pile — 20 octets. Lors du passage à sum_array, nums décroît en pointeur vers nums[0].",
+        "step_label": "Tableau nums en mémoire"
+      },
+      {
+        "label": "Pointeur arr avance (i=2)",
+        "stack": [
+          {
+            "name": "nums[0]",
+            "value": "10"
+          },
+          {
+            "name": "nums[1]",
+            "value": "20"
+          },
+          {
+            "name": "nums[2]",
+            "value": "30"
+          },
+          {
+            "name": "nums[3]",
+            "value": "40"
+          },
+          {
+            "name": "nums[4]",
+            "value": "50"
+          },
+          {
+            "name": "arr",
+            "value": "→nums[0]"
+          },
+          {
+            "name": "i",
+            "value": "2"
+          },
+          {
+            "name": "*(arr+2)",
+            "value": "30"
+          }
+        ],
+        "heap": [],
+        "arrows": [
+          {
+            "from": "arr",
+            "to": "nums[0]",
+            "label": "i=2→nums[2]"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": false
+          },
+          {
+            "function_name": "sum_array",
+            "args": "arr=nums, n=5",
+            "is_active": true
+          }
+        ],
+        "explanation": "Dans sum_array, arr+2 décale le pointeur de 2 * sizeof(int) = 8 octets — il pointe vers nums[2]=30. *(arr+i) et arr[i] sont strictement équivalents.",
+        "step_label": "Pointeur arr avance (i=2)"
+      }
+    ]
+  },
+  "prerequisites": [
+    "ptr-deref-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "p+i == &arr[i], *(p+i) == arr[i]",
+  "common_mistake": "Confondre p++ (modifie p) avec *(p+i) (lit sans modifier)",
+  "kc_ids": [
+    "KC-C01"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\n// ★ p+i est équivalent à &arr[i]\n// ★ *(p+i) est équivalent à arr[i]\nint sum_array(const int *arr, int n) {\n    int sum = 0;\n    for (int i = 0; i < n; i++) {\n        sum += *(arr + i); // ★ arithmétique de pointeurs\n    }\n    return sum;\n}\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2)); // ★ accès sans crochets\n    return 0;\n}",
+    "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    int sum = 0;\n    for (int i = 0; i < n; i++) {\n        sum += ____; // accès par arithmétique de pointeurs\n    }\n    return sum;\n}\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+    "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    int sum = ____;\n    for (int i = 0; i < ____; i++) {\n        sum += ____;\n    }\n    return sum;\n}\n\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+    "#include <stdio.h>\n\n// Implémentez sum_array qui additionne arr[0..n-1]\n// via arithmétique de pointeurs (*(arr+i)), sans crochets\nint sum_array(const int *arr, int n) {\n    return 0; // TODO\n}\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    printf(\"Somme : %d\\n\", sum_array(nums, 5));\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+    "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    return 0;\n}\nint main(void) {\n    return 0;\n}"
+  ]
+}

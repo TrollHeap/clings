@@ -1,0 +1,65 @@
+{
+  "id": "file-binary-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "fwrite/fread binaire avec structs",
+  "description": "NSY103 — fwrite() et fread() opèrent en binaire : ils copient directement les octets d'une struct. Plus rapide que le texte, mais non-portable entre architectures.\n\nÉcrivez 3 structs ProcessRecord dans un buffer binaire via fwrite, puis relisez-les avec fread.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\nint main(void) {\n    char buf[1024];\n    memset(buf, 0, sizeof(buf));\n    FILE *f = fmemopen(buf, sizeof(buf), \"w+\");\n    if (!f) return 1;\n    ProcessRecord procs[] = {\n        {1,    0,    \"init\"},\n        {42,   1000, \"bash\"},\n        {1337, 1000, \"kernelforge\"}\n    };\n    for (int i = 0; i < 3; i++)\n        fwrite(____, ____, ____, f);\n    rewind(f);\n    ProcessRecord r;\n    printf(\"pid  uid  cmd\\n\");\n    while (fread(____, ____, ____, f) == 1)\n        printf(\"%-4d %-4d %s\\n\", r.pid, r.uid, r.cmd);\n    fclose(f);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\nint main(void) {\n    char buf[1024];\n    memset(buf, 0, sizeof(buf));\n    FILE *f = fmemopen(buf, sizeof(buf), \"w+\");\n    if (!f) return 1;\n    ProcessRecord procs[] = {\n        {1,    0, \"init\"},\n        {42,   1000, \"bash\"},\n        {1337, 1000, \"kernelforge\"}\n    };\n    for (int i = 0; i < 3; i++)\n        fwrite(&procs[i], sizeof(ProcessRecord), 1, f);\n    rewind(f);\n    ProcessRecord r;\n    printf(\"pid  uid  cmd\\n\");\n    while (fread(&r, sizeof(ProcessRecord), 1, f) == 1)\n        printf(\"%-4d %-4d %s\\n\", r.pid, r.uid, r.cmd);\n    fclose(f);\n    return 0;\n}",
+  "hints": [
+    "char buf[1024] = {0}; FILE *fw = fmemopen(buf, sizeof(buf), \"w+\");",
+    "fwrite(&record, sizeof(record), 1, fw);",
+    "Rembobiner : rewind(fw); ou fseek(fw, 0, SEEK_SET);"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "pid  uid  cmd\n1    0    init\n42   1000 bash\n1337 1000 kernelforge\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "fmemopen buf en mode w+",
+        "stack": [
+          {"name": "buf[1024]", "value": "(zéros)"},
+          {"name": "f", "value": "FILE* (w+)"},
+          {"name": "procs[3]", "value": "structs ProcessRecord"}
+        ],
+        "heap": [],
+        "arrows": [{"from": "f", "to": "buf[1024]"}]
+      },
+      {
+        "label": "fwrite 3 structs en binaire",
+        "stack": [
+          {"name": "buf", "value": "[octets bruts pid+uid+cmd x3]"},
+          {"name": "position", "value": "3 * sizeof(ProcessRecord)"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "rewind puis fread",
+        "stack": [
+          {"name": "position", "value": "0 (remis au début)"},
+          {"name": "r", "value": "ProcessRecord lu depuis buf"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": ["file-read-lines-01"],
+  "exercise_type": "complete",
+  "key_concept": "fwrite(&s, sizeof(s), 1, f) écrit sizeof(s) octets bruts",
+  "common_mistake": "Mélanger mode texte (\"w\") et binaire : sur Windows crée des problèmes de \\r\\n. Utiliser \"wb\"/\"rb\" en binaire.",
+  "kc_ids": ["KC-C06"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    char buf[1024];\n    memset(buf, 0, sizeof(buf));\n    FILE *f = fmemopen(buf, sizeof(buf), \"w+\"); // ★ w+ = lecture+écriture\n    if (!f) return 1;\n    ProcessRecord procs[] = {\n        {1,    0,    \"init\"},\n        {42,   1000, \"bash\"},\n        {1337, 1000, \"kernelforge\"}\n    };\n    for (int i = 0; i < 3; i++)\n        fwrite(&procs[i], sizeof(ProcessRecord), 1, f); // ★ écriture binaire\n    rewind(f); // ★ retour au début pour relire\n    ProcessRecord r;\n    printf(\"pid  uid  cmd\\n\");\n    while (fread(&r, sizeof(ProcessRecord), 1, f) == 1) // ★ lecture binaire\n        printf(\"%-4d %-4d %s\\n\", r.pid, r.uid, r.cmd);\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\nint main(void) {\n    char buf[1024];\n    memset(buf, 0, sizeof(buf));\n    FILE *f = fmemopen(buf, sizeof(buf), \"w+\");\n    if (!f) return 1;\n    ProcessRecord procs[] = {\n        {1,    0,    \"init\"},\n        {42,   1000, \"bash\"},\n        {1337, 1000, \"kernelforge\"}\n    };\n    for (int i = 0; i < 3; i++)\n        fwrite(&procs[i], sizeof(ProcessRecord), 1, f);\n    rewind(f);\n    ProcessRecord r;\n    printf(\"pid  uid  cmd\\n\");\n    while (fread(____, ____, ____, f) == 1) // &r, sizeof(ProcessRecord), 1\n        printf(\"%-4d %-4d %s\\n\", r.pid, r.uid, r.cmd);\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\nint main(void) {\n    char buf[1024];\n    memset(buf, 0, sizeof(buf));\n    FILE *f = fmemopen(buf, sizeof(buf), \"w+\");\n    if (!f) return 1;\n    ProcessRecord procs[] = {\n        {1,    0,    \"init\"},\n        {42,   1000, \"bash\"},\n        {1337, 1000, \"kernelforge\"}\n    };\n    for (int i = 0; i < 3; i++)\n        fwrite(____, ____, ____, f);\n    rewind(f);\n    ProcessRecord r;\n    printf(\"pid  uid  cmd\\n\");\n    while (fread(____, ____, ____, f) == 1)\n        printf(\"%-4d %-4d %s\\n\", r.pid, r.uid, r.cmd);\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\nint main(void) {\n    // buf[1024] + fmemopen en mode \"w+\"\n    // fwrite 3 ProcessRecord en binaire\n    // rewind puis fread en boucle\n    // Afficher \"pid  uid  cmd\" puis chaque struct\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

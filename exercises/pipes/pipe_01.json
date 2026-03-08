@@ -1,0 +1,119 @@
+{
+  "id": "pipe-01",
+  "subject": "pipes",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Pipe anonyme : écriture et lecture",
+  "description": "NSY103 — Un pipe crée deux descripteurs de fichier : fd[0] (lecture) et fd[1] (écriture). Ce mécanisme IPC est unidirectionnel. Sans fork, un seul processus peut écrire dans fd[1] puis lire dans fd[0].\n\nCréez un pipe, écrivez 'hello pipe', fermez fd[1], puis lisez et affichez le message.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    ____(____);\n    const char *msg = \"hello pipe\";\n    write(fd[____], msg, strlen(msg));\n    close(fd[____]);\n    char buf[32];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[____]);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    const char *msg = \"hello pipe\";\n    write(fd[1], msg, strlen(msg));\n    close(fd[1]);\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
+  "hints": [
+    "pipe(fd) remplit fd[0] (lecture) et fd[1] (écriture)",
+    "Écrire dans fd[1], lire depuis fd[0]",
+    "Fermer fd[1] avant de lire signale EOF au lecteur"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Received: hello pipe\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "pipe(fd) — deux descripteurs créés",
+        "nodes": [
+          {
+            "id": "w",
+            "label": "fd[1]\n(write)"
+          },
+          {
+            "id": "r",
+            "label": "fd[0]\n(read)"
+          }
+        ],
+        "edges": [
+          {
+            "source": "w",
+            "target": "r",
+            "label": "kernel buffer"
+          }
+        ]
+      },
+      {
+        "label": "write(fd[1], \"hello pipe\", 10)",
+        "nodes": [
+          {
+            "id": "msg",
+            "label": "\"hello pipe\""
+          },
+          {
+            "id": "buf",
+            "label": "kernel buffer"
+          }
+        ],
+        "edges": [
+          {
+            "source": "msg",
+            "target": "buf",
+            "label": "10 bytes"
+          }
+        ]
+      },
+      {
+        "label": "read(fd[0], buf, 31) — récupère le message",
+        "nodes": [
+          {
+            "id": "buf",
+            "label": "kernel buffer"
+          },
+          {
+            "id": "out",
+            "label": "buf[]"
+          }
+        ],
+        "edges": [
+          {
+            "source": "buf",
+            "target": "out",
+            "label": "n bytes"
+          }
+        ]
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "fd[0]=lecture, fd[1]=écriture ; fermer l'extrémité écriture signale EOF",
+  "common_mistake": "Lire avant de fermer fd[1] : si le kernel buffer est plein, read peut bloquer indéfiniment",
+  "kc_ids": [
+    "KC-C10"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int fd[2];\n    pipe(fd);                              // ★ fd[0]=lecture fd[1]=écriture\n    const char *msg = \"hello pipe\";\n    write(fd[1], msg, strlen(msg));        // ★ écrire dans l'extrémité écriture\n    close(fd[1]);                          // ★ signaler EOF\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf) - 1); // ★ lire depuis l'extrémité lecture\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    const char *msg = \"hello pipe\";\n    write(fd[1], msg, strlen(msg));\n    close(fd[1]);\n    char buf[32];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1); // quel fd?\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    ____(____);\n    const char *msg = \"hello pipe\";\n    write(fd[____], msg, strlen(msg));\n    close(fd[____]);\n    char buf[32];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[____]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    // Créez un pipe, écrivez \"hello pipe\" dans fd[1]\n    // Fermez fd[1], lisez depuis fd[0], affichez \"Received: hello pipe\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "hobbylab",
+    "clientName": "HobbyLab",
+    "contactEmail": "dave@hobbylab.sys",
+    "tier": 1,
+    "receivedTime": "08:20",
+    "subject": "IPC basique — pipe anonyme write/read",
+    "incidentEmail": "Hey,\n\nJ'essaie de faire communiquer deux parties de mon programme via un pipe UNIX. Montre-moi comment écrire dans p[1] et lire depuis p[0] avec write() et read().\n\nDave @ HobbyLab",
+    "payout": 100,
+    "successEmail": "Top ! Le pipe fonctionne parfaitement. Je comprends maintenant comment p[0] et p[1] sont les deux extrémités.\n\nDave",
+    "failureEmail": "La sortie n'est pas correcte. Assure-toi d'écrire dans p[1] et lire depuis p[0].\n\nDave",
+    "syscallsInvolved": [
+      "pipe",
+      "write",
+      "read",
+      "close"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": []
+  }
+}

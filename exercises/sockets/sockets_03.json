@@ -1,0 +1,129 @@
+{
+  "id": "sockets-03",
+  "subject": "sockets",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Datagramme réseau : struct NetMsg avec src, dst, payload",
+  "description": "NSY103 — Un datagramme réseau contient typiquement l'adresse source, l'adresse destination et un payload. La simulation sans socket() permet de pratiquer la construction et l'affichage de structures réseau complètes.\n\nConstituez un NetMsg avec src=10.0.0.1:1234, dst=10.0.0.2:5678, payload='ping', et affichez le tout.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\ntypedef struct {\n    struct sockaddr_in src;\n    struct sockaddr_in dst;\n    char payload[64];\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    memset(&msg, 0, sizeof(msg));\n    msg.src.sin_family = AF_INET;\n    msg.src.sin_port = htons(____);               // port 1234\n    inet_pton(AF_INET, \"10.0.0.1\", &msg.src.sin_addr);\n    msg.dst.sin_family = AF_INET;\n    msg.dst.sin_port = htons(____);               // port 5678\n    inet_pton(AF_INET, \"10.0.0.2\", &msg.dst.sin_addr);\n    strncpy(msg.____, \"ping\", sizeof(msg.payload) - 1);  // champ payload\n    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &msg.src.sin_addr, src_ip, sizeof(src_ip));\n    inet_ntop(AF_INET, &msg.dst.sin_addr, dst_ip, sizeof(dst_ip));\n    printf(\"From: %s:%d -> To: %s:%d\\n\",\n           src_ip, ntohs(msg.src.sin_port),\n           dst_ip, ntohs(msg.dst.sin_port));\n    printf(\"Payload: %s\\n\", msg.payload);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\ntypedef struct {\n    struct sockaddr_in src;\n    struct sockaddr_in dst;\n    char payload[64];\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    memset(&msg, 0, sizeof(msg));\n    msg.src.sin_family = AF_INET;\n    msg.src.sin_port = htons(1234);\n    inet_pton(AF_INET, \"10.0.0.1\", &msg.src.sin_addr);\n    msg.dst.sin_family = AF_INET;\n    msg.dst.sin_port = htons(5678);\n    inet_pton(AF_INET, \"10.0.0.2\", &msg.dst.sin_addr);\n    strncpy(msg.payload, \"ping\", sizeof(msg.payload) - 1);\n    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &msg.src.sin_addr, src_ip, sizeof(src_ip));\n    inet_ntop(AF_INET, &msg.dst.sin_addr, dst_ip, sizeof(dst_ip));\n    printf(\"From: %s:%d -> To: %s:%d\\n\",\n           src_ip, ntohs(msg.src.sin_port),\n           dst_ip, ntohs(msg.dst.sin_port));\n    printf(\"Payload: %s\\n\", msg.payload);\n    return 0;\n}",
+  "hints": [
+    "htons(1234) convertit le port source en big-endian réseau",
+    "msg.payload est un champ char[64] dans la struct NetMsg",
+    "ntohs(msg.src.sin_port) reconvertit pour l'affichage : htons(1234) → ntohs → 1234"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "From: 10.0.0.1:1234 -> To: 10.0.0.2:5678\nPayload: ping\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "memset(&msg, 0) — NetMsg zéro-initialisé",
+        "stack": [
+          {
+            "name": "msg.src.sin_port",
+            "value": "0"
+          },
+          {
+            "name": "msg.dst.sin_port",
+            "value": "0"
+          },
+          {
+            "name": "msg.payload",
+            "value": "''"
+          }
+        ],
+        "heap": []
+      },
+      {
+        "label": "src: 10.0.0.1:1234 configuré",
+        "stack": [
+          {
+            "name": "msg.src.sin_port",
+            "value": "htons(1234)"
+          },
+          {
+            "name": "msg.src.sin_addr",
+            "value": "10.0.0.1"
+          }
+        ],
+        "heap": []
+      },
+      {
+        "label": "dst: 10.0.0.2:5678 + payload='ping'",
+        "stack": [
+          {
+            "name": "msg.dst.sin_port",
+            "value": "htons(5678)"
+          },
+          {
+            "name": "msg.dst.sin_addr",
+            "value": "10.0.0.2"
+          },
+          {
+            "name": "msg.payload",
+            "value": "'ping'"
+          }
+        ],
+        "heap": []
+      },
+      {
+        "label": "printf From:...To:... + Payload",
+        "stack": [
+          {
+            "name": "inet_ntop src",
+            "value": "10.0.0.1"
+          },
+          {
+            "name": "inet_ntop dst",
+            "value": "10.0.0.2"
+          }
+        ],
+        "heap": []
+      }
+    ]
+  },
+  "prerequisites": [
+    "sockets-02"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "struct imbriquée {sockaddr_in src, dst; char payload[]} = représentation d'un datagramme UDP ; sendto/recvfrom transporteraient cette struct en vrai",
+  "common_mistake": "Oublier memset(&msg, 0, sizeof(msg)) → champs sin_zero[] garbage dans sockaddr_in → comportement indéfini",
+  "kc_ids": [
+    "KC-C14"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\n// ★ Stage 0 — Exemple complet\ntypedef struct {\n    struct sockaddr_in src;     // ★ adresse source\n    struct sockaddr_in dst;     // ★ adresse destination\n    char payload[64];           // ★ données transportées\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    memset(&msg, 0, sizeof(msg));              // ★ TOUJOURS zéro-init (sin_zero[] garbage sinon)\n    msg.src.sin_family = AF_INET;\n    msg.src.sin_port = htons(1234);            // ★ port source → big-endian\n    inet_pton(AF_INET, \"10.0.0.1\", &msg.src.sin_addr); // ★ IP string → binaire\n    msg.dst.sin_family = AF_INET;\n    msg.dst.sin_port = htons(5678);            // ★ port destination → big-endian\n    inet_pton(AF_INET, \"10.0.0.2\", &msg.dst.sin_addr);\n    strncpy(msg.payload, \"ping\", sizeof(msg.payload) - 1); // ★ copie sécurisée\n    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &msg.src.sin_addr, src_ip, sizeof(src_ip));\n    inet_ntop(AF_INET, &msg.dst.sin_addr, dst_ip, sizeof(dst_ip));\n    printf(\"From: %s:%d -> To: %s:%d\\n\",\n           src_ip, ntohs(msg.src.sin_port),   // ★ ntohs pour afficher\n           dst_ip, ntohs(msg.dst.sin_port));\n    printf(\"Payload: %s\\n\", msg.payload);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\ntypedef struct {\n    struct sockaddr_in src;\n    struct sockaddr_in dst;\n    char payload[64];\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    memset(&msg, 0, sizeof(msg));\n    msg.src.sin_family = AF_INET;\n    msg.src.sin_port = htons(1234);\n    inet_pton(AF_INET, \"10.0.0.1\", &msg.src.sin_addr);\n    msg.dst.sin_family = AF_INET;\n    msg.dst.sin_port = htons(5678);\n    inet_pton(AF_INET, \"10.0.0.2\", &msg.dst.sin_addr);\n    strncpy(msg.____, \"ping\", sizeof(msg.payload) - 1);  // quel champ?\n    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &msg.src.sin_addr, src_ip, sizeof(src_ip));\n    inet_ntop(AF_INET, &msg.dst.sin_addr, dst_ip, sizeof(dst_ip));\n    printf(\"From: %s:%d -> To: %s:%d\\n\",\n           src_ip, ntohs(msg.src.sin_port),\n           dst_ip, ntohs(msg.dst.sin_port));\n    printf(\"Payload: %s\\n\", msg.payload);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\ntypedef struct {\n    struct sockaddr_in src;\n    struct sockaddr_in dst;\n    char payload[64];\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    memset(&msg, 0, sizeof(msg));\n    msg.src.sin_family = AF_INET;\n    msg.src.sin_port = htons(____);               // port 1234\n    inet_pton(AF_INET, \"10.0.0.1\", &msg.src.sin_addr);\n    msg.dst.sin_family = AF_INET;\n    msg.dst.sin_port = htons(____);               // port 5678\n    inet_pton(AF_INET, \"10.0.0.2\", &msg.dst.sin_addr);\n    strncpy(msg.____, \"ping\", sizeof(msg.payload) - 1);  // champ payload\n    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];\n    inet_ntop(AF_INET, &msg.src.sin_addr, src_ip, sizeof(src_ip));\n    inet_ntop(AF_INET, &msg.dst.sin_addr, dst_ip, sizeof(dst_ip));\n    printf(\"From: %s:%d -> To: %s:%d\\n\",\n           src_ip, ntohs(msg.src.sin_port),\n           dst_ip, ntohs(msg.dst.sin_port));\n    printf(\"Payload: %s\\n\", msg.payload);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\ntypedef struct {\n    struct sockaddr_in src;\n    struct sockaddr_in dst;\n    char payload[64];\n} NetMsg;\n\nint main(void) {\n    NetMsg msg;\n    // Zéro-initialisez msg\n    // Configurez src: 10.0.0.1:1234 et dst: 10.0.0.2:5678\n    // Copiez \"ping\" dans msg.payload\n    // Affichez: \"From: 10.0.0.1:1234 -> To: 10.0.0.2:5678\" puis \"Payload: ping\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\nint main(void) {\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "omnicorp",
+    "clientName": "OmniCorp",
+    "contactEmail": "cto@omnicorp.sys",
+    "tier": 4,
+    "receivedTime": "10:00",
+    "subject": "Datagramme réseau — struct NetMsg src/dst/payload OmniCorp",
+    "incidentEmail": "Directeur technique,\n\nNotre infrastructure réseau doit manipuler des datagrammes complets avec adresse source, destination et payload. La struct NetMsg{src, dst, payload} représente un paquet UDP.\n\nConfigurez src=10.0.0.1:1234, dst=10.0.0.2:5678, payload='ping'. Affichez From/To/Payload.\n\nCTO @ OmniCorp",
+    "payout": 400,
+    "successEmail": "Datagramme validé. From:10.0.0.1:1234->To:10.0.0.2:5678 Payload:ping — notre couche réseau est opérationnelle.\n\nOmniCorp CTO",
+    "failureEmail": "Le datagramme n'est pas correctement construit. Vérifie htons() pour les ports, inet_pton pour les IPs, et strncpy pour le payload.\n\nCTO @ OmniCorp",
+    "syscallsInvolved": [
+      "sendto",
+      "recvfrom",
+      "htons",
+      "ntohs",
+      "inet_pton",
+      "inet_ntop"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": [
+      "sockets-02"
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "id": "file-read-lines-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Lire et parser des lignes avec fgets",
+  "description": "NSY103 — fgets(buf, size, f) lit une ligne depuis un FILE* (s'arrête à \\n ou EOF). Idéal pour parser des fichiers ligne par ligne.\n\nParsez un fichier /etc/passwd simulé (via fmemopen), extrayez login et UID.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    FILE *f = fmemopen((void *)data, strlen(data), \"r\");\n    if (!f) return 1;\n    char line[256], login[64];\n    int uid;\n    printf(\"login,uid\\n\");\n    while (fgets(____, ____, f)) {\n        line[strcspn(line, \"\\n\")] = ____;\n        if (sscanf(line, \"%63[^:]:%*[^:]:%d\", login, &uid) == 2)\n            printf(\"%s,%d\\n\", ____, ____);\n    }\n    fclose(f);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    FILE *f = fmemopen((void *)data, strlen(data), \"r\");\n    if (!f) return 1;\n    char line[256], login[64];\n    int uid;\n    printf(\"login,uid\\n\");\n    while (fgets(line, sizeof(line), f)) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%63[^:]:%*[^:]:%d\", login, &uid) == 2)\n            printf(\"%s,%d\\n\", login, uid);\n    }\n    fclose(f);\n    return 0;\n}",
+  "hints": [
+    "while (fgets(line, sizeof(line), f)) { /* traite line */ }",
+    "Retire le \\n : line[strcspn(line, \"\\n\")] = 0;",
+    "Parser avec sscanf(line, \"%63[^:]:%*[^:]:%d\", login, &uid);"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "login,uid\nroot,0\ndaemon,1\nalice,1000\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "fmemopen depuis data string",
+        "stack": [
+          {"name": "data", "value": "\"root:x:0:0...\""},
+          {"name": "f", "value": "FILE* (r)"},
+          {"name": "line[256]", "value": "(vide)"}
+        ],
+        "heap": [],
+        "arrows": [{"from": "f", "to": "data", "label": "lit"}]
+      },
+      {
+        "label": "fgets lit ligne 1",
+        "stack": [
+          {"name": "line", "value": "\"root:x:0:0:root:/root:/bin/bash\""},
+          {"name": "login", "value": "\"root\""},
+          {"name": "uid", "value": "0"}
+        ],
+        "heap": [],
+        "arrows": []
+      },
+      {
+        "label": "fgets lit ligne 3",
+        "stack": [
+          {"name": "line", "value": "\"alice:x:1000:1000:Alice:...\""},
+          {"name": "login", "value": "\"alice\""},
+          {"name": "uid", "value": "1000"}
+        ],
+        "heap": [],
+        "arrows": []
+      }
+    ]
+  },
+  "prerequisites": ["file-write-mem-01"],
+  "exercise_type": "complete",
+  "key_concept": "fgets inclut le \\n dans buf — souvent on le retire avec buf[strcspn(buf,\"\\n\")]=0",
+  "common_mistake": "Oublier que fgets ajoute \\0 mais garde \\n — comparaisons de chaînes échouent",
+  "kc_ids": ["KC-C06"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    FILE *f = fmemopen((void *)data, strlen(data), \"r\");\n    if (!f) return 1;\n    char line[256], login[64];\n    int uid;\n    printf(\"login,uid\\n\");\n    while (fgets(line, sizeof(line), f)) { // ★ lit jusqu'à \\n ou EOF\n        line[strcspn(line, \"\\n\")] = 0; // ★ retire le \\n trailing\n        if (sscanf(line, \"%63[^:]:%*[^:]:%d\", login, &uid) == 2) // ★ parse champ1:champ2(skip):champ3\n            printf(\"%s,%d\\n\", login, uid);\n    }\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    FILE *f = fmemopen((void *)data, strlen(data), \"r\");\n    if (!f) return 1;\n    char line[256], login[64];\n    int uid;\n    printf(\"login,uid\\n\");\n    while (fgets(line, sizeof(line), f)) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%63[^:]:%*[^:]:%d\", ____, ____) == 2) // login et &uid\n            printf(\"%s,%d\\n\", login, uid);\n    }\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    FILE *f = fmemopen((void *)data, strlen(data), \"r\");\n    if (!f) return 1;\n    char line[256], login[64];\n    int uid;\n    printf(\"login,uid\\n\");\n    while (fgets(____, ____, f)) {\n        line[strcspn(line, \"\\n\")] = ____;\n        if (sscanf(line, \"%63[^:]:%*[^:]:%d\", login, &uid) == 2)\n            printf(\"%s,%d\\n\", ____, ____);\n    }\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    const char *data =\n        \"root:x:0:0:root:/root:/bin/bash\\n\"\n        \"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\\n\"\n        \"alice:x:1000:1000:Alice:/home/alice:/bin/bash\\n\";\n    // fmemopen pour créer FILE* en lecture\n    // fgets ligne par ligne, retirer \\n\n    // sscanf pour extraire login (champ 1) et uid (champ 3)\n    // Afficher \"login,uid\\n\" puis chaque paire\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

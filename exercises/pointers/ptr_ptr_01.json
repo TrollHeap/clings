@@ -1,0 +1,128 @@
+{
+  "id": "ptr-ptr-01",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Double pointeur — swap via **pp",
+  "description": "NSY103 — Un pointeur vers un pointeur (`int **pp`) permet de modifier un pointeur depuis une fonction. Cela permet par exemple d'implémenter `swap` qui échange réellement les valeurs.\n\nImplémentez `swap(int *a, int *b)` qui échange les valeurs pointées, et démontrez l'utilisation de `int **pp`.",
+  "starter_code": "#include <stdio.h>\n\nvoid swap(____ *a, ____ *b) {\n    int tmp = ____;\n    *a = ____;\n    *b = ____;\n}\n\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(____, ____);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = ____;\n    printf(\"Via **pp : %d\\n\", ____);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = &p;\n    printf(\"Via **pp : %d\\n\", **pp);\n    return 0;\n}",
+  "hints": [
+    "Pour swap : `int tmp = *a; *a = *b; *b = tmp;`",
+    "Pour déclarer un pointeur vers pointeur : `int **pp = &p;`",
+    "`**pp` lit la valeur finale, `*pp` lit le pointeur intermédiaire"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Avant : x=10 y=20\nApres swap : x=20 y=10\nVia **pp : 99\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Avant swap",
+        "stack": [
+          {
+            "name": "x",
+            "value": "10"
+          },
+          {
+            "name": "y",
+            "value": "20"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "x et y sont des variables locales sur la pile. Pour échanger leurs valeurs depuis une fonction, il faut passer leurs adresses (&x, &y) — pas les valeurs.",
+        "step_label": "Avant swap"
+      },
+      {
+        "label": "Après swap(&x, &y)",
+        "stack": [
+          {
+            "name": "x",
+            "value": "20"
+          },
+          {
+            "name": "y",
+            "value": "10"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "swap(int *a, int *b) reçoit &x et &y. À l'intérieur, *a et *b déréférencent vers x et y dans main. L'échange via tmp modifie les valeurs originales — résultat visible dans main après le retour.",
+        "step_label": "Après swap(&x, &y)"
+      },
+      {
+        "label": "Double pointeur pp→p→val",
+        "stack": [
+          {
+            "name": "val",
+            "value": "99"
+          },
+          {
+            "name": "p",
+            "value": "→val"
+          },
+          {
+            "name": "pp",
+            "value": "→p"
+          }
+        ],
+        "heap": [],
+        "arrows": [
+          {
+            "from": "pp",
+            "to": "p",
+            "label": "*pp"
+          },
+          {
+            "from": "p",
+            "to": "val",
+            "label": "**pp"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "int **pp = &p — pp pointe vers p, qui pointe vers val. *pp donne p, **pp donne val=99. Chaque * ajoute un niveau de déréférencement.",
+        "step_label": "Double pointeur pp→p→val"
+      }
+    ]
+  },
+  "prerequisites": [
+    "ptr-deref-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "int **pp : pointe vers un pointeur vers int",
+  "common_mistake": "Passer int* au lieu de int** : la valeur du pointeur ne peut pas être modifiée depuis la fonction",
+  "kc_ids": [
+    "KC-C01"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n// ★ Stage 0 — Exemple complet\nvoid swap(int *a, int *b) {\n    int tmp = *a;  // ★ déréférencement\n    *a = *b;\n    *b = tmp;\n}\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);  // ★ passage par adresse\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = &p;  // ★ pointeur vers pointeur\n    printf(\"Via **pp : %d\\n\", **pp); // ★ double déréférencement\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = ____;\n    *b = ____;\n}\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = &p;\n    printf(\"Via **pp : %d\\n\", ____); // double déréférencement\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(____ *a, ____ *b) {\n    int tmp = ____;\n    *a = ____;\n    *b = ____;\n}\n\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(____, ____);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = ____;\n    printf(\"Via **pp : %d\\n\", ____);\n    return 0;\n}",
+    "#include <stdio.h>\n\n// Implémentez swap(int *a, int *b) qui échange *a et *b\n// Puis démontrez int **pp avec val=99, p=&val, pp=&p\nvoid swap(int *a, int *b) {\n    // TODO\n}\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    // TODO: appeler swap, puis démo **pp\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n}\nint main(void) {\n    return 0;\n}"
+  ]
+}
