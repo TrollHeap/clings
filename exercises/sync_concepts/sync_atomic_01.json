@@ -1,0 +1,59 @@
+{
+  "id": "sync-atomic-01",
+  "subject": "sync_concepts",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Opérations atomiques avec __atomic builtins",
+  "description": "NSY103 — Les builtins __atomic de GCC garantissent des opérations indivisibles sur des variables partagées, sans mutex. __atomic_add_fetch effectue une addition atomique et retourne la nouvelle valeur.\n\nUtilisez __atomic_add_fetch pour incrémenter un compteur de manière thread-safe avec deux threads.",
+  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\n\nvoid *increment(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 100000; i++) {\n        ____(____counter, 1, __ATOMIC_SEQ_CST);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Counter: %d\\n\", counter);\n    printf(\"Atomique: %s\\n\", counter == ____ ? \"OUI\" : \"NON\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\n\nvoid *increment(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 100000; i++) {\n        __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Counter: %d\\n\", counter);\n    printf(\"Atomique: %s\\n\", counter == 200000 ? \"OUI\" : \"NON\");\n    return 0;\n}",
+  "hints": [
+    "Le builtin est __atomic_add_fetch pour addition atomique",
+    "Le premier argument est l'adresse : &counter",
+    "Le résultat attendu est 200000 car les opérations sont atomiques"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Counter: 200000\nAtomique: OUI\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Opération atomique — indivisible",
+        "stack": [
+          {"name": "counter", "value": "0 (global)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Avec __atomic_add_fetch, chaque incrémentation est une instruction atomique : read-modify-write en une seule opération indivisible.",
+        "step_label": "Atomique"
+      },
+      {
+        "label": "Résultat garanti",
+        "stack": [
+          {"name": "counter", "value": "200000 (exact)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Contrairement à counter++, __atomic_add_fetch ne peut pas perdre d'incrémentation. Le résultat est toujours 200000.",
+        "step_label": "Résultat"
+      }
+    ]
+  },
+  "prerequisites": ["sync-race-01"],
+  "exercise_type": "complete",
+  "key_concept": "__atomic_add_fetch(&var, val, order) effectue var += val de manière atomique et retourne la nouvelle valeur",
+  "common_mistake": "Oublier le & devant la variable — __atomic_add_fetch prend un pointeur, pas une valeur",
+  "kc_ids": ["KC-C22"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Atomique : __atomic_sub_fetch pour décrémenter\n * On décrémente un compteur partagé de manière atomique.\n * ========================================================= */\nint shared_val = 1000;\n\nvoid *decrement_example(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 500; i++) {\n        __atomic_sub_fetch(&shared_val, 1, __ATOMIC_SEQ_CST);\n    }\n    return NULL;\n}\n\nvoid example_atomic_sub(void) {\n    pthread_t ta, tb;\n    pthread_create(&ta, NULL, decrement_example, NULL);\n    pthread_create(&tb, NULL, decrement_example, NULL);\n    pthread_join(ta, NULL);\n    pthread_join(tb, NULL);\n    printf(\"shared_val: %d (attendu: 0)\\n\", shared_val);\n}\n/* Résultat : shared_val vaut toujours exactement 0 */\n\n/* == VOTRE EXERCICE ========================================\n * Utilisez __atomic_add_fetch pour incrémenter counter.\n * Inspirez-vous de __atomic_sub_fetch ci-dessus.\n * ========================================================= */\n\nint counter = 0;\n\nvoid *increment(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 100000; i++) {\n        /* TODO: __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST) */\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Counter: %d\\n\", counter);\n    printf(\"Atomique: %s\\n\", counter == 200000 ? \"OUI\" : \"NON\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\n\nvoid *increment(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 100000; i++) {\n        __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Counter: %d\\n\", counter);\n    printf(\"Atomique: %s\\n\", counter == ____ ? \"OUI\" : \"NON\"); /* valeur attendue */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\n\nvoid *increment(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 100000; i++) {\n        ____(____counter, 1, __ATOMIC_SEQ_CST);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Counter: %d\\n\", counter);\n    printf(\"Atomique: %s\\n\", counter == ____ ? \"OUI\" : \"NON\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\n// Variable globale counter = 0\n// Fonction increment : boucle 100000 fois, __atomic_add_fetch\n// main : 2 threads, joindre, afficher counter et vérifier == 200000\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

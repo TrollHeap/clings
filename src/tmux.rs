@@ -22,7 +22,10 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
             "-P",
             "-F",
             "#{pane_id}",
-            &format!("nvim {}", file.display()),
+            &format!(
+                "nvim '{}'",
+                file.display().to_string().replace('\'', "'\\''")
+            ),
         ])
         .output()
         .ok()?;

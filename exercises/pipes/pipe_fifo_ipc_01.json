@@ -1,0 +1,187 @@
+{
+  "id": "pipe-fifo-ipc-01",
+  "subject": "pipes",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "FIFO nommé : IPC inter-processus avec fork",
+  "description": "NSY103 — Le FIFO nommé permet la communication entre processus non liés. open() sur un FIFO bloque jusqu'à ce que les deux extrémités (O_RDONLY et O_WRONLY) soient ouvertes — c'est le mécanisme de rendez-vous du FIFO.\n\nAvec fork(), l'enfant ouvre le FIFO en lecture, le parent en écriture. Chaque open() débloque l'autre. Le parent écrit 'hello ipc', l'enfant lit et affiche, le parent attend la fin de l'enfant puis supprime le FIFO.",
+  "starter_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);\n    pid_t pid = ____();\n    if (pid == 0) {\n        /* enfant : lecteur */\n        int fd = open(FIFO_PATH, ____);\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        /* parent : écrivain */\n        int fd = open(FIFO_PATH, ____);\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        ____(NULL);\n        unlink(FIFO_PATH);\n    }\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);\n    pid_t pid = fork();\n    if (pid == 0) {\n        /* enfant : lecteur */\n        int fd = open(FIFO_PATH, O_RDONLY);\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        /* parent : écrivain */\n        int fd = open(FIFO_PATH, O_WRONLY);\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        wait(NULL);\n        unlink(FIFO_PATH);\n    }\n    return 0;\n}",
+  "hints": [
+    "fork() avant les open() : l'enfant et le parent ouvrent chacun une extrémité, ce qui débloque mutuellement les deux open()",
+    "L'enfant utilise O_RDONLY, le parent O_WRONLY — chaque open() bloque jusqu'à ce que l'autre côté soit aussi ouvert",
+    "wait(NULL) dans le parent garantit que l'enfant a terminé d'afficher avant que le parent appelle unlink()"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Child received: hello ipc\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "mkfifo() + fork() — création du FIFO puis deux processus",
+        "nodes": [
+          {
+            "id": "parent",
+            "label": "parent\n(écrivain)"
+          },
+          {
+            "id": "child",
+            "label": "enfant\n(lecteur)"
+          },
+          {
+            "id": "fifo",
+            "label": "/tmp/kf_fifo_02"
+          }
+        ],
+        "edges": [
+          {
+            "source": "parent",
+            "target": "fifo",
+            "label": "mkfifo()"
+          },
+          {
+            "source": "parent",
+            "target": "child",
+            "label": "fork()"
+          }
+        ],
+        "explanation": "Le fork() doit impérativement avoir lieu AVANT les open() sur le FIFO. Si le parent appelait open(O_WRONLY) en premier sans que personne n'ouvre l'autre côté, il bloquerait indéfiniment — le fork() permet aux deux extrémités d'être ouvertes en parallèle.",
+        "step_label": "Étape 1 — mkfifo() puis fork() avant les open() sur le FIFO"
+      },
+      {
+        "label": "open() bloquant — rendez-vous des deux extrémités",
+        "nodes": [
+          {
+            "id": "parent",
+            "label": "parent\nopen(O_WRONLY)"
+          },
+          {
+            "id": "fifo",
+            "label": "/tmp/kf_fifo_02\n(rendez-vous)"
+          },
+          {
+            "id": "child",
+            "label": "enfant\nopen(O_RDONLY)"
+          }
+        ],
+        "edges": [
+          {
+            "source": "parent",
+            "target": "fifo",
+            "label": "bloque → débloqué"
+          },
+          {
+            "source": "child",
+            "target": "fifo",
+            "label": "bloque → débloqué"
+          }
+        ],
+        "explanation": "Chaque open() sur un FIFO en mode O_RDONLY ou O_WRONLY bloque jusqu'à ce que l'extrémité opposée soit ouverte — c'est le mécanisme de rendez-vous POSIX. Grâce au fork() préalable, les deux processus progressent en parallèle et se débloquent mutuellement dès que les deux open() sont lancés.",
+        "step_label": "Étape 2 — open() bloquant : rendez-vous des deux extrémités du FIFO"
+      },
+      {
+        "label": "write() parent → read() enfant",
+        "nodes": [
+          {
+            "id": "parent",
+            "label": "parent\n\"hello ipc\""
+          },
+          {
+            "id": "buf",
+            "label": "kernel buffer\n(FIFO)"
+          },
+          {
+            "id": "child",
+            "label": "enfant\nbuf[]"
+          }
+        ],
+        "edges": [
+          {
+            "source": "parent",
+            "target": "buf",
+            "label": "write()"
+          },
+          {
+            "source": "buf",
+            "target": "child",
+            "label": "read()"
+          }
+        ],
+        "explanation": "write() dans le parent dépose 'hello ipc' dans le buffer kernel du FIFO. Le parent ferme ensuite fd — cela signale EOF à l'enfant : quand le buffer est épuisé, le prochain read() de l'enfant retournera 0. L'enfant lit, affiche, et ferme sa propre extrémité.",
+        "step_label": "Étape 3 — Parent write() 'hello ipc', enfant read() et affiche"
+      },
+      {
+        "label": "wait() + unlink() — nettoyage",
+        "nodes": [
+          {
+            "id": "parent",
+            "label": "parent\nwait(NULL)"
+          },
+          {
+            "id": "child",
+            "label": "enfant\n(terminé)"
+          },
+          {
+            "id": "fifo",
+            "label": "/tmp/kf_fifo_02\n(supprimé)"
+          }
+        ],
+        "edges": [
+          {
+            "source": "child",
+            "target": "parent",
+            "label": "exit → débloque wait()"
+          },
+          {
+            "source": "parent",
+            "target": "fifo",
+            "label": "unlink()"
+          }
+        ],
+        "explanation": "wait(NULL) bloque le parent jusqu'à ce que l'enfant se termine — ce qui garantit que l'enfant a eu le temps d'afficher son message avant que le parent appelle unlink(). Sans ce wait(), le parent pourrait supprimer le FIFO avant que l'enfant termine sa lecture, laissant l'enfant avec un fd valide mais le fichier supprimé du filesystem.",
+        "step_label": "Étape 4 — wait() garantit la fin de l'enfant avant unlink()"
+      }
+    ]
+  },
+  "prerequisites": ["pipe_fifo_named_01.json"],
+  "exercise_type": "complete",
+  "key_concept": "open() sur un FIFO bloque jusqu'au rendez-vous des deux extrémités ; fork() permet d'ouvrir les deux côtés",
+  "common_mistake": "Ouvrir les deux extrémités dans le même processus avant fork() : le parent se bloquerait sur open(O_WRONLY) si l'enfant n'est pas encore prêt",
+  "kc_ids": [
+    "KC-C11"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet : FIFO nommé inter-processus\n// Principe clé : open() sur un FIFO BLOQUE jusqu'à ce que les DEUX extrémités soient ouvertes\n// fork() résout ce blocage : enfant et parent ouvrent chacun leur côté\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);     // ★ crée le fichier FIFO\n    pid_t pid = fork();          // ★ fork AVANT les open()\n    if (pid == 0) {\n        /* enfant : lecteur */\n        int fd = open(FIFO_PATH, O_RDONLY); // ★ bloque jusqu'à ce que le parent ouvre O_WRONLY\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        /* parent : écrivain */\n        int fd = open(FIFO_PATH, O_WRONLY); // ★ débloque l'open de l'enfant\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        wait(NULL);              // ★ attendre que l'enfant affiche\n        unlink(FIFO_PATH);       // ★ nettoyage\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = open(FIFO_PATH, O_RDONLY);\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        int fd = open(FIFO_PATH, O_WRONLY);\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        ____(NULL);   // attendre l'enfant avant unlink\n        unlink(FIFO_PATH);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = open(FIFO_PATH, ____);  // flag lecture\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        int fd = open(FIFO_PATH, ____);  // flag écriture\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        wait(NULL);\n        unlink(FIFO_PATH);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    mkfifo(FIFO_PATH, 0600);\n    pid_t pid = ____();\n    if (pid == 0) {\n        /* enfant : lecteur */\n        int fd = open(FIFO_PATH, ____);\n        char buf[32];\n        ssize_t n = read(fd, buf, sizeof(buf) - 1);\n        buf[n] = '\\0';\n        printf(\"Child received: %s\\n\", buf);\n        close(fd);\n    } else {\n        /* parent : écrivain */\n        int fd = open(FIFO_PATH, ____);\n        const char *msg = \"hello ipc\";\n        write(fd, msg, strlen(msg));\n        close(fd);\n        ____(NULL);\n        unlink(FIFO_PATH);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <string.h>\n\n#define FIFO_PATH \"/tmp/kf_fifo_02\"\n\nint main(void) {\n    // Créez un FIFO avec mkfifo(), puis fork()\n    // Enfant : ouvre en O_RDONLY, lit, affiche \"Child received: hello ipc\"\n    // Parent : ouvre en O_WRONLY, écrit \"hello ipc\", attend l'enfant, unlink()\n    return 0;\n}"
+  ],
+  "mission": {
+    "clientId": "kernelops",
+    "clientName": "KernelOps",
+    "contactEmail": "infra@kernelops.sys",
+    "tier": 3,
+    "receivedTime": "14:30",
+    "subject": "IPC — FIFO nommé inter-processus",
+    "incidentEmail": "Salut,\n\nOn a besoin de faire communiquer deux processus indépendants via un tube nommé. Le processus producteur écrit dans le FIFO, le consommateur lit et affiche. Montre-moi le pattern de base avec fork() pour valider que les deux open() se débloquent mutuellement.\n\nInfra @ KernelOps",
+    "payout": 350,
+    "successEmail": "Excellent ! Le rendez-vous FIFO fonctionne parfaitement. Les deux open() se débloquent bien mutuellement grâce au fork(). On peut construire dessus.\n\nInfra @ KernelOps",
+    "failureEmail": "La sortie n'est pas correcte. Vérifie l'ordre fork() avant open(), et que l'enfant utilise O_RDONLY pendant que le parent utilise O_WRONLY.\n\nInfra @ KernelOps",
+    "syscallsInvolved": [
+      "mkfifo",
+      "fork",
+      "open",
+      "write",
+      "read",
+      "close",
+      "wait",
+      "unlink"
+    ],
+    "deadlineMinutes": null,
+    "prereqMissionIds": ["pipe-fifo-named-01"]
+  }
+}

@@ -1,6 +1,7 @@
 use chrono::Utc;
 use rusqlite::{params, Connection};
 
+use crate::error::Result;
 use crate::mastery;
 use crate::models::Subject;
 
@@ -23,46 +24,64 @@ CREATE TABLE IF NOT EXISTS practice_log (
     success INTEGER NOT NULL DEFAULT 0,
     practiced_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 ";
 
 /// Open (or create) the progress database.
-pub fn open_db() -> Result<Connection, String> {
-    let dir = dirs::home_dir()
+pub fn open_db() -> Result<Connection> {
+    let dir = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join(".kernelforge");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create dir: {e}"))?;
+    std::fs::create_dir_all(&dir)?;
 
     let db_path = dir.join("progress.db");
-    let conn = Connection::open(&db_path).map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = Connection::open(&db_path)?;
 
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
-        .map_err(|e| format!("Pragma error: {e}"))?;
-
-    conn.execute_batch(SCHEMA)
-        .map_err(|e| format!("Schema error: {e}"))?;
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+    conn.execute_batch(SCHEMA)?;
 
     Ok(conn)
 }
 
 /// Ensure a subject row exists in the DB.
-pub fn ensure_subject(conn: &Connection, name: &str) -> Result<(), String> {
+pub fn ensure_subject(conn: &Connection, name: &str) -> Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
         params![name],
-    )
-    .map_err(|e| format!("Insert subject error: {e}"))?;
+    )?;
+    Ok(())
+}
+
+/// Batch-ensure all subject rows exist (single transaction).
+pub fn ensure_subjects_batch(
+    conn: &mut Connection,
+    exercises: &[crate::models::Exercise],
+) -> Result<()> {
+    let unique: std::collections::HashSet<&str> =
+        exercises.iter().map(|e| e.subject.as_str()).collect();
+    let tx = conn.transaction()?;
+    for name in unique {
+        tx.execute(
+            "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
+            params![name],
+        )?;
+    }
+    tx.commit()?;
     Ok(())
 }
 
 /// Get all subjects from DB.
-pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT name, mastery_score, last_practiced_at, attempts_total, attempts_success,
-                    difficulty_unlocked, next_review_at, srs_interval_days
-             FROM subjects ORDER BY name",
-        )
-        .map_err(|e| format!("Query error: {e}"))?;
+pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT name, mastery_score, last_practiced_at, attempts_total, attempts_success,
+                difficulty_unlocked, next_review_at, srs_interval_days
+         FROM subjects ORDER BY name",
+    )?;
 
     let subjects = stmt
         .query_map([], |row| {
@@ -76,10 +95,8 @@ pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>, String> {
                 next_review_at: row.get(6)?,
                 srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
             })
-        })
-        .map_err(|e| format!("Query map error: {e}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Collect error: {e}"))?;
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(subjects)
 }
@@ -90,7 +107,7 @@ pub fn record_attempt(
     subject: &str,
     exercise_id: &str,
     success: bool,
-) -> Result<Subject, String> {
+) -> Result<Subject> {
     let now = Utc::now().timestamp();
 
     ensure_subject(conn, subject)?;
@@ -101,8 +118,7 @@ pub fn record_attempt(
         "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![log_id, subject, exercise_id, success as i32, now],
-    )
-    .map_err(|e| format!("Log insert error: {e}"))?;
+    )?;
 
     // Load current subject
     let mut sub = get_subject(conn, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
@@ -137,21 +153,18 @@ pub fn record_attempt(
             sub.next_review_at,
             sub.srs_interval_days,
         ],
-    )
-    .map_err(|e| format!("Update subject error: {e}"))?;
+    )?;
 
     Ok(sub)
 }
 
 /// Get a single subject.
-pub fn get_subject(conn: &Connection, name: &str) -> Result<Option<Subject>, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT name, mastery_score, last_practiced_at, attempts_total, attempts_success,
-                    difficulty_unlocked, next_review_at, srs_interval_days
-             FROM subjects WHERE name = ?1",
-        )
-        .map_err(|e| format!("Query error: {e}"))?;
+pub fn get_subject(conn: &Connection, name: &str) -> Result<Option<Subject>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT name, mastery_score, last_practiced_at, attempts_total, attempts_success,
+                difficulty_unlocked, next_review_at, srs_interval_days
+         FROM subjects WHERE name = ?1",
+    )?;
 
     let subject = stmt
         .query_row(params![name], |row| {
@@ -172,20 +185,16 @@ pub fn get_subject(conn: &Connection, name: &str) -> Result<Option<Subject>, Str
 }
 
 /// Get current streak (consecutive days with at least one practice).
-pub fn get_streak(conn: &Connection) -> Result<i64, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT DISTINCT date(practiced_at, 'unixepoch') as day
-             FROM practice_log
-             ORDER BY day DESC",
-        )
-        .map_err(|e| format!("Streak query error: {e}"))?;
+pub fn get_streak(conn: &Connection) -> Result<i64> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT DISTINCT date(practiced_at, 'unixepoch') as day
+         FROM practice_log
+         ORDER BY day DESC",
+    )?;
 
     let days: Vec<String> = stmt
-        .query_map([], |row| row.get(0))
-        .map_err(|e| format!("Streak map error: {e}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Streak collect error: {e}"))?;
+        .query_map([], |row| row.get(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     if days.is_empty() {
         return Ok(0);
@@ -219,28 +228,303 @@ pub fn get_streak(conn: &Connection) -> Result<i64, String> {
 }
 
 /// Reset all progress (with confirmation handled by caller).
-pub fn reset_progress(conn: &Connection) -> Result<(), String> {
+pub fn reset_progress(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "DELETE FROM practice_log;
          DELETE FROM subjects;",
-    )
-    .map_err(|e| format!("Reset error: {e}"))?;
+    )?;
     Ok(())
 }
 
-/// Apply decay to all subjects.
-pub fn apply_all_decay(conn: &Connection) -> Result<(), String> {
+/// Open an in-memory database for testing.
+#[cfg(test)]
+fn open_test_db() -> Result<Connection> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(SCHEMA)?;
+    Ok(conn)
+}
+
+/// Save piscine checkpoint (current exercise index).
+pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO kv (key, value) VALUES ('piscine_checkpoint', ?1)",
+        params![index.to_string()],
+    )?;
+    Ok(())
+}
+
+/// Load piscine checkpoint, returns None if no checkpoint saved.
+pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
+    let mut stmt = conn.prepare_cached("SELECT value FROM kv WHERE key = 'piscine_checkpoint'")?;
+    let result = stmt
+        .query_row([], |row| row.get::<_, String>(0))
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok());
+    Ok(result)
+}
+
+/// Clear piscine checkpoint (called when piscine is fully completed).
+pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM kv WHERE key = 'piscine_checkpoint'", [])?;
+    Ok(())
+}
+
+/// Get subjects whose SRS review is due (next_review_at <= now).
+pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT name FROM subjects
+         WHERE next_review_at IS NOT NULL AND next_review_at <= unixepoch()
+         ORDER BY mastery_score ASC",
+    )?;
+    let names = stmt
+        .query_map([], |row| row.get(0))?
+        .collect::<std::result::Result<Vec<String>, _>>()?;
+    Ok(names)
+}
+
+/// Apply decay to all subjects (batched in single transaction).
+pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
     let mut subjects = get_all_subjects(conn)?;
+    let tx = conn.transaction()?;
     for sub in &mut subjects {
         let old_score = sub.mastery_score;
         mastery::apply_decay(sub);
         if sub.mastery_score != old_score {
-            conn.execute(
+            tx.execute(
                 "UPDATE subjects SET mastery_score = ?2 WHERE name = ?1",
                 params![sub.name, sub.mastery_score],
-            )
-            .map_err(|e| format!("Decay update error: {e}"))?;
+            )?;
         }
     }
+    tx.commit()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_subject_creates_row() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        let sub = get_subject(&conn, "pointers").unwrap();
+        assert!(sub.is_some());
+        let sub = sub.unwrap();
+        assert_eq!(sub.name, "pointers");
+        assert_eq!(sub.mastery_score, 0.0);
+        assert_eq!(sub.difficulty_unlocked, 1);
+    }
+
+    #[test]
+    fn test_ensure_subject_idempotent() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        let subjects = get_all_subjects(&conn).unwrap();
+        assert_eq!(subjects.len(), 1);
+    }
+
+    #[test]
+    fn test_record_attempt_success() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+        let sub = record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
+        assert_eq!(sub.mastery_score, 1.0);
+        assert_eq!(sub.attempts_total, 1);
+        assert_eq!(sub.attempts_success, 1);
+    }
+
+    #[test]
+    fn test_record_attempt_failure() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+
+        // First succeed to have score > 0
+        record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
+        let sub = record_attempt(&conn, "structs", "struct-point-01", false).unwrap();
+        assert_eq!(sub.mastery_score, 0.5);
+        assert_eq!(sub.attempts_total, 2);
+        assert_eq!(sub.attempts_success, 1);
+    }
+
+    #[test]
+    fn test_reset_progress() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
+        reset_progress(&conn).unwrap();
+        let subjects = get_all_subjects(&conn).unwrap();
+        assert!(subjects.is_empty());
+    }
+
+    #[test]
+    fn test_get_subject_missing() {
+        let conn = open_test_db().unwrap();
+        let sub = get_subject(&conn, "nonexistent").unwrap();
+        assert!(sub.is_none());
+    }
+
+    #[test]
+    fn test_kv_checkpoint_roundtrip() {
+        let conn = open_test_db().unwrap();
+        save_piscine_checkpoint(&conn, 42).unwrap();
+        let loaded = load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, Some(42));
+    }
+
+    #[test]
+    fn test_kv_checkpoint_missing_returns_none() {
+        let conn = open_test_db().unwrap();
+        let loaded = load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, None);
+    }
+
+    #[test]
+    fn test_kv_checkpoint_clear() {
+        let conn = open_test_db().unwrap();
+        save_piscine_checkpoint(&conn, 7).unwrap();
+        clear_piscine_checkpoint(&conn).unwrap();
+        let loaded = load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, None);
+    }
+
+    #[test]
+    fn test_kv_checkpoint_overwrite() {
+        let conn = open_test_db().unwrap();
+        save_piscine_checkpoint(&conn, 3).unwrap();
+        save_piscine_checkpoint(&conn, 17).unwrap();
+        let loaded = load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, Some(17));
+    }
+
+    #[test]
+    fn test_due_subjects_past_review() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        // next_review_at dans le passé → sujet doit apparaître
+        let past = Utc::now().timestamp() - 3_600;
+        conn.execute(
+            "UPDATE subjects SET next_review_at = ?1 WHERE name = 'pointers'",
+            params![past],
+        )
+        .unwrap();
+        let due = get_due_subjects(&conn).unwrap();
+        assert!(due.contains(&"pointers".to_string()));
+    }
+
+    #[test]
+    fn test_due_subjects_future_review() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        // next_review_at dans le futur → sujet absent
+        let future = Utc::now().timestamp() + 86_400;
+        conn.execute(
+            "UPDATE subjects SET next_review_at = ?1 WHERE name = 'pointers'",
+            params![future],
+        )
+        .unwrap();
+        let due = get_due_subjects(&conn).unwrap();
+        assert!(!due.contains(&"pointers".to_string()));
+    }
+
+    #[test]
+    fn test_due_subjects_null_review() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        // next_review_at NULL par défaut → sujet absent
+        let due = get_due_subjects(&conn).unwrap();
+        assert!(!due.contains(&"pointers".to_string()));
+    }
+
+    #[test]
+    fn test_get_streak_empty() {
+        let conn = open_test_db().unwrap();
+        assert_eq!(get_streak(&conn).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_get_streak_today() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES ('t1', 'pointers', 'ex1', 1, ?1)",
+            params![now],
+        ).unwrap();
+        assert_eq!(get_streak(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_get_streak_consecutive_days() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        let now = Utc::now().timestamp();
+        for (i, id) in ["c1", "c2", "c3"].iter().enumerate() {
+            let ts = now - (i as i64) * 86_400;
+            conn.execute(
+                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
+                params![id, ts],
+            ).unwrap();
+        }
+        assert_eq!(get_streak(&conn).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_get_streak_broken() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        let now = Utc::now().timestamp();
+        // Aujourd'hui et il y a 3 jours (pas hier) → streak = 1
+        for (id, offset) in [("b1", 0i64), ("b2", 3)] {
+            conn.execute(
+                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
+                params![id, now - offset * 86_400],
+            ).unwrap();
+        }
+        assert_eq!(get_streak(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_apply_all_decay_updates_db() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        conn.execute(
+            "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
+            params![old_ts],
+        ).unwrap();
+        apply_all_decay(&mut conn).unwrap();
+        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, 1.5);
+    }
+
+    #[test]
+    fn test_apply_all_decay_no_change_when_recent() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pipes").unwrap();
+        let recent_ts = Utc::now().timestamp() - 5 * 86_400;
+        conn.execute(
+            "UPDATE subjects SET mastery_score = 3.0, last_practiced_at = ?1 WHERE name = 'pipes'",
+            params![recent_ts],
+        )
+        .unwrap();
+        apply_all_decay(&mut conn).unwrap();
+        let sub = get_subject(&conn, "pipes").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, 3.0);
+    }
+
+    #[test]
+    fn test_record_attempt_persists_srs_fields() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pipes").unwrap();
+        let sub = record_attempt(&conn, "pipes", "pipe-01", true).unwrap();
+        // Après un succès, intervalle SRS = round(1 * 2.5) = 3
+        assert_eq!(sub.srs_interval_days, 3);
+        assert!(sub.next_review_at.is_some());
+        // Vérifier la persistance en DB
+        let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();
+        assert_eq!(reloaded.srs_interval_days, sub.srs_interval_days);
+        assert_eq!(reloaded.next_review_at, sub.next_review_at);
+    }
 }

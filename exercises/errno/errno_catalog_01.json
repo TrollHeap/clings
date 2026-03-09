@@ -1,0 +1,39 @@
+{
+  "id": "errno-catalog-01",
+  "subject": "errno",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Catalogue des codes errno courants",
+  "description": "NSY103 — Les codes errno les plus fréquents en programmation système Linux incluent EPERM, ENOENT, ESRCH, EINTR, EIO, ENOMEM, EACCES, EEXIST, EINVAL, etc.\n\nCréez un catalogue qui affiche les 10 codes errno les plus importants avec leur valeur et description.",
+  "starter_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n\ntypedef struct {\n    int code;\n    const char *name;\n} errno_entry;\n\nint main(void) {\n    errno_entry catalog[] = {\n        {EPERM,  \"EPERM\"},\n        {ENOENT, \"ENOENT\"},\n        {ESRCH,  \"ESRCH\"},\n        {EINTR,  \"EINTR\"},\n        {EIO,    \"EIO\"},\n        {ENOMEM, \"ENOMEM\"},\n        {EACCES, \"EACCES\"},\n        {EEXIST, \"EEXIST\"},\n        {EINVAL, \"EINVAL\"},\n        {EPIPE,  \"EPIPE\"}\n    };\n    int count = sizeof(catalog) / sizeof(catalog[0]);\n    printf(\"=== Errno Catalog (%d entries) ===\\n\", ____);\n    for (int i = 0; i < count; i++) {\n        printf(\"%2d %-8s %s\\n\", catalog[i].____, catalog[i].____, ____(catalog[i].code));\n    }\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\ntypedef struct {\n    int code;\n    const char *name;\n} errno_entry;\nint main(void) {\n    errno_entry catalog[] = {\n        {EPERM,  \"EPERM\"},\n        {ENOENT, \"ENOENT\"},\n        {ESRCH,  \"ESRCH\"},\n        {EINTR,  \"EINTR\"},\n        {EIO,    \"EIO\"},\n        {ENOMEM, \"ENOMEM\"},\n        {EACCES, \"EACCES\"},\n        {EEXIST, \"EEXIST\"},\n        {EINVAL, \"EINVAL\"},\n        {EPIPE,  \"EPIPE\"}\n    };\n    int count = sizeof(catalog) / sizeof(catalog[0]);\n    printf(\"=== Errno Catalog (%d entries) ===\\n\", count);\n    for (int i = 0; i < count; i++) {\n        printf(\"%2d %-8s %s\\n\", catalog[i].code, catalog[i].name, strerror(catalog[i].code));\n    }\n    return 0;\n}",
+  "hints": [
+    "sizeof(catalog)/sizeof(catalog[0]) donne le nombre d'éléments",
+    "catalog[i].code pour le numéro, catalog[i].name pour le nom",
+    "strerror(catalog[i].code) pour la description"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "=== Errno Catalog (10 entries) ===\n 1 EPERM    Operation not permitted\n 2 ENOENT   No such file or directory\n 3 ESRCH    No such process\n 4 EINTR    Interrupted system call\n 5 EIO      Input/output error\n12 ENOMEM   Cannot allocate memory\n13 EACCES   Permission denied\n17 EEXIST   File exists\n22 EINVAL   Invalid argument\n32 EPIPE    Broken pipe\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "Tableau de structures errno_entry", "stack": [{"name": "catalog[0]", "value": "{1, \"EPERM\"}"}, {"name": "catalog[1]", "value": "{2, \"ENOENT\"}"}, {"name": "count", "value": "10"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "10 entrées dans le catalogue", "step_label": "Étape 1"},
+      {"label": "Itération et affichage", "stack": [{"name": "i", "value": "0..9"}, {"name": "code", "value": "catalog[i].code"}, {"name": "name", "value": "catalog[i].name"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "strerror convertit chaque code en description", "step_label": "Étape 2"}
+    ]
+  },
+  "prerequisites": ["errno-eperm-01"],
+  "exercise_type": "complete",
+  "key_concept": "Les codes errno sont des entiers standardisés POSIX avec des descriptions via strerror()",
+  "common_mistake": "Les valeurs numériques des errno ne sont pas séquentielles — ENOMEM=12, EACCES=13, EINVAL=22",
+  "kc_ids": ["KC-C15"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n\n/* == EXEMPLE: afficher un seul errno ==================== */\nvoid example_show(int code, const char *name) {\n    printf(\"%2d %-8s %s\\n\", code, name, strerror(code));\n}\n/* Resultat: 22 EINVAL   Invalid argument */\n\n/* == VOTRE EXERCICE ====================================== */\ntypedef struct { int code; const char *name; } errno_entry;\n\nint main(void) {\n    errno_entry catalog[] = {\n        {EPERM, \"EPERM\"}, {ENOENT, \"ENOENT\"}, {ESRCH, \"ESRCH\"},\n        {EINTR, \"EINTR\"}, {EIO, \"EIO\"}, {ENOMEM, \"ENOMEM\"},\n        {EACCES, \"EACCES\"}, {EEXIST, \"EEXIST\"}, {EINVAL, \"EINVAL\"},\n        {EPIPE, \"EPIPE\"}\n    };\n    int count = sizeof(catalog) / sizeof(catalog[0]);\n    printf(\"=== Errno Catalog (%d entries) ===\\n\", count);\n    for (int i = 0; i < count; i++) {\n        printf(\"%2d %-8s %s\\n\", catalog[i].code, catalog[i].name, strerror(catalog[i].code));\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n\ntypedef struct { int code; const char *name; } errno_entry;\n\nint main(void) {\n    errno_entry catalog[] = {\n        {EPERM, \"EPERM\"}, {ENOENT, \"ENOENT\"}, {ESRCH, \"ESRCH\"},\n        {EINTR, \"EINTR\"}, {EIO, \"EIO\"}, {ENOMEM, \"ENOMEM\"},\n        {EACCES, \"EACCES\"}, {EEXIST, \"EEXIST\"}, {EINVAL, \"EINVAL\"},\n        {EPIPE, \"EPIPE\"}\n    };\n    int count = sizeof(catalog) / sizeof(catalog[0]);\n    printf(\"=== Errno Catalog (%d entries) ===\\n\", count);\n    for (int i = 0; i < count; i++) {\n        printf(\"%2d %-8s %s\\n\", catalog[i].code, catalog[i].name, ____(catalog[i].code));\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n\ntypedef struct { int code; const char *name; } errno_entry;\n\nint main(void) {\n    errno_entry catalog[] = {\n        {EPERM, \"EPERM\"}, {ENOENT, \"ENOENT\"}, {ESRCH, \"ESRCH\"},\n        {EINTR, \"EINTR\"}, {EIO, \"EIO\"}, {ENOMEM, \"ENOMEM\"},\n        {EACCES, \"EACCES\"}, {EEXIST, \"EEXIST\"}, {EINVAL, \"EINVAL\"},\n        {EPIPE, \"EPIPE\"}\n    };\n    int count = sizeof(catalog) / sizeof(catalog[0]);\n    printf(\"=== Errno Catalog (%d entries) ===\\n\", ____);\n    for (int i = 0; i < count; i++) {\n        printf(\"%2d %-8s %s\\n\", catalog[i].____, catalog[i].____, ____(catalog[i].code));\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n\n// Créez un tableau de struct {code, name} pour 10 errno courants\n// Affichez chaque entrée avec son code, nom et strerror\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

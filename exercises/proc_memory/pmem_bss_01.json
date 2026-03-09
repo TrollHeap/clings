@@ -1,0 +1,35 @@
+{
+  "id": "pmem-bss-01",
+  "subject": "proc_memory",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Segment BSS et initialisation implicite",
+  "description": "NSY103 — Le segment BSS (Block Started by Symbol) contient les variables globales et statiques non initialisées. Le noyau les met à zéro au chargement du programme. Les variables statiques locales persistent entre les appels.\n\nDémontrez que les variables BSS sont initialisées à zéro et que les variables statiques persistent.",
+  "starter_code": "#include <stdio.h>\n\nint g_uninit;\nint g_array[4];\n\nint counter(void) {\n    ____ int count = 0;\n    return ++count;\n}\n\nint main(void) {\n    printf(\"g_uninit: %d\\n\", g_uninit);\n    printf(\"g_array: %d %d %d %d\\n\", g_array[0], g_array[1], g_array[2], g_array[3]);\n    printf(\"All BSS zero: %s\\n\",\n        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? \"yes\" : \"no\");\n    printf(\"call1: %d\\n\", counter());\n    printf(\"call2: %d\\n\", counter());\n    printf(\"call3: %d\\n\", ____);\n    printf(\"Static persists: yes\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nint g_uninit;\nint g_array[4];\nint counter(void) {\n    static int count = 0;\n    return ++count;\n}\nint main(void) {\n    printf(\"g_uninit: %d\\n\", g_uninit);\n    printf(\"g_array: %d %d %d %d\\n\", g_array[0], g_array[1], g_array[2], g_array[3]);\n    printf(\"All BSS zero: %s\\n\",\n        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? \"yes\" : \"no\");\n    printf(\"call1: %d\\n\", counter());\n    printf(\"call2: %d\\n\", counter());\n    printf(\"call3: %d\\n\", counter());\n    printf(\"Static persists: yes\\n\");\n    return 0;\n}",
+  "hints": [
+    "Les variables globales non initialisées vont dans BSS et sont mises à 0",
+    "Le mot-clé 'static' dans une fonction rend la variable persistante entre appels",
+    "BSS n'occupe pas d'espace dans le fichier ELF — juste une taille à allouer"
+  ],
+  "validation": {"mode": "output", "expected_output": "g_uninit: 0\ng_array: 0 0 0 0\nAll BSS zero: yes\ncall1: 1\ncall2: 2\ncall3: 3\nStatic persists: yes\n", "test_code": null},
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "BSS initialisé à zéro", "stack": [{"name": "g_uninit", "value": "0 (BSS)"}, {"name": "g_array", "value": "{0,0,0,0} (BSS)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Le noyau met BSS à zéro au chargement", "step_label": "Étape 1"},
+      {"label": "static count persiste", "stack": [{"name": "count (static)", "value": "1 → 2 → 3"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "counter", "args": "void", "is_active": true}], "explanation": "static local: même adresse, valeur persistante", "step_label": "Étape 2"}
+    ]
+  },
+  "prerequisites": ["pmem-layout-01"],
+  "exercise_type": "complete",
+  "key_concept": "BSS = globales non-init (zéro garanti), static = persistance entre appels",
+  "common_mistake": "Croire que les variables locales non initialisées sont à zéro — c'est seulement BSS",
+  "kc_ids": ["KC-C17"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE: différence data vs bss ================== */\nint g_data = 42;  /* segment data (initialisé) */\nint g_bss_ex;     /* segment bss (non-initialisé → 0) */\nvoid example_segments(void) {\n    printf(\"data: %d, bss: %d\\n\", g_data, g_bss_ex);\n}\n\nint g_uninit;\nint g_array[4];\nint counter(void) { static int count = 0; return ++count; }\nint main(void) {\n    printf(\"g_uninit: %d\\n\", g_uninit);\n    printf(\"g_array: %d %d %d %d\\n\", g_array[0], g_array[1], g_array[2], g_array[3]);\n    printf(\"All BSS zero: %s\\n\",\n        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? \"yes\" : \"no\");\n    printf(\"call1: %d\\n\", counter());\n    printf(\"call2: %d\\n\", counter());\n    printf(\"call3: %d\\n\", counter());\n    printf(\"Static persists: yes\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\nint g_uninit;\nint g_array[4];\nint counter(void) { static int count = 0; return ++count; }\nint main(void) {\n    printf(\"g_uninit: %d\\n\", g_uninit);\n    printf(\"g_array: %d %d %d %d\\n\", g_array[0], g_array[1], g_array[2], g_array[3]);\n    printf(\"All BSS zero: %s\\n\",\n        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? \"yes\" : \"no\");\n    printf(\"call1: %d\\n\", counter());\n    printf(\"call2: %d\\n\", ____);\n    printf(\"call3: %d\\n\", counter());\n    printf(\"Static persists: yes\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\nint g_uninit;\nint g_array[4];\nint counter(void) {\n    ____ int count = 0;\n    return ++count;\n}\nint main(void) {\n    printf(\"g_uninit: %d\\n\", g_uninit);\n    printf(\"g_array: %d %d %d %d\\n\", g_array[0], g_array[1], g_array[2], g_array[3]);\n    printf(\"All BSS zero: %s\\n\",\n        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? \"yes\" : \"no\");\n    printf(\"call1: %d\\n\", counter());\n    printf(\"call2: %d\\n\", counter());\n    printf(\"call3: %d\\n\", ____);\n    printf(\"Static persists: yes\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n\nint g_uninit;\nint g_array[4];\n\n// Montrez que BSS est à zéro et que static persiste\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

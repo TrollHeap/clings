@@ -38,7 +38,9 @@
             "target": "q",
             "label": "qtail=0→1"
           }
-        ]
+        ],
+        "explanation": "msgsnd_sim copie le message dans queue[qtail] et incrémente qtail. En vrai IPC POSIX, mq_send() effectue une copie kernel : le message est stocké dans la file du noyau, identifiée par son nom, et accessible par tout processus ayant ouvert cette même file nommée.",
+        "step_label": "Étape 1 — Envoi du message dans la file"
       },
       {
         "label": "msgrcv_sim() — défile",
@@ -58,7 +60,9 @@
             "target": "out",
             "label": "qhead=0→1"
           }
-        ]
+        ],
+        "explanation": "msgrcv_sim copie queue[qhead] dans le buffer de sortie et incrémente qhead. En POSIX réel, mq_receive() retire le message du noyau avec une copie vers l'espace utilisateur, libérant un emplacement dans la file pour de futurs envois.",
+        "step_label": "Étape 2 — Défilement du message (réception)"
       },
       {
         "label": "printf mtype + mtext",
@@ -78,7 +82,9 @@
             "target": "stdout",
             "label": "mtype=1 mtext=..."
           }
-        ]
+        ],
+        "explanation": "printf affiche le champ mtype (identifiant du canal) et mtext (données du message). Le mtype est la clé de filtrage en IPC POSIX : msgrcv peut cibler uniquement les messages d'un type donné, permettant de multiplexer plusieurs canaux sur une même file.",
+        "step_label": "Étape 3 — Affichage du message reçu"
       }
     ]
   },
@@ -90,7 +96,7 @@
     "KC-C12"
   ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 64\n#define QUEUE_LEN 4\n\n// ★ Stage 0 — Exemple complet\ntypedef struct {\n    long mtype;          // ★ identifiant de canal/priorité\n    char mtext[MSG_SIZE]; // ★ contenu du message\n} MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;                      // ★ stocker le type\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1); // ★ copier le texte\n    qtail++;                                         // ★ avancer la queue\n}\n\nint msgrcv_sim(MsgBuf *out) {\n    if (qhead >= qtail) return -1;  // ★ file vide\n    *out = queue[qhead++];          // ★ lire et avancer la tête\n    return 0;\n}\n\nint main(void) {\n    msgsnd_sim(1, \"hello queue\");   // ★ enfiler un message type=1\n    MsgBuf msg;\n    msgrcv_sim(&msg);               // ★ défiler\n    printf(\"mtype=%ld mtext=%s\\n\", msg.mtype, msg.mtext);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 64\n#define QUEUE_LEN 4\n\ntypedef struct {\n    long mtype;\n    char mtext[MSG_SIZE];\n} MsgBuf;\n\n/* == EXEMPLE ===============================================\n * File de priorite avec struct msgbuf\n * Enfile 2 messages avec priorites, defile dans l'ordre FIFO.\n * ========================================================= */\nMsgBuf example_q[QUEUE_LEN];\nint example_head = 0, example_tail = 0;\n\nvoid example_enqueue(long prio, const char *text) {\n    example_q[example_tail].mtype = prio;\n    strncpy(example_q[example_tail].mtext, text, MSG_SIZE - 1);\n    example_tail++;\n}\n\nint example_dequeue(MsgBuf *out) {\n    if (example_head >= example_tail) return -1;\n    *out = example_q[example_head++];\n    return 0;\n}\n\nvoid example_priority_queue(void) {\n    example_enqueue(3, \"low priority\");\n    example_enqueue(1, \"high priority\");\n    MsgBuf m;\n    while (example_dequeue(&m) == 0)\n        printf(\"prio=%ld: %s\\n\", m.mtype, m.mtext);\n}\n/* Resultat: prio=3: low priority, prio=1: high priority */\n\n/* == VOTRE EXERCICE ========================================\n * File de messages : struct msgbuf + tableau\n * Inspirez-vous de example_enqueue/example_dequeue ci-dessus.\n * Implementez msgsnd_sim et msgrcv_sim.\n * ========================================================= */\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\n\nvoid msgsnd_sim(long type, const char *text) {\n    /* TODO: store type in queue[qtail].mtype, copy text, advance qtail */\n    qtail++;\n}\n\nint msgrcv_sim(MsgBuf *out) {\n    if (qhead >= qtail) return -1;\n    /* TODO: copy queue[qhead] to *out and advance qhead */\n    return 0;\n}\n\nint main(void) {\n    msgsnd_sim(1, \"hello queue\");\n    MsgBuf msg;\n    msgrcv_sim(&msg);\n    printf(\"mtype=%ld mtext=%s\\n\", msg.mtype, msg.mtext);\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 64\n#define QUEUE_LEN 4\n\ntypedef struct {\n    long mtype;\n    char mtext[MSG_SIZE];\n} MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = type;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nint msgrcv_sim(MsgBuf *out) {\n    if (qhead >= qtail) return -1;\n    *out = queue[____++];  // lire la tête et avancer\n    return 0;\n}\n\nint main(void) {\n    msgsnd_sim(1, \"hello queue\");\n    MsgBuf msg;\n    msgrcv_sim(&msg);\n    printf(\"mtype=%ld mtext=%s\\n\", msg.mtype, msg.mtext);\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 64\n#define QUEUE_LEN 4\n\ntypedef struct {\n    long mtype;\n    char mtext[MSG_SIZE];\n} MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\n\nvoid msgsnd_sim(long type, const char *text) {\n    queue[qtail].mtype = ____;\n    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);\n    qtail++;\n}\n\nint msgrcv_sim(MsgBuf *out) {\n    if (qhead >= qtail) return -1;\n    *out = queue[____++];\n    return 0;\n}\n\nint main(void) {\n    msgsnd_sim(1, \"hello queue\");\n    MsgBuf msg;\n    msgrcv_sim(&msg);\n    printf(\"mtype=%ld mtext=%s\\n\", msg.mtype, msg.mtext);\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\n#define MSG_SIZE 64\n#define QUEUE_LEN 4\n\ntypedef struct {\n    long mtype;\n    char mtext[MSG_SIZE];\n} MsgBuf;\n\nMsgBuf queue[QUEUE_LEN];\nint qhead = 0, qtail = 0;\n\n// Implémentez msgsnd_sim(long type, const char *text) :\n//   stocker type et text dans queue[qtail], incrémenter qtail\n\n// Implémentez msgrcv_sim(MsgBuf *out) :\n//   retourner -1 si file vide, sinon copier queue[qhead] dans *out et incrémenter qhead\n\nint main(void) {\n    // Enfilez type=1 \"hello queue\", défilez, affichez mtype et mtext\n    // Sortie attendue : \"mtype=1 mtext=hello queue\"\n    return 0;\n}",

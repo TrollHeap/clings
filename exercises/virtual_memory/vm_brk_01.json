@@ -1,0 +1,125 @@
+{
+  "id": "vm-brk-01",
+  "subject": "virtual_memory",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "brk/sbrk et le tas",
+  "description": "NSY103 — sbrk() et brk() sont les appels système historiques pour étendre le tas (heap). sbrk(0) retourne l'adresse actuelle du program break. sbrk(n) l'avance de n octets. malloc() utilise sbrk en interne pour les petites allocations.\n\nExplorez le program break et observez comment il évolue avec sbrk et malloc.",
+  "starter_code": "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <stdlib.h>\n#include <stdint.h>\n\nint main(void) {\n    void *brk0 = ____(0);\n    printf(\"Initial break: %p\\n\", brk0);\n    void *brk1 = ____(4096);\n    printf(\"After sbrk(4096): %p\\n\", brk1);\n    void *brk2 = sbrk(0);\n    printf(\"Current break: %p\\n\", brk2);\n    ptrdiff_t diff = (char *)brk2 - (char *)brk0;\n    printf(\"Moved: %td bytes\\n\", diff);\n    printf(\"Moved 4096: %s\\n\", diff >= 4096 ? \"yes\" : \"no\");\n    sbrk(____); /* retract */\n    void *brk3 = sbrk(0);\n    printf(\"After retract: %s\\n\",\n        brk3 == brk0 ? \"back to start\" : \"different\");\n    return 0;\n}",
+  "solution_code": "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <stdlib.h>\n#include <stdint.h>\nint main(void) {\n    void *brk0 = sbrk(0);\n    printf(\"Initial break: %p\\n\", brk0);\n    void *brk1 = sbrk(4096);\n    printf(\"After sbrk(4096): %p\\n\", brk1);\n    void *brk2 = sbrk(0);\n    printf(\"Current break: %p\\n\", brk2);\n    ptrdiff_t diff = (char *)brk2 - (char *)brk0;\n    printf(\"Moved: %td bytes\\n\", diff);\n    printf(\"Moved 4096: %s\\n\", diff >= 4096 ? \"yes\" : \"no\");\n    sbrk(-4096); /* retract */\n    void *brk3 = sbrk(0);\n    printf(\"After retract: %s\\n\",\n        brk3 == brk0 ? \"back to start\" : \"different\");\n    return 0;\n}",
+  "hints": [
+    "sbrk(0) retourne l'adresse actuelle du program break sans le modifier",
+    "sbrk(n) avance le break de n octets et retourne l'ancien break",
+    "sbrk(-n) recule le break — c'est ainsi que free() rend la mémoire"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:(?s)Initial break: 0x[0-9a-f]+.*Moved 4096: yes\\nAfter retract: (back to start|different)",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "sbrk(0) — program break initial",
+        "stack": [
+          {
+            "name": "brk0",
+            "value": "→ fin du tas"
+          }
+        ],
+        "heap": [
+          {
+            "address": "tas",
+            "content": "[vide]"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "brk0",
+            "to": "tas"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Le program break marque la fin du segment de données",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "sbrk(4096) — extension",
+        "stack": [
+          {
+            "name": "brk1",
+            "value": "→ ancien break"
+          },
+          {
+            "name": "brk2",
+            "value": "→ nouveau break (+4096)"
+          }
+        ],
+        "heap": [
+          {
+            "address": "tas",
+            "content": "[4096 octets alloués]"
+          }
+        ],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Le tas grandit de 4096 octets",
+        "step_label": "Étape 2"
+      },
+      {
+        "label": "sbrk(-4096) — rétraction",
+        "stack": [
+          {
+            "name": "brk3",
+            "value": "== brk0"
+          }
+        ],
+        "heap": [
+          {
+            "address": "tas",
+            "content": "[vide]"
+          }
+        ],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Le break revient à sa position initiale",
+        "step_label": "Étape 3"
+      }
+    ]
+  },
+  "prerequisites": [
+    "vm-addr-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "sbrk étend/rétracte le tas en déplaçant le program break — base de malloc",
+  "common_mistake": "Confondre la valeur retournée par sbrk(n): c'est l'ANCIEN break, pas le nouveau",
+  "kc_ids": [
+    "KC-C18"
+  ],
+  "starter_code_stages": [
+    "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <stdlib.h>\n#include <stdint.h>\n\n/* == EXEMPLE: observer le break avec malloc =========== */\nvoid example_malloc_brk(void) {\n    void *b1 = sbrk(0);\n    void *p = malloc(1024);\n    void *b2 = sbrk(0);\n    printf(\"Break avant malloc: %p\\n\", b1);\n    printf(\"Break après malloc: %p\\n\", b2);\n    printf(\"malloc a bougé le break: %s\\n\", b2 > b1 ? \"oui\" : \"non\");\n    free(p);\n}\n\nint main(void) {\n    void *brk0 = sbrk(0);\n    printf(\"Initial break: %p\\n\", brk0);\n    void *brk1 = sbrk(4096);\n    printf(\"After sbrk(4096): %p\\n\", brk1);\n    void *brk2 = sbrk(0);\n    printf(\"Current break: %p\\n\", brk2);\n    ptrdiff_t diff = (char *)brk2 - (char *)brk0;\n    printf(\"Moved: %td bytes\\n\", diff);\n    printf(\"Moved 4096: %s\\n\", diff >= 4096 ? \"yes\" : \"no\");\n    sbrk(-4096);\n    void *brk3 = sbrk(0);\n    printf(\"After retract: %s\\n\", brk3 == brk0 ? \"back to start\" : \"different\");\n    return 0;\n}",
+    "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <stdlib.h>\n#include <stdint.h>\nint main(void) {\n    void *brk0 = sbrk(0);\n    printf(\"Initial break: %p\\n\", brk0);\n    void *brk1 = sbrk(4096);\n    printf(\"After sbrk(4096): %p\\n\", brk1);\n    void *brk2 = sbrk(0);\n    printf(\"Current break: %p\\n\", brk2);\n    ptrdiff_t diff = (char *)brk2 - (char *)brk0;\n    printf(\"Moved: %td bytes\\n\", diff);\n    printf(\"Moved 4096: %s\\n\", diff >= 4096 ? \"yes\" : \"no\");\n    sbrk(____); /* retract */\n    void *brk3 = sbrk(0);\n    printf(\"After retract: %s\\n\", brk3 == brk0 ? \"back to start\" : \"different\");\n    return 0;\n}",
+    "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <stdlib.h>\n#include <stdint.h>\nint main(void) {\n    void *brk0 = ____(0);\n    printf(\"Initial break: %p\\n\", brk0);\n    void *brk1 = ____(4096);\n    printf(\"After sbrk(4096): %p\\n\", brk1);\n    void *brk2 = sbrk(0);\n    printf(\"Current break: %p\\n\", brk2);\n    ptrdiff_t diff = (char *)brk2 - (char *)brk0;\n    printf(\"Moved: %td bytes\\n\", diff);\n    printf(\"Moved 4096: %s\\n\", diff >= 4096 ? \"yes\" : \"no\");\n    sbrk(____); /* retract */\n    void *brk3 = sbrk(0);\n    printf(\"After retract: %s\\n\", brk3 == brk0 ? \"back to start\" : \"different\");\n    return 0;\n}",
+    "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n\n// Explorez sbrk(0), sbrk(4096), puis rétractez avec sbrk(-4096)\nint main(void) {\n    return 0;\n}",
+    "#include <stddef.h>\n#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

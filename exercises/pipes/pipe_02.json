@@ -38,7 +38,9 @@
             "target": "p1",
             "label": "2 bytes"
           }
-        ]
+        ],
+        "explanation": "write() dépose les octets dans le buffer kernel de pipe1. La donnée \"42\" attend dans ce buffer jusqu'à être consommée par un read() — c'est le modèle producteur/consommateur élémentaire via pipe.",
+        "step_label": "Étape 1 — write() alimente le premier pipe"
       },
       {
         "label": "read(p1[0]) → transform ×2 → write(p2[1])",
@@ -67,7 +69,9 @@
             "target": "p2",
             "label": "\"84\""
           }
-        ]
+        ],
+        "explanation": "C'est le cœur du pipeline : on lit depuis pipe1 (consommer), on applique une transformation (ici ×2), puis on écrit dans pipe2 (produire). Ce pattern est la brique fondamentale de toute chaîne de traitement Unix.",
+        "step_label": "Étape 2 — Transformation et transfert pipe1 → pipe2"
       },
       {
         "label": "read(p2[0]) → printf",
@@ -87,7 +91,9 @@
             "target": "out",
             "label": "\"84\""
           }
-        ]
+        ],
+        "explanation": "La lecture finale depuis pipe2 délivre le résultat transformé. On ferme systématiquement fd[1] avant de lire pour que le kernel détecte la fin des données (EOF) et ne fasse pas bloquer read() en attente d'autres octets.",
+        "step_label": "Étape 3 — read() extrait le résultat final depuis pipe2"
       }
     ]
   },
@@ -101,7 +107,7 @@
     "KC-C10"
   ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int p1[2], p2[2];\n    pipe(p1);                              // ★ pipe1 : p1[0]=lecture p1[1]=écriture\n    pipe(p2);                              // ★ pipe2 : p2[0]=lecture p2[1]=écriture\n    write(p1[1], \"42\", 2);                 // ★ écrire dans p1\n    close(p1[1]);                          // ★ EOF pour le lecteur de p1\n    char buf1[8];\n    ssize_t n1 = read(p1[0], buf1, sizeof(buf1) - 1); // ★ lire depuis p1\n    buf1[n1] = '\\0';\n    close(p1[0]);\n    printf(\"Pipe1: %s\\n\", buf1);\n    int val = atoi(buf1) * 2;             // ★ transformer : ×2\n    char buf2[8];\n    snprintf(buf2, sizeof(buf2), \"%d\", val);\n    write(p2[1], buf2, strlen(buf2));      // ★ écrire résultat dans p2\n    close(p2[1]);\n    char out[8];\n    ssize_t n2 = read(p2[0], out, sizeof(out) - 1);\n    out[n2] = '\\0';\n    close(p2[0]);\n    printf(\"Pipe2: %s\\n\", out);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n\n/* == EXEMPLE =======================================\n * Pipeline deux pipes : ajouter 10\n * Meme pattern : pipe1 -> lire -> transformer -> pipe2.\n * Ici on ajoute 10 au lieu de multiplier par 2.\n * ================================================= */\nvoid example_pipeline_add(void) {\n    int p1[2], p2[2];\n    pipe(p1);\n    pipe(p2);\n    write(p1[1], \"5\", 1);\n    close(p1[1]);\n    char b1[8];\n    ssize_t n1 = read(p1[0], b1, sizeof(b1) - 1);\n    b1[n1] = '\\0';\n    close(p1[0]);\n    int v = atoi(b1) + 10;\n    char b2[8];\n    snprintf(b2, sizeof(b2), \"%d\", v);\n    write(p2[1], b2, strlen(b2));\n    close(p2[1]);\n    char out[8];\n    ssize_t n2 = read(p2[0], out, sizeof(out) - 1);\n    out[n2] = '\\0';\n    close(p2[0]);\n    printf(\"In: 5, Out: %s\\n\", out);\n}\n/* Resultat: In: 5, Out: 15 */\n\n/* == VOTRE EXERCICE ================================\n * Pipeline deux pipes : multiplier par 2\n * Inspirez-vous de example_pipeline_add ci-dessus.\n * Ecrivez \"42\" dans pipe1, lisez, doublez, ecrivez\n * dans pipe2, lisez et affichez.\n * ================================================= */\nint main(void) {\n    int p1[2], p2[2];\n    pipe(p1);\n    pipe(p2);\n    /* TODO: write \"42\" dans p1[1], close p1[1] */\n    char buf1[8];\n    ssize_t n1 = 0;\n    /* TODO: n1 = read(p1[0], ...) */\n    buf1[n1] = '\\0';\n    close(p1[0]);\n    printf(\"Pipe1: %s\\n\", buf1);\n    int val = atoi(buf1) * 2;\n    char buf2[8];\n    snprintf(buf2, sizeof(buf2), \"%d\", val);\n    /* TODO: write buf2 dans p2[1], close p2[1] */\n    char out[8];\n    ssize_t n2 = 0;\n    /* TODO: n2 = read(p2[0], ...) */\n    out[n2] = '\\0';\n    close(p2[0]);\n    printf(\"Pipe2: %s\\n\", out);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p1[2], p2[2];\n    pipe(p1);\n    pipe(p2);\n    write(p1[1], \"42\", 2);\n    close(p1[1]);\n    char buf1[8];\n    ssize_t n1 = read(p1[0], buf1, sizeof(buf1) - 1);\n    buf1[n1] = '\\0';\n    close(p1[0]);\n    printf(\"Pipe1: %s\\n\", buf1);\n    int val = atoi(buf1) * 2;\n    char buf2[8];\n    snprintf(buf2, sizeof(buf2), \"%d\", val);\n    write(p2[____], buf2, strlen(buf2));  // quel fd écriture?\n    close(p2[1]);\n    char out[8];\n    ssize_t n2 = read(p2[____], out, sizeof(out) - 1);  // quel fd lecture?\n    out[n2] = '\\0';\n    close(p2[0]);\n    printf(\"Pipe2: %s\\n\", out);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p1[2], p2[2];\n    pipe(p1);\n    pipe(p2);\n    write(p1[____], \"42\", 2);\n    close(p1[____]);\n    char buf1[8];\n    ssize_t n1 = read(p1[____], buf1, sizeof(buf1) - 1);\n    buf1[n1] = '\\0';\n    close(p1[____]);\n    printf(\"Pipe1: %s\\n\", buf1);\n    int val = atoi(buf1) * 2;\n    char buf2[8];\n    snprintf(buf2, sizeof(buf2), \"%d\", val);\n    write(p2[____], buf2, strlen(buf2));\n    close(p2[____]);\n    char out[8];\n    ssize_t n2 = read(p2[____], out, sizeof(out) - 1);\n    out[n2] = '\\0';\n    close(p2[____]);\n    printf(\"Pipe2: %s\\n\", out);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p1[2], p2[2];\n    // Créez deux pipes\n    // Écrivez \"42\" dans p1, lisez, doublez, écrivez \"84\" dans p2, lisez\n    // Sortie: \"Pipe1: 42\\nPipe2: 84\\n\"\n    return 0;\n}",

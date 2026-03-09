@@ -1,0 +1,40 @@
+{
+  "id": "errno-eintr-01",
+  "subject": "errno",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "EINTR et relance d'appel système",
+  "description": "NSY103 — Quand un signal interrompt un appel système bloquant, celui-ci retourne -1 avec errno=EINTR. Il faut relancer l'appel dans une boucle.\n\nImplémentez une fonction safe_write() qui relance write() si errno==EINTR, et testez-la avec une écriture dans un pipe.",
+  "starter_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\n\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    ssize_t n;\n    do {\n        n = write(fd, buf, count);\n    } while (n == ____ && errno == ____);\n    return n;\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    ssize_t n;\n    do {\n        n = write(fd, buf, count);\n    } while (n == -1 && errno == EINTR);\n    return n;\n}\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+  "hints": [
+    "Un appel interrompu retourne -1",
+    "EINTR signifie qu'un signal a interrompu l'appel",
+    "La boucle do/while relance tant que n==-1 && errno==EINTR"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Written: 13 bytes\nRead: safe write ok\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "write() appelé", "stack": [{"name": "n", "value": "?"}, {"name": "errno", "value": "0"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "safe_write", "args": "fd, buf, count", "is_active": true}], "explanation": "Premier appel à write()", "step_label": "Étape 1"},
+      {"label": "Si EINTR → relance", "stack": [{"name": "n", "value": "-1"}, {"name": "errno", "value": "4 (EINTR)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "safe_write", "args": "fd, buf, count", "is_active": true}], "explanation": "Signal reçu, on reboucle", "step_label": "Étape 2"},
+      {"label": "Succès", "stack": [{"name": "n", "value": "13"}, {"name": "errno", "value": "0"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "write réussit, on sort de la boucle", "step_label": "Étape 3"}
+    ]
+  },
+  "prerequisites": ["errno-check-01"],
+  "exercise_type": "complete",
+  "key_concept": "Boucle EINTR: do { n=syscall(); } while(n==-1 && errno==EINTR);",
+  "common_mistake": "Ne pas vérifier EINTR — l'appel semble échouer alors qu'il faut juste le relancer",
+  "kc_ids": ["KC-C15"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\n\n/* == EXEMPLE: safe_read avec boucle EINTR ================ */\nssize_t example_safe_read(int fd, void *buf, size_t count) {\n    ssize_t n;\n    do {\n        n = read(fd, buf, count);\n    } while (n == -1 && errno == EINTR);\n    return n;\n}\n\n/* == VOTRE EXERCICE: safe_write ========================== */\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    ssize_t n;\n    /* TODO: boucle do/while comme example_safe_read */\n    n = write(fd, buf, count);\n    return n;\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\n\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    ssize_t n;\n    do {\n        n = write(fd, buf, count);\n    } while (n == -1 && errno == ____); /* quelle constante? */\n    return n;\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\n\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    ssize_t n;\n    do {\n        n = write(fd, buf, count);\n    } while (n == ____ && errno == ____);\n    return n;\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <unistd.h>\n\n// Implémentez safe_write: relance write() si EINTR\nssize_t safe_write(int fd, const void *buf, size_t count) {\n    return write(fd, buf, count);\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"safe write ok\";\n    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));\n    close(pipefd[1]);\n    char buf[64];\n    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[nr] = '\\0';\n    close(pipefd[0]);\n    printf(\"Written: %zd bytes\\n\", written);\n    printf(\"Read: %s\\n\", buf);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

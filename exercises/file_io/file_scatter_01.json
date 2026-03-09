@@ -1,0 +1,142 @@
+{
+  "id": "file-scatter-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 5,
+  "title": "E/S vectorisées readv/writev",
+  "description": "NSY103 — writev() et readv() permettent d'écrire/lire plusieurs buffers non-contigus en un seul appel système (scatter-gather I/O). Plus efficace que plusieurs write() pour les protocoles réseau ou les logs structurés.\n\nUtilisez writev pour écrire un header + body + footer en un seul appel, puis readv pour les relire séparément.",
+  "starter_code": "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_iov_XXXXXX\";\n    int fd = mkstemp(path);\n    if (fd == -1) { perror(\"mkstemp\"); return 1; }\n    unlink(path);\n\n    /* Trois buffers non-contigus */\n    char header[] = \"HDR:\";\n    char body[]   = \"Hello World\";\n    char footer[] = \":END\";\n\n    struct iovec wv[3];\n    wv[0].iov_base = header;\n    wv[0].iov_len  = strlen(____);\n    wv[1].iov_base = body;\n    wv[1].iov_len  = strlen(____);\n    wv[2].iov_base = footer;\n    wv[2].iov_len  = strlen(____);\n\n    ssize_t nw = ____(fd, wv, 3);\n    printf(\"Wrote %zd bytes\\n\", nw);\n\n    /* Relire avec readv en 3 buffers separés */\n    lseek(fd, 0, SEEK_SET);\n\n    char rh[5] = {0}, rb[12] = {0}, rf[5] = {0};\n    struct iovec rv[3];\n    rv[0].iov_base = rh;\n    rv[0].iov_len  = 4;\n    rv[1].iov_base = rb;\n    rv[1].iov_len  = 11;\n    rv[2].iov_base = rf;\n    rv[2].iov_len  = 4;\n\n    ssize_t nr = ____(fd, rv, 3);\n    printf(\"Read %zd bytes\\n\", nr);\n    printf(\"Header: %s\\n\", rh);\n    printf(\"Body: %s\\n\", rb);\n    printf(\"Footer: %s\\n\", rf);\n\n    close(fd);\n    return 0;\n}",
+  "solution_code": "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_iov_XXXXXX\";\n    int fd = mkstemp(path);\n    if (fd == -1) { perror(\"mkstemp\"); return 1; }\n    unlink(path);\n\n    /* Trois buffers non-contigus */\n    char header[] = \"HDR:\";\n    char body[]   = \"Hello World\";\n    char footer[] = \":END\";\n\n    struct iovec wv[3];\n    wv[0].iov_base = header;\n    wv[0].iov_len  = strlen(header);\n    wv[1].iov_base = body;\n    wv[1].iov_len  = strlen(body);\n    wv[2].iov_base = footer;\n    wv[2].iov_len  = strlen(footer);\n\n    ssize_t nw = writev(fd, wv, 3);\n    printf(\"Wrote %zd bytes\\n\", nw);\n\n    /* Relire avec readv en 3 buffers separés */\n    lseek(fd, 0, SEEK_SET);\n\n    char rh[5] = {0}, rb[12] = {0}, rf[5] = {0};\n    struct iovec rv[3];\n    rv[0].iov_base = rh;\n    rv[0].iov_len  = 4;\n    rv[1].iov_base = rb;\n    rv[1].iov_len  = 11;\n    rv[2].iov_base = rf;\n    rv[2].iov_len  = 4;\n\n    ssize_t nr = readv(fd, rv, 3);\n    printf(\"Read %zd bytes\\n\", nr);\n    printf(\"Header: %s\\n\", rh);\n    printf(\"Body: %s\\n\", rb);\n    printf(\"Footer: %s\\n\", rf);\n\n    close(fd);\n    return 0;\n}",
+  "hints": [
+    "struct iovec { void *iov_base; size_t iov_len; } décrit un buffer",
+    "writev(fd, iov, count) écrit count buffers en un seul appel atomique",
+    "readv(fd, iov, count) remplit les buffers séquentiellement depuis le fichier"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Wrote 19 bytes\nRead 19 bytes\nHeader: HDR:\nBody: Hello World\nFooter: :END\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "3 iovec pointent vers 3 buffers",
+        "stack": [
+          {
+            "name": "wv[0]",
+            "value": "{header, 4}"
+          },
+          {
+            "name": "wv[1]",
+            "value": "{body, 11}"
+          },
+          {
+            "name": "wv[2]",
+            "value": "{footer, 4}"
+          }
+        ],
+        "heap": [],
+        "arrows": [
+          {
+            "from": "wv[0]",
+            "to": "header",
+            "label": "iov_base"
+          },
+          {
+            "from": "wv[1]",
+            "to": "body",
+            "label": "iov_base"
+          },
+          {
+            "from": "wv[2]",
+            "to": "footer",
+            "label": "iov_base"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Chaque iovec décrit un segment de données non-contigu",
+        "step_label": "Scatter setup"
+      },
+      {
+        "label": "writev envoie les 3 buffers en 1 appel",
+        "stack": [
+          {
+            "name": "nw",
+            "value": "19 (4+11+4)"
+          }
+        ],
+        "heap": [
+          {
+            "name": "fichier",
+            "value": "\"HDR:Hello World:END\""
+          }
+        ],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Un seul appel système — plus efficace que 3 write() séparés",
+        "step_label": "writev"
+      },
+      {
+        "label": "readv remplit 3 buffers séquentiellement",
+        "stack": [
+          {
+            "name": "rh",
+            "value": "\"HDR:\""
+          },
+          {
+            "name": "rb",
+            "value": "\"Hello World\""
+          },
+          {
+            "name": "rf",
+            "value": "\":END\""
+          },
+          {
+            "name": "nr",
+            "value": "19"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "readv distribue les données lues dans les buffers par ordre",
+        "step_label": "readv"
+      }
+    ]
+  },
+  "prerequisites": [
+    "file-lock-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "readv/writev = scatter-gather I/O : un seul syscall pour plusieurs buffers non-contigus",
+  "common_mistake": "Tailles iov_len incohérentes entre écriture et lecture — données décalées",
+  "kc_ids": [
+    "KC-C06"
+  ],
+  "starter_code_stages": [
+    "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\n/* == EXEMPLE =======================================\n * writev pour écrire un log structuré\n * timestamp + message en un seul appel\n * ================================================= */\nvoid example_writev(void) {\n    char p[] = \"/tmp/kf_ex_iov_XXXXXX\";\n    int fd = mkstemp(p);\n    if (fd == -1) return;\n    unlink(p);\n    char ts[] = \"[LOG] \";\n    char msg[] = \"system started\";\n    struct iovec v[2] = {\n        {ts, strlen(ts)},\n        {msg, strlen(msg)}\n    };\n    ssize_t n = writev(fd, v, 2);\n    printf(\"example: wrote %zd bytes\\n\", n);\n    lseek(fd, 0, SEEK_SET);\n    char buf[32] = {0};\n    read(fd, buf, sizeof(buf) - 1);\n    printf(\"example: %s\\n\", buf);\n    close(fd);\n}\n/* Resultat: wrote 20 bytes, [LOG] system started */\n\n/* == VOTRE EXERCICE ================================\n * writev header+body+footer, readv en 3 buffers\n * Inspirez-vous de example_writev.\n * ================================================= */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_iov_XXXXXX\";\n    int fd = mkstemp(path);\n    if (fd == -1) { perror(\"mkstemp\"); return 1; }\n    unlink(path);\n    char header[] = \"HDR:\";\n    char body[]   = \"Hello World\";\n    char footer[] = \":END\";\n    struct iovec wv[3];\n    wv[0].iov_base = header; wv[0].iov_len = strlen(header);\n    wv[1].iov_base = body;   wv[1].iov_len = strlen(body);\n    wv[2].iov_base = footer; wv[2].iov_len = strlen(footer);\n    ssize_t nw = writev(fd, wv, 3);\n    printf(\"Wrote %zd bytes\\n\", nw);\n    lseek(fd, 0, SEEK_SET);\n    char rh[5]={0}, rb[12]={0}, rf[5]={0};\n    struct iovec rv[3];\n    rv[0].iov_base = rh; rv[0].iov_len = 4;\n    rv[1].iov_base = rb; rv[1].iov_len = 11;\n    rv[2].iov_base = rf; rv[2].iov_len = 4;\n    ssize_t nr = ____(fd, rv, 3); // quelle fonction?\n    printf(\"Read %zd bytes\\n\", nr);\n    printf(\"Header: %s\\nBody: %s\\nFooter: %s\\n\", rh, rb, rf);\n    close(fd);\n    return 0;\n}",
+    "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_iov_XXXXXX\";\n    int fd = mkstemp(path);\n    if (fd == -1) { perror(\"mkstemp\"); return 1; }\n    unlink(path);\n\n    char header[] = \"HDR:\";\n    char body[]   = \"Hello World\";\n    char footer[] = \":END\";\n\n    struct iovec wv[3];\n    wv[0].iov_base = header;\n    wv[0].iov_len  = strlen(____);\n    wv[1].iov_base = body;\n    wv[1].iov_len  = strlen(____);\n    wv[2].iov_base = footer;\n    wv[2].iov_len  = strlen(____);\n\n    ssize_t nw = ____(fd, wv, 3);\n    printf(\"Wrote %zd bytes\\n\", nw);\n\n    lseek(fd, 0, SEEK_SET);\n\n    char rh[5]={0}, rb[12]={0}, rf[5]={0};\n    struct iovec rv[3];\n    rv[0].iov_base = rh; rv[0].iov_len = 4;\n    rv[1].iov_base = rb; rv[1].iov_len = 11;\n    rv[2].iov_base = rf; rv[2].iov_len = 4;\n\n    ssize_t nr = ____(fd, rv, 3);\n    printf(\"Read %zd bytes\\n\", nr);\n    printf(\"Header: %s\\nBody: %s\\nFooter: %s\\n\", rh, rb, rf);\n\n    close(fd);\n    return 0;\n}",
+    "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/uio.h>\n#include <fcntl.h>\n\nint main(void) {\n    // mkstemp + unlink pour fichier temporaire\n    // Préparer 3 buffers: header, body, footer\n    // struct iovec wv[3] + writev\n    // lseek au début\n    // struct iovec rv[3] + readv\n    // Afficher les résultats\n    return 0;\n}",
+    "#include <stdlib.h>\n#include <stdio.h>\n#include <sys/uio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "id": "pipe-splice-01",
+  "subject": "pipes",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "Zero-copy avec splice()",
+  "description": "NSY103 — splice() transfère des données entre un fd et un pipe sans copie en espace utilisateur (zero-copy). C'est plus efficace que read()+write() pour de grandes quantités de données. splice() nécessite qu'au moins un des deux fd soit un pipe.\n\nCréez un fichier temporaire avec du contenu, utilisez splice() pour transférer ce contenu vers un pipe, puis lisez depuis le pipe et affichez.",
+  "starter_code": "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\nint main(void) {\n    char tmpfile[] = \"/tmp/kf_splice_XXXXXX\";\n    int tmpfd = mkstemp(tmpfile);\n    const char *data = \"splice zero-copy\";\n    write(tmpfd, data, strlen(data));\n    lseek(tmpfd, 0, SEEK_SET);\n\n    int fd[2];\n    pipe(fd);\n    ssize_t moved = ____(tmpfd, NULL, fd[____], NULL, strlen(data), 0);\n    close(tmpfd);\n    unlink(tmpfile);\n\n    char buf[64];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Spliced %zd bytes: %s\\n\", moved, buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+  "solution_code": "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\nint main(void) {\n    char tmpfile[] = \"/tmp/kf_splice_XXXXXX\";\n    int tmpfd = mkstemp(tmpfile);\n    const char *data = \"splice zero-copy\";\n    write(tmpfd, data, strlen(data));\n    lseek(tmpfd, 0, SEEK_SET);\n\n    int fd[2];\n    pipe(fd);\n    ssize_t moved = splice(tmpfd, NULL, fd[1], NULL, strlen(data), 0);\n    close(tmpfd);\n    unlink(tmpfile);\n\n    char buf[64];\n    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Spliced %zd bytes: %s\\n\", moved, buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+  "hints": [
+    "splice(fd_in, off_in, fd_out, off_out, len, flags) — un des fd doit être un pipe",
+    "On transfère du fichier (tmpfd) vers le pipe (fd[1])",
+    "Le fichier doit être repositionné au début avec lseek avant splice"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Spliced 16 bytes: splice zero-copy\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "Fichier temporaire créé avec mkstemp",
+        "nodes": [
+          {"id": "file", "label": "tmpfile\n\"splice zero-copy\""},
+          {"id": "fd", "label": "tmpfd"}
+        ],
+        "edges": [
+          {"source": "file", "target": "fd", "label": "write + lseek(0)"}
+        ],
+        "explanation": "mkstemp() crée un fichier temporaire unique et retourne un fd ouvert. Après le write(), lseek(tmpfd, 0, SEEK_SET) repositionne le curseur au début — sans cette étape, splice() lirait depuis la position courante (fin du fichier) et ne transférerait rien.",
+        "step_label": "Étape 1 — mkstemp() crée le fichier source, lseek() remet le curseur au début"
+      },
+      {
+        "label": "splice(tmpfd → fd[1]) — zero-copy kernel transfer",
+        "nodes": [
+          {"id": "tmpfd", "label": "tmpfd (fichier)"},
+          {"id": "pipe", "label": "pipe fd[1]"}
+        ],
+        "edges": [
+          {"source": "tmpfd", "target": "pipe", "label": "splice (no userspace copy)"}
+        ],
+        "explanation": "splice() déplace les pages du page cache du fichier directement dans le buffer circulaire du pipe, sans jamais copier les données en espace utilisateur. Le kernel déplace des pointeurs de pages plutôt que du contenu — la performance est constante quelle que soit la taille transférée.",
+        "step_label": "Étape 2 — splice() transfère sans copie du fichier vers le pipe"
+      },
+      {
+        "label": "read(fd[0]) — récupérer les données",
+        "nodes": [
+          {"id": "pipe", "label": "pipe fd[0]"},
+          {"id": "buf", "label": "buf = \"splice zero-copy\""}
+        ],
+        "edges": [
+          {"source": "pipe", "target": "buf", "label": "16 bytes"}
+        ],
+        "explanation": "read(fd[0]) récupère les données depuis le pipe — l'extrémité lecture du buffer circulaire kernel. Le nombre d'octets retourné par splice() correspond exactement à ce qui sera disponible en lecture, ce qui permet d'imprimer le compte précis sans appel supplémentaire.",
+        "step_label": "Étape 3 — read(fd[0]) consomme les données transférées par splice()"
+      }
+    ]
+  },
+  "prerequisites": ["pipe-select-01"],
+  "exercise_type": "complete",
+  "key_concept": "splice() transfère des données entre fd et pipe dans le kernel, sans copie en espace utilisateur",
+  "common_mistake": "Oublier lseek(fd, 0, SEEK_SET) après write — splice lit depuis la position courante",
+  "kc_ids": ["KC-C10"],
+  "starter_code_stages": [
+    "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\n/* == EXEMPLE =======================================\n * splice() entre 2 pipes : zero-copy pipe-to-pipe\n * ================================================= */\nvoid example_splice_pipes(void) {\n    int p1[2], p2[2];\n    pipe(p1); pipe(p2);\n    write(p1[1], \"hello\", 5);\n    close(p1[1]);\n    splice(p1[0], NULL, p2[1], NULL, 5, 0);\n    close(p2[1]);\n    char buf[16];\n    ssize_t n = read(p2[0], buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    printf(\"Pipe-to-pipe: %s\\n\", buf);\n    close(p1[0]); close(p2[0]);\n}\n/* Resultat: Pipe-to-pipe: hello */\n\n/* == VOTRE EXERCICE ================================\n * splice() fichier → pipe : zero-copy file-to-pipe\n * ================================================= */\nint main(void) {\n    char tmpfile[] = \"/tmp/kf_splice_XXXXXX\";\n    int tmpfd = mkstemp(tmpfile);\n    const char *data = \"splice zero-copy\";\n    write(tmpfd, data, strlen(data));\n    lseek(tmpfd, 0, SEEK_SET);\n    int fd[2]; pipe(fd);\n    /* TODO: splice(tmpfd, NULL, fd[1], NULL, strlen(data), 0) */\n    close(tmpfd); unlink(tmpfile);\n    char buf[64];\n    ssize_t n = read(fd[0], buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    printf(\"Spliced %zd bytes: %s\\n\", (ssize_t)strlen(data), buf);\n    close(fd[0]); close(fd[1]);\n    return 0;\n}",
+    "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\nint main(void) {\n    char tmpfile[] = \"/tmp/kf_splice_XXXXXX\";\n    int tmpfd = mkstemp(tmpfile);\n    const char *data = \"splice zero-copy\";\n    write(tmpfd, data, strlen(data));\n    lseek(tmpfd, 0, SEEK_SET);\n    int fd[2]; pipe(fd);\n    ssize_t moved = splice(tmpfd, NULL, fd[____], NULL, strlen(data), 0);  // quel fd ?\n    close(tmpfd); unlink(tmpfile);\n    char buf[64];\n    ssize_t n = read(fd[0], buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    printf(\"Spliced %zd bytes: %s\\n\", moved, buf);\n    close(fd[0]); close(fd[1]);\n    return 0;\n}",
+    "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\nint main(void) {\n    char tmpfile[] = \"/tmp/kf_splice_XXXXXX\";\n    int tmpfd = mkstemp(tmpfile);\n    const char *data = \"splice zero-copy\";\n    write(tmpfd, data, strlen(data));\n    lseek(tmpfd, 0, SEEK_SET);\n\n    int fd[2];\n    pipe(fd);\n    ssize_t moved = ____(tmpfd, NULL, fd[____], NULL, strlen(data), 0);\n    close(tmpfd);\n    unlink(tmpfile);\n\n    char buf[64];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Spliced %zd bytes: %s\\n\", moved, buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+    "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <string.h>\n#include <stdlib.h>\n\nint main(void) {\n    // Créez un fichier temporaire avec \"splice zero-copy\"\n    // Utilisez splice() pour transférer vers un pipe\n    // Lisez depuis le pipe, affichez \"Spliced 16 bytes: splice zero-copy\"\n    return 0;\n}",
+    "#define _GNU_SOURCE\n#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

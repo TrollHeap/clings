@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
+use crate::error::{KfError, Result};
+
 /// Action returned by the watch callback or keyboard input.
 pub enum WatchAction {
     /// Exercise solved — advance to next
@@ -23,22 +25,16 @@ pub fn watch_file_interactive<F, K>(
     path: &Path,
     mut on_change: F,
     mut on_key: K,
-) -> Result<WatchAction, String>
+) -> Result<WatchAction>
 where
     F: FnMut() -> WatchAction,
     K: FnMut(u8) -> Option<WatchAction>,
 {
     let (tx, rx) = mpsc::channel();
 
-    let mut watcher = RecommendedWatcher::new(
-        tx,
-        notify::Config::default().with_poll_interval(Duration::from_millis(100)),
-    )
-    .map_err(|e| format!("Failed to create watcher: {e}"))?;
+    let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())?;
 
-    watcher
-        .watch(path, RecursiveMode::NonRecursive)
-        .map_err(|e| format!("Failed to watch {}: {e}", path.display()))?;
+    watcher.watch(path, RecursiveMode::NonRecursive)?;
 
     // Set up non-blocking stdin
     let (key_tx, key_rx) = mpsc::channel();
@@ -76,7 +72,7 @@ where
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err("File watcher disconnected".to_string());
+                return Err(KfError::Config("File watcher disconnected".to_string()));
             }
         }
 

@@ -1,0 +1,40 @@
+{
+  "id": "errno-eperm-01",
+  "subject": "errno",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "EPERM/EACCES: permissions",
+  "description": "NSY103 — EPERM (Operation not permitted) et EACCES (Permission denied) sont deux erreurs de permissions distinctes. EACCES concerne les droits d'accès fichier, EPERM concerne les opérations privilégiées.\n\nDémontrez la différence en testant des opérations qui génèrent chacune de ces erreurs.",
+  "starter_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_readonly_test.txt\", O_CREAT | O_WRONLY, 0444);\n    if (fd >= 0) {\n        write(fd, \"test\", 4);\n        close(fd);\n    }\n    errno = 0;\n    fd = open(\"/tmp/kf_readonly_test.txt\", O_WRONLY);\n    if (fd == ____) {\n        printf(\"Write attempt: %s (errno=%d)\\n\", ____(errno), errno);\n    } else {\n        close(fd);\n    }\n    printf(\"EPERM=%d, EACCES=%d\\n\", EPERM, EACCES);\n    unlink(\"/tmp/kf_readonly_test.txt\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\nint main(void) {\n    int fd = open(\"/tmp/kf_readonly_test.txt\", O_CREAT | O_WRONLY, 0444);\n    if (fd >= 0) {\n        write(fd, \"test\", 4);\n        close(fd);\n    }\n    errno = 0;\n    fd = open(\"/tmp/kf_readonly_test.txt\", O_WRONLY);\n    if (fd == -1) {\n        printf(\"Write attempt: %s (errno=%d)\\n\", strerror(errno), errno);\n    } else {\n        close(fd);\n    }\n    printf(\"EPERM=%d, EACCES=%d\\n\", EPERM, EACCES);\n    unlink(\"/tmp/kf_readonly_test.txt\");\n    return 0;\n}",
+  "hints": [
+    "open() retourne -1 en cas d'erreur",
+    "strerror(errno) donne le message lisible",
+    "Un fichier mode 0444 ne peut pas être ouvert en écriture"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Write attempt: Permission denied (errno=13)\nEPERM=1, EACCES=13\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "Fichier créé mode 0444", "stack": [{"name": "mode", "value": "0444 (r--r--r--)"}, {"name": "fd", "value": ">= 0"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Fichier créé en lecture seule", "step_label": "Étape 1"},
+      {"label": "open(O_WRONLY) → EACCES", "stack": [{"name": "fd", "value": "-1"}, {"name": "errno", "value": "13 (EACCES)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Pas de permission d'écriture → EACCES", "step_label": "Étape 2"},
+      {"label": "EPERM vs EACCES", "stack": [{"name": "EPERM", "value": "1"}, {"name": "EACCES", "value": "13"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "EPERM=opération privilégiée, EACCES=droits fichier", "step_label": "Étape 3"}
+    ]
+  },
+  "prerequisites": ["errno-enoent-01"],
+  "exercise_type": "complete",
+  "key_concept": "EACCES=droits fichier insuffisants, EPERM=opération réservée à root/privilégiée",
+  "common_mistake": "Confondre EPERM et EACCES — EACCES est pour les permissions fichier, EPERM pour les opérations système",
+  "kc_ids": ["KC-C15"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\n/* == EXEMPLE: ENOENT vs EACCES ========================== */\nvoid example_permissions(void) {\n    int fd = open(\"/nonexistent\", O_RDONLY);\n    if (fd == -1) printf(\"ENOENT: %s\\n\", strerror(errno));\n}\n\n/* == VOTRE EXERCICE ====================================== */\nint main(void) {\n    int fd = open(\"/tmp/kf_readonly_test.txt\", O_CREAT | O_WRONLY, 0444);\n    if (fd >= 0) { write(fd, \"test\", 4); close(fd); }\n    errno = 0;\n    fd = open(\"/tmp/kf_readonly_test.txt\", O_WRONLY);\n    if (fd == -1) {\n        printf(\"Write attempt: %s (errno=%d)\\n\", strerror(errno), errno);\n    } else { close(fd); }\n    printf(\"EPERM=%d, EACCES=%d\\n\", EPERM, EACCES);\n    unlink(\"/tmp/kf_readonly_test.txt\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_readonly_test.txt\", O_CREAT | O_WRONLY, 0444);\n    if (fd >= 0) { write(fd, \"test\", 4); close(fd); }\n    errno = 0;\n    fd = open(\"/tmp/kf_readonly_test.txt\", O_WRONLY);\n    if (fd == -1) {\n        printf(\"Write attempt: %s (errno=%d)\\n\", ____(errno), errno);\n    } else { close(fd); }\n    printf(\"EPERM=%d, EACCES=%d\\n\", EPERM, EACCES);\n    unlink(\"/tmp/kf_readonly_test.txt\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_readonly_test.txt\", O_CREAT | O_WRONLY, 0444);\n    if (fd >= 0) { write(fd, \"test\", 4); close(fd); }\n    errno = 0;\n    fd = open(\"/tmp/kf_readonly_test.txt\", O_WRONLY);\n    if (fd == ____) {\n        printf(\"Write attempt: %s (errno=%d)\\n\", ____(errno), errno);\n    } else { close(fd); }\n    printf(\"EPERM=%d, EACCES=%d\\n\", EPERM, EACCES);\n    unlink(\"/tmp/kf_readonly_test.txt\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n#include <string.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\nint main(void) {\n    // Créez un fichier 0444, tentez de l'ouvrir en écriture\n    // Affichez l'erreur et EPERM/EACCES\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

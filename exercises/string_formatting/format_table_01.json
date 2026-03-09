@@ -1,0 +1,64 @@
+{
+  "id": "format-table-01",
+  "subject": "string_formatting",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Affichage tabulaire formaté",
+  "description": "NSY103 — Combiner largeur, précision et alignement pour créer des tableaux lisibles. %-Ns aligne les chaînes à gauche, %Nd aligne les nombres à droite — essentiel pour les rapports et logs.\n\nAffichez un tableau formaté de processus avec colonnes alignées.",
+  "starter_code": "#include <stdio.h>\n\ntypedef struct {\n    int pid;\n    char name[16];\n    float cpu;\n    int mem_kb;\n} ProcInfo;\n\nint main(void) {\n    ProcInfo procs[] = {\n        {1, \"init\", 0.1f, 2048},\n        {42, \"bash\", 1.5f, 8192},\n        {1337, \"gcc\", 95.2f, 524288},\n    };\n    int n = 3;\n    printf(\"____\\n\", \"PID\", \"NAME\", \"CPU%\", \"MEM(KB)\");\n    printf(\"----+----------+-------+--------\\n\");\n    for (int i = 0; i < n; i++) {\n        printf(\"____\\n\",\n               procs[i].pid, procs[i].name,\n               procs[i].cpu, procs[i].mem_kb);\n    }\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\ntypedef struct {\n    int pid;\n    char name[16];\n    float cpu;\n    int mem_kb;\n} ProcInfo;\n\nint main(void) {\n    ProcInfo procs[] = {\n        {1, \"init\", 0.1f, 2048},\n        {42, \"bash\", 1.5f, 8192},\n        {1337, \"gcc\", 95.2f, 524288},\n    };\n    int n = 3;\n    printf(\"%4s|%-10s|%6s|%8s\\n\", \"PID\", \"NAME\", \"CPU%\", \"MEM(KB)\");\n    printf(\"----+----------+-------+--------\\n\");\n    for (int i = 0; i < n; i++) {\n        printf(\"%4d|%-10s|%6.1f|%8d\\n\",\n               procs[i].pid, procs[i].name,\n               procs[i].cpu, procs[i].mem_kb);\n    }\n    return 0;\n}",
+  "hints": [
+    "%4d aligne un entier à droite sur 4 caractères",
+    "%-10s aligne une chaîne à gauche sur 10 caractères",
+    "%6.1f affiche un float sur 6 caractères avec 1 décimale"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": " PID|NAME      |  CPU%| MEM(KB)\n----+----------+-------+--------\n   1|init      |   0.1|    2048\n  42|bash      |   1.5|    8192\n1337|gcc       |  95.2|  524288\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Structure ProcInfo",
+        "stack": [
+          {"name": "procs[0]", "value": "{1, \"init\", 0.1, 2048}"},
+          {"name": "procs[1]", "value": "{42, \"bash\", 1.5, 8192}"},
+          {"name": "procs[2]", "value": "{1337, \"gcc\", 95.2, 524288}"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Tableau de structs avec des valeurs de largeurs différentes",
+        "step_label": "1. Données"
+      },
+      {
+        "label": "Format: %4d|%-10s|%6.1f|%8d",
+        "stack": [
+          {"name": "%4d", "value": "PID aligné droite, 4 chars"},
+          {"name": "%-10s", "value": "NAME aligné gauche, 10 chars"},
+          {"name": "%6.1f", "value": "CPU% droite, 6 chars, 1 décimale"},
+          {"name": "%8d", "value": "MEM droite, 8 chars"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Chaque colonne a sa propre largeur et son alignement",
+        "step_label": "2. Format"
+      }
+    ]
+  },
+  "prerequisites": ["strtol-parse-01"],
+  "exercise_type": "complete",
+  "key_concept": "Combiner %Nd (droite), %-Ns (gauche) et %.Nf (précision) pour des tableaux proprement alignés",
+  "common_mistake": "Mélanger les largeurs entre l'en-tête et les données → colonnes désalignées",
+  "kc_ids": ["KC-C05"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Tableau formaté avec printf\n * =========================================================== */\nvoid example_table(void) {\n    printf(\"%3s|%-8s|%5s\\n\", \"ID\", \"Name\", \"Score\");\n    printf(\"---+--------+-----\\n\");\n    printf(\"%3d|%-8s|%5.1f\\n\", 1, \"Alice\", 98.5);\n    printf(\"%3d|%-8s|%5.1f\\n\", 2, \"Bob\", 75.0);\n}\n\n/* == VOTRE EXERCICE =========================================\n * Affichez un tableau de ProcInfo aligné\n * =========================================================== */\n\ntypedef struct {\n    int pid;\n    char name[16];\n    float cpu;\n    int mem_kb;\n} ProcInfo;\n\nint main(void) {\n    ProcInfo procs[] = {\n        {1, \"init\", 0.1f, 2048},\n        {42, \"bash\", 1.5f, 8192},\n        {1337, \"gcc\", 95.2f, 524288},\n    };\n    int n = 3;\n    /* TODO: header + separator + boucle formatée */\n    printf(\"%4s|%-10s|%6s|%8s\\n\", \"PID\", \"NAME\", \"CPU%\", \"MEM(KB)\");\n    printf(\"----+----------+-------+--------\\n\");\n    for (int i = 0; i < n; i++) {\n        printf(\"%4d|%-10s|%6.1f|%8d\\n\",\n               procs[i].pid, procs[i].name,\n               procs[i].cpu, procs[i].mem_kb);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n\ntypedef struct {\n    int pid;\n    char name[16];\n    float cpu;\n    int mem_kb;\n} ProcInfo;\n\nint main(void) {\n    ProcInfo procs[] = {\n        {1, \"init\", 0.1f, 2048},\n        {42, \"bash\", 1.5f, 8192},\n        {1337, \"gcc\", 95.2f, 524288},\n    };\n    int n = 3;\n    printf(\"%4s|%-10s|%6s|%8s\\n\", \"PID\", \"NAME\", \"CPU%\", \"MEM(KB)\");\n    printf(\"----+----------+-------+--------\\n\");\n    for (int i = 0; i < n; i++) {\n        printf(\"%4d|______|%6.1f|%8d\\n\",\n               procs[i].pid, procs[i].name,\n               procs[i].cpu, procs[i].mem_kb);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n\ntypedef struct {\n    int pid;\n    char name[16];\n    float cpu;\n    int mem_kb;\n} ProcInfo;\n\nint main(void) {\n    ProcInfo procs[] = {\n        {1, \"init\", 0.1f, 2048},\n        {42, \"bash\", 1.5f, 8192},\n        {1337, \"gcc\", 95.2f, 524288},\n    };\n    int n = 3;\n    printf(\"____\\n\", \"PID\", \"NAME\", \"CPU%\", \"MEM(KB)\");\n    printf(\"----+----------+-------+--------\\n\");\n    for (int i = 0; i < n; i++) {\n        printf(\"____\\n\",\n               procs[i].pid, procs[i].name,\n               procs[i].cpu, procs[i].mem_kb);\n    }\n    return 0;\n}",
+    "#include <stdio.h>\n\n// struct ProcInfo {pid, name, cpu, mem_kb}\n// Tableau: PID(4)|NAME(10 gauche)|CPU%(6.1f)|MEM(8)\n// 3 entrées: init, bash, gcc\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

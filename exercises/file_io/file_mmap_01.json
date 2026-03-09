@@ -1,0 +1,78 @@
+{
+  "id": "file-mmap-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "Fichier mappé en mémoire avec mmap",
+  "description": "NSY103 — mmap() projette un fichier (ou une région anonyme) dans l'espace d'adressage du processus. Les accès mémoire sont traduits en E/S fichier par le noyau. C'est plus efficace que read/write pour les accès aléatoires.\n\nUtilisez mmap MAP_ANONYMOUS pour simuler un fichier mappé, écrivez des données et relisez-les.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\nint main(void) {\n    size_t page = (size_t)sysconf(_SC_PAGESIZE);\n    size_t map_size = page; /* au moins 1 page */\n\n    /* mmap anonyme : pas de fichier, memoire privee */\n    void *addr = mmap(NULL, map_size,\n                      PROT_READ | ____,\n                      MAP_PRIVATE | MAP_ANONYMOUS,\n                      -1, 0);\n    if (addr == MAP_FAILED) {\n        perror(\"mmap\");\n        return 1;\n    }\n\n    printf(\"Mapped %zu bytes at %p\\n\", map_size, addr);\n\n    /* Ecrire des records directement en memoire */\n    Record *records = (Record *)addr;\n    records[0] = (Record){1, \"Alice\"};\n    records[1] = (Record){2, \"Bob\"};\n    records[2] = (Record){3, \"Charlie\"};\n\n    /* Relire */\n    for (int i = 0; i < 3; i++)\n        printf(\"Record %d: %s\\n\", records[i].____, records[i].____);\n\n    /* Nombre de records possibles dans la page */\n    printf(\"Max records per page: %zu\\n\", page / sizeof(____));\n\n    ____(addr, map_size);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\nint main(void) {\n    size_t page = (size_t)sysconf(_SC_PAGESIZE);\n    size_t map_size = page; /* au moins 1 page */\n\n    /* mmap anonyme : pas de fichier, memoire privee */\n    void *addr = mmap(NULL, map_size,\n                      PROT_READ | PROT_WRITE,\n                      MAP_PRIVATE | MAP_ANONYMOUS,\n                      -1, 0);\n    if (addr == MAP_FAILED) {\n        perror(\"mmap\");\n        return 1;\n    }\n\n    printf(\"Mapped %zu bytes at %p\\n\", map_size, addr);\n\n    /* Ecrire des records directement en memoire */\n    Record *records = (Record *)addr;\n    records[0] = (Record){1, \"Alice\"};\n    records[1] = (Record){2, \"Bob\"};\n    records[2] = (Record){3, \"Charlie\"};\n\n    /* Relire */\n    for (int i = 0; i < 3; i++)\n        printf(\"Record %d: %s\\n\", records[i].id, records[i].name);\n\n    /* Nombre de records possibles dans la page */\n    printf(\"Max records per page: %zu\\n\", page / sizeof(Record));\n\n    munmap(addr, map_size);\n    return 0;\n}",
+  "hints": [
+    "PROT_WRITE permet l'écriture dans la zone mappée",
+    "MAP_ANONYMOUS crée un mapping sans fichier (fd = -1)",
+    "munmap(addr, size) libère le mapping — équivalent de free pour mmap"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:Mapped \\d+ bytes at 0x[0-9a-f]+\nRecord 1: Alice\nRecord 2: Bob\nRecord 3: Charlie\nMax records per page: \\d+\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "mmap crée un mapping anonyme",
+        "stack": [
+          {"name": "page", "value": "4096"},
+          {"name": "map_size", "value": "4096"},
+          {"name": "addr", "value": "0x7f... (page virtuelle)"}
+        ],
+        "heap": [
+          {"name": "mapping", "value": "(4096 bytes, PROT_READ|PROT_WRITE)"}
+        ],
+        "arrows": [{"from": "addr", "to": "mapping", "label": "pointe vers"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le noyau alloue une page et la mappe dans l'espace virtuel",
+        "step_label": "mmap"
+      },
+      {
+        "label": "Écriture directe de records via pointeur",
+        "stack": [
+          {"name": "records", "value": "(Record*)addr"}
+        ],
+        "heap": [
+          {"name": "records[0]", "value": "{1, \"Alice\"}"},
+          {"name": "records[1]", "value": "{2, \"Bob\"}"},
+          {"name": "records[2]", "value": "{3, \"Charlie\"}"}
+        ],
+        "arrows": [{"from": "records", "to": "records[0]", "label": "cast"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le mapping se comporte comme un tableau — écriture directe en mémoire",
+        "step_label": "Écriture"
+      },
+      {
+        "label": "munmap libère le mapping",
+        "stack": [
+          {"name": "addr", "value": "(libéré)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "munmap rend la page au noyau — accès après = SIGSEGV",
+        "step_label": "munmap"
+      }
+    ]
+  },
+  "prerequisites": ["file-record-01"],
+  "exercise_type": "complete",
+  "key_concept": "mmap transforme un fichier en tableau mémoire — le noyau gère la pagination transparente",
+  "common_mistake": "Oublier munmap — fuite de mémoire virtuelle, la mémoire n'est pas libérée par free",
+  "kc_ids": ["KC-C06"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\n/* == EXEMPLE =======================================\n * mmap anonyme pour un buffer d'entiers\n * Pattern: mmap(MAP_ANONYMOUS) + cast + munmap\n * ================================================= */\nvoid example_mmap(void) {\n    size_t sz = (size_t)sysconf(_SC_PAGESIZE);\n    int *arr = mmap(NULL, sz, PROT_READ | PROT_WRITE,\n                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);\n    if (arr == MAP_FAILED) return;\n    for (int i = 0; i < 5; i++) arr[i] = i * 10;\n    for (int i = 0; i < 5; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    munmap(arr, sz);\n}\n/* Resultat: 0 10 20 30 40 */\n\n/* == VOTRE EXERCICE ================================\n * Mapper une page, y écrire des Record, relire.\n * Inspirez-vous de example_mmap.\n * ================================================= */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\nint main(void) {\n    size_t page = (size_t)sysconf(_SC_PAGESIZE);\n    size_t map_size = page;\n    void *addr = mmap(NULL, map_size, PROT_READ | PROT_WRITE,\n                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);\n    if (addr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    printf(\"Mapped %zu bytes at %p\\n\", map_size, addr);\n    Record *records = (Record *)addr;\n    records[0] = (Record){1, \"Alice\"};\n    records[1] = (Record){2, \"Bob\"};\n    records[2] = (Record){3, \"Charlie\"};\n    for (int i = 0; i < 3; i++)\n        printf(\"Record %d: %s\\n\", records[i].id, records[i].____); // quel champ?\n    printf(\"Max records per page: %zu\\n\", page / sizeof(____)); // quel type?\n    ____(addr, map_size); // libérer le mapping\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\nint main(void) {\n    size_t page = (size_t)sysconf(_SC_PAGESIZE);\n    size_t map_size = page;\n\n    void *addr = mmap(NULL, map_size,\n                      PROT_READ | ____,\n                      MAP_PRIVATE | MAP_ANONYMOUS,\n                      -1, 0);\n    if (addr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n\n    printf(\"Mapped %zu bytes at %p\\n\", map_size, addr);\n\n    Record *records = (Record *)addr;\n    records[0] = (Record){1, \"Alice\"};\n    records[1] = (Record){2, \"Bob\"};\n    records[2] = (Record){3, \"Charlie\"};\n\n    for (int i = 0; i < 3; i++)\n        printf(\"Record %d: %s\\n\", records[i].____, records[i].____);\n\n    printf(\"Max records per page: %zu\\n\", page / sizeof(____));\n\n    ____(addr, map_size);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <sys/mman.h>\n#include <unistd.h>\n\ntypedef struct { int id; char name[16]; } Record;\n\nint main(void) {\n    // sysconf(_SC_PAGESIZE) pour la taille de page\n    // mmap(NULL, page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)\n    // Caster addr en Record*, écrire 3 records, relire\n    // munmap pour libérer\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/mman.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

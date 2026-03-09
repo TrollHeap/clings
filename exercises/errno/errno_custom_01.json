@@ -1,0 +1,40 @@
+{
+  "id": "errno-custom-01",
+  "subject": "errno",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "Gestion d'erreur personnalisée style errno",
+  "description": "NSY103 — Dans une bibliothèque, on peut implémenter un système d'erreur inspiré d'errno : une variable thread-local + des fonctions de diagnostic.\n\nCréez un mini-système d'erreur avec des codes custom, un getter/setter et un message descriptif.",
+  "starter_code": "#include <stdio.h>\n\nenum {\n    ERR_NONE = 0,\n    ERR_OVERFLOW = 1,\n    ERR_UNDERFLOW = 2,\n    ERR_DIVZERO = 3\n};\n\nstatic __thread int my_errno = ERR_NONE;\n\nvoid set_error(int code) { my_errno = ____; }\nint get_error(void) { return ____; }\n\nconst char *error_str(int code) {\n    switch (code) {\n        case ERR_NONE:      return \"no error\";\n        case ERR_OVERFLOW:  return \"overflow\";\n        case ERR_UNDERFLOW: return \"underflow\";\n        case ERR_DIVZERO:   return \"division by zero\";\n        default:            return \"unknown error\";\n    }\n}\n\nint safe_div(int a, int b) {\n    if (b == 0) { set_error(____); return 0; }\n    set_error(ERR_NONE);\n    return a / b;\n}\n\nint main(void) {\n    int r1 = safe_div(10, 3);\n    printf(\"10/3=%d err=%s\\n\", r1, error_str(get_error()));\n    int r2 = safe_div(5, 0);\n    printf(\"5/0=%d err=%s\\n\", r2, error_str(get_error()));\n    set_error(ERR_OVERFLOW);\n    printf(\"manual: err=%s\\n\", error_str(get_error()));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\nenum {\n    ERR_NONE = 0,\n    ERR_OVERFLOW = 1,\n    ERR_UNDERFLOW = 2,\n    ERR_DIVZERO = 3\n};\nstatic __thread int my_errno = ERR_NONE;\nvoid set_error(int code) { my_errno = code; }\nint get_error(void) { return my_errno; }\nconst char *error_str(int code) {\n    switch (code) {\n        case ERR_NONE:      return \"no error\";\n        case ERR_OVERFLOW:  return \"overflow\";\n        case ERR_UNDERFLOW: return \"underflow\";\n        case ERR_DIVZERO:   return \"division by zero\";\n        default:            return \"unknown error\";\n    }\n}\nint safe_div(int a, int b) {\n    if (b == 0) { set_error(ERR_DIVZERO); return 0; }\n    set_error(ERR_NONE);\n    return a / b;\n}\nint main(void) {\n    int r1 = safe_div(10, 3);\n    printf(\"10/3=%d err=%s\\n\", r1, error_str(get_error()));\n    int r2 = safe_div(5, 0);\n    printf(\"5/0=%d err=%s\\n\", r2, error_str(get_error()));\n    set_error(ERR_OVERFLOW);\n    printf(\"manual: err=%s\\n\", error_str(get_error()));\n    return 0;\n}",
+  "hints": [
+    "set_error stocke le code dans my_errno",
+    "get_error retourne my_errno",
+    "ERR_DIVZERO pour la division par zéro"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "10/3=3 err=no error\n5/0=0 err=division by zero\nmanual: err=overflow\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "safe_div(10,3) → succès", "stack": [{"name": "my_errno", "value": "0 (ERR_NONE)"}, {"name": "result", "value": "3"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "safe_div", "args": "10, 3", "is_active": true}], "explanation": "Division réussie, errno remis à 0", "step_label": "Étape 1"},
+      {"label": "safe_div(5,0) → ERR_DIVZERO", "stack": [{"name": "my_errno", "value": "3 (ERR_DIVZERO)"}, {"name": "result", "value": "0"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "safe_div", "args": "5, 0", "is_active": true}], "explanation": "Division par zéro détectée", "step_label": "Étape 2"},
+      {"label": "__thread isolation", "stack": [{"name": "__thread my_errno", "value": "thread-local storage"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "__thread garantit l'isolation entre threads", "step_label": "Étape 3"}
+    ]
+  },
+  "prerequisites": ["errno-thread-01"],
+  "exercise_type": "complete",
+  "key_concept": "__thread pour thread-local storage, pattern getter/setter avec codes d'erreur enum",
+  "common_mistake": "Oublier __thread — my_errno serait partagé entre threads et causerait des races",
+  "kc_ids": ["KC-C15"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE: compteur thread-local ===================== */\nstatic __thread int counter = 0;\nvoid inc(void) { counter++; }\nint get_count(void) { return counter; }\n\n/* == VOTRE EXERCICE ====================================== */\nenum { ERR_NONE=0, ERR_OVERFLOW=1, ERR_UNDERFLOW=2, ERR_DIVZERO=3 };\nstatic __thread int my_errno = ERR_NONE;\nvoid set_error(int code) { my_errno = code; }\nint get_error(void) { return my_errno; }\nconst char *error_str(int code) {\n    switch (code) {\n        case ERR_NONE: return \"no error\";\n        case ERR_OVERFLOW: return \"overflow\";\n        case ERR_UNDERFLOW: return \"underflow\";\n        case ERR_DIVZERO: return \"division by zero\";\n        default: return \"unknown error\";\n    }\n}\nint safe_div(int a, int b) {\n    if (b == 0) { set_error(ERR_DIVZERO); return 0; }\n    set_error(ERR_NONE);\n    return a / b;\n}\nint main(void) {\n    int r1 = safe_div(10, 3);\n    printf(\"10/3=%d err=%s\\n\", r1, error_str(get_error()));\n    int r2 = safe_div(5, 0);\n    printf(\"5/0=%d err=%s\\n\", r2, error_str(get_error()));\n    set_error(ERR_OVERFLOW);\n    printf(\"manual: err=%s\\n\", error_str(get_error()));\n    return 0;\n}",
+    "#include <stdio.h>\n\nenum { ERR_NONE=0, ERR_OVERFLOW=1, ERR_UNDERFLOW=2, ERR_DIVZERO=3 };\nstatic __thread int my_errno = ERR_NONE;\nvoid set_error(int code) { my_errno = code; }\nint get_error(void) { return my_errno; }\nconst char *error_str(int code) {\n    switch (code) {\n        case ERR_NONE: return \"no error\";\n        case ERR_OVERFLOW: return \"overflow\";\n        case ERR_UNDERFLOW: return \"underflow\";\n        case ERR_DIVZERO: return \"division by zero\";\n        default: return \"unknown error\";\n    }\n}\nint safe_div(int a, int b) {\n    if (b == 0) { set_error(____); return 0; }\n    set_error(ERR_NONE);\n    return a / b;\n}\nint main(void) {\n    int r1 = safe_div(10, 3);\n    printf(\"10/3=%d err=%s\\n\", r1, error_str(get_error()));\n    int r2 = safe_div(5, 0);\n    printf(\"5/0=%d err=%s\\n\", r2, error_str(get_error()));\n    set_error(ERR_OVERFLOW);\n    printf(\"manual: err=%s\\n\", error_str(get_error()));\n    return 0;\n}",
+    "#include <stdio.h>\n\nenum { ERR_NONE=0, ERR_OVERFLOW=1, ERR_UNDERFLOW=2, ERR_DIVZERO=3 };\nstatic __thread int my_errno = ERR_NONE;\nvoid set_error(int code) { my_errno = ____; }\nint get_error(void) { return ____; }\nconst char *error_str(int code) {\n    switch (code) {\n        case ERR_NONE: return \"no error\";\n        case ERR_OVERFLOW: return \"overflow\";\n        case ERR_UNDERFLOW: return \"underflow\";\n        case ERR_DIVZERO: return \"division by zero\";\n        default: return \"unknown error\";\n    }\n}\nint safe_div(int a, int b) {\n    if (b == 0) { set_error(____); return 0; }\n    set_error(ERR_NONE);\n    return a / b;\n}\nint main(void) {\n    int r1 = safe_div(10, 3);\n    printf(\"10/3=%d err=%s\\n\", r1, error_str(get_error()));\n    int r2 = safe_div(5, 0);\n    printf(\"5/0=%d err=%s\\n\", r2, error_str(get_error()));\n    set_error(ERR_OVERFLOW);\n    printf(\"manual: err=%s\\n\", error_str(get_error()));\n    return 0;\n}",
+    "#include <stdio.h>\n\n// Créez un système d'erreur custom: enum codes, __thread variable,\n// set_error/get_error/error_str, safe_div avec gestion d'erreur\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

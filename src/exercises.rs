@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::error::{KfError, Result};
 use crate::models::Exercise;
 
+/// Ensemble d'exercices : liste complète + index par sujet.
 pub type ExerciseSet = (Vec<Exercise>, HashMap<String, Vec<Exercise>>);
 
 /// Recursively load all exercise JSON files from a directory.
@@ -18,6 +20,7 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
             exercises.extend(load_exercises_from_dir(&path));
         } else if path.extension().is_some_and(|e| e == "json")
             && path.file_name() != Some(std::ffi::OsStr::new("kc_error_map.json"))
+            && path.file_name() != Some(std::ffi::OsStr::new("annales_map.json"))
         {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 match serde_json::from_str::<Exercise>(&content) {
@@ -32,16 +35,16 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
 
 /// Resolve the exercises directory path.
 /// Priority: KERNELFORGE_EXERCISES env var > auto-detect exercises/ relative to binary or CWD
-fn resolve_exercises_dir() -> Result<PathBuf, String> {
+pub fn resolve_exercises_dir() -> Result<PathBuf> {
     if let Ok(env_path) = std::env::var("KERNELFORGE_EXERCISES") {
         let p = PathBuf::from(env_path);
         if p.exists() {
             return Ok(p);
         }
-        return Err(format!(
+        return Err(KfError::Config(format!(
             "KERNELFORGE_EXERCISES path does not exist: {}",
             p.display()
-        ));
+        )));
     }
 
     // Try relative to the binary location
@@ -64,18 +67,22 @@ fn resolve_exercises_dir() -> Result<PathBuf, String> {
         }
     }
 
-    Err(
+    Err(KfError::Config(
         "Cannot find exercises directory. Set KERNELFORGE_EXERCISES or run from project root."
             .to_string(),
-    )
+    ))
 }
 
-/// Load all C exercises, grouped by subject.
-pub fn load_all_exercises() -> Result<ExerciseSet, String> {
+/// Charge tous les exercices JSON depuis le répertoire résolu, groupés par sujet.
+/// Retourne une erreur si aucun exercice n'est trouvé.
+pub fn load_all_exercises() -> Result<ExerciseSet> {
     let dir = resolve_exercises_dir()?;
     let exercises = load_exercises_from_dir(&dir);
     if exercises.is_empty() {
-        return Err(format!("No exercises found in {}", dir.display()));
+        return Err(KfError::Config(format!(
+            "No exercises found in {}",
+            dir.display()
+        )));
     }
 
     let mut by_subject: HashMap<String, Vec<Exercise>> = HashMap::new();
@@ -89,7 +96,57 @@ pub fn load_all_exercises() -> Result<ExerciseSet, String> {
     Ok((exercises, by_subject))
 }
 
-/// Find an exercise by ID.
+/// Recherche un exercice par identifiant exact dans la liste fournie.
 pub fn find_exercise<'a>(exercises: &'a [Exercise], id: &str) -> Option<&'a Exercise> {
     exercises.iter().find(|e| e.id == id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_all_exercises_finds_files() {
+        let result = load_all_exercises();
+        assert!(result.is_ok(), "Should find exercises from project root");
+        let (exercises, by_subject) = result.unwrap();
+        assert!(!exercises.is_empty(), "Should load at least one exercise");
+        assert!(!by_subject.is_empty(), "Should group by subject");
+    }
+
+    #[test]
+    fn test_find_exercise_exists() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        let first_id = &exercises[0].id;
+        let found = find_exercise(&exercises, first_id);
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, *first_id);
+    }
+
+    #[test]
+    fn test_find_exercise_missing() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        assert!(find_exercise(&exercises, "nonexistent-id-999").is_none());
+    }
+
+    #[test]
+    fn test_exercises_have_required_fields() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        for ex in &exercises {
+            assert!(!ex.id.is_empty(), "Exercise ID must not be empty");
+            assert!(!ex.subject.is_empty(), "Subject must not be empty");
+            assert!(!ex.title.is_empty(), "Title must not be empty");
+            assert!(
+                !ex.starter_code.is_empty(),
+                "Starter code must not be empty"
+            );
+        }
+    }
+
+    #[test]
+    fn test_by_subject_consistency() {
+        let (exercises, by_subject) = load_all_exercises().unwrap();
+        let total_in_map: usize = by_subject.values().map(|v| v.len()).sum();
+        assert_eq!(exercises.len(), total_in_map);
+    }
 }

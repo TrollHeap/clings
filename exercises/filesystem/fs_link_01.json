@@ -1,0 +1,81 @@
+{
+  "id": "fs-link-01",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Liens symboliques et hard links",
+  "description": "NSY103 — `link()` crée un hard link (même inode, même données). `symlink()` crée un lien symbolique (nouvel inode, pointe vers un chemin). `readlink()` lit la cible d'un lien symbolique. `lstat()` inspecte le lien lui-même sans le suivre.\n\nCréez un fichier, un hard link et un symlink vers ce fichier. Vérifiez que le hard link partage le même inode et lisez la cible du symlink.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    const char *orig = \"/tmp/kf_link_orig\";\n    const char *hard = \"/tmp/kf_link_hard\";\n    const char *soft = \"/tmp/kf_link_soft\";\n\n    FILE *f = fopen(orig, \"w\");\n    fprintf(f, \"test\");\n    fclose(f);\n\n    ____(orig, hard);\n    ____(orig, soft);\n\n    struct stat s1, s2;\n    stat(orig, &s1);\n    stat(hard, &s2);\n    printf(\"Meme inode : %d\\n\", (s1.st_ino == s2.st_ino) ? 1 : 0);\n    printf(\"Nlinks : %ld\\n\", (long)s1.st_nlink);\n\n    char buf[256];\n    ssize_t len = ____(soft, buf, sizeof(buf) - 1);\n    buf[len] = '\\0';\n    printf(\"Cible symlink : %s\\n\", buf);\n\n    unlink(soft);\n    unlink(hard);\n    unlink(orig);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    const char *orig = \"/tmp/kf_link_orig\";\n    const char *hard = \"/tmp/kf_link_hard\";\n    const char *soft = \"/tmp/kf_link_soft\";\n\n    unlink(hard);\n    unlink(soft);\n    unlink(orig);\n\n    FILE *f = fopen(orig, \"w\");\n    fprintf(f, \"test\");\n    fclose(f);\n\n    link(orig, hard);\n    symlink(orig, soft);\n\n    struct stat s1, s2;\n    stat(orig, &s1);\n    stat(hard, &s2);\n    printf(\"Meme inode : %d\\n\", (s1.st_ino == s2.st_ino) ? 1 : 0);\n    printf(\"Nlinks : %ld\\n\", (long)s1.st_nlink);\n\n    char buf[256];\n    ssize_t len = readlink(soft, buf, sizeof(buf) - 1);\n    buf[len] = '\\0';\n    printf(\"Cible symlink : %s\\n\", buf);\n\n    unlink(soft);\n    unlink(hard);\n    unlink(orig);\n    return 0;\n}",
+  "hints": [
+    "`link(source, destination)` crée un hard link — les deux noms partagent le même inode",
+    "`symlink(cible, nom_lien)` crée un lien symbolique",
+    "`readlink(chemin, buf, taille)` lit la cible d'un symlink sans le suivre"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Meme inode : 1\nNlinks : 2\nCible symlink : /tmp/kf_link_orig\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Fichier original créé",
+        "stack": [
+          {"name": "orig", "value": "\"/tmp/kf_link_orig\""}
+        ],
+        "heap": [
+          {"name": "inode N", "value": "data=\"test\", nlink=1"}
+        ],
+        "arrows": [{"from": "orig", "to": "inode N", "label": "→"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le fichier original est créé. Il pointe vers un inode unique qui contient les données. Le compteur de liens (nlink) est à 1.",
+        "step_label": "Fichier original — inode avec nlink=1"
+      },
+      {
+        "label": "Hard link créé",
+        "stack": [
+          {"name": "orig", "value": "→inode N"},
+          {"name": "hard", "value": "→inode N"}
+        ],
+        "heap": [
+          {"name": "inode N", "value": "data=\"test\", nlink=2"}
+        ],
+        "arrows": [
+          {"from": "orig", "to": "inode N", "label": "→"},
+          {"from": "hard", "to": "inode N", "label": "→"}
+        ],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "link() crée une deuxième entrée de répertoire pointant vers le même inode. nlink passe à 2. Les deux noms sont équivalents — supprimer l'un ne supprime pas les données tant que nlink > 0.",
+        "step_label": "Hard link — même inode, nlink=2"
+      },
+      {
+        "label": "Symlink créé",
+        "stack": [
+          {"name": "soft", "value": "→inode M"}
+        ],
+        "heap": [
+          {"name": "inode M (symlink)", "value": "cible=\"/tmp/kf_link_orig\""},
+          {"name": "inode N", "value": "data=\"test\", nlink=2"}
+        ],
+        "arrows": [{"from": "inode M (symlink)", "to": "inode N", "label": "résolution"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "symlink() crée un nouvel inode M de type lien symbolique. Son contenu est la chaîne \"/tmp/kf_link_orig\". Le noyau résout cette indirection lors de l'accès. readlink() lit le chemin stocké sans le résoudre.",
+        "step_label": "Symlink — inode séparé, stocke le chemin cible"
+      }
+    ]
+  },
+  "prerequisites": ["fs-stat-01"],
+  "exercise_type": "complete",
+  "key_concept": "Hard link = même inode, symlink = nouvel inode pointant vers un chemin",
+  "common_mistake": "Confondre l'ordre des arguments de symlink() : c'est symlink(cible, nom_du_lien)",
+  "kc_ids": ["KC-C19"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Creer un hard link et verifier le compteur nlink\n * link() ajoute un nom pour le meme inode.\n * =========================================================== */\nvoid example_hardlink(void) {\n    const char *a = \"/tmp/kf_ex_a\";\n    const char *b = \"/tmp/kf_ex_b\";\n    unlink(a); unlink(b);\n    FILE *f = fopen(a, \"w\"); fprintf(f, \"hi\"); fclose(f);\n    link(a, b);\n    struct stat sa, sb;\n    stat(a, &sa); stat(b, &sb);\n    printf(\"Meme inode: %d\\n\", (sa.st_ino == sb.st_ino) ? 1 : 0);\n    printf(\"nlink: %ld\\n\", (long)sa.st_nlink);\n    unlink(a); unlink(b);\n}\n/* Resultat: Meme inode: 1, nlink: 2 */\n\n/* == VOTRE EXERCICE =========================================\n * Creer un hard link ET un symlink. Verifier inode, nlink,\n * et lire la cible du symlink avec readlink().\n * =========================================================== */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    const char *orig = \"/tmp/kf_link_orig\";\n    const char *hard = \"/tmp/kf_link_hard\";\n    const char *soft = \"/tmp/kf_link_soft\";\n    unlink(hard); unlink(soft); unlink(orig);\n    FILE *f = fopen(orig, \"w\"); fprintf(f, \"test\"); fclose(f);\n\n    link(orig, hard);       // hard link\n    ____(orig, soft);       // lien symbolique\n\n    struct stat s1, s2;\n    stat(orig, &s1); stat(hard, &s2);\n    printf(\"Meme inode : %d\\n\", (s1.st_ino == s2.st_ino) ? 1 : 0);\n    printf(\"Nlinks : %ld\\n\", (long)s1.st_nlink);\n\n    char buf[256];\n    ssize_t len = readlink(soft, buf, sizeof(buf) - 1);\n    buf[len] = '\\0';\n    printf(\"Cible symlink : %s\\n\", buf);\n    unlink(soft); unlink(hard); unlink(orig);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    const char *orig = \"/tmp/kf_link_orig\";\n    const char *hard = \"/tmp/kf_link_hard\";\n    const char *soft = \"/tmp/kf_link_soft\";\n    unlink(hard); unlink(soft); unlink(orig);\n    FILE *f = fopen(orig, \"w\"); fprintf(f, \"test\"); fclose(f);\n\n    ____(orig, hard);\n    ____(orig, soft);\n\n    struct stat s1, s2;\n    stat(orig, &s1); stat(hard, &s2);\n    printf(\"Meme inode : %d\\n\", (s1.st_ino == s2.st_ino) ? 1 : 0);\n    printf(\"Nlinks : %ld\\n\", (long)s1.st_nlink);\n\n    char buf[256];\n    ssize_t len = ____(soft, buf, sizeof(buf) - 1);\n    buf[len] = '\\0';\n    printf(\"Cible symlink : %s\\n\", buf);\n    unlink(soft); unlink(hard); unlink(orig);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    // Creer un fichier /tmp/kf_link_orig\n    // Creer un hard link et un symlink\n    // Verifier: meme inode, nlinks, cible du symlink\n    // Nettoyer avec unlink()\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/stat.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

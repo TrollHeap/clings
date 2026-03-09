@@ -1,0 +1,74 @@
+{
+  "id": "fs-path-01",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Manipulation de chemins (basename/dirname)",
+  "description": "NSY103 — Les fonctions `basename()` et `dirname()` de `<libgen.h>` extraient respectivement le nom de fichier et le répertoire parent d'un chemin. Attention : ces fonctions peuvent modifier la chaîne passée en argument — il faut travailler sur une copie.\n\nExtrayez le nom de fichier et le répertoire parent du chemin `/usr/local/bin/gcc`.",
+  "starter_code": "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    const char *path = \"/usr/local/bin/gcc\";\n    char buf1[256], buf2[256];\n    strncpy(buf1, path, sizeof(buf1) - 1);\n    buf1[sizeof(buf1) - 1] = '\\0';\n    strncpy(buf2, path, sizeof(buf2) - 1);\n    buf2[sizeof(buf2) - 1] = '\\0';\n    printf(\"Chemin complet : %s\\n\", path);\n    printf(\"Nom de fichier : %s\\n\", ____(buf1));\n    printf(\"Repertoire : %s\\n\", ____(buf2));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    const char *path = \"/usr/local/bin/gcc\";\n    char buf1[256], buf2[256];\n    strncpy(buf1, path, sizeof(buf1) - 1);\n    buf1[sizeof(buf1) - 1] = '\\0';\n    strncpy(buf2, path, sizeof(buf2) - 1);\n    buf2[sizeof(buf2) - 1] = '\\0';\n    printf(\"Chemin complet : %s\\n\", path);\n    printf(\"Nom de fichier : %s\\n\", basename(buf1));\n    printf(\"Repertoire : %s\\n\", dirname(buf2));\n    return 0;\n}",
+  "hints": [
+    "`basename()` retourne le dernier composant du chemin (après le dernier `/`)",
+    "`dirname()` retourne tout sauf le dernier composant",
+    "Les deux fonctions peuvent modifier leur argument — toujours travailler sur une copie"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Chemin complet : /usr/local/bin/gcc\nNom de fichier : gcc\nRepertoire : /usr/local/bin\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Copie du chemin",
+        "stack": [
+          {"name": "path", "value": "\"/usr/local/bin/gcc\""},
+          {"name": "buf1", "value": "\"/usr/local/bin/gcc\""},
+          {"name": "buf2", "value": "\"/usr/local/bin/gcc\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "On copie le chemin dans deux buffers séparés car basename() et dirname() peuvent modifier la chaîne en place (insertion de '\\0' pour tronquer).",
+        "step_label": "Copie défensive du chemin"
+      },
+      {
+        "label": "basename() extrait le nom",
+        "stack": [
+          {"name": "buf1", "value": "modifié"},
+          {"name": "basename(buf1)", "value": "\"gcc\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "basename() retourne un pointeur vers le dernier composant. Pour \"/usr/local/bin/gcc\", il retourne \"gcc\". La chaîne peut être modifiée en interne.",
+        "step_label": "basename() → \"gcc\""
+      },
+      {
+        "label": "dirname() extrait le répertoire",
+        "stack": [
+          {"name": "buf2", "value": "modifié"},
+          {"name": "dirname(buf2)", "value": "\"/usr/local/bin\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "dirname() retourne le chemin parent. Pour \"/usr/local/bin/gcc\", il retourne \"/usr/local/bin\". La chaîne originale est modifiée — d'où la copie préalable.",
+        "step_label": "dirname() → \"/usr/local/bin\""
+      }
+    ]
+  },
+  "prerequisites": ["fs-stat-01"],
+  "exercise_type": "complete",
+  "key_concept": "basename() et dirname() décomposent un chemin en nom et répertoire",
+  "common_mistake": "Passer directement un littéral chaîne à basename/dirname — ils peuvent modifier l'argument",
+  "kc_ids": ["KC-C19"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Decomposer le chemin /etc/network/interfaces\n * basename() donne le nom, dirname() le repertoire parent.\n * IMPORTANT: ces fonctions modifient leur argument.\n * =========================================================== */\nvoid example_decompose(void) {\n    const char *p = \"/etc/network/interfaces\";\n    char b1[256], b2[256];\n    strncpy(b1, p, sizeof(b1) - 1); b1[255] = '\\0';\n    strncpy(b2, p, sizeof(b2) - 1); b2[255] = '\\0';\n    printf(\"basename: %s\\n\", basename(b1));  /* interfaces */\n    printf(\"dirname:  %s\\n\", dirname(b2));   /* /etc/network */\n}\n/* Resultat: basename: interfaces, dirname: /etc/network */\n\n/* == VOTRE EXERCICE =========================================\n * Decomposer /usr/local/bin/gcc avec basename et dirname\n * Copiez le chemin avant chaque appel.\n * =========================================================== */\nint main(void) {\n    const char *path = \"/usr/local/bin/gcc\";\n    /* TODO: copier path, appeler basename, dirname, afficher */\n    (void)path;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    const char *path = \"/usr/local/bin/gcc\";\n    char buf1[256], buf2[256];\n    strncpy(buf1, path, sizeof(buf1) - 1);\n    buf1[sizeof(buf1) - 1] = '\\0';\n    strncpy(buf2, path, sizeof(buf2) - 1);\n    buf2[sizeof(buf2) - 1] = '\\0';\n    printf(\"Chemin complet : %s\\n\", path);\n    printf(\"Nom de fichier : %s\\n\", ____(buf1)); // nom du fichier\n    printf(\"Repertoire : %s\\n\", ____(buf2)); // repertoire parent\n    return 0;\n}",
+    "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    const char *path = \"/usr/local/bin/gcc\";\n    char buf1[256], buf2[256];\n    strncpy(buf1, path, sizeof(buf1) - 1);\n    buf1[sizeof(buf1) - 1] = '\\0';\n    strncpy(buf2, path, sizeof(buf2) - 1);\n    buf2[sizeof(buf2) - 1] = '\\0';\n    printf(\"Chemin complet : %s\\n\", path);\n    printf(\"Nom de fichier : %s\\n\", ____(____));\n    printf(\"Repertoire : %s\\n\", ____(____));\n    return 0;\n}",
+    "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    // Decomposez /usr/local/bin/gcc\n    // Copiez le chemin dans deux buffers (basename/dirname modifient leur arg)\n    // Affichez: chemin complet, nom de fichier, repertoire\n    return 0;\n}",
+    "#include <stdio.h>\n#include <libgen.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

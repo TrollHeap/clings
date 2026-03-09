@@ -1,0 +1,86 @@
+{
+  "id": "ptr-deref-02",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Swap de deux variables via pointeurs",
+  "description": "NSY103 — Pour modifier des variables depuis une fonction, il faut passer leurs adresses (pointeurs). La fonction reçoit `int *a, int *b` et échange les valeurs via déréférencement `*a`, `*b`.\n\nImplémentez une fonction `swap` qui échange les valeurs de deux entiers via pointeurs.",
+  "starter_code": "#include <stdio.h>\n\nvoid swap(____ *a, ____ *b) {\n    int tmp = ____;\n    ____ = *b;\n    ____ = tmp;\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(____, ____);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+  "hints": [
+    "La fonction swap reçoit des pointeurs : `void swap(int *a, int *b)`",
+    "Pour lire la valeur pointée : `int tmp = *a;`",
+    "Pour appeler swap, passez les adresses : `swap(&x, &y);`"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Avant : x=5 y=17\nApres : x=17 y=5\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Avant swap",
+        "stack": [
+          {"name": "x", "value": "5"},
+          {"name": "y", "value": "17"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "x et y sont des variables locales sur la pile de main. Pour les modifier depuis swap, il faut passer leurs adresses.",
+        "step_label": "Avant swap — x=5, y=17"
+      },
+      {
+        "label": "Pendant swap(&x, &y)",
+        "stack": [
+          {"name": "x", "value": "5"},
+          {"name": "y", "value": "17"},
+          {"name": "a", "value": "→x"},
+          {"name": "b", "value": "→y"},
+          {"name": "tmp", "value": "5"}
+        ],
+        "heap": [],
+        "arrows": [
+          {"from": "a", "to": "x", "label": "*a"},
+          {"from": "b", "to": "y", "label": "*b"}
+        ],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": false},
+          {"function_name": "swap", "args": "&x, &y", "is_active": true}
+        ],
+        "explanation": "swap reçoit a=&x et b=&y. tmp sauvegarde *a (=5). Puis *a = *b copie 17 dans x, et *b = tmp copie 5 dans y.",
+        "step_label": "Pendant swap — a→x, b→y, tmp=5"
+      },
+      {
+        "label": "Après swap",
+        "stack": [
+          {"name": "x", "value": "17"},
+          {"name": "y", "value": "5"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Retour dans main : x vaut maintenant 17, y vaut 5. L'échange a fonctionné car swap a modifié les valeurs originales via les pointeurs.",
+        "step_label": "Après swap — x=17, y=5"
+      }
+    ]
+  },
+  "prerequisites": ["ptr-deref-01"],
+  "exercise_type": "complete",
+  "key_concept": "Passer &x à une fonction permet de modifier x depuis cette fonction via *ptr",
+  "common_mistake": "Passer x au lieu de &x : la fonction reçoit une copie et ne modifie pas l'original",
+  "kc_ids": ["KC-C01"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Doubler une valeur via pointeur\n * La fonction recoit l'adresse et modifie la variable originale.\n * =========================================================== */\nvoid example_double(int *p) {\n    *p = *p * 2;\n}\nvoid example_demo(void) {\n    int val = 7;\n    printf(\"Avant : %d\\n\", val);\n    example_double(&val);\n    printf(\"Apres : %d\\n\", val);\n}\n/* Resultat: Avant : 7 / Apres : 14 */\n\n/* == VOTRE EXERCICE =========================================\n * Swap de deux variables via pointeurs\n * Inspirez-vous de example_double ci-dessus.\n * Implementez swap(int *a, int *b) qui echange *a et *b.\n * =========================================================== */\nvoid swap(int *a, int *b) {\n    (void)a; (void)b; /* TODO */\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = ____; // copier la valeur de b\n    *b = ____; // restaurer depuis tmp\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(____ *a, ____ *b) {\n    int tmp = ____;\n    ____ = *b;\n    ____ = tmp;\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(____, ____);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+    "#include <stdio.h>\n\n// Implémentez swap(int *a, int *b) qui échange *a et *b\n// Utilisez une variable temporaire tmp\nvoid swap(int *a, int *b) {\n    // TODO\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    // TODO: appeler swap\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}",
+    "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n}\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

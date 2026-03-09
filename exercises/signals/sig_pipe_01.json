@@ -1,0 +1,65 @@
+{
+  "id": "sig-pipe-01",
+  "subject": "signals",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "SIGPIPE handling",
+  "description": "NSY103 — SIGPIPE est envoyé quand un processus écrit dans un pipe dont le lecteur a fermé son extrémité. Par défaut, SIGPIPE termine le processus. En l'ignorant ou en installant un handler, write() retourne -1 avec errno=EPIPE.\n\nDémontrez le mécanisme SIGPIPE en fermant le côté lecture d'un pipe avant d'écrire.",
+  "starter_code": "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n#include <errno.h>\n\nvolatile sig_atomic_t pipe_broken = 0;\n\nvoid sigpipe_handler(int sig) {\n    (void)sig;\n    pipe_broken = 1;\n}\n\nint main(void) {\n    int fd[2];\n    if (pipe(fd) == -1) { perror(\"pipe\"); return 1; }\n\n    /* Installer le handler SIGPIPE */\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_handler = ____;\n    sigemptyset(&sa.sa_mask);\n    sigaction(____, &sa, NULL);\n    printf(\"SIGPIPE handler installed\\n\");\n\n    /* Fermer le cote lecture */\n    close(____[0]);\n    printf(\"Read end closed\\n\");\n\n    /* Ecrire dans le pipe casse */\n    ssize_t n = write(fd[1], \"hello\", 5);\n    printf(\"write returned: %zd\\n\", n);\n\n    if (pipe_broken)\n        printf(\"SIGPIPE caught!\\n\");\n    if (n == -1 && errno == ____)\n        printf(\"errno = EPIPE\\n\");\n\n    close(fd[1]);\n    printf(\"Done\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n#include <errno.h>\n\nvolatile sig_atomic_t pipe_broken = 0;\n\nvoid sigpipe_handler(int sig) {\n    (void)sig;\n    pipe_broken = 1;\n}\n\nint main(void) {\n    int fd[2];\n    if (pipe(fd) == -1) { perror(\"pipe\"); return 1; }\n\n    /* Installer le handler SIGPIPE */\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_handler = sigpipe_handler;\n    sigemptyset(&sa.sa_mask);\n    sigaction(SIGPIPE, &sa, NULL);\n    printf(\"SIGPIPE handler installed\\n\");\n\n    /* Fermer le cote lecture */\n    close(fd[0]);\n    printf(\"Read end closed\\n\");\n\n    /* Ecrire dans le pipe casse */\n    ssize_t n = write(fd[1], \"hello\", 5);\n    printf(\"write returned: %zd\\n\", n);\n\n    if (pipe_broken)\n        printf(\"SIGPIPE caught!\\n\");\n    if (n == -1 && errno == EPIPE)\n        printf(\"errno = EPIPE\\n\");\n\n    close(fd[1]);\n    printf(\"Done\\n\");\n    return 0;\n}",
+  "hints": [
+    "SIGPIPE arrive AVANT que write() retourne — le handler est appelé en premier",
+    "Avec un handler installé, write() retourne -1 et errno = EPIPE",
+    "Sans handler, SIGPIPE termine le processus (comportement par défaut)"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "SIGPIPE handler installed\nRead end closed\nwrite returned: -1\nSIGPIPE caught!\nerrno = EPIPE\nDone\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Pipe créé, lecteur fermé",
+        "stack": [
+          {"name": "fd[0]", "value": "(fermé — plus de lecteur)"},
+          {"name": "fd[1]", "value": "ouvert (écriture)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Fermer fd[0] signifie qu'aucun processus ne lira le pipe",
+        "step_label": "Pipe cassé"
+      },
+      {
+        "label": "write() sur pipe cassé → SIGPIPE",
+        "stack": [
+          {"name": "SIGPIPE", "value": "délivré au processus"},
+          {"name": "pipe_broken", "value": "1"},
+          {"name": "write()", "value": "-1, errno=EPIPE"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main"},
+          {"function_name": "sigpipe_handler", "args": "SIGPIPE", "is_active": true}
+        ],
+        "explanation": "Le noyau envoie SIGPIPE puis write() échoue avec EPIPE",
+        "step_label": "SIGPIPE"
+      }
+    ]
+  },
+  "prerequisites": ["sig-child-01"],
+  "exercise_type": "complete",
+  "key_concept": "SIGPIPE signale l'écriture dans un pipe sans lecteur — le handler empêche la terminaison",
+  "common_mistake": "Ne pas gérer SIGPIPE dans un serveur — une déconnexion client tue le serveur entier",
+  "kc_ids": ["KC-C08"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n#include <errno.h>\n\n/* == EXEMPLE =======================================\n * Ignorer SIGPIPE avec SIG_IGN\n * ================================================= */\nvoid example_sigpipe(void) {\n    signal(SIGPIPE, SIG_IGN); /* ignorer au lieu de mourir */\n    int fd[2];\n    pipe(fd);\n    close(fd[0]); /* fermer lecteur */\n    ssize_t n = write(fd[1], \"x\", 1);\n    printf(\"example: write=%zd, errno=%d (EPIPE=%d)\\n\", n, errno, EPIPE);\n    close(fd[1]);\n}\n\n/* == VOTRE EXERCICE ================================\n * Handler SIGPIPE + pipe cassé + vérifier EPIPE\n * ================================================= */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n#include <errno.h>\n\nvolatile sig_atomic_t pipe_broken = 0;\nvoid sigpipe_handler(int sig) { (void)sig; pipe_broken = 1; }\n\nint main(void) {\n    int fd[2];\n    if (pipe(fd) == -1) { perror(\"pipe\"); return 1; }\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_handler = sigpipe_handler;\n    sigemptyset(&sa.sa_mask);\n    sigaction(SIGPIPE, &sa, NULL);\n    printf(\"SIGPIPE handler installed\\n\");\n    close(fd[0]);\n    printf(\"Read end closed\\n\");\n    ssize_t n = write(fd[1], \"hello\", 5);\n    printf(\"write returned: %zd\\n\", n);\n    if (pipe_broken) printf(\"SIGPIPE caught!\\n\");\n    if (n == -1 && errno == ____) printf(\"errno = EPIPE\\n\"); // quelle constante?\n    close(fd[1]);\n    printf(\"Done\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n#include <errno.h>\n\nvolatile sig_atomic_t pipe_broken = 0;\nvoid sigpipe_handler(int sig) { (void)sig; pipe_broken = 1; }\n\nint main(void) {\n    int fd[2];\n    if (pipe(fd) == -1) { perror(\"pipe\"); return 1; }\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_handler = ____;\n    sigemptyset(&sa.sa_mask);\n    sigaction(____, &sa, NULL);\n    printf(\"SIGPIPE handler installed\\n\");\n    close(____[0]);\n    printf(\"Read end closed\\n\");\n    ssize_t n = write(fd[1], \"hello\", 5);\n    printf(\"write returned: %zd\\n\", n);\n    if (pipe_broken) printf(\"SIGPIPE caught!\\n\");\n    if (n == -1 && errno == ____) printf(\"errno = EPIPE\\n\");\n    close(fd[1]);\n    printf(\"Done\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <unistd.h>\n#include <errno.h>\n\n// handler SIGPIPE set pipe_broken=1\n// main: pipe, sigaction, close(fd[0]), write(fd[1])\n// vérifier pipe_broken et errno==EPIPE\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "id": "fs-readdir-01",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Lister un répertoire avec opendir/readdir",
+  "description": "NSY103 — Les fonctions `opendir()` et `readdir()` permettent de parcourir le contenu d'un répertoire. `opendir()` retourne un `DIR *`, `readdir()` retourne un `struct dirent *` à chaque appel (NULL à la fin). Le champ `d_name` contient le nom de l'entrée.\n\nCréez un répertoire temporaire avec 3 fichiers, puis listez-les avec opendir/readdir en filtrant `.` et `..`.",
+  "starter_code": "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\nint main(void) {\n    const char *dir = \"/tmp/kf_test_readdir\";\n    mkdir(dir, 0755);\n    FILE *f;\n    f = fopen(\"/tmp/kf_test_readdir/alpha.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/beta.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/gamma.txt\", \"w\"); fclose(f);\n\n    DIR *dp = ____(dir);\n    if (!dp) { perror(\"opendir\"); return 1; }\n    struct dirent *entry;\n    int count = 0;\n    while ((entry = ____(dp)) != NULL) {\n        if (strcmp(entry->____, \".\") == 0 || strcmp(entry->d_name, \"..\") == 0)\n            continue;\n        count++;\n    }\n    ____(dp);\n    printf(\"Fichiers trouves : %d\\n\", count);\n    remove(\"/tmp/kf_test_readdir/alpha.txt\");\n    remove(\"/tmp/kf_test_readdir/beta.txt\");\n    remove(\"/tmp/kf_test_readdir/gamma.txt\");\n    rmdir(dir);\n    return 0;\n}",
+  "solution_code": "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\nint main(void) {\n    const char *dir = \"/tmp/kf_test_readdir\";\n    mkdir(dir, 0755);\n    FILE *f;\n    f = fopen(\"/tmp/kf_test_readdir/alpha.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/beta.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/gamma.txt\", \"w\"); fclose(f);\n\n    DIR *dp = opendir(dir);\n    if (!dp) { perror(\"opendir\"); return 1; }\n    struct dirent *entry;\n    int count = 0;\n    while ((entry = readdir(dp)) != NULL) {\n        if (strcmp(entry->d_name, \".\") == 0 || strcmp(entry->d_name, \"..\") == 0)\n            continue;\n        count++;\n    }\n    closedir(dp);\n    printf(\"Fichiers trouves : %d\\n\", count);\n    remove(\"/tmp/kf_test_readdir/alpha.txt\");\n    remove(\"/tmp/kf_test_readdir/beta.txt\");\n    remove(\"/tmp/kf_test_readdir/gamma.txt\");\n    rmdir(dir);\n    return 0;\n}",
+  "hints": [
+    "Ouvrir un répertoire : `DIR *dp = opendir(chemin);`",
+    "Lire l'entrée suivante : `struct dirent *entry = readdir(dp);`",
+    "Le nom du fichier est dans `entry->d_name`, fermer avec `closedir(dp)`"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Fichiers trouves : 3\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "opendir() ouvre le répertoire",
+        "stack": [
+          {
+            "name": "dp",
+            "value": "→DIR"
+          }
+        ],
+        "heap": [
+          {
+            "name": "DIR stream",
+            "value": "{fd, pos, buf}"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "dp",
+            "to": "DIR stream",
+            "label": "→"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "opendir() ouvre un flux de répertoire. Le DIR* est un pointeur opaque vers une structure interne qui maintient la position de lecture dans le répertoire.",
+        "step_label": "opendir() — ouverture du flux répertoire"
+      },
+      {
+        "label": "readdir() lit une entrée",
+        "stack": [
+          {
+            "name": "dp",
+            "value": "→DIR"
+          },
+          {
+            "name": "entry",
+            "value": "→dirent"
+          },
+          {
+            "name": "entry->d_name",
+            "value": "\"alpha.txt\""
+          }
+        ],
+        "heap": [
+          {
+            "name": "DIR stream",
+            "value": "{fd, pos=1}"
+          },
+          {
+            "name": "struct dirent",
+            "value": "{d_ino, d_name}"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "entry",
+            "to": "struct dirent",
+            "label": "→"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "readdir() retourne un pointeur vers une struct dirent statique interne. Le champ d_name contient le nom de l'entrée. Le pointeur est écrasé à chaque appel — ne pas le stocker.",
+        "step_label": "readdir() — lecture séquentielle"
+      },
+      {
+        "label": "closedir() ferme le flux",
+        "stack": [
+          {
+            "name": "count",
+            "value": "3"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "closedir() libère les ressources internes du flux DIR et ferme le descripteur de fichier sous-jacent. Toujours appeler closedir() après usage.",
+        "step_label": "closedir() — libération des ressources"
+      }
+    ]
+  },
+  "prerequisites": [
+    "fs-stat-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "opendir/readdir/closedir pour parcourir un répertoire",
+  "common_mistake": "Oublier de filtrer les entrées \".\" et \"..\" qui apparaissent dans tout répertoire",
+  "kc_ids": [
+    "KC-C19"
+  ],
+  "starter_code_stages": [
+    "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\n/* == EXEMPLE ================================================\n * Compter les sous-repertoires dans /tmp\n * opendir() ouvre, readdir() itere, closedir() ferme.\n * =========================================================== */\nvoid example_count_dirs(void) {\n    DIR *dp = opendir(\"/tmp\");\n    if (!dp) { perror(\"opendir\"); return; }\n    struct dirent *entry;\n    int dirs = 0;\n    while ((entry = readdir(dp)) != NULL) {\n        if (entry->d_type == DT_DIR &&\n            strcmp(entry->d_name, \".\") != 0 &&\n            strcmp(entry->d_name, \"..\") != 0) {\n            dirs++;\n        }\n    }\n    closedir(dp);\n    printf(\"Sous-repertoires dans /tmp : %d\\n\", dirs);\n}\n/* Resultat: nombre variable selon le systeme */\n\n/* == VOTRE EXERCICE =========================================\n * Creer un repertoire avec 3 fichiers, les compter\n * avec opendir/readdir en filtrant . et ..\n * =========================================================== */\nint main(void) {\n    /* TODO: creer /tmp/kf_test_readdir + 3 fichiers */\n    /* TODO: opendir, readdir en boucle, compter, closedir */\n    /* TODO: nettoyer les fichiers */\n    return 0;\n}",
+    "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\nint main(void) {\n    const char *dir = \"/tmp/kf_test_readdir\";\n    mkdir(dir, 0755);\n    FILE *f;\n    f = fopen(\"/tmp/kf_test_readdir/alpha.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/beta.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/gamma.txt\", \"w\"); fclose(f);\n\n    DIR *dp = opendir(____); // ouvrir le repertoire\n    if (!dp) { perror(\"opendir\"); return 1; }\n    struct dirent *entry;\n    int count = 0;\n    while ((entry = readdir(dp)) != NULL) {\n        if (strcmp(entry->d_name, \".\") == 0 || strcmp(entry->d_name, \"..\") == 0)\n            continue;\n        count++;\n    }\n    ____(dp); // fermer le flux\n    printf(\"Fichiers trouves : %d\\n\", count);\n    remove(\"/tmp/kf_test_readdir/alpha.txt\");\n    remove(\"/tmp/kf_test_readdir/beta.txt\");\n    remove(\"/tmp/kf_test_readdir/gamma.txt\");\n    rmdir(dir);\n    return 0;\n}",
+    "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\nint main(void) {\n    const char *dir = \"/tmp/kf_test_readdir\";\n    mkdir(dir, 0755);\n    FILE *f;\n    f = fopen(\"/tmp/kf_test_readdir/alpha.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/beta.txt\", \"w\"); fclose(f);\n    f = fopen(\"/tmp/kf_test_readdir/gamma.txt\", \"w\"); fclose(f);\n\n    DIR *dp = ____(dir);\n    if (!dp) { perror(\"opendir\"); return 1; }\n    struct dirent *entry;\n    int count = 0;\n    while ((entry = ____(dp)) != NULL) {\n        if (strcmp(entry->____, \".\") == 0 || strcmp(entry->d_name, \"..\") == 0)\n            continue;\n        count++;\n    }\n    ____(dp);\n    printf(\"Fichiers trouves : %d\\n\", count);\n    remove(\"/tmp/kf_test_readdir/alpha.txt\");\n    remove(\"/tmp/kf_test_readdir/beta.txt\");\n    remove(\"/tmp/kf_test_readdir/gamma.txt\");\n    rmdir(dir);\n    return 0;\n}",
+    "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n\nint main(void) {\n    // Creer /tmp/kf_test_readdir avec 3 fichiers\n    // Ouvrir avec opendir(), lire avec readdir() en boucle\n    // Filtrer . et .., compter les fichiers\n    // Fermer avec closedir(), nettoyer, afficher le compte\n    return 0;\n}",
+    "#include <unistd.h>\n#include <stdio.h>\n#include <dirent.h>\n#include <string.h>\n#include <sys/stat.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

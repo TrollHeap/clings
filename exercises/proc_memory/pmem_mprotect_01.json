@@ -1,0 +1,104 @@
+{
+  "id": "pmem-mprotect-01",
+  "subject": "proc_memory",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "mprotect: changer les permissions mémoire",
+  "description": "NSY103 — mprotect() modifie les permissions (lecture/écriture/exécution) d'une zone mémoire alignée sur les pages. On peut rendre une zone en lecture seule après écriture, ou la protéger complètement.\n\nAllouez une page via mmap, écrivez dedans, puis passez en lecture seule et vérifiez les permissions.",
+  "starter_code": "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\n\nstatic jmp_buf jump_buf;\nstatic void handler(int sig) {\n    (void)sig;\n    longjmp(jump_buf, 1);\n}\n\nint main(void) {\n    long page = sysconf(_SC_PAGESIZE);\n    printf(\"Page size: %ld\\n\", page);\n    void *ptr = mmap(NULL, (size_t)page,\n        PROT_READ | PROT_WRITE,\n        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);\n    if (ptr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    strcpy((char *)ptr, \"protected data\");\n    printf(\"Before protect: %s\\n\", (char *)ptr);\n    int rc = ____(ptr, (size_t)page, ____);\n    printf(\"mprotect result: %d\\n\", rc);\n    signal(SIGSEGV, handler);\n    if (setjmp(jump_buf) == 0) {\n        ((char *)ptr)[0] = 'X';\n        printf(\"Write succeeded (unexpected)\\n\");\n    } else {\n        printf(\"SIGSEGV caught: write blocked\\n\");\n    }\n    printf(\"Read after protect: %s\\n\", (char *)ptr);\n    munmap(ptr, (size_t)page);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\nstatic jmp_buf jump_buf;\nstatic void handler(int sig) {\n    (void)sig;\n    longjmp(jump_buf, 1);\n}\nint main(void) {\n    long page = sysconf(_SC_PAGESIZE);\n    printf(\"Page size: %ld\\n\", page);\n    void *ptr = mmap(NULL, (size_t)page,\n        PROT_READ | PROT_WRITE,\n        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);\n    if (ptr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    strcpy((char *)ptr, \"protected data\");\n    printf(\"Before protect: %s\\n\", (char *)ptr);\n    int rc = mprotect(ptr, (size_t)page, PROT_READ);\n    printf(\"mprotect result: %d\\n\", rc);\n    signal(SIGSEGV, handler);\n    if (setjmp(jump_buf) == 0) {\n        ((char *)ptr)[0] = 'X';\n        printf(\"Write succeeded (unexpected)\\n\");\n    } else {\n        printf(\"SIGSEGV caught: write blocked\\n\");\n    }\n    printf(\"Read after protect: %s\\n\", (char *)ptr);\n    munmap(ptr, (size_t)page);\n    return 0;\n}",
+  "hints": [
+    "mprotect(ptr, len, prot) change les permissions — ptr doit être aligné sur page",
+    "PROT_READ seul permet la lecture mais interdit l'écriture → SIGSEGV",
+    "setjmp/longjmp permet de capturer le SIGSEGV sans terminer le programme"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:Page size: \\d+\nBefore protect: protected data\nmprotect result: 0\nSIGSEGV caught: write blocked\nRead after protect: protected data\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "mmap RW + écriture",
+        "stack": [
+          {
+            "name": "ptr",
+            "value": "→ page RW"
+          },
+          {
+            "name": "page",
+            "value": "4096"
+          }
+        ],
+        "heap": [
+          {
+            "address": "mmap page",
+            "content": "\"protected data\""
+          }
+        ],
+        "arrows": [
+          {
+            "from": "ptr",
+            "to": "mmap page"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Page allouée en lecture-écriture",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "mprotect → PROT_READ",
+        "stack": [
+          {
+            "name": "ptr",
+            "value": "→ page R (read-only)"
+          },
+          {
+            "name": "rc",
+            "value": "0 (succès)"
+          }
+        ],
+        "heap": [
+          {
+            "address": "mmap page",
+            "content": "\"protected data\" [RO]"
+          }
+        ],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "Écriture → SIGSEGV, lecture OK",
+        "step_label": "Étape 2"
+      }
+    ]
+  },
+  "prerequisites": [
+    "pmem-mmap-anon-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "mprotect change les permissions RWX d'une page — violation → SIGSEGV",
+  "common_mistake": "Passer une adresse non alignée sur page à mprotect — retourne EINVAL",
+  "kc_ids": [
+    "KC-C17"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\n\n/* == EXEMPLE: mprotect PROT_NONE ====================== */\nstatic jmp_buf ex_jmp;\nstatic void ex_handler(int sig) { (void)sig; longjmp(ex_jmp, 1); }\nvoid example_none(void) {\n    long pg = sysconf(_SC_PAGESIZE);\n    void *p = mmap(NULL, (size_t)pg, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);\n    mprotect(p, (size_t)pg, PROT_NONE);\n    signal(SIGSEGV, ex_handler);\n    if (setjmp(ex_jmp) == 0) { volatile char c = ((char*)p)[0]; (void)c; }\n    else printf(\"PROT_NONE: even read blocked\\n\");\n    munmap(p, (size_t)pg);\n}\n\nstatic jmp_buf jump_buf;\nstatic void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }\nint main(void) {\n    long page = sysconf(_SC_PAGESIZE);\n    printf(\"Page size: %ld\\n\", page);\n    void *ptr = mmap(NULL, (size_t)page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);\n    if (ptr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    strcpy((char *)ptr, \"protected data\");\n    printf(\"Before protect: %s\\n\", (char *)ptr);\n    int rc = mprotect(ptr, (size_t)page, PROT_READ);\n    printf(\"mprotect result: %d\\n\", rc);\n    signal(SIGSEGV, handler);\n    if (setjmp(jump_buf) == 0) { ((char *)ptr)[0] = 'X'; printf(\"Write succeeded (unexpected)\\n\"); }\n    else printf(\"SIGSEGV caught: write blocked\\n\");\n    printf(\"Read after protect: %s\\n\", (char *)ptr);\n    munmap(ptr, (size_t)page);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\nstatic jmp_buf jump_buf;\nstatic void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }\nint main(void) {\n    long page = sysconf(_SC_PAGESIZE);\n    printf(\"Page size: %ld\\n\", page);\n    void *ptr = mmap(NULL, (size_t)page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);\n    if (ptr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    strcpy((char *)ptr, \"protected data\");\n    printf(\"Before protect: %s\\n\", (char *)ptr);\n    int rc = mprotect(ptr, (size_t)page, ____);\n    printf(\"mprotect result: %d\\n\", rc);\n    signal(SIGSEGV, handler);\n    if (setjmp(jump_buf) == 0) { ((char *)ptr)[0] = 'X'; printf(\"Write succeeded (unexpected)\\n\"); }\n    else printf(\"SIGSEGV caught: write blocked\\n\");\n    printf(\"Read after protect: %s\\n\", (char *)ptr);\n    munmap(ptr, (size_t)page);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\nstatic jmp_buf jump_buf;\nstatic void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }\nint main(void) {\n    long page = sysconf(_SC_PAGESIZE);\n    printf(\"Page size: %ld\\n\", page);\n    void *ptr = mmap(NULL, (size_t)page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);\n    if (ptr == MAP_FAILED) { perror(\"mmap\"); return 1; }\n    strcpy((char *)ptr, \"protected data\");\n    printf(\"Before protect: %s\\n\", (char *)ptr);\n    int rc = ____(ptr, (size_t)page, ____);\n    printf(\"mprotect result: %d\\n\", rc);\n    signal(SIGSEGV, handler);\n    if (setjmp(jump_buf) == 0) { ((char *)ptr)[0] = 'X'; printf(\"Write succeeded (unexpected)\\n\"); }\n    else printf(\"SIGSEGV caught: write blocked\\n\");\n    printf(\"Read after protect: %s\\n\", (char *)ptr);\n    munmap(ptr, (size_t)page);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n#include <string.h>\n#include <signal.h>\n#include <setjmp.h>\n\n// Allouez une page mmap, écrivez, passez en lecture seule, vérifiez SIGSEGV\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/mman.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

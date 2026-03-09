@@ -1,0 +1,73 @@
+{
+  "id": "pipe-nonblock-01",
+  "subject": "pipes",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Pipe non-bloquant avec O_NONBLOCK",
+  "description": "NSY103 — Par défaut, read() sur un pipe vide bloque. Avec fcntl(fd, F_SETFL, O_NONBLOCK), read() retourne -1 avec errno=EAGAIN si le pipe est vide. Cela permet de tenter une lecture sans bloquer.\n\nCréez un pipe, mettez fd[0] en mode non-bloquant, tentez de lire (pipe vide → EAGAIN), puis écrivez et relisez avec succès.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    ____(fd[0], F_SETFL, ____);\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf));\n    if (n == -1 && errno == ____)\n        printf(\"Read 1: EAGAIN (pipe empty)\\n\");\n    const char *msg = \"nonblock\";\n    write(fd[1], msg, strlen(msg));\n    n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Read 2: %s\\n\", buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    fcntl(fd[0], F_SETFL, O_NONBLOCK);\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf));\n    if (n == -1 && errno == EAGAIN)\n        printf(\"Read 1: EAGAIN (pipe empty)\\n\");\n    const char *msg = \"nonblock\";\n    write(fd[1], msg, strlen(msg));\n    n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Read 2: %s\\n\", buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+  "hints": [
+    "fcntl(fd[0], F_SETFL, O_NONBLOCK) met le descripteur en mode non-bloquant",
+    "Quand le pipe est vide, read() retourne -1 et errno vaut EAGAIN",
+    "Après écriture, le pipe n'est plus vide et read() réussit"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Read 1: EAGAIN (pipe empty)\nRead 2: nonblock\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "fcntl(fd[0], F_SETFL, O_NONBLOCK)",
+        "nodes": [
+          {"id": "fd0", "label": "fd[0]\nO_NONBLOCK"},
+          {"id": "pipe", "label": "pipe buffer\n(vide)"}
+        ],
+        "edges": [
+          {"source": "pipe", "target": "fd0", "label": "read → EAGAIN"}
+        ],
+        "explanation": "fcntl(fd[0], F_SETFL, O_NONBLOCK) modifie les flags du descripteur au niveau kernel. Dès lors, read() sur un pipe vide retourne immédiatement -1 avec errno=EAGAIN au lieu de suspendre le processus — essentiel pour les boucles d'événements.",
+        "step_label": "Étape 1 — fcntl() active O_NONBLOCK sur fd[0]"
+      },
+      {
+        "label": "write(fd[1], \"nonblock\") — pipe non vide",
+        "nodes": [
+          {"id": "msg", "label": "\"nonblock\""},
+          {"id": "pipe", "label": "pipe buffer"}
+        ],
+        "edges": [
+          {"source": "msg", "target": "pipe", "label": "8 bytes"}
+        ],
+        "explanation": "write() dépose les données dans le buffer kernel. Le pipe n'est plus vide, donc le prochain read() pourra aboutir même en mode O_NONBLOCK — on illustre ainsi que O_NONBLOCK ne bloque que lorsqu'il n'y a rien à lire.",
+        "step_label": "Étape 2 — write() alimente le pipe (plus vide)"
+      },
+      {
+        "label": "read(fd[0]) — succès cette fois",
+        "nodes": [
+          {"id": "pipe", "label": "pipe buffer"},
+          {"id": "buf", "label": "buf = \"nonblock\""}
+        ],
+        "edges": [
+          {"source": "pipe", "target": "buf", "label": "8 bytes"}
+        ],
+        "explanation": "read() réussit cette fois car le buffer kernel contient des données. En mode O_NONBLOCK, il n'y a aucune différence quand des données sont disponibles — la non-bloquance n'affecte que le cas où le pipe est vide ou plein.",
+        "step_label": "Étape 3 — read() réussit car le pipe n'est plus vide"
+      }
+    ]
+  },
+  "prerequisites": ["pipe-chain-01"],
+  "exercise_type": "complete",
+  "key_concept": "O_NONBLOCK transforme les opérations bloquantes en retour immédiat avec EAGAIN",
+  "common_mistake": "Oublier de vérifier errno==EAGAIN : -1 pourrait indiquer une autre erreur",
+  "kc_ids": ["KC-C10"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\n/* == EXEMPLE =======================================\n * O_NONBLOCK sur un pipe : write quand buffer plein\n * Montre que write non-bloquant retourne EAGAIN si\n * le buffer kernel est plein.\n * ================================================= */\nvoid example_nonblock_write(void) {\n    int fd[2];\n    pipe(fd);\n    fcntl(fd[1], F_SETFL, O_NONBLOCK);\n    char data[1024];\n    memset(data, 'A', sizeof(data));\n    int count = 0;\n    while (write(fd[1], data, sizeof(data)) > 0) count++;\n    printf(\"Wrote %d KB before EAGAIN\\n\", count);\n    close(fd[0]); close(fd[1]);\n}\n/* Resultat: Wrote N KB before EAGAIN */\n\n/* == VOTRE EXERCICE ================================\n * O_NONBLOCK en lecture : read sur pipe vide → EAGAIN\n * Puis write + read avec succes.\n * ================================================= */\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    /* TODO: fcntl O_NONBLOCK on fd[0] */\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf));\n    if (n == -1 && errno == EAGAIN)\n        printf(\"Read 1: EAGAIN (pipe empty)\\n\");\n    const char *msg = \"nonblock\";\n    write(fd[1], msg, strlen(msg));\n    n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Read 2: %s\\n\", buf);\n    close(fd[0]); close(fd[1]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    fcntl(fd[0], F_SETFL, O_NONBLOCK);\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf));\n    if (n == -1 && errno == ____)\n        printf(\"Read 1: EAGAIN (pipe empty)\\n\");\n    const char *msg = \"nonblock\";\n    write(fd[1], msg, strlen(msg));\n    n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Read 2: %s\\n\", buf);\n    close(fd[0]); close(fd[1]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    ____(fd[0], F_SETFL, ____);\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf));\n    if (n == -1 && errno == ____)\n        printf(\"Read 1: EAGAIN (pipe empty)\\n\");\n    const char *msg = \"nonblock\";\n    write(fd[1], msg, strlen(msg));\n    n = read(fd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Read 2: %s\\n\", buf);\n    close(fd[0]);\n    close(fd[1]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <fcntl.h>\n#include <errno.h>\n\nint main(void) {\n    int fd[2];\n    // Créez pipe, mettez fd[0] en O_NONBLOCK avec fcntl\n    // Tentez read (vide → EAGAIN), affichez \"Read 1: EAGAIN (pipe empty)\"\n    // Écrivez \"nonblock\", relisez, affichez \"Read 2: nonblock\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "id": "pipe-epoll-01",
+  "subject": "pipes",
+  "lang": "c",
+  "difficulty": 5,
+  "title": "Event loop avec epoll et pipes",
+  "description": "NSY103 — epoll est l'API Linux scalable pour le multiplexage I/O, supérieure à select() pour un grand nombre de fd. epoll_create1() crée une instance, epoll_ctl() ajoute/modifie/supprime des fd, et epoll_wait() attend des événements.\n\nCréez 3 pipes. 3 enfants écrivent chacun dans un pipe. Le parent utilise epoll pour collecter les messages au fur et à mesure, puis les affiche dans l'ordre de réception.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\nint main(void) {\n    int pipes[N][2];\n    for (int i = 0; i < N; i++)\n        pipe(pipes[i]);\n\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < N; j++) {\n                close(pipes[j][0]);\n                if (j != i) close(pipes[j][1]);\n            }\n            char msg[32];\n            snprintf(msg, sizeof(msg), \"epoll-%d\", i);\n            write(pipes[i][1], msg, strlen(msg));\n            close(pipes[i][1]);\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < N; i++)\n        close(pipes[i][1]);\n\n    int epfd = ____(____);\n    for (int i = 0; i < N; i++) {\n        struct epoll_event ev;\n        ev.events = ____;\n        ev.data.fd = pipes[i][0];\n        ____(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);\n    }\n\n    char results[N][32];\n    int count = 0;\n    while (count < N) {\n        struct epoll_event events[N];\n        int nfds = epoll_wait(epfd, events, N, -1);\n        for (int i = 0; i < nfds; i++) {\n            char buf[32];\n            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);\n            if (n > 0) {\n                buf[n] = '\\0';\n                strcpy(results[count++], buf);\n            }\n            close(events[i].data.fd);\n        }\n    }\n    close(epfd);\n    for (int i = 0; i < N; i++)\n        wait(NULL);\n    for (int i = 0; i < count; i++)\n        printf(\"Event: %s\\n\", results[i]);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\nint main(void) {\n    int pipes[N][2];\n    for (int i = 0; i < N; i++)\n        pipe(pipes[i]);\n\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < N; j++) {\n                close(pipes[j][0]);\n                if (j != i) close(pipes[j][1]);\n            }\n            char msg[32];\n            snprintf(msg, sizeof(msg), \"epoll-%d\", i);\n            write(pipes[i][1], msg, strlen(msg));\n            close(pipes[i][1]);\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < N; i++)\n        close(pipes[i][1]);\n\n    int epfd = epoll_create1(0);\n    for (int i = 0; i < N; i++) {\n        struct epoll_event ev;\n        ev.events = EPOLLIN;\n        ev.data.fd = pipes[i][0];\n        epoll_ctl(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);\n    }\n\n    char results[N][32];\n    int count = 0;\n    while (count < N) {\n        struct epoll_event events[N];\n        int nfds = epoll_wait(epfd, events, N, -1);\n        for (int i = 0; i < nfds; i++) {\n            char buf[32];\n            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);\n            if (n > 0) {\n                buf[n] = '\\0';\n                strcpy(results[count++], buf);\n            }\n            close(events[i].data.fd);\n        }\n    }\n    close(epfd);\n    for (int i = 0; i < N; i++)\n        wait(NULL);\n    for (int i = 0; i < count; i++)\n        printf(\"Event: %s\\n\", results[i]);\n    return 0;\n}",
+  "hints": [
+    "epoll_create1(0) crée une instance epoll (le flag 0 = pas de EPOLL_CLOEXEC)",
+    "ev.events = EPOLLIN pour surveiller la disponibilité en lecture",
+    "epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) ajoute un fd à l'instance epoll"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Event: epoll-0\nEvent: epoll-1\nEvent: epoll-2\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "3 pipes enregistrés dans epoll avec EPOLLIN",
+        "nodes": [
+          {"id": "p0", "label": "pipe[0]"},
+          {"id": "p1", "label": "pipe[1]"},
+          {"id": "p2", "label": "pipe[2]"},
+          {"id": "epoll", "label": "epoll instance"}
+        ],
+        "edges": [
+          {"source": "p0", "target": "epoll", "label": "EPOLL_CTL_ADD"},
+          {"source": "p1", "target": "epoll", "label": "EPOLL_CTL_ADD"},
+          {"source": "p2", "target": "epoll", "label": "EPOLL_CTL_ADD"}
+        ],
+        "explanation": "epoll_create1(0) crée une instance epoll dans le kernel — une structure de données qui surveille un ensemble de fd. epoll_ctl(EPOLL_CTL_ADD) enregistre chaque pipe read-end avec l'événement EPOLLIN : le kernel notifiera quand des données seront disponibles en lecture.",
+        "step_label": "Étape 1 — epoll_create1() + epoll_ctl() enregistrent les 3 pipes"
+      },
+      {
+        "label": "epoll_wait() retourne les fd prêts",
+        "nodes": [
+          {"id": "epoll", "label": "epoll_wait()"},
+          {"id": "events", "label": "events[]\nnfds ready"}
+        ],
+        "edges": [
+          {"source": "epoll", "target": "events", "label": "EPOLLIN triggered"}
+        ],
+        "explanation": "epoll_wait() bloque jusqu'à ce qu'au moins un fd enregistré ait des données. Il retourne directement le tableau des fd prêts (events[]) — contrairement à select() qui retourne un bitmap à scanner, epoll retourne uniquement les fd actifs, d'où sa complexité O(nombre d'événements) et non O(maxfd).",
+        "step_label": "Étape 2 — epoll_wait() retourne les fd prêts directement"
+      },
+      {
+        "label": "read() sur chaque événement → résultats collectés",
+        "nodes": [
+          {"id": "events", "label": "events[i].data.fd"},
+          {"id": "results", "label": "results[]\nepoll-0,1,2"}
+        ],
+        "edges": [
+          {"source": "events", "target": "results", "label": "read()"}
+        ],
+        "explanation": "Pour chaque événement retourné par epoll_wait(), on lit depuis events[i].data.fd — le fd que l'on avait stocké dans ev.data.fd lors de l'epoll_ctl(). Fermer le fd après lecture le retire automatiquement de l'instance epoll (EPOLL_CTL_DEL implicite), empêchant les événements parasites.",
+        "step_label": "Étape 3 — read() sur chaque fd prêt, fermeture retire le fd de l'epoll"
+      }
+    ]
+  },
+  "prerequisites": ["pipe-splice-01"],
+  "exercise_type": "complete",
+  "key_concept": "epoll = multiplexage O(1) ; epoll_create1 + epoll_ctl(ADD) + epoll_wait en boucle",
+  "common_mistake": "Oublier de fermer le fd epoll avec close(epfd) → fuite de descripteur kernel",
+  "kc_ids": ["KC-C10"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\n/* == EXEMPLE =======================================\n * epoll avec 1 pipe : registre, attente, lecture\n * ================================================= */\nvoid example_epoll_one(void) {\n    int fd[2]; pipe(fd);\n    if (fork() == 0) {\n        close(fd[0]);\n        write(fd[1], \"evt\", 3);\n        close(fd[1]); _exit(0);\n    }\n    close(fd[1]);\n    int epfd = epoll_create1(0);\n    struct epoll_event ev = { .events = EPOLLIN, .data.fd = fd[0] };\n    epoll_ctl(epfd, EPOLL_CTL_ADD, fd[0], &ev);\n    struct epoll_event evts[1];\n    epoll_wait(epfd, evts, 1, -1);\n    char buf[16];\n    ssize_t n = read(evts[0].data.fd, buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    printf(\"Got: %s\\n\", buf);\n    close(fd[0]); close(epfd); wait(NULL);\n}\n/* Resultat: Got: evt */\n\n/* == VOTRE EXERCICE ================================\n * epoll avec 3 pipes : event loop complet.\n * ================================================= */\nint main(void) {\n    int pipes[N][2];\n    for (int i = 0; i < N; i++) pipe(pipes[i]);\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < N; j++) { close(pipes[j][0]); if (j!=i) close(pipes[j][1]); }\n            char msg[32]; snprintf(msg, sizeof(msg), \"epoll-%d\", i);\n            write(pipes[i][1], msg, strlen(msg)); close(pipes[i][1]); _exit(0);\n        }\n    }\n    for (int i = 0; i < N; i++) close(pipes[i][1]);\n    /* TODO: create epoll, add all pipe read ends, loop epoll_wait, read, collect */\n    for (int i = 0; i < N; i++) { close(pipes[i][0]); wait(NULL); }\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\nint main(void) {\n    int pipes[N][2];\n    for (int i = 0; i < N; i++) pipe(pipes[i]);\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < N; j++) { close(pipes[j][0]); if (j!=i) close(pipes[j][1]); }\n            char msg[32]; snprintf(msg, sizeof(msg), \"epoll-%d\", i);\n            write(pipes[i][1], msg, strlen(msg)); close(pipes[i][1]); _exit(0);\n        }\n    }\n    for (int i = 0; i < N; i++) close(pipes[i][1]);\n    int epfd = epoll_create1(0);\n    for (int i = 0; i < N; i++) {\n        struct epoll_event ev = { .events = EPOLLIN, .data.fd = pipes[i][0] };\n        epoll_ctl(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);\n    }\n    char results[N][32]; int count = 0;\n    while (count < N) {\n        struct epoll_event events[N];\n        int nfds = ____(epfd, events, N, -1);  // quelle fonction ?\n        for (int i = 0; i < nfds; i++) {\n            char buf[32];\n            ssize_t n = read(events[i].data.fd, buf, sizeof(buf)-1);\n            if (n > 0) { buf[n]='\\0'; strcpy(results[count++], buf); }\n            close(events[i].data.fd);\n        }\n    }\n    close(epfd);\n    for (int i = 0; i < N; i++) wait(NULL);\n    for (int i = 0; i < count; i++) printf(\"Event: %s\\n\", results[i]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\nint main(void) {\n    int pipes[N][2];\n    for (int i = 0; i < N; i++)\n        pipe(pipes[i]);\n\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < N; j++) {\n                close(pipes[j][0]);\n                if (j != i) close(pipes[j][1]);\n            }\n            char msg[32];\n            snprintf(msg, sizeof(msg), \"epoll-%d\", i);\n            write(pipes[i][1], msg, strlen(msg));\n            close(pipes[i][1]);\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < N; i++)\n        close(pipes[i][1]);\n\n    int epfd = ____(____);\n    for (int i = 0; i < N; i++) {\n        struct epoll_event ev;\n        ev.events = ____;\n        ev.data.fd = pipes[i][0];\n        ____(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);\n    }\n\n    char results[N][32];\n    int count = 0;\n    while (count < N) {\n        struct epoll_event events[N];\n        int nfds = epoll_wait(epfd, events, N, -1);\n        for (int i = 0; i < nfds; i++) {\n            char buf[32];\n            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);\n            if (n > 0) {\n                buf[n] = '\\0';\n                strcpy(results[count++], buf);\n            }\n            close(events[i].data.fd);\n        }\n    }\n    close(epfd);\n    for (int i = 0; i < N; i++)\n        wait(NULL);\n    for (int i = 0; i < count; i++)\n        printf(\"Event: %s\\n\", results[i]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <sys/epoll.h>\n\n#define N 3\n\nint main(void) {\n    // Créez 3 pipes, 3 enfants écrivent \"epoll-0\", \"epoll-1\", \"epoll-2\"\n    // Parent: epoll_create1, epoll_ctl ADD pour chaque pipe\n    // Boucle epoll_wait, read, collecte résultats\n    // Affiche \"Event: epoll-X\" pour chaque\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -39,7 +39,9 @@
             "target": "saved",
             "label": "dup()"
           }
-        ]
+        ],
+        "explanation": "dup(STDOUT_FILENO) crée une copie de fd 1 sur le plus petit fd disponible. Cette sauvegarde est indispensable pour pouvoir restaurer stdout après la redirection — sans elle, on perdrait définitivement l'accès au terminal.",
+        "step_label": "Étape 1 — dup() sauvegarde stdout avant redirection"
       },
       {
         "label": "dup2(p[1], 1) — stdout→pipe",
@@ -59,7 +61,9 @@
             "target": "pipe",
             "label": "stdout→p[1]"
           }
-        ]
+        ],
+        "explanation": "dup2(p[1], STDOUT_FILENO) remplace fd 1 par p[1] — tout appel à printf() passe désormais par le pipe sans que le code source de la routine ne soit modifié. C'est la base de la capture de sortie dans les shells et outils de test.",
+        "step_label": "Étape 2 — dup2() redirige stdout vers le pipe"
       },
       {
         "label": "dup2(saved, 1) — restaurer stdout",
@@ -79,7 +83,9 @@
             "target": "stdout",
             "label": "dup2()"
           }
-        ]
+        ],
+        "explanation": "dup2(saved_stdout, STDOUT_FILENO) rétablit fd 1 vers le terminal. Il faut impérativement appeler fflush(stdout) avant cette restauration pour vider le buffer C de la libc — sinon les données encore en buffer seraient perdues ou envoyées au mauvais fd.",
+        "step_label": "Étape 3 — dup2() restaure stdout vers le terminal"
       },
       {
         "label": "read(p[0]) — capturer",
@@ -99,7 +105,9 @@
             "target": "buf",
             "label": "n bytes"
           }
-        ]
+        ],
+        "explanation": "read(p[0]) extrait ce qui a été capturé dans le pipe (la sortie de printf redirigé). Stdout étant restauré au préalable, le printf suivant affiche \"Captured: ...\" directement sur le terminal — c'est le résultat de toute la séquence de capture.",
+        "step_label": "Étape 4 — read() récupère la sortie capturée"
       }
     ]
   },
@@ -113,7 +121,7 @@
     "KC-C10"
   ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int p[2];\n    pipe(p);                                    // ★ p[0]=lecture p[1]=écriture\n    int saved_stdout = dup(STDOUT_FILENO);      // ★ copier fd 1 → fd libre (sauvegarde)\n    dup2(p[1], STDOUT_FILENO);                  // ★ stdout (fd 1) pointe maintenant vers p[1]\n    close(p[1]);                                // ★ fermer l'original p[1] (évite read bloquant)\n    printf(\"hello stdout\");                    // ★ va dans le pipe, pas dans le terminal\n    fflush(stdout);                             // ★ vider le buffer avant de restaurer\n    dup2(saved_stdout, STDOUT_FILENO);          // ★ restaurer stdout → terminal\n    close(saved_stdout);                        // ★ fermer la sauvegarde devenue inutile\n    char buf[64];\n    ssize_t n = read(p[0], buf, sizeof(buf) - 1); // ★ lire ce qui était dans le pipe\n    buf[n] = '\\0';\n    close(p[0]);\n    printf(\"Captured: %s\\n\", buf);             // ★ afficher dans le vrai stdout\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\n/* == EXEMPLE =======================================\n * Rediriger stderr vers un pipe avec dup2\n * dup(fd) sauvegarde, dup2(src, dst) redirige.\n * Meme pattern que stdout mais avec STDERR_FILENO.\n * ================================================= */\nvoid example_capture_stderr(void) {\n    int p[2];\n    pipe(p);\n    int saved_stderr = dup(STDERR_FILENO);\n    dup2(p[1], STDERR_FILENO);\n    close(p[1]);\n    fprintf(stderr, \"error msg\");\n    fflush(stderr);\n    dup2(saved_stderr, STDERR_FILENO);\n    close(saved_stderr);\n    char buf[64];\n    ssize_t n = read(p[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    close(p[0]);\n    fprintf(stderr, \"Caught: %s\\n\", buf);\n}\n/* Resultat: Caught: error msg (sur stderr) */\n\n/* == VOTRE EXERCICE ================================\n * Rediriger stdout vers un pipe avec dup2\n * Inspirez-vous de example_capture_stderr ci-dessus.\n * Sauvegardez stdout, redirigez vers pipe, printf,\n * restaurez, lisez le pipe.\n * ================================================= */\nint main(void) {\n    int p[2];\n    pipe(p);\n    /* TODO: int saved_stdout = dup(STDOUT_FILENO); */\n    /* TODO: dup2(p[1], STDOUT_FILENO); */\n    close(p[1]);\n    printf(\"hello stdout\");\n    fflush(stdout);\n    /* TODO: dup2(saved_stdout, STDOUT_FILENO); */\n    /* TODO: close(saved_stdout); */\n    char buf[64];\n    ssize_t n = read(p[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    close(p[0]);\n    printf(\"Captured: %s\\n\", buf);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p[2];\n    pipe(p);\n    int saved_stdout = dup(STDOUT_FILENO);\n    dup2(p[1], STDOUT_FILENO);\n    close(p[1]);\n    printf(\"hello stdout\");\n    fflush(stdout);\n    ____(saved_stdout, STDOUT_FILENO);  // restaurer stdout\n    close(saved_stdout);\n    char buf[64];\n    ssize_t n = read(p[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    close(p[0]);\n    printf(\"Captured: %s\\n\", buf);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p[2];\n    pipe(p);\n    int saved_stdout = ____(STDOUT_FILENO);  // sauvegarder stdout\n    ____(p[1], STDOUT_FILENO);               // redirecter stdout → pipe\n    close(p[1]);\n    printf(\"hello stdout\");\n    fflush(stdout);\n    ____(saved_stdout, STDOUT_FILENO);       // restaurer stdout\n    close(saved_stdout);\n    char buf[64];\n    ssize_t n = read(p[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    close(p[0]);\n    printf(\"Captured: %s\\n\", buf);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int p[2];\n    // Créez un pipe, sauvegardez stdout avec dup()\n    // Redirigez stdout vers p[1] avec dup2(), fermez p[1]\n    // printf \"hello stdout\", fflush, restaurez stdout, fermez la sauvegarde\n    // Lisez p[0] dans buf, affichez \"Captured: hello stdout\"\n    return 0;\n}",

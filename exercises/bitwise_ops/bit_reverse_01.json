@@ -1,0 +1,63 @@
+{
+  "id": "bit-reverse-01",
+  "subject": "bitwise_ops",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Inversion de l'ordre des bits",
+  "description": "NSY103 — Inverser l'ordre des bits d'un octet (MSB↔LSB) est utile pour les protocoles série (LSB-first vs MSB-first). L'algorithme parcourt chaque bit source et le place à la position miroir dans le résultat.\n\nImplémentez reverse_bits pour un octet et un entier 32 bits.",
+  "starter_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result ____ 1;\n        result |= (b ____ 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & ____);\n        val >>= 1;\n    }\n    return result;\n}\n\nint main(void) {\n    unsigned char bytes[] = {0xA5, 0x0F, 0x80, 0x01};\n    for (int i = 0; i < 4; i++) {\n        printf(\"0x%02X -> 0x%02X\\n\", bytes[i], reverse_byte(bytes[i]));\n    }\n    unsigned int val = 0x12345678;\n    printf(\"0x%08X -> 0x%08X\\n\", val, reverse_32(val));\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & 1);\n        val >>= 1;\n    }\n    return result;\n}\n\nint main(void) {\n    unsigned char bytes[] = {0xA5, 0x0F, 0x80, 0x01};\n    for (int i = 0; i < 4; i++) {\n        printf(\"0x%02X -> 0x%02X\\n\", bytes[i], reverse_byte(bytes[i]));\n    }\n    unsigned int val = 0x12345678;\n    printf(\"0x%08X -> 0x%08X\\n\", val, reverse_32(val));\n    return 0;\n}",
+  "hints": [
+    "result <<= 1 fait de la place pour le prochain bit",
+    "b & 1 extrait le bit de poids faible de la source",
+    "result |= (b & 1) ajoute ce bit au résultat"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "0xA5 -> 0xA5\n0x0F -> 0xF0\n0x80 -> 0x01\n0x01 -> 0x80\n0x12345678 -> 0x1E6A2C48\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "reverse_byte(0x0F)",
+        "stack": [
+          {"name": "b", "value": "00001111b (0x0F)"},
+          {"name": "i=0", "value": "result=0, b&1=1, result=1"},
+          {"name": "i=1", "value": "result=10, b&1=1, result=11"},
+          {"name": "i=7", "value": "result=11110000b (0xF0)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "reverse_byte", "args": "0x0F", "is_active": true}],
+        "explanation": "Chaque bit est extrait de droite et placé à gauche dans result",
+        "step_label": "1. Byte"
+      },
+      {
+        "label": "Cas symétrique: 0xA5 → 0xA5",
+        "stack": [
+          {"name": "0xA5", "value": "10100101b"},
+          {"name": "reversed", "value": "10100101b (palindrome!)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "0xA5 est un palindrome binaire — il se lit pareil dans les deux sens",
+        "step_label": "2. Palindrome"
+      }
+    ]
+  },
+  "prerequisites": ["bit-count-01"],
+  "exercise_type": "complete",
+  "key_concept": "Reversal bit par bit: result <<= 1; result |= (val & 1); val >>= 1 — pattern applicable à toute taille",
+  "common_mistake": "Oublier result <<= 1 avant le OR → tous les bits s'accumulent sur le bit 0",
+  "kc_ids": ["KC-C04"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Inversion de 4 bits: 1010 → 0101\n * =========================================================== */\nvoid example_reverse(void) {\n    unsigned char x = 0x0A; /* 1010b */\n    unsigned char r = 0;\n    for (int i = 0; i < 4; i++) {\n        r <<= 1;\n        r |= (x & 1);\n        x >>= 1;\n    }\n    printf(\"0x%X → 0x%X\\n\", 0x0A, r); /* 0xA → 0x5 */\n}\n\n/* == VOTRE EXERCICE =========================================\n * reverse_byte(8 bits) et reverse_32(32 bits)\n * =========================================================== */\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & 1);\n        val >>= 1;\n    }\n    return result;\n}\n\nint main(void) {\n    unsigned char bytes[] = {0xA5, 0x0F, 0x80, 0x01};\n    for (int i = 0; i < 4; i++)\n        printf(\"0x%02X -> 0x%02X\\n\", bytes[i], reverse_byte(bytes[i]));\n    unsigned int val = 0x12345678;\n    printf(\"0x%08X -> 0x%08X\\n\", val, reverse_32(val));\n    return 0;\n}",
+    "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & ____);\n        val ____ 1;\n    }\n    return result;\n}\n\nint main(void) {\n    unsigned char bytes[] = {0xA5, 0x0F, 0x80, 0x01};\n    for (int i = 0; i < 4; i++)\n        printf(\"0x%02X -> 0x%02X\\n\", bytes[i], reverse_byte(bytes[i]));\n    unsigned int val = 0x12345678;\n    printf(\"0x%08X -> 0x%08X\\n\", val, reverse_32(val));\n    return 0;\n}",
+    "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result ____ 1;\n        result |= (b ____ 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & ____);\n        val >>= 1;\n    }\n    return result;\n}\n\nint main(void) {\n    unsigned char bytes[] = {0xA5, 0x0F, 0x80, 0x01};\n    for (int i = 0; i < 4; i++)\n        printf(\"0x%02X -> 0x%02X\\n\", bytes[i], reverse_byte(bytes[i]));\n    unsigned int val = 0x12345678;\n    printf(\"0x%08X -> 0x%08X\\n\", val, reverse_32(val));\n    return 0;\n}",
+    "#include <stdio.h>\n\n// reverse_byte: extraire LSB, shift result gauche, OR\n// reverse_32: même algo sur 32 bits\n// Tester: 0xA5, 0x0F, 0x80, 0x01, 0x12345678\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

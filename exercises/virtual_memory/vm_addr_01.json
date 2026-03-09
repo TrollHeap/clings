@@ -1,0 +1,35 @@
+{
+  "id": "vm-addr-01",
+  "subject": "virtual_memory",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Espace d'adressage virtuel",
+  "description": "NSY103 — Chaque processus a son propre espace d'adressage virtuel. Sur x86_64, c'est 48 bits (256 TB). Les adresses virtuelles sont traduites en adresses physiques par la MMU via les tables de pages.\n\nExplorez les propriétés de l'espace d'adressage: taille de pointeur, zones utilisateur/noyau.",
+  "starter_code": "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\n\nint main(void) {\n    printf(\"Pointer size: %zu bytes\\n\", ____(void *));\n    printf(\"Address bits: %zu\\n\", sizeof(void *) * 8);\n    int stack_var = 42;\n    printf(\"Stack addr high nibble: 0x%lx\\n\",\n        ((unsigned long)&stack_var) >> (____ * 8 - 4));\n    int is_userspace = ((unsigned long)&stack_var >> 47) == 0;\n    printf(\"In userspace: %s\\n\", is_userspace ? \"yes\" : \"no\");\n    printf(\"getpagesize: %d\\n\", getpagesize());\n    unsigned long pages_in_4gb = (1UL << 32) / (unsigned long)____();\n    printf(\"Pages in 4GB: %lu\\n\", pages_in_4gb);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\nint main(void) {\n    printf(\"Pointer size: %zu bytes\\n\", sizeof(void *));\n    printf(\"Address bits: %zu\\n\", sizeof(void *) * 8);\n    int stack_var = 42;\n    printf(\"Stack addr high nibble: 0x%lx\\n\",\n        ((unsigned long)&stack_var) >> (sizeof(void *) * 8 - 4));\n    int is_userspace = ((unsigned long)&stack_var >> 47) == 0;\n    printf(\"In userspace: %s\\n\", is_userspace ? \"yes\" : \"no\");\n    printf(\"getpagesize: %d\\n\", getpagesize());\n    unsigned long pages_in_4gb = (1UL << 32) / (unsigned long)getpagesize();\n    printf(\"Pages in 4GB: %lu\\n\", pages_in_4gb);\n    return 0;\n}",
+  "hints": [
+    "sizeof(void *) donne la taille d'un pointeur — 8 octets sur x86_64",
+    "Les adresses userspace ont le bit 47 à 0 sur x86_64",
+    "getpagesize() pour calculer le nombre de pages dans un espace donné"
+  ],
+  "validation": {"mode": "output", "expected_output": "REGEX:(?s)Pointer size: 8 bytes\\nAddress bits: 64\\nStack addr high nibble: 0x[0-9a-f]+\\nIn userspace: yes\\ngetpagesize: 4096\\nPages in 4GB: 1048576", "test_code": null},
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "Espace d'adressage", "stack": [{"name": "sizeof(void*)", "value": "8 (64 bits)"}, {"name": "Userspace", "value": "bit 47 = 0"}, {"name": "Kernel", "value": "bit 47 = 1"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "x86_64: 48 bits effectifs, moitié user/kernel", "step_label": "Étape 1"},
+      {"label": "Pages dans 4GB", "stack": [{"name": "4GB", "value": "4294967296 octets"}, {"name": "page_size", "value": "4096"}, {"name": "pages", "value": "1048576 (1M pages)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "4GB / 4KB = 1M pages", "step_label": "Étape 2"}
+    ]
+  },
+  "prerequisites": ["vm-page-01"],
+  "exercise_type": "complete",
+  "key_concept": "Espace virtuel 48-bit sur x86_64, userspace/kernel séparés au bit 47",
+  "common_mistake": "Supposer que sizeof(void*) == sizeof(int) — c'est faux sur x86_64 (8 vs 4)",
+  "kc_ids": ["KC-C18"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\n\n/* == EXEMPLE: exploration de l'espace d'adressage ===== */\nvoid example_addr(void) {\n    int x; void *p = &x;\n    printf(\"Stack address: %p\\n\", p);\n    printf(\"Top 16 bits: 0x%04lx\\n\", ((unsigned long)p) >> 48);\n}\n\nint main(void) {\n    printf(\"Pointer size: %zu bytes\\n\", sizeof(void *));\n    printf(\"Address bits: %zu\\n\", sizeof(void *) * 8);\n    int stack_var = 42;\n    printf(\"Stack addr high nibble: 0x%lx\\n\",\n        ((unsigned long)&stack_var) >> (sizeof(void*)*8-4));\n    int is_userspace = ((unsigned long)&stack_var >> 47) == 0;\n    printf(\"In userspace: %s\\n\", is_userspace ? \"yes\" : \"no\");\n    printf(\"getpagesize: %d\\n\", getpagesize());\n    unsigned long pages_in_4gb = (1UL << 32) / (unsigned long)getpagesize();\n    printf(\"Pages in 4GB: %lu\\n\", pages_in_4gb);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\nint main(void) {\n    printf(\"Pointer size: %zu bytes\\n\", sizeof(void *));\n    printf(\"Address bits: %zu\\n\", sizeof(void *) * 8);\n    int stack_var = 42;\n    printf(\"Stack addr high nibble: 0x%lx\\n\",\n        ((unsigned long)&stack_var) >> (sizeof(void*)*8-4));\n    int is_userspace = ((unsigned long)&stack_var >> 47) == 0;\n    printf(\"In userspace: %s\\n\", is_userspace ? \"yes\" : \"no\");\n    printf(\"getpagesize: %d\\n\", getpagesize());\n    unsigned long pages_in_4gb = (1UL << 32) / (unsigned long)____();\n    printf(\"Pages in 4GB: %lu\\n\", pages_in_4gb);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\nint main(void) {\n    printf(\"Pointer size: %zu bytes\\n\", ____(void *));\n    printf(\"Address bits: %zu\\n\", sizeof(void *) * 8);\n    int stack_var = 42;\n    printf(\"Stack addr high nibble: 0x%lx\\n\",\n        ((unsigned long)&stack_var) >> (____ * 8 - 4));\n    int is_userspace = ((unsigned long)&stack_var >> 47) == 0;\n    printf(\"In userspace: %s\\n\", is_userspace ? \"yes\" : \"no\");\n    printf(\"getpagesize: %d\\n\", getpagesize());\n    unsigned long pages_in_4gb = (1UL << 32) / (unsigned long)____();\n    printf(\"Pages in 4GB: %lu\\n\", pages_in_4gb);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdint.h>\n#include <unistd.h>\n\n// Explorez sizeof(void*), userspace detection, pages dans 4GB\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

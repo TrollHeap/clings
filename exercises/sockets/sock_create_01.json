@@ -1,0 +1,73 @@
+{
+  "id": "sock-create-01",
+  "subject": "sockets",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "socket() et struct sockaddr_in",
+  "description": "NSY103 — socket() crée un point de communication. Les paramètres (AF_INET, SOCK_STREAM, 0) créent un socket TCP IPv4. Le descripteur retourné est un entier positif.\n\nCréez un socket TCP et un socket UDP, affichez leurs descripteurs, puis fermez-les.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\nint main(void) {\n    int tcp_fd = socket(AF_INET, ____, 0);\n    int udp_fd = socket(AF_INET, ____, 0);\n    printf(\"TCP socket: fd=%d\\n\", tcp_fd >= 0 ? 1 : 0);\n    printf(\"UDP socket: fd=%d\\n\", udp_fd >= 0 ? 1 : 0);\n    printf(\"TCP type: SOCK_STREAM\\n\");\n    printf(\"UDP type: SOCK_DGRAM\\n\");\n    close(tcp_fd);\n    close(udp_fd);\n    printf(\"Sockets closed.\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\nint main(void) {\n    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);\n    int udp_fd = socket(AF_INET, SOCK_DGRAM, 0);\n    printf(\"TCP socket: fd=%d\\n\", tcp_fd >= 0 ? 1 : 0);\n    printf(\"UDP socket: fd=%d\\n\", udp_fd >= 0 ? 1 : 0);\n    printf(\"TCP type: SOCK_STREAM\\n\");\n    printf(\"UDP type: SOCK_DGRAM\\n\");\n    close(tcp_fd);\n    close(udp_fd);\n    printf(\"Sockets closed.\\n\");\n    return 0;\n}",
+  "hints": [
+    "SOCK_STREAM = TCP (connexion fiable, ordonnée)",
+    "SOCK_DGRAM = UDP (datagrammes, sans connexion)",
+    "socket() retourne -1 en cas d'erreur, sinon un fd >= 0"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "TCP socket: fd=1\nUDP socket: fd=1\nTCP type: SOCK_STREAM\nUDP type: SOCK_DGRAM\nSockets closed.\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "socket() crée un descripteur",
+        "stack": [
+          {"name": "tcp_fd", "value": "3 (fd)"},
+          {"name": "udp_fd", "value": "4 (fd)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Chaque appel socket() retourne un file descriptor du noyau",
+        "step_label": "1. Création"
+      },
+      {
+        "label": "Types de sockets",
+        "stack": [
+          {"name": "SOCK_STREAM", "value": "TCP (fiable, ordonné)"},
+          {"name": "SOCK_DGRAM", "value": "UDP (datagramme)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "STREAM = connexion TCP, DGRAM = datagramme UDP",
+        "step_label": "2. Types"
+      },
+      {
+        "label": "close() libère les descripteurs",
+        "stack": [
+          {"name": "tcp_fd", "value": "fermé"},
+          {"name": "udp_fd", "value": "fermé"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Toujours fermer les sockets pour libérer les ressources noyau",
+        "step_label": "3. Fermeture"
+      }
+    ]
+  },
+  "prerequisites": ["sockets-01"],
+  "exercise_type": "complete",
+  "key_concept": "socket(AF_INET, SOCK_STREAM, 0) crée un TCP; SOCK_DGRAM crée un UDP — toujours close() après usage",
+  "common_mistake": "Confondre SOCK_STREAM (TCP) et SOCK_DGRAM (UDP)",
+  "kc_ids": ["KC-C14"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\n/* == EXEMPLE ===============================================\n * Créer un socket raw (nécessite root)\n * ========================================================= */\nvoid example_raw(void) {\n    int raw = socket(AF_INET, SOCK_RAW, 0);\n    printf(\"Raw socket: %s\\n\", raw >= 0 ? \"ok\" : \"need root\");\n    if (raw >= 0) close(raw);\n}\n\n/* == VOTRE EXERCICE ========================================\n * Créez un socket TCP et un socket UDP\n * ========================================================= */\n\nint main(void) {\n    /* TODO: socket(AF_INET, SOCK_STREAM, 0) pour TCP */\n    /* TODO: socket(AF_INET, SOCK_DGRAM, 0) pour UDP */\n    int tcp_fd = -1, udp_fd = -1;\n    printf(\"TCP socket: fd=%d\\n\", tcp_fd >= 0 ? 1 : 0);\n    printf(\"UDP socket: fd=%d\\n\", udp_fd >= 0 ? 1 : 0);\n    printf(\"TCP type: SOCK_STREAM\\n\");\n    printf(\"UDP type: SOCK_DGRAM\\n\");\n    if (tcp_fd >= 0) close(tcp_fd);\n    if (udp_fd >= 0) close(udp_fd);\n    printf(\"Sockets closed.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\nint main(void) {\n    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);\n    int udp_fd = socket(AF_INET, ____, 0);  // UDP\n    printf(\"TCP socket: fd=%d\\n\", tcp_fd >= 0 ? 1 : 0);\n    printf(\"UDP socket: fd=%d\\n\", udp_fd >= 0 ? 1 : 0);\n    printf(\"TCP type: SOCK_STREAM\\n\");\n    printf(\"UDP type: SOCK_DGRAM\\n\");\n    close(tcp_fd);\n    close(udp_fd);\n    printf(\"Sockets closed.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\nint main(void) {\n    int tcp_fd = socket(AF_INET, ____, 0);\n    int udp_fd = socket(AF_INET, ____, 0);\n    printf(\"TCP socket: fd=%d\\n\", tcp_fd >= 0 ? 1 : 0);\n    printf(\"UDP socket: fd=%d\\n\", udp_fd >= 0 ? 1 : 0);\n    printf(\"TCP type: SOCK_STREAM\\n\");\n    printf(\"UDP type: SOCK_DGRAM\\n\");\n    close(tcp_fd);\n    close(udp_fd);\n    printf(\"Sockets closed.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n\n// Créez un socket TCP (SOCK_STREAM) et UDP (SOCK_DGRAM)\n// Affichez si chaque fd >= 0 (1 ou 0), le type, puis fermez\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <sys/socket.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}
