@@ -1,10 +1,10 @@
 [package]
-name = "kernelforge-cli"
+name = "clings"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "kf"
+name = "clings"
 path = "src/main.rs"
 
 [dependencies]

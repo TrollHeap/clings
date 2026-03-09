@@ -1,4 +1,4 @@
-# findings.md — Audit d'alignement NSY103 / UTC502 / KernelForge CLI
+# findings.md — Audit d'alignement NSY103 / UTC502 / clings
 
 Date: 2026-03-09
 
@@ -109,7 +109,7 @@ Date: 2026-03-09
 - Ch.7 — E/S et interruptions
 - Ch.8 — Sécurité
 
-### Couverture UTC502 par KernelForge
+### Couverture UTC502 par clings
 
 | Thème UTC502 | Couverture KF | Notes |
 |---|---|---|

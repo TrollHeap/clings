@@ -1,4 +1,4 @@
-# progress.md — État d'avancement KernelForge CLI
+# progress.md — État d'avancement clings
 
 Date: 2026-03-09
 

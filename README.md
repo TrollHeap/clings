@@ -1,8 +1,8 @@
-# KernelForge CLI
+# clings
 
 **Entraîneur interactif de programmation systèmes C, aligné sur le cursus NSY103 — Linux : noyau et programmation système.**
 
-Résolvez 260 exercices C directement dans votre éditeur. `kf` surveille vos sauvegardes, compile avec `gcc`, valide la sortie, et mesure votre maîtrise via un algorithme de répétition espacée (SRS).
+Résolvez 260 exercices C directement dans votre éditeur. `clings` surveille vos sauvegardes, compile avec `gcc`, valide la sortie, et mesure votre maîtrise via un algorithme de répétition espacée (SRS).
 
 ---
 
@@ -13,9 +13,9 @@ Résolvez 260 exercices C directement dans votre éditeur. `kf` surveille vos sa
 ```bash
 # Depuis les sources
 git clone <repo>
-cd kernelforge-cli
+cd clings
 cargo build --release
-# Binaire : target/release/kf
+# Binaire : target/release/clings
 
 # Ou directement dans ~/.cargo/bin/
 cargo install --path .
@@ -27,14 +27,14 @@ cargo install --path .
 
 | Commande | Description |
 |---|---|
-| `kf` ou `kf watch` | Mode surveillance SRS : exercices priorisés par niveau de maîtrise, avancement automatique |
-| `kf list` | Liste tous les exercices (filtre possible : `--subject <sujet>`) |
-| `kf run <id>` | Lance un exercice précis en mode surveillance (ex : `kf run ptr-deref-01`) |
-| `kf progress` | Tableau de bord : maîtrise par sujet, série de jours consécutifs |
-| `kf hint <id>` | Affiche les indices de l'exercice |
-| `kf solution <id>` | Affiche la solution (nécessite au moins une tentative) |
-| `kf reset` | Réinitialise toute la progression (confirmation requise) |
-| `kf piscine` | Mode piscine : parcours linéaire intégral, tous les exercices déverrouillés d'emblée |
+| `clings` ou `clings watch` | Mode surveillance SRS : exercices priorisés par niveau de maîtrise, avancement automatique |
+| `clings list` | Liste tous les exercices (filtre possible : `--subject <sujet>`) |
+| `clings run <id>` | Lance un exercice précis en mode surveillance (ex : `clings run ptr-deref-01`) |
+| `clings progress` | Tableau de bord : maîtrise par sujet, série de jours consécutifs |
+| `clings hint <id>` | Affiche les indices de l'exercice |
+| `clings solution <id>` | Affiche la solution (nécessite au moins une tentative) |
+| `clings reset` | Réinitialise toute la progression (confirmation requise) |
+| `clings piscine` | Mode piscine : parcours linéaire intégral, tous les exercices déverrouillés d'emblée |
 
 ### Raccourcis clavier (mode watch)
 
@@ -50,10 +50,10 @@ cargo install --path .
 
 ## Fonctionnement
 
-1. `kf watch` sélectionne l'exercice suivant selon l'algorithme SRS (maîtrise la plus faible en priorité).
-2. Le code de départ est écrit dans `~/.kernelforge/current.c`.
+1. `clings watch` sélectionne l'exercice suivant selon l'algorithme SRS (maîtrise la plus faible en priorité).
+2. Le code de départ est écrit dans `~/.clings/current.c`.
 3. Ouvrez ce fichier dans votre éditeur et modifiez-le.
-4. À chaque sauvegarde, `kf` compile avec `gcc -Wall -Wextra -std=c11` et compare la sortie à la valeur attendue.
+4. À chaque sauvegarde, `clings` compile avec `gcc -Wall -Wextra -std=c11` et compare la sortie à la valeur attendue.
 5. En cas de succès, la maîtrise du sujet augmente (+1,0) et l'exercice suivant est chargé.
 6. En cas d'échec d'exécution (pas d'erreur de compilation), la maîtrise diminue (−0,5).
 
@@ -98,11 +98,11 @@ Exercices supplémentaires alignés sur UTC502 : algorithmes de remplacement de 
 
 | Paramètre | Valeur par défaut | Description |
 |---|---|---|
-| Répertoire de travail | `~/.kernelforge/` | Fichier courant, base de données SQLite |
+| Répertoire de travail | `~/.clings/` | Fichier courant, base de données SQLite |
 | `KERNELFORGE_EXERCISES` | _(non défini)_ | Chemin alternatif vers le dossier `exercises/` |
-| Intégration tmux | automatique | Si `kf` tourne dans tmux, ouvre neovim dans un split |
+| Intégration tmux | automatique | Si `clings` tourne dans tmux, ouvre neovim dans un split |
 
-La base de données de progression se trouve dans `~/.kernelforge/progress.db`.
+La base de données de progression se trouve dans `~/.clings/progress.db`.
 
 ---
 

@@ -36,7 +36,7 @@ pub fn open_db() -> Result<Connection> {
     let dir = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".kernelforge");
+        .join(".clings");
     std::fs::create_dir_all(&dir)?;
 
     let db_path = dir.join("progress.db");

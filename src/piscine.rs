@@ -230,7 +230,7 @@ pub fn cmd_piscine() -> Result<()> {
         );
     } else {
         println!(
-            "  {} {}/{} exercices complétés en {}h{:02}m. `kf piscine` pour reprendre.",
+            "  {} {}/{} exercices complétés en {}h{:02}m. `clings piscine` pour reprendre.",
             "Session piscine terminée.".bold(),
             done,
             total,
