@@ -1,0 +1,77 @@
+{
+  "id": "mq-priority-01",
+  "subject": "message_queues",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Messages avec priorités",
+  "description": "NSY103 — Les files POSIX délivrent les messages par priorité décroissante. Un message de priorité 5 sera reçu avant un message de priorité 1, quel que soit l'ordre d'envoi.\n\nEnvoyez 3 messages avec des priorités différentes (1, 3, 2). Recevez-les et vérifiez qu'ils arrivent dans l'ordre décroissant de priorité.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_prio\", O_CREAT | O_RDWR, 0644, &attr);\n\n    mq_send(mq, \"low\", 3, ____);\n    mq_send(mq, \"high\", 4, ____);\n    mq_send(mq, \"mid\", 3, ____);\n\n    for (int i = 0; i < 3; i++) {\n        char buf[128];\n        unsigned int prio;\n        ssize_t n = ____(mq, buf, sizeof(buf), &prio);\n        buf[n] = '\\0';\n        printf(\"prio=%u msg=%s\\n\", prio, buf);\n    }\n\n    mq_close(mq);\n    mq_unlink(\"/kf_mq_prio\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_prio\", O_CREAT | O_RDWR, 0644, &attr);\n\n    mq_send(mq, \"low\", 3, 1);\n    mq_send(mq, \"high\", 4, 3);\n    mq_send(mq, \"mid\", 3, 2);\n\n    for (int i = 0; i < 3; i++) {\n        char buf[128];\n        unsigned int prio;\n        ssize_t n = mq_receive(mq, buf, sizeof(buf), &prio);\n        buf[n] = '\\0';\n        printf(\"prio=%u msg=%s\\n\", prio, buf);\n    }\n\n    mq_close(mq);\n    mq_unlink(\"/kf_mq_prio\");\n    return 0;\n}",
+  "hints": [
+    "mq_send(mq, msg, len, priority) — priority plus élevée = reçu en premier",
+    "mq_receive retourne toujours le message de plus haute priorité",
+    "Priorité 3 > 2 > 1 → ordre de réception : high, mid, low"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "prio=3 msg=high\nprio=2 msg=mid\nprio=1 msg=low\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "3 messages envoyés avec priorités différentes",
+        "nodes": [
+          {"id": "m1", "label": "\"low\" prio=1"},
+          {"id": "m2", "label": "\"high\" prio=3"},
+          {"id": "m3", "label": "\"mid\" prio=2"},
+          {"id": "mq", "label": "file MQ"}
+        ],
+        "edges": [
+          {"source": "m1", "target": "mq", "label": "mq_send"},
+          {"source": "m2", "target": "mq", "label": "mq_send"},
+          {"source": "m3", "target": "mq", "label": "mq_send"}
+        ],
+        "explanation": "Trois messages sont envoyés avec des priorités 1, 3 et 2 dans cet ordre. Le noyau POSIX ne les stocke pas dans l'ordre d'arrivée : il les trie par priorité décroissante dans la file interne. mq_send() est un appel système qui effectue cette insertion triée dans l'espace kernel.",
+        "step_label": "Étape 1 — mq_send() avec priorités différentes"
+      },
+      {
+        "label": "mq_receive délivre par priorité décroissante",
+        "nodes": [
+          {"id": "mq", "label": "file triée:\nhigh(3), mid(2), low(1)"},
+          {"id": "out", "label": "réception"}
+        ],
+        "edges": [
+          {"source": "mq", "target": "out", "label": "3 → 2 → 1"}
+        ],
+        "explanation": "mq_receive() extrait toujours le message de plus haute priorité disponible dans la file, indépendamment de l'ordre d'envoi. Le noyau implémente cette garantie via une structure de file triée. C'est une propriété fondamentale des message queues POSIX qui les distingue des pipes (strictement FIFO).",
+        "step_label": "Étape 2 — mq_receive() délivre par priorité décroissante"
+      },
+      {
+        "label": "Résultat: high, mid, low",
+        "nodes": [
+          {"id": "r", "label": "high\nmid\nlow"},
+          {"id": "stdout", "label": "stdout"}
+        ],
+        "edges": [
+          {"source": "r", "target": "stdout", "label": "printf"}
+        ],
+        "explanation": "L'ordre de réception est high(3), mid(2), low(1) quel que soit l'ordre d'envoi. Cette garantie de délivrance par priorité est cruciale pour les systèmes temps-réel : les événements critiques (priorité haute) sont toujours traités avant les tâches de routine, même s'ils arrivent en dernier.",
+        "step_label": "Étape 3 — Résultat : ordre prioritaire confirmé"
+      }
+    ]
+  },
+  "prerequisites": ["mq-sendrecv-01"],
+  "exercise_type": "complete",
+  "key_concept": "Les files POSIX sont triées par priorité ; mq_receive retourne le plus prioritaire",
+  "common_mistake": "Croire que la priorité 0 est la plus haute — c'est l'inverse, 0 est la plus basse",
+  "kc_ids": ["KC-C12"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\n/* == EXEMPLE =======================================\n * 2 messages avec priorites : urgent vs normal\n * ================================================= */\nvoid example_prio(void) {\n    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };\n    mqd_t q = mq_open(\"/kf_ex_prio\", O_CREAT|O_RDWR, 0644, &a);\n    mq_send(q, \"normal\", 6, 1);\n    mq_send(q, \"urgent\", 6, 5);\n    char buf[64]; unsigned int p;\n    for (int i = 0; i < 2; i++) {\n        ssize_t n = mq_receive(q, buf, sizeof(buf), &p);\n        buf[n] = '\\0';\n        printf(\"%s (p=%u)\\n\", buf, p);\n    }\n    mq_close(q); mq_unlink(\"/kf_ex_prio\");\n}\n/* Resultat: urgent (p=5), normal (p=1) */\n\n/* == VOTRE EXERCICE ================================\n * 3 messages: low(1), high(3), mid(2)\n * Verifier l'ordre de reception.\n * ================================================= */\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_prio\", O_CREAT|O_RDWR, 0644, &attr);\n    /* TODO: send 3 msgs with different priorities, receive in order */\n    mq_close(mq); mq_unlink(\"/kf_mq_prio\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_prio\", O_CREAT | O_RDWR, 0644, &attr);\n    mq_send(mq, \"low\", 3, 1);\n    mq_send(mq, \"high\", 4, 3);\n    mq_send(mq, \"mid\", 3, ____);\n    for (int i = 0; i < 3; i++) {\n        char buf[128]; unsigned int prio;\n        ssize_t n = mq_receive(mq, buf, sizeof(buf), &prio);\n        buf[n] = '\\0';\n        printf(\"prio=%u msg=%s\\n\", prio, buf);\n    }\n    mq_close(mq); mq_unlink(\"/kf_mq_prio\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_prio\", O_CREAT | O_RDWR, 0644, &attr);\n\n    mq_send(mq, \"low\", 3, ____);\n    mq_send(mq, \"high\", 4, ____);\n    mq_send(mq, \"mid\", 3, ____);\n\n    for (int i = 0; i < 3; i++) {\n        char buf[128];\n        unsigned int prio;\n        ssize_t n = ____(mq, buf, sizeof(buf), &prio);\n        buf[n] = '\\0';\n        printf(\"prio=%u msg=%s\\n\", prio, buf);\n    }\n\n    mq_close(mq);\n    mq_unlink(\"/kf_mq_prio\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    // Créez /kf_mq_prio, envoyez \"low\"(1), \"high\"(3), \"mid\"(2)\n    // Recevez 3 fois, affichez prio et msg\n    // Sortie attendue: high(3), mid(2), low(1)\n    return 0;\n}",
+    "#include <stdio.h>\n#include <mqueue.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

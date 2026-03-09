@@ -38,7 +38,9 @@
             "target": "r",
             "label": "kernel buffer"
           }
-        ]
+        ],
+        "explanation": "pipe(fd) est un appel système qui demande au noyau de créer une paire de descripteurs liés : fd[0] pour la lecture, fd[1] pour l'écriture. Ils partagent un buffer circulaire de 4096 octets (PIPE_BUF) géré entièrement par le kernel.",
+        "step_label": "Étape 1 — pipe() crée la paire de file descriptors"
       },
       {
         "label": "write(fd[1], \"hello pipe\", 10)",
@@ -58,7 +60,9 @@
             "target": "buf",
             "label": "10 bytes"
           }
-        ]
+        ],
+        "explanation": "write() transfère les octets dans le buffer kernel du pipe. Le kernel maintient un buffer circulaire (PIPE_BUF = 4096 octets) ; l'écriture est atomique si n ≤ PIPE_BUF et le buffer n'est pas plein.",
+        "step_label": "Étape 2 — write() remplit le buffer kernel"
       },
       {
         "label": "read(fd[0], buf, 31) — récupère le message",
@@ -78,7 +82,9 @@
             "target": "out",
             "label": "n bytes"
           }
-        ]
+        ],
+        "explanation": "read() extrait les octets du buffer kernel et les place dans le tableau buf de l'espace utilisateur. Fermer fd[1] avant read() est crucial : si l'extrémité écriture reste ouverte, read() bloque indéfiniment même si le buffer est vide (pas d'EOF).",
+        "step_label": "Étape 3 — read() consomme le buffer kernel"
       }
     ]
   },
@@ -90,7 +96,7 @@
     "KC-C10"
   ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\n// ★ Stage 0 — Exemple complet\nint main(void) {\n    int fd[2];\n    pipe(fd);                              // ★ fd[0]=lecture fd[1]=écriture\n    const char *msg = \"hello pipe\";\n    write(fd[1], msg, strlen(msg));        // ★ écrire dans l'extrémité écriture\n    close(fd[1]);                          // ★ signaler EOF\n    char buf[32];\n    ssize_t n = read(fd[0], buf, sizeof(buf) - 1); // ★ lire depuis l'extrémité lecture\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\n/* == EXEMPLE =======================================\n * Envoyer un entier via un pipe\n * pipe(fd) cree fd[0]=lecture, fd[1]=ecriture.\n * write dans fd[1], close fd[1], read depuis fd[0].\n * ================================================= */\nvoid example_pipe_int(void) {\n    int fd[2];\n    pipe(fd);\n    int value = 42;\n    write(fd[1], &value, sizeof(value));\n    close(fd[1]);\n    int received = 0;\n    read(fd[0], &received, sizeof(received));\n    printf(\"Got: %d\\n\", received);\n    close(fd[0]);\n}\n/* Resultat: Got: 42 */\n\n/* == VOTRE EXERCICE ================================\n * Envoyer une chaine via un pipe\n * Inspirez-vous de example_pipe_int ci-dessus.\n * Ecrivez \"hello pipe\" dans fd[1], lisez depuis fd[0].\n * ================================================= */\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    const char *msg = \"hello pipe\";\n    /* TODO: write(fd[?], msg, strlen(msg)); */\n    /* TODO: close(fd[?]); */\n    char buf[32];\n    ssize_t n = 0;\n    /* TODO: n = read(fd[?], buf, sizeof(buf) - 1); */\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    pipe(fd);\n    const char *msg = \"hello pipe\";\n    write(fd[1], msg, strlen(msg));\n    close(fd[1]);\n    char buf[32];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1); // quel fd?\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[0]);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    ____(____);\n    const char *msg = \"hello pipe\";\n    write(fd[____], msg, strlen(msg));\n    close(fd[____]);\n    char buf[32];\n    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(fd[____]);\n    return 0;\n}",
     "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    int fd[2];\n    // Créez un pipe, écrivez \"hello pipe\" dans fd[1]\n    // Fermez fd[1], lisez depuis fd[0], affichez \"Received: hello pipe\"\n    return 0;\n}",

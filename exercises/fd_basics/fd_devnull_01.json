@@ -1,0 +1,36 @@
+{
+  "id": "fd-devnull-01",
+  "subject": "fd_basics",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Redirection vers /dev/null",
+  "description": "NSY103 — /dev/null est un fichier spécial qui absorbe tout ce qu'on y écrit et retourne EOF en lecture. Rediriger stderr vers /dev/null supprime les messages d'erreur.\n\nRedirigez stderr vers /dev/null, vérifiez que les messages sont absorbés, puis restaurez.",
+  "starter_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    printf(\"Step 1: stderr active\\n\");\n    int saved_stderr = ____(STDERR_FILENO);\n    int devnull = open(\"/dev/null\", ____);\n    ____(devnull, STDERR_FILENO);\n    close(devnull);\n    fprintf(stderr, \"This should be suppressed\\n\");\n    printf(\"Step 2: stderr suppressed\\n\");\n    ____(saved_stderr, STDERR_FILENO);\n    close(saved_stderr);\n    printf(\"Step 3: stderr restored\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\nint main(void) {\n    printf(\"Step 1: stderr active\\n\");\n    int saved_stderr = dup(STDERR_FILENO);\n    int devnull = open(\"/dev/null\", O_WRONLY);\n    dup2(devnull, STDERR_FILENO);\n    close(devnull);\n    fprintf(stderr, \"This should be suppressed\\n\");\n    printf(\"Step 2: stderr suppressed\\n\");\n    dup2(saved_stderr, STDERR_FILENO);\n    close(saved_stderr);\n    printf(\"Step 3: stderr restored\\n\");\n    return 0;\n}",
+  "hints": [
+    "dup(STDERR_FILENO) sauvegarde stderr",
+    "O_WRONLY pour ouvrir /dev/null en écriture",
+    "dup2(devnull, STDERR_FILENO) redirige stderr vers /dev/null"
+  ],
+  "validation": {"mode": "output", "expected_output": "Step 1: stderr active\nStep 2: stderr suppressed\nStep 3: stderr restored\n", "test_code": null},
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "stderr → terminal", "stack": [{"name": "STDERR_FILENO", "value": "2 → terminal"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "stderr affiche normalement", "step_label": "Étape 1"},
+      {"label": "stderr → /dev/null", "stack": [{"name": "STDERR_FILENO", "value": "2 → /dev/null"}, {"name": "saved_stderr", "value": "→ terminal"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Les écritures sur stderr sont absorbées", "step_label": "Étape 2"},
+      {"label": "stderr → terminal (restauré)", "stack": [{"name": "STDERR_FILENO", "value": "2 → terminal"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "stderr restauré via dup2", "step_label": "Étape 3"}
+    ]
+  },
+  "prerequisites": ["fd-redirect-01"],
+  "exercise_type": "complete",
+  "key_concept": "/dev/null absorbe tout — utile pour supprimer stderr ou stdout temporairement",
+  "common_mistake": "Oublier de sauvegarder stderr avant la redirection — impossible de le restaurer",
+  "kc_ids": ["KC-C16"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\n/* == EXEMPLE: /dev/null en lecture ======================= */\nvoid example_devnull_read(void) {\n    int fd = open(\"/dev/null\", O_RDONLY);\n    char buf[8];\n    ssize_t n = read(fd, buf, sizeof(buf));\n    printf(\"/dev/null read: %zd bytes (EOF)\\n\", n);\n    close(fd);\n}\n\nint main(void) {\n    printf(\"Step 1: stderr active\\n\");\n    int saved_stderr = dup(STDERR_FILENO);\n    int devnull = open(\"/dev/null\", O_WRONLY);\n    dup2(devnull, STDERR_FILENO); close(devnull);\n    fprintf(stderr, \"This should be suppressed\\n\");\n    printf(\"Step 2: stderr suppressed\\n\");\n    dup2(saved_stderr, STDERR_FILENO); close(saved_stderr);\n    printf(\"Step 3: stderr restored\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    printf(\"Step 1: stderr active\\n\");\n    int saved_stderr = dup(STDERR_FILENO);\n    int devnull = open(\"/dev/null\", O_WRONLY);\n    dup2(devnull, STDERR_FILENO); close(devnull);\n    fprintf(stderr, \"This should be suppressed\\n\");\n    printf(\"Step 2: stderr suppressed\\n\");\n    ____(saved_stderr, STDERR_FILENO); close(saved_stderr);\n    printf(\"Step 3: stderr restored\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    printf(\"Step 1: stderr active\\n\");\n    int saved_stderr = ____(STDERR_FILENO);\n    int devnull = open(\"/dev/null\", ____);\n    ____(devnull, STDERR_FILENO); close(devnull);\n    fprintf(stderr, \"This should be suppressed\\n\");\n    printf(\"Step 2: stderr suppressed\\n\");\n    ____(saved_stderr, STDERR_FILENO); close(saved_stderr);\n    printf(\"Step 3: stderr restored\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    // Redirigez stderr vers /dev/null, vérifiez la suppression, restaurez\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

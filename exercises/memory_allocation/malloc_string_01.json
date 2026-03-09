@@ -1,0 +1,73 @@
+{
+  "id": "malloc-string-01",
+  "subject": "memory_allocation",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "strdup maison : malloc + strcpy",
+  "description": "NSY103 — `strdup` alloue de la m\u00e9moire avec `malloc` et y copie une cha\u00eene. Bien que POSIX, elle n'est pas dans le standard C. Impl\u00e9menter sa propre version enseigne le calcul de taille (`strlen+1` pour le '\\0') et le pattern allocation+copie.\n\nImpl\u00e9mentez `my_strdup` et d\u00e9montrez que la copie est ind\u00e9pendante de l'original.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + ____);\n    if (!dst) return NULL;\n    ____(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(____);\n    if (!copie) return 1;\n\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n\n    ____;\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(original);\n    if (!copie) return 1;\n\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n\n    free(copie);\n    return 0;\n}",
+  "hints": [
+    "`malloc(len + 1)` : le +1 est pour le terminateur '\\0'",
+    "`strcpy(dst, src)` copie la cha\u00eene y compris le '\\0'",
+    "La copie est ind\u00e9pendante : modifier copie[0] ne change pas original"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "original : Bonjour\ncopie    : Bonjour\nApres modif copie :\noriginal : Bonjour\ncopie    : bonjour\nlen = 7\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Apr\u00e8s my_strdup",
+        "stack": [
+          {"name": "original", "value": "\u2192\"Bonjour\" (rodata)"},
+          {"name": "copie", "value": "\u2192heap"}
+        ],
+        "heap": [
+          {"address": "heap", "value": "\"Bonjour\\0\" (8 octets)"}
+        ],
+        "arrows": [
+          {"from": "copie", "to": "heap", "label": "malloc(8)"}
+        ],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "original pointe vers une cha\u00eene litt\u00e9rale en lecture seule (rodata). copie pointe vers une zone heap de 8 octets (7 caract\u00e8res + '\\0'). Les deux sont ind\u00e9pendantes.",
+        "step_label": "Deux copies ind\u00e9pendantes"
+      },
+      {
+        "label": "Apr\u00e8s copie[0] = 'b'",
+        "stack": [
+          {"name": "original", "value": "\u2192\"Bonjour\""},
+          {"name": "copie", "value": "\u2192heap"}
+        ],
+        "heap": [
+          {"address": "heap", "value": "\"bonjour\\0\""}
+        ],
+        "arrows": [
+          {"from": "copie", "to": "heap", "label": "\u2192"}
+        ],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Seule la copie sur le heap est modifi\u00e9e. L'original en rodata reste \"Bonjour\". C'est le principe de la deep copy \u2014 contrairement \u00e0 un simple `char *copie = original` qui ne ferait qu'une shallow copy.",
+        "step_label": "Deep copy \u2014 modification ind\u00e9pendante"
+      }
+    ]
+  },
+  "prerequisites": ["malloc-array-01"],
+  "exercise_type": "complete",
+  "key_concept": "strdup = malloc(strlen+1) + strcpy \u2014 le +1 pour le terminateur '\\0' est essentiel",
+  "common_mistake": "Oublier le +1 dans malloc(len+1) \u2014 buffer overflow qui \u00e9crase le '\\0'",
+  "kc_ids": ["KC-C02"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Duplication d'un tableau d'entiers sur le heap\n * Pattern : malloc(n * sizeof) + memcpy\n * =========================================================== */\nint *dup_array(const int *src, int n) {\n    int *dst = malloc(n * sizeof(int));\n    if (!dst) return NULL;\n    memcpy(dst, src, n * sizeof(int));\n    return dst;\n}\nvoid example_demo(void) {\n    int orig[] = {10, 20, 30};\n    int *copy = dup_array(orig, 3);\n    copy[0] = 99;\n    printf(\"orig[0]=%d copy[0]=%d\\n\", orig[0], copy[0]);\n    free(copy);\n}\n/* Resultat: orig[0]=10 copy[0]=99 */\n\n/* == VOTRE EXERCICE =========================================\n * my_strdup : malloc(strlen+1) + strcpy\n * =========================================================== */\nchar *my_strdup(const char *src) { (void)src; return NULL; }\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(original);\n    if (!copie) return 1;\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n    free(copie);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(original);\n    if (!copie) return 1;\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", ____);\n    printf(\"copie    : %s\\n\", ____);\n    printf(\"len = %zu\\n\", strlen(copie));\n    ____;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + ____);\n    if (!dst) return NULL;\n    ____(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(____);\n    if (!copie) return 1;\n\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n\n    ____;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n// Impl\u00e9mentez my_strdup : malloc(strlen+1) + strcpy\nchar *my_strdup(const char *src) {\n    (void)src;\n    return NULL; // TODO\n}\n\nint main(void) {\n    // TODO: dupliquer \"Bonjour\", modifier la copie, afficher les deux\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

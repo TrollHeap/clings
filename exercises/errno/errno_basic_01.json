@@ -1,0 +1,64 @@
+{
+  "id": "errno-basic-01",
+  "subject": "errno",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "errno et perror basique",
+  "description": "NSY103 — `errno` est une variable globale (thread-local) mise à jour par les appels système en cas d'erreur. `perror()` affiche un message d'erreur basé sur la valeur courante de `errno`.\n\nMettez `errno` à ENOENT puis à EACCES, et utilisez `perror()` pour afficher les messages correspondants.",
+  "starter_code": "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    errno = ____;\n    perror(\"Test ENOENT\");\n    errno = ____;\n    perror(\"Test EACCES\");\n    printf(\"ENOENT=%d, EACCES=%d\\n\", ENOENT, EACCES);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <errno.h>\nint main(void) {\n    errno = ENOENT;\n    perror(\"Test ENOENT\");\n    errno = EACCES;\n    perror(\"Test EACCES\");\n    printf(\"ENOENT=%d, EACCES=%d\\n\", ENOENT, EACCES);\n    return 0;\n}",
+  "hints": [
+    "ENOENT vaut 2 sur Linux — utilisez la constante, pas le chiffre",
+    "perror() lit errno et affiche 'préfixe: message d'erreur' sur stderr",
+    "EACCES vaut 13 sur Linux"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "ENOENT=2, EACCES=13\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "errno = ENOENT (2)",
+        "stack": [{"name": "errno", "value": "2 (ENOENT)"}],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "errno est mis à ENOENT=2, perror lit cette valeur",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "errno = EACCES (13)",
+        "stack": [{"name": "errno", "value": "13 (EACCES)"}],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "errno est changé à EACCES=13",
+        "step_label": "Étape 2"
+      },
+      {
+        "label": "Affichage des constantes",
+        "stack": [{"name": "ENOENT", "value": "2"}, {"name": "EACCES", "value": "13"}],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Les constantes errno sont des entiers définis dans <errno.h>",
+        "step_label": "Étape 3"
+      }
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "errno est mis à jour par les appels système échoués, perror() affiche le message",
+  "common_mistake": "Ne pas remettre errno à 0 avant un appel système — une ancienne erreur pourrait être lue",
+  "kc_ids": ["KC-C15"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <errno.h>\n\n/* == EXEMPLE ===============================================\n * Afficher un message d'erreur pour EINVAL\n * errno est une variable globale mise à jour par le noyau.\n * perror(prefix) affiche: prefix: description de l'erreur\n * ========================================================= */\nvoid example_errno(void) {\n    errno = EINVAL;\n    perror(\"Example EINVAL\");\n    printf(\"EINVAL=%d\\n\", EINVAL);\n}\n/* Resultat: Example EINVAL: Invalid argument */\n/* Resultat: EINVAL=22 */\n\n/* == VOTRE EXERCICE ========================================\n * Mettez errno à ENOENT puis EACCES et appelez perror().\n * Affichez aussi les valeurs numériques de ces constantes.\n * ========================================================= */\nint main(void) {\n    errno = 0; /* TODO: mettre à ENOENT */\n    perror(\"Test ENOENT\");\n    errno = 0; /* TODO: mettre à EACCES */\n    perror(\"Test EACCES\");\n    printf(\"ENOENT=%d, EACCES=%d\\n\", ENOENT, EACCES);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    errno = ENOENT;\n    perror(\"Test ENOENT\");\n    errno = ____; /* EACCES */\n    perror(\"Test EACCES\");\n    printf(\"ENOENT=%d, EACCES=%d\\n\", ENOENT, EACCES);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    errno = ____;\n    perror(\"Test ENOENT\");\n    errno = ____;\n    perror(\"Test EACCES\");\n    printf(\"ENOENT=%d, EACCES=%d\\n\", ENOENT, EACCES);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    // Mettez errno à ENOENT, appelez perror(\"Test ENOENT\")\n    // Mettez errno à EACCES, appelez perror(\"Test EACCES\")\n    // Affichez \"ENOENT=%d, EACCES=%d\\n\"\n    return 0;\n}",
+    "#include <stdio.h>\n#include <errno.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

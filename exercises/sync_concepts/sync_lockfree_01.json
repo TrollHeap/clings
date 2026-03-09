@@ -1,0 +1,65 @@
+{
+  "id": "sync-lockfree-01",
+  "subject": "sync_concepts",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Queue lock-free simple",
+  "description": "NSY103 — Une structure lock-free utilise des opérations atomiques au lieu de mutex. Une pile (stack) lock-free LIFO utilise CAS pour modifier atomiquement le pointeur de tête. push et pop tentent un CAS en boucle jusqu'à succès.\n\nImplémentez une pile lock-free avec __atomic_compare_exchange_n sur le pointeur head.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\ntypedef struct Node {\n    int value;\n    struct Node *next;\n} Node;\n\nNode *head = NULL;\n\nvoid push(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val;\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        n->next = ____;\n    } while (!__atomic_compare_exchange_n(&head, &old_head, ____, 0,\n            __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n}\n\nint pop(int *val) {\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        if (old_head == ____) return 0;\n    } while (!__atomic_compare_exchange_n(&head, &old_head,\n            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n    *val = old_head->value;\n    free(old_head);\n    return 1;\n}\n\nint main(void) {\n    push(10);\n    push(20);\n    push(30);\n    int val;\n    while (pop(&val)) {\n        printf(\"%d\\n\", val);\n    }\n    printf(\"Pile vide\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\ntypedef struct Node {\n    int value;\n    struct Node *next;\n} Node;\n\nNode *head = NULL;\n\nvoid push(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val;\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        n->next = old_head;\n    } while (!__atomic_compare_exchange_n(&head, &old_head, n, 0,\n            __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n}\n\nint pop(int *val) {\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        if (old_head == NULL) return 0;\n    } while (!__atomic_compare_exchange_n(&head, &old_head,\n            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n    *val = old_head->value;\n    free(old_head);\n    return 1;\n}\n\nint main(void) {\n    push(10);\n    push(20);\n    push(30);\n    int val;\n    while (pop(&val)) {\n        printf(\"%d\\n\", val);\n    }\n    printf(\"Pile vide\\n\");\n    return 0;\n}",
+  "hints": [
+    "Dans push, n->next doit pointer vers l'ancien head : old_head",
+    "Le CAS dans push remplace head par le nouveau noeud n",
+    "Une pile vide a head == NULL"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "30\n20\n10\nPile vide\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Push 10 — premier élément",
+        "stack": [
+          {"name": "head", "value": "→ Node(10)"}
+        ],
+        "heap": [
+          {"name": "Node", "value": "{10, next=NULL}"}
+        ],
+        "arrows": [{"from": "head", "to": "Node"}],
+        "call_frames": [{"function_name": "push", "args": "10", "is_active": true}],
+        "explanation": "Le nouveau noeud pointe vers NULL (ancien head). CAS remplace head par le nouveau noeud.",
+        "step_label": "Push 10"
+      },
+      {
+        "label": "Push 30 — tête de pile",
+        "stack": [
+          {"name": "head", "value": "→ Node(30)"}
+        ],
+        "heap": [
+          {"name": "Node(30)", "value": "{30, next→Node(20)}"},
+          {"name": "Node(20)", "value": "{20, next→Node(10)}"},
+          {"name": "Node(10)", "value": "{10, next=NULL}"}
+        ],
+        "arrows": [{"from": "head", "to": "Node(30)"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Pile LIFO : head → 30 → 20 → 10 → NULL. Pop retournera 30, 20, 10.",
+        "step_label": "Pile complète"
+      }
+    ]
+  },
+  "prerequisites": ["sync-spinlock-01"],
+  "exercise_type": "complete",
+  "key_concept": "Lock-free : CAS en boucle retry — si un autre thread modifie head entre load et CAS, le CAS échoue et on retente",
+  "common_mistake": "Problème ABA : entre le load et le CAS, un autre thread peut pop puis push un noeud différent à la même adresse",
+  "kc_ids": ["KC-C22"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Compteur lock-free avec fetch-and-add\n * Pas besoin de CAS pour un simple compteur.\n * ========================================================= */\nint lf_counter = 0;\n\nvoid *lf_worker(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 1000; i++)\n        __atomic_add_fetch(&lf_counter, 1, __ATOMIC_SEQ_CST);\n    return NULL;\n}\n\nvoid example_lockfree_counter(void) {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, lf_worker, NULL);\n    pthread_create(&t2, NULL, lf_worker, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"Lock-free counter: %d\\n\", lf_counter); /* 2000 */\n}\n\n/* == VOTRE EXERCICE ========================================\n * Pile lock-free avec CAS.\n * push : CAS(head, old_head, new_node)\n * pop  : CAS(head, old_head, old_head->next)\n * ========================================================= */\n\ntypedef struct Node { int value; struct Node *next; } Node;\nNode *head = NULL;\n\nvoid push(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val;\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        n->next = old_head;\n    } while (!__atomic_compare_exchange_n(&head, &old_head, n, 0,\n            __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n}\n\nint pop(int *val) {\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        if (old_head == NULL) return 0;\n    } while (!__atomic_compare_exchange_n(&head, &old_head,\n            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n    *val = old_head->value;\n    free(old_head);\n    return 1;\n}\n\nint main(void) {\n    push(10); push(20); push(30);\n    int val;\n    while (pop(&val)) printf(\"%d\\n\", val);\n    printf(\"Pile vide\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\ntypedef struct Node { int value; struct Node *next; } Node;\nNode *head = NULL;\n\nvoid push(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val;\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        n->next = old_head;\n    } while (!__atomic_compare_exchange_n(&head, &old_head, n, 0,\n            __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n}\n\nint pop(int *val) {\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        if (old_head == ____) return 0; /* pile vide ? */\n    } while (!__atomic_compare_exchange_n(&head, &old_head,\n            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n    *val = old_head->value;\n    free(old_head);\n    return 1;\n}\n\nint main(void) {\n    push(10); push(20); push(30);\n    int val;\n    while (pop(&val)) printf(\"%d\\n\", val);\n    printf(\"Pile vide\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\ntypedef struct Node { int value; struct Node *next; } Node;\nNode *head = NULL;\n\nvoid push(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val;\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        n->next = ____;\n    } while (!__atomic_compare_exchange_n(&head, &old_head, ____, 0,\n            __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n}\n\nint pop(int *val) {\n    Node *old_head;\n    do {\n        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);\n        if (old_head == ____) return 0;\n    } while (!__atomic_compare_exchange_n(&head, &old_head,\n            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));\n    *val = old_head->value;\n    free(old_head);\n    return 1;\n}\n\nint main(void) {\n    push(10); push(20); push(30);\n    int val;\n    while (pop(&val)) printf(\"%d\\n\", val);\n    printf(\"Pile vide\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\n// struct Node { int value; Node *next; }\n// head global = NULL\n// push : allouer noeud, CAS boucle pour insérer en tête\n// pop : CAS boucle pour retirer la tête, retourner valeur\n// main : push 10,20,30 puis pop tout, afficher LIFO\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

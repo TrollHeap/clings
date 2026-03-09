@@ -1,0 +1,76 @@
+{
+  "id": "malloc-leak-01",
+  "subject": "memory_allocation",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "D\u00e9tection de fuite : compteur alloc/free",
+  "description": "NSY103 — Une technique simple de d\u00e9tection de fuites m\u00e9moire consiste \u00e0 wrapper malloc/free avec des compteurs. Si `allocs != frees` \u00e0 la fin du programme, il y a une fuite.\n\nImpl\u00e9mentez `tracked_malloc` et `tracked_free` avec un compteur global, puis d\u00e9montrez la d\u00e9tection d'une fuite intentionnelle.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int g_allocs = 0;\nstatic int g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\nvoid *tracked_malloc(size_t size) {\n    void *ptr = malloc(size);\n    if (ptr) {\n        g_allocs____;\n        g_total_bytes += size;\n    }\n    return ptr;\n}\n\nvoid tracked_free(void *ptr) {\n    if (ptr) {\n        ____;\n        g_frees++;\n    }\n}\n\nvoid leak_report(void) {\n    printf(\"=== Leak Report ===\\n\");\n    printf(\"allocs: %d\\n\", g_allocs);\n    printf(\"frees:  %d\\n\", g_frees);\n    printf(\"total bytes: %zu\\n\", g_total_bytes);\n    if (g_allocs == g_frees)\n        printf(\"Status: OK\\n\");\n    else\n        printf(\"LEAK: %d bloc(s) non libere(s)\\n\", g_allocs - ____);\n}\n\nint main(void) {\n    char *a = tracked_malloc(32);\n    char *b = tracked_malloc(64);\n    char *c = tracked_malloc(16);\n\n    strcpy(a, \"hello\");\n    strcpy(b, \"world\");\n    strcpy(c, \"leak\");\n\n    tracked_free(a);\n    tracked_free(b);\n    /* c est intentionnellement NON libere */\n\n    leak_report();\n    /* cleanup pour valgrind */\n    free(c);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int g_allocs = 0;\nstatic int g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\nvoid *tracked_malloc(size_t size) {\n    void *ptr = malloc(size);\n    if (ptr) {\n        g_allocs++;\n        g_total_bytes += size;\n    }\n    return ptr;\n}\n\nvoid tracked_free(void *ptr) {\n    if (ptr) {\n        free(ptr);\n        g_frees++;\n    }\n}\n\nvoid leak_report(void) {\n    printf(\"=== Leak Report ===\\n\");\n    printf(\"allocs: %d\\n\", g_allocs);\n    printf(\"frees:  %d\\n\", g_frees);\n    printf(\"total bytes: %zu\\n\", g_total_bytes);\n    if (g_allocs == g_frees)\n        printf(\"Status: OK\\n\");\n    else\n        printf(\"LEAK: %d bloc(s) non libere(s)\\n\", g_allocs - g_frees);\n}\n\nint main(void) {\n    char *a = tracked_malloc(32);\n    char *b = tracked_malloc(64);\n    char *c = tracked_malloc(16);\n\n    strcpy(a, \"hello\");\n    strcpy(b, \"world\");\n    strcpy(c, \"leak\");\n\n    tracked_free(a);\n    tracked_free(b);\n    /* c est intentionnellement NON libere */\n\n    leak_report();\n    /* cleanup pour valgrind */\n    free(c);\n    return 0;\n}",
+  "hints": [
+    "`tracked_malloc` : incr\u00e9menter `g_allocs++` apr\u00e8s un malloc r\u00e9ussi",
+    "`tracked_free` : appeler `free(ptr)` ET incr\u00e9menter `g_frees++`",
+    "La diff\u00e9rence `g_allocs - g_frees` donne le nombre de blocs non lib\u00e9r\u00e9s"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "=== Leak Report ===\nallocs: 3\nfrees:  2\ntotal bytes: 112\nLEAK: 1 bloc(s) non libere(s)\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "3 allocations track\u00e9es",
+        "stack": [
+          {"name": "g_allocs", "value": "3"},
+          {"name": "g_frees", "value": "0"},
+          {"name": "g_total_bytes", "value": "112"},
+          {"name": "a", "value": "\u2192heap (32)"},
+          {"name": "b", "value": "\u2192heap (64)"},
+          {"name": "c", "value": "\u2192heap (16)"}
+        ],
+        "heap": [
+          {"address": "heap_a", "value": "\"hello\" (32 octets)"},
+          {"address": "heap_b", "value": "\"world\" (64 octets)"},
+          {"address": "heap_c", "value": "\"leak\" (16 octets)"}
+        ],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Chaque tracked_malloc incr\u00e9mente g_allocs et accumule la taille. 32+64+16 = 112 octets allou\u00e9s au total.",
+        "step_label": "3 allocs \u2014 compteur = 3"
+      },
+      {
+        "label": "Apr\u00e8s 2 frees \u2014 1 fuite",
+        "stack": [
+          {"name": "g_allocs", "value": "3"},
+          {"name": "g_frees", "value": "2"},
+          {"name": "c", "value": "\u2192heap (16) \u2014 FUITE"}
+        ],
+        "heap": [
+          {"address": "heap_c", "value": "\"leak\" (16 octets) \u2014 non lib\u00e9r\u00e9"}
+        ],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "a et b sont lib\u00e9r\u00e9s, mais c ne l'est pas avant le rapport. allocs(3) - frees(2) = 1 bloc fuit\u00e9. En production, on utilise Valgrind ou ASan pour d\u00e9tecter automatiquement.",
+        "step_label": "allocs - frees = 1 \u2014 FUITE d\u00e9tect\u00e9e"
+      }
+    ]
+  },
+  "prerequisites": ["malloc-pool-01"],
+  "exercise_type": "complete",
+  "key_concept": "Wrapper malloc/free avec compteurs pour d\u00e9tecter les fuites \u2014 allocs != frees = fuite m\u00e9moire",
+  "common_mistake": "Oublier d'appeler free(ptr) dans tracked_free \u2014 le compteur augmente mais la m\u00e9moire n'est pas lib\u00e9r\u00e9e",
+  "kc_ids": ["KC-C02"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Comptage simple alloc/free avec wrapper\n * =========================================================== */\nstatic int ex_allocs = 0, ex_frees = 0;\nvoid *ex_malloc(size_t s) { void *p = malloc(s); if (p) ex_allocs++; return p; }\nvoid ex_free(void *p) { if (p) { free(p); ex_frees++; } }\n\nvoid example_demo(void) {\n    int *a = ex_malloc(sizeof(int));\n    int *b = ex_malloc(sizeof(int));\n    ex_free(a);\n    printf(\"allocs=%d frees=%d leaks=%d\\n\", ex_allocs, ex_frees, ex_allocs - ex_frees);\n    ex_free(b);\n}\n/* Resultat: allocs=2 frees=1 leaks=1 */\n\n/* == VOTRE EXERCICE =========================================\n * tracked_malloc/tracked_free avec rapport de fuites\n * =========================================================== */\nstatic int g_allocs = 0, g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\nvoid *tracked_malloc(size_t size) { (void)size; return NULL; }\nvoid tracked_free(void *ptr) { (void)ptr; }\nvoid leak_report(void) { }\n\nint main(void) {\n    /* TODO: 3 allocs, 2 frees, leak_report */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int g_allocs = 0, g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\nvoid *tracked_malloc(size_t size) {\n    void *ptr = malloc(size);\n    if (ptr) { g_allocs++; g_total_bytes += size; }\n    return ptr;\n}\nvoid tracked_free(void *ptr) {\n    if (ptr) { free(ptr); g_frees++; }\n}\nvoid leak_report(void) {\n    printf(\"=== Leak Report ===\\n\");\n    printf(\"allocs: %d\\n\", g_allocs);\n    printf(\"frees:  %d\\n\", g_frees);\n    printf(\"total bytes: %zu\\n\", g_total_bytes);\n    if (g_allocs == g_frees) printf(\"Status: OK\\n\");\n    else printf(\"LEAK: %d bloc(s) non libere(s)\\n\", g_allocs - ____);\n}\n\nint main(void) {\n    char *a = tracked_malloc(32);\n    char *b = tracked_malloc(64);\n    char *c = tracked_malloc(16);\n    strcpy(a, \"hello\"); strcpy(b, \"world\"); strcpy(c, \"leak\");\n    tracked_free(a); tracked_free(b);\n    leak_report();\n    free(c);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int g_allocs = 0;\nstatic int g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\nvoid *tracked_malloc(size_t size) {\n    void *ptr = malloc(size);\n    if (ptr) {\n        g_allocs____;\n        g_total_bytes += size;\n    }\n    return ptr;\n}\n\nvoid tracked_free(void *ptr) {\n    if (ptr) {\n        ____;\n        g_frees++;\n    }\n}\n\nvoid leak_report(void) {\n    printf(\"=== Leak Report ===\\n\");\n    printf(\"allocs: %d\\n\", g_allocs);\n    printf(\"frees:  %d\\n\", g_frees);\n    printf(\"total bytes: %zu\\n\", g_total_bytes);\n    if (g_allocs == g_frees)\n        printf(\"Status: OK\\n\");\n    else\n        printf(\"LEAK: %d bloc(s) non libere(s)\\n\", g_allocs - ____);\n}\n\nint main(void) {\n    char *a = tracked_malloc(32);\n    char *b = tracked_malloc(64);\n    char *c = tracked_malloc(16);\n\n    strcpy(a, \"hello\");\n    strcpy(b, \"world\");\n    strcpy(c, \"leak\");\n\n    tracked_free(a);\n    tracked_free(b);\n    /* c est intentionnellement NON libere */\n\n    leak_report();\n    /* cleanup pour valgrind */\n    free(c);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int g_allocs = 0, g_frees = 0;\nstatic size_t g_total_bytes = 0;\n\n// Impl\u00e9mentez tracked_malloc, tracked_free, leak_report\n// D\u00e9montrez la d\u00e9tection d'une fuite intentionnelle\nint main(void) {\n    // TODO: 3 allocs, 2 frees, rapport\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

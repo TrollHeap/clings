@@ -1,0 +1,91 @@
+{
+  "id": "fs-blocks-01",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Allocation physique : st_blocks et st_blksize",
+  "description": "NSY103 — L'inode stocke deux champs liés à l'allocation physique :\n\n- `st_blksize` : taille de bloc optimale pour les I/O (typiquement 4096 octets sur ext4/xfs/tmpfs).\n- `st_blocks` : nombre de blocs de **512 octets** effectivement alloués par le noyau (unité POSIX fixe, indépendante de `st_blksize`).\n\nRègle pratique : 4096 octets de données → 1 bloc de 4K → `st_blocks = 8` (8 × 512 = 4096).\n\nUn fichier *sparse* (creux) a `st_size` >> allocation réelle : le noyau ne crée pas de blocs pour les zones de zéros implicites.\n\nNote : `st_blksize` et `st_blocks` varient selon le filesystem (ext4 : st_blksize=4096, st_blocks=8 pour 4 Ko). Cet exercice vérifie qu'ils sont positifs plutôt que leur valeur exacte.",
+  "starter_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_blocks_test\", O_CREAT | O_WRONLY | O_TRUNC, 0600);\n    char buf[4096];\n    memset(buf, 'A', sizeof(buf));\n    write(fd, buf, sizeof(buf));\n    close(fd);\n\n    struct stat st;\n    ____(\"\/tmp\/kf_blocks_test\", ____);\n    printf(\"st_size: %lld bytes\\n\", (long long)st.______);\n    printf(\"st_blksize > 0: %s\\n\", st.______ > 0 ? \"yes\" : \"no\");\n    printf(\"st_blocks > 0: %s\\n\", st.______ > 0 ? \"yes\" : \"no\");\n    long long blocks_4k = st.st_blocks / ____;\n    printf(\"blocks_4k >= 1: %s\\n\", blocks_4k >= 1 ? \"yes\" : \"no\");\n\n    unlink(\"/tmp/kf_blocks_test\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_blocks_test\", O_CREAT | O_WRONLY | O_TRUNC, 0600);\n    char buf[4096];\n    memset(buf, 'A', sizeof(buf));\n    write(fd, buf, sizeof(buf));\n    close(fd);\n\n    struct stat st;\n    stat(\"/tmp/kf_blocks_test\", &st);\n    /* st_size est toujours exact (taille logique) */\n    printf(\"st_size: %lld bytes\\n\", (long long)st.st_size);\n    /* st_blksize varie selon le FS, mais toujours > 0 */\n    printf(\"st_blksize > 0: %s\\n\", st.st_blksize > 0 ? \"yes\" : \"no\");\n    /* st_blocks en unites 512-octets, toujours > 0 pour un fichier non-creux */\n    printf(\"st_blocks > 0: %s\\n\", st.st_blocks > 0 ? \"yes\" : \"no\");\n    /* Calcul : blocs de 512B -> blocs de 4K */\n    long long blocks_4k = st.st_blocks / 8;\n    printf(\"blocks_4k >= 1: %s\\n\", blocks_4k >= 1 ? \"yes\" : \"no\");\n\n    unlink(\"/tmp/kf_blocks_test\");\n    return 0;\n}",
+  "hints": [
+    "`stat(path, &st)` remplit `struct stat st` — le premier argument est le chemin, le second est un pointeur vers la struct",
+    "`st_blocks` est en unités de 512 octets (norme POSIX) ; divise par 8 pour obtenir le nombre de blocs de 4 Ko",
+    "`st_blksize` est la taille de bloc optimale pour les transferts I/O, pas la taille d'un bloc disque physique"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "st_size: 4096 bytes\nst_blksize > 0: yes\nst_blocks > 0: yes\nblocks_4k >= 1: yes\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "open() — créer le fichier",
+        "stack": [
+          {"name": "fd", "value": "3 (descripteur)"},
+          {"name": "path", "value": "\"/tmp/kf_blocks_test\""},
+          {"name": "flags", "value": "O_CREAT|O_WRONLY|O_TRUNC"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "open() crée ou tronque le fichier et retourne un descripteur de fichier.",
+        "step_label": "Ouverture du fichier"
+      },
+      {
+        "label": "write() — écrire 4096 octets",
+        "stack": [
+          {"name": "buf[4096]", "value": "{0} (tout à zéro)"},
+          {"name": "written", "value": "4096 bytes"}
+        ],
+        "heap": [
+          {"name": "disque", "value": "1 bloc de 4K alloué"}
+        ],
+        "arrows": [
+          {"from": "buf", "to": "disque", "label": "write()"}
+        ],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le noyau alloue au moins 1 bloc pour stocker les données. st_blocks sera > 0 (typiquement 8 sur ext4 : 8 × 512 = 4096).",
+        "step_label": "Allocation d'un bloc physique"
+      },
+      {
+        "label": "stat() — lire les métadonnées",
+        "stack": [
+          {"name": "st.st_size", "value": "4096 (exact)"},
+          {"name": "st.st_blksize", "value": "> 0 (varie selon FS)"},
+          {"name": "st.st_blocks", "value": "> 0 (unités 512 B)"},
+          {"name": "blocks_4k", "value": "st_blocks / 8 >= 1"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "st_size est toujours la taille logique exacte. st_blksize et st_blocks dépendent du filesystem, mais sont toujours > 0 pour un fichier avec des données.",
+        "step_label": "Lecture de l'allocation physique"
+      },
+      {
+        "label": "unlink() — supprimer le fichier",
+        "stack": [
+          {"name": "path", "value": "\"/tmp/kf_blocks_test\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "unlink() supprime l'entrée du répertoire. Quand nlink tombe à 0, le noyau libère l'inode et les blocs disque.",
+        "step_label": "Libération des blocs"
+      }
+    ]
+  },
+  "prerequisites": ["fs-inode-01"],
+  "exercise_type": "complete",
+  "key_concept": "st_blocks compte les blocs de 512 octets alloués ; diviser par 8 donne les blocs de 4K réels",
+  "common_mistake": "Confondre st_blksize (taille optimale d'I/O, ex. 4096) avec l'unité de st_blocks (toujours 512 B en POSIX)",
+  "kc_ids": ["KC-C5"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Lire la taille logique et l'allocation physique de /etc/hostname\n * struct stat contient st_size, st_blocks, st_blksize\n * =========================================================== */\nvoid example_stat_hostname(void) {\n    struct stat sb;\n    stat(\"/etc/hostname\", &sb);\n    printf(\"st_size: %lld bytes\\n\", (long long)sb.st_size);\n    printf(\"st_blksize > 0: %s\\n\", sb.st_blksize > 0 ? \"yes\" : \"no\");\n    printf(\"st_blocks > 0: %s\\n\", sb.st_blocks > 0 ? \"yes\" : \"no\");\n}\n/* st_blocks est en unites de 512 octets (POSIX),\n * st_blksize est la taille optimale pour read/write */\n\n/* == VOTRE EXERCICE =========================================\n * Creer /tmp/kf_blocks_test (4096 octets), stat(), verifier :\n *   st_size exact, st_blksize > 0, st_blocks > 0,\n *   et blocks_4k (= st_blocks/8) >= 1.\n * =========================================================== */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_blocks_test\", O_CREAT | O_WRONLY | O_TRUNC, 0600);\n    char buf[4096];\n    memset(buf, 'A', sizeof(buf));\n    write(fd, buf, sizeof(buf));\n    close(fd);\n\n    struct stat st;\n    stat(\"/tmp/kf_blocks_test\", &st);\n    printf(\"st_size: %lld bytes\\n\", (long long)st.st_size);\n    printf(\"st_blksize > 0: %s\\n\", st.st_blksize > 0 ? \"yes\" : \"no\");\n    printf(\"st_blocks > 0: %s\\n\", st.st_blocks > 0 ? \"yes\" : \"no\");\n    /* st_blocks est en unites de 512 B ; combien de blocs de 4K ? */\n    long long blocks_4k = st.st_blocks / ____;\n    printf(\"blocks_4k >= 1: %s\\n\", blocks_4k >= 1 ? \"yes\" : \"no\");\n\n    unlink(\"/tmp/kf_blocks_test\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    int fd = open(\"/tmp/kf_blocks_test\", O_CREAT | O_WRONLY | O_TRUNC, 0600);\n    char buf[4096];\n    memset(buf, 'A', sizeof(buf));\n    write(fd, buf, sizeof(buf));\n    close(fd);\n\n    struct stat st;\n    ____(\"\/tmp\/kf_blocks_test\", ____);\n    printf(\"st_size: %lld bytes\\n\", (long long)st.______);\n    printf(\"st_blksize > 0: %s\\n\", st.______ > 0 ? \"yes\" : \"no\");\n    printf(\"st_blocks > 0: %s\\n\", st.______ > 0 ? \"yes\" : \"no\");\n    long long blocks_4k = st.st_blocks / ____;\n    printf(\"blocks_4k >= 1: %s\\n\", blocks_4k >= 1 ? \"yes\" : \"no\");\n\n    unlink(\"/tmp/kf_blocks_test\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    // Creer /tmp/kf_blocks_test avec 4096 octets non-nuls\n    // stat() le fichier, afficher :\n    //   st_size en bytes (valeur exacte)\n    //   st_blksize > 0: yes/no\n    //   st_blocks > 0: yes/no\n    //   blocks_4k (= st_blocks/8) >= 1: yes/no\n    // Supprimer le fichier avec unlink()\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <sys/stat.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

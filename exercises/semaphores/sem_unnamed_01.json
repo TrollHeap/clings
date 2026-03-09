@@ -1,0 +1,55 @@
+{
+  "id": "sem-unnamed-01",
+  "subject": "semaphores",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Semaphore anonyme: sem_init",
+  "description": "NSY103 — Un semaphore anonyme est cree avec sem_init() directement dans une variable sem_t (pas de nom). Le parametre pshared=0 le limite aux threads du meme processus, pshared=1 permet le partage inter-processus (si place en memoire partagee).\n\nCreez un semaphore anonyme local (pshared=0) avec une valeur initiale de 3. Faites 3 sem_wait successifs (decremente a 0), puis affichez la valeur finale.",
+  "starter_code": "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t sem;\n    sem_init(&sem, ____, 3);\n    int val;\n\n    sem_getvalue(&sem, &val);\n    printf(\"Initial: %d\\n\", val);\n\n    for (int i = 0; i < 3; i++)\n        ____(____); \n\n    sem_getvalue(&sem, &val);\n    printf(\"After 3 waits: %d\\n\", val);\n\n    sem_destroy(&sem);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t sem;\n    sem_init(&sem, 0, 3);\n    int val;\n\n    sem_getvalue(&sem, &val);\n    printf(\"Initial: %d\\n\", val);\n\n    for (int i = 0; i < 3; i++)\n        sem_wait(&sem);\n\n    sem_getvalue(&sem, &val);\n    printf(\"After 3 waits: %d\\n\", val);\n\n    sem_destroy(&sem);\n    return 0;\n}",
+  "hints": [
+    "sem_init(&sem, 0, 3) : pshared=0 (local), valeur initiale=3",
+    "Chaque sem_wait decremente de 1 : 3 -> 2 -> 1 -> 0",
+    "sem_destroy libere les ressources du semaphore anonyme"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Initial: 3\nAfter 3 waits: 0\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "sem_init: semaphore local valeur 3",
+        "stack": [{"name": "sem (sem_t)", "value": "val=3"}],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "sem_init initialise un semaphore sur la stack. pshared=0 signifie partage intra-processus uniquement.",
+        "step_label": "init"
+      },
+      {
+        "label": "3x sem_wait: 3 -> 0",
+        "stack": [{"name": "sem (sem_t)", "value": "val=0"}],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Chaque sem_wait decremente atomiquement. Aucun blocage car la valeur reste >= 0 a chaque etape.",
+        "step_label": "decrements"
+      }
+    ]
+  },
+  "prerequisites": ["sem-named-01"],
+  "exercise_type": "complete",
+  "key_concept": "sem_init cree un semaphore anonyme sur la stack ; pshared=0 pour threads, pshared=1 pour processus",
+  "common_mistake": "Utiliser sem_close/sem_unlink sur un semaphore anonyme — ces fonctions sont pour les semaphores nommes uniquement",
+  "kc_ids": ["KC-C11"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <semaphore.h>\n\n/* == EXEMPLE =======================================\n * sem_init anonyme avec 2 waits\n * ================================================= */\nvoid example_unnamed(void) {\n    sem_t s;\n    sem_init(&s, 0, 2);\n    int v;\n    sem_getvalue(&s, &v); printf(\"Start: %d\\n\", v);\n    sem_wait(&s); sem_wait(&s);\n    sem_getvalue(&s, &v); printf(\"End: %d\\n\", v);\n    sem_destroy(&s);\n}\n/* Resultat: Start: 2  End: 0 */\n\n/* == VOTRE EXERCICE ================================\n * sem_init(val=3), 3 sem_wait, afficher valeur.\n * ================================================= */\nint main(void) {\n    /* TODO: sem_init val=3, getvalue, 3 waits, getvalue, destroy */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t sem;\n    sem_init(&sem, 0, 3);\n    int val;\n    sem_getvalue(&sem, &val);\n    printf(\"Initial: %d\\n\", val);\n    for (int i = 0; i < 3; i++)\n        ____(____);  // decrementer\n    sem_getvalue(&sem, &val);\n    printf(\"After 3 waits: %d\\n\", val);\n    sem_destroy(&sem);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    sem_t sem;\n    sem_init(&sem, ____, 3);\n    int val;\n\n    sem_getvalue(&sem, &val);\n    printf(\"Initial: %d\\n\", val);\n\n    for (int i = 0; i < 3; i++)\n        ____(____); \n\n    sem_getvalue(&sem, &val);\n    printf(\"After 3 waits: %d\\n\", val);\n\n    sem_destroy(&sem);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    // sem_t sur la stack, sem_init(pshared=0, val=3)\n    // 3x sem_wait, afficher valeur initiale et finale\n    // sem_destroy\n    return 0;\n}",
+    "#include <stdio.h>\n#include <semaphore.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

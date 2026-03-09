@@ -1,0 +1,72 @@
+{
+  "id": "pthread-cancel-01",
+  "subject": "pthreads",
+  "lang": "c",
+  "difficulty": 5,
+  "title": "Annulation et cleanup handlers",
+  "description": "NSY103 — pthread_cancel envoie une demande d'annulation à un thread. pthread_cleanup_push/pop enregistrent des handlers de nettoyage exécutés à l'annulation ou à la fin du thread.\n\nCréez un thread avec un cleanup handler, annulez-le, et vérifiez que le cleanup s'exécute.",
+  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nvoid cleanup(void *arg) {\n    printf(\"Cleanup: %s\\n\", (char *)arg);\n}\n\nvoid *worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(____, \"resource freed\");\n    printf(\"Worker: running\\n\");\n    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);\n    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);\n    /* Point d'annulation */\n    usleep(200000);\n    printf(\"Worker: finished normally\\n\");\n    pthread_cleanup_pop(0);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t;\n    pthread_create(&t, NULL, worker, NULL);\n    usleep(50000);\n    ____(t);\n    void *res;\n    pthread_join(t, &res);\n    printf(\"Main: thread %s\\n\", res == PTHREAD_CANCELED ? \"cancelled\" : \"finished\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nvoid cleanup(void *arg) {\n    printf(\"Cleanup: %s\\n\", (char *)arg);\n}\n\nvoid *worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(cleanup, \"resource freed\");\n    printf(\"Worker: running\\n\");\n    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);\n    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);\n    usleep(200000);\n    printf(\"Worker: finished normally\\n\");\n    pthread_cleanup_pop(0);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t;\n    pthread_create(&t, NULL, worker, NULL);\n    usleep(50000);\n    pthread_cancel(t);\n    void *res;\n    pthread_join(t, &res);\n    printf(\"Main: thread %s\\n\", res == PTHREAD_CANCELED ? \"cancelled\" : \"finished\");\n    return 0;\n}",
+  "hints": [
+    "pthread_cleanup_push(cleanup, arg) enregistre le handler — attention c'est une macro avec { implicite",
+    "pthread_cancel(t) envoie la demande d'annulation",
+    "usleep est un point d'annulation — le thread y sera annulé si cancel est pending"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Worker: running\nCleanup: resource freed\nMain: thread cancelled\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Worker démarre avec cleanup handler",
+        "stack": [
+          {"name": "cleanup_stack", "value": "[cleanup(\"resource freed\")]"},
+          {"name": "cancel_state", "value": "ENABLED, DEFERRED"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "worker", "args": "void", "is_active": true}],
+        "explanation": "cleanup_push enregistre le handler sur la pile de nettoyage",
+        "step_label": "1. Setup"
+      },
+      {
+        "label": "Main envoie pthread_cancel",
+        "stack": [
+          {"name": "cancel_pending", "value": "true"},
+          {"name": "worker", "value": "dans usleep (point d'annulation)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "pthread_cancel met une requête, le thread s'arrête au prochain point d'annulation",
+        "step_label": "2. Cancel"
+      },
+      {
+        "label": "Cleanup handler exécuté",
+        "stack": [
+          {"name": "res", "value": "PTHREAD_CANCELED"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "cleanup", "args": "\"resource freed\"", "is_active": true}],
+        "explanation": "Le handler de nettoyage s'exécute, puis join retourne PTHREAD_CANCELED",
+        "step_label": "3. Cleanup"
+      }
+    ]
+  },
+  "prerequisites": ["pthread-tls-01"],
+  "exercise_type": "complete",
+  "key_concept": "pthread_cancel + cleanup_push/pop garantissent le nettoyage des ressources même en cas d'annulation",
+  "common_mistake": "Oublier cleanup_pop → erreur de compilation (push/pop sont des macros avec accolades)",
+  "kc_ids": ["KC-C09"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\n/* == EXEMPLE ===============================================\n * Cleanup handler pour fermer un fichier à l'annulation\n * ========================================================= */\nvoid ex_cleanup(void *arg) { printf(\"Closing: %s\\n\", (char *)arg); }\nvoid *ex_worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(ex_cleanup, \"logfile.txt\");\n    printf(\"Working...\\n\");\n    usleep(100000);\n    pthread_cleanup_pop(1); /* 1 = exécuter même sans annulation */\n    return NULL;\n}\n/* Resultat: Working... puis Closing: logfile.txt */\n\n/* == VOTRE EXERCICE ========================================\n * Thread annulé avec cleanup handler\n * ========================================================= */\n\nvoid cleanup(void *arg) {\n    printf(\"Cleanup: %s\\n\", (char *)arg);\n}\n\nvoid *worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(cleanup, \"resource freed\");\n    printf(\"Worker: running\\n\");\n    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);\n    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);\n    usleep(200000);\n    printf(\"Worker: finished normally\\n\");\n    pthread_cleanup_pop(0);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t;\n    pthread_create(&t, NULL, worker, NULL);\n    usleep(50000);\n    /* TODO: pthread_cancel(t); */\n    void *res;\n    pthread_join(t, &res);\n    printf(\"Main: thread %s\\n\", res == PTHREAD_CANCELED ? \"cancelled\" : \"finished\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nvoid cleanup(void *arg) {\n    printf(\"Cleanup: %s\\n\", (char *)arg);\n}\n\nvoid *worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(cleanup, \"resource freed\");\n    printf(\"Worker: running\\n\");\n    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);\n    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);\n    usleep(200000);\n    printf(\"Worker: finished normally\\n\");\n    pthread_cleanup_pop(0);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t;\n    pthread_create(&t, NULL, worker, NULL);\n    usleep(50000);\n    pthread_cancel(t);\n    void *res;\n    pthread_join(t, &res);\n    printf(\"Main: thread %s\\n\", res == ____ ? \"cancelled\" : \"finished\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nvoid cleanup(void *arg) {\n    printf(\"Cleanup: %s\\n\", (char *)arg);\n}\n\nvoid *worker(void *arg) {\n    (void)arg;\n    pthread_cleanup_push(____, \"resource freed\");\n    printf(\"Worker: running\\n\");\n    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);\n    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);\n    usleep(200000);\n    printf(\"Worker: finished normally\\n\");\n    pthread_cleanup_pop(0);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t;\n    pthread_create(&t, NULL, worker, NULL);\n    usleep(50000);\n    ____(t);\n    void *res;\n    pthread_join(t, &res);\n    printf(\"Main: thread %s\\n\", res == PTHREAD_CANCELED ? \"cancelled\" : \"finished\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\n// cleanup handler qui affiche \"Cleanup: resource freed\"\n// worker avec cleanup_push, annulé par main via pthread_cancel\n// Sortie: Worker: running, Cleanup: resource freed, Main: thread cancelled\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

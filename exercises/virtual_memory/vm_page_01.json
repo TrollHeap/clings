@@ -1,0 +1,35 @@
+{
+  "id": "vm-page-01",
+  "subject": "virtual_memory",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Taille de page et getpagesize()",
+  "description": "NSY103 — La mémoire virtuelle est découpée en pages (typiquement 4096 octets sur x86_64). getpagesize() et sysconf(_SC_PAGESIZE) retournent cette taille. Toutes les opérations mmap/mprotect doivent être alignées sur cette granularité.\n\nAffichez la taille de page et vérifiez qu'elle est une puissance de 2.",
+  "starter_code": "#include <stdio.h>\n#include <unistd.h>\n\nint is_power_of_2(long n) {\n    return n > 0 && (n & (n - 1)) == 0;\n}\n\nint main(void) {\n    long ps1 = ____();\n    long ps2 = sysconf(____);\n    printf(\"getpagesize: %ld\\n\", ps1);\n    printf(\"sysconf: %ld\\n\", ps2);\n    printf(\"Match: %s\\n\", ps1 == ps2 ? \"yes\" : \"no\");\n    printf(\"Power of 2: %s\\n\", is_power_of_2(ps1) ? \"yes\" : \"no\");\n    printf(\"Page size >= 4096: %s\\n\", ps1 >= 4096 ? \"yes\" : \"no\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <unistd.h>\nint is_power_of_2(long n) {\n    return n > 0 && (n & (n - 1)) == 0;\n}\nint main(void) {\n    long ps1 = getpagesize();\n    long ps2 = sysconf(_SC_PAGESIZE);\n    printf(\"getpagesize: %ld\\n\", ps1);\n    printf(\"sysconf: %ld\\n\", ps2);\n    printf(\"Match: %s\\n\", ps1 == ps2 ? \"yes\" : \"no\");\n    printf(\"Power of 2: %s\\n\", is_power_of_2(ps1) ? \"yes\" : \"no\");\n    printf(\"Page size >= 4096: %s\\n\", ps1 >= 4096 ? \"yes\" : \"no\");\n    return 0;\n}",
+  "hints": [
+    "getpagesize() retourne la taille de page en octets",
+    "_SC_PAGESIZE est la constante sysconf pour la taille de page",
+    "Sur x86_64, la page standard fait 4096 octets (2^12)"
+  ],
+  "validation": {"mode": "output", "expected_output": "REGEX:(?s)getpagesize: \\d+\\nsysconf: \\d+\\nMatch: yes\\nPower of 2: yes\\nPage size >= 4096: yes", "test_code": null},
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {"label": "Page size", "stack": [{"name": "ps1", "value": "4096 (getpagesize)"}, {"name": "ps2", "value": "4096 (sysconf)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Deux API, même résultat: 4096 octets", "step_label": "Étape 1"},
+      {"label": "Propriétés", "stack": [{"name": "Match", "value": "yes"}, {"name": "Power of 2", "value": "yes (4096 = 2^12)"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "Pages toujours puissance de 2 pour l'alignement", "step_label": "Étape 2"}
+    ]
+  },
+  "prerequisites": [],
+  "exercise_type": "complete",
+  "key_concept": "La page est l'unité de base de la mémoire virtuelle — getpagesize() la révèle",
+  "common_mistake": "Supposer que la page fait toujours 4096 — sur ARM64 elle peut faire 16384",
+  "kc_ids": ["KC-C18"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <unistd.h>\n\n/* == EXEMPLE: constantes de page ====================== */\nvoid example_page(void) {\n    printf(\"PAGE_SIZE via getpagesize: %d\\n\", getpagesize());\n    printf(\"Bits: %d (2^12 = 4096)\\n\", 12);\n}\n\nint is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }\nint main(void) {\n    long ps1 = getpagesize();\n    long ps2 = sysconf(_SC_PAGESIZE);\n    printf(\"getpagesize: %ld\\n\", ps1);\n    printf(\"sysconf: %ld\\n\", ps2);\n    printf(\"Match: %s\\n\", ps1 == ps2 ? \"yes\" : \"no\");\n    printf(\"Power of 2: %s\\n\", is_power_of_2(ps1) ? \"yes\" : \"no\");\n    printf(\"Page size >= 4096: %s\\n\", ps1 >= 4096 ? \"yes\" : \"no\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\nint is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }\nint main(void) {\n    long ps1 = getpagesize();\n    long ps2 = sysconf(_SC_PAGESIZE);\n    printf(\"getpagesize: %ld\\n\", ps1);\n    printf(\"sysconf: %ld\\n\", ps2);\n    printf(\"Match: %s\\n\", ps1 == ps2 ? \"yes\" : \"no\");\n    printf(\"Power of 2: %s\\n\", ____(ps1) ? \"yes\" : \"no\");\n    printf(\"Page size >= 4096: %s\\n\", ps1 >= 4096 ? \"yes\" : \"no\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\nint is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }\nint main(void) {\n    long ps1 = ____();\n    long ps2 = sysconf(____);\n    printf(\"getpagesize: %ld\\n\", ps1);\n    printf(\"sysconf: %ld\\n\", ps2);\n    printf(\"Match: %s\\n\", ps1 == ps2 ? \"yes\" : \"no\");\n    printf(\"Power of 2: %s\\n\", is_power_of_2(ps1) ? \"yes\" : \"no\");\n    printf(\"Page size >= 4096: %s\\n\", ps1 >= 4096 ? \"yes\" : \"no\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\n// Affichez la taille de page avec 2 API et vérifiez les propriétés\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

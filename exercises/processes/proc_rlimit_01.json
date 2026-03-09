@@ -1,0 +1,64 @@
+{
+  "id": "proc-rlimit-01",
+  "subject": "processes",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "getrlimit/setrlimit",
+  "description": "NSY103 — getrlimit/setrlimit contrôlent les limites de ressources par processus : taille de fichier (RLIMIT_FSIZE), nombre de fichiers ouverts (RLIMIT_NOFILE), taille de la pile (RLIMIT_STACK), etc. Chaque limite a une valeur soft (courante) et hard (maximum).\n\nAffichez et modifiez les limites de ressources du processus courant.",
+  "starter_code": "#include <stdio.h>\n#include <sys/resource.h>\n\nvoid show_limit(const char *name, int resource) {\n    struct rlimit rl;\n    if (getrlimit(resource, &____) == 0) {\n        if (rl.rlim_cur == RLIM_INFINITY)\n            printf(\"%-15s soft=unlimited\", name);\n        else\n            printf(\"%-15s soft=%-10lu\", name, (unsigned long)rl.rlim_cur);\n        if (rl.rlim_max == RLIM_INFINITY)\n            printf(\"  hard=unlimited\\n\");\n        else\n            printf(\"  hard=%lu\\n\", (unsigned long)rl.____);\n    }\n}\n\nint main(void) {\n    show_limit(\"RLIMIT_NOFILE\", ____);\n    show_limit(\"RLIMIT_STACK\", RLIMIT_STACK);\n    show_limit(\"RLIMIT_FSIZE\", RLIMIT_FSIZE);\n\n    /* Reduire la limite de fichiers ouverts */\n    struct rlimit new_rl;\n    getrlimit(RLIMIT_NOFILE, &new_rl);\n    unsigned long old_soft = (unsigned long)new_rl.rlim_cur;\n    new_rl.rlim_cur = 64;\n    if (____(RLIMIT_NOFILE, &new_rl) == 0)\n        printf(\"\\nChanged NOFILE: %lu -> %lu\\n\", old_soft, 64UL);\n\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n\n    /* Restaurer */\n    new_rl.rlim_cur = old_soft;\n    setrlimit(RLIMIT_NOFILE, &new_rl);\n    printf(\"Restored\\n\");\n\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <sys/resource.h>\n\nvoid show_limit(const char *name, int resource) {\n    struct rlimit rl;\n    if (getrlimit(resource, &rl) == 0) {\n        if (rl.rlim_cur == RLIM_INFINITY)\n            printf(\"%-15s soft=unlimited\", name);\n        else\n            printf(\"%-15s soft=%-10lu\", name, (unsigned long)rl.rlim_cur);\n        if (rl.rlim_max == RLIM_INFINITY)\n            printf(\"  hard=unlimited\\n\");\n        else\n            printf(\"  hard=%lu\\n\", (unsigned long)rl.rlim_max);\n    }\n}\n\nint main(void) {\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n    show_limit(\"RLIMIT_STACK\", RLIMIT_STACK);\n    show_limit(\"RLIMIT_FSIZE\", RLIMIT_FSIZE);\n\n    /* Reduire la limite de fichiers ouverts */\n    struct rlimit new_rl;\n    getrlimit(RLIMIT_NOFILE, &new_rl);\n    unsigned long old_soft = (unsigned long)new_rl.rlim_cur;\n    new_rl.rlim_cur = 64;\n    if (setrlimit(RLIMIT_NOFILE, &new_rl) == 0)\n        printf(\"\\nChanged NOFILE: %lu -> %lu\\n\", old_soft, 64UL);\n\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n\n    /* Restaurer */\n    new_rl.rlim_cur = old_soft;\n    setrlimit(RLIMIT_NOFILE, &new_rl);\n    printf(\"Restored\\n\");\n\n    return 0;\n}",
+  "hints": [
+    "struct rlimit { rlim_t rlim_cur (soft), rlim_t rlim_max (hard) }",
+    "getrlimit(resource, &rl) remplit la struct, setrlimit la modifie",
+    "On ne peut augmenter soft que jusqu'à hard — seul root peut augmenter hard"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:RLIMIT_NOFILE\\s+soft=\\d+\\s+hard=\\d+\nRLIMIT_STACK\\s+soft=\\d+\\s+hard=.+\nRLIMIT_FSIZE\\s+soft=unlimited\\s+hard=unlimited\n\nChanged NOFILE: \\d+ -> 64\nRLIMIT_NOFILE\\s+soft=64\\s+hard=\\d+\nRestored\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "getrlimit lit les limites courantes",
+        "stack": [
+          {"name": "rl.rlim_cur", "value": "soft limit"},
+          {"name": "rl.rlim_max", "value": "hard limit"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main"},
+          {"function_name": "show_limit", "args": "\"RLIMIT_NOFILE\"", "is_active": true}
+        ],
+        "explanation": "Chaque ressource a une limite soft (courante) et hard (plafond)",
+        "step_label": "getrlimit"
+      },
+      {
+        "label": "setrlimit réduit NOFILE à 64",
+        "stack": [
+          {"name": "new_rl.rlim_cur", "value": "64"},
+          {"name": "new_rl.rlim_max", "value": "(inchangé)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Réduire soft est toujours autorisé — augmenter au-delà de hard nécessite root",
+        "step_label": "setrlimit"
+      }
+    ]
+  },
+  "prerequisites": ["proc-daemon-01"],
+  "exercise_type": "complete",
+  "key_concept": "rlimit contrôle les ressources : soft = limite courante, hard = plafond non-root",
+  "common_mistake": "Tenter d'augmenter hard sans privilèges root — setrlimit retourne EPERM",
+  "kc_ids": ["KC-C07"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <sys/resource.h>\n\n/* == EXEMPLE =======================================\n * Lire RLIMIT_CPU (temps CPU max en secondes)\n * ================================================= */\nvoid example_rlimit(void) {\n    struct rlimit rl;\n    getrlimit(RLIMIT_CPU, &rl);\n    if (rl.rlim_cur == RLIM_INFINITY)\n        printf(\"CPU time: unlimited\\n\");\n    else\n        printf(\"CPU time: %lu sec\\n\", (unsigned long)rl.rlim_cur);\n}\n\n/* == VOTRE EXERCICE ================================\n * Afficher NOFILE, STACK, FSIZE\n * Modifier NOFILE, restaurer\n * ================================================= */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/resource.h>\n\nvoid show_limit(const char *name, int resource) {\n    struct rlimit rl;\n    if (getrlimit(resource, &rl) == 0) {\n        if (rl.rlim_cur == RLIM_INFINITY) printf(\"%-15s soft=unlimited\", name);\n        else printf(\"%-15s soft=%-10lu\", name, (unsigned long)rl.rlim_cur);\n        if (rl.rlim_max == RLIM_INFINITY) printf(\"  hard=unlimited\\n\");\n        else printf(\"  hard=%lu\\n\", (unsigned long)rl.rlim_max);\n    }\n}\n\nint main(void) {\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n    show_limit(\"RLIMIT_STACK\", RLIMIT_STACK);\n    show_limit(\"RLIMIT_FSIZE\", RLIMIT_FSIZE);\n    struct rlimit new_rl;\n    getrlimit(RLIMIT_NOFILE, &new_rl);\n    unsigned long old_soft = (unsigned long)new_rl.rlim_cur;\n    new_rl.rlim_cur = 64;\n    if (____(RLIMIT_NOFILE, &new_rl) == 0) // quelle fonction?\n        printf(\"\\nChanged NOFILE: %lu -> %lu\\n\", old_soft, 64UL);\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n    new_rl.rlim_cur = old_soft;\n    setrlimit(RLIMIT_NOFILE, &new_rl);\n    printf(\"Restored\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/resource.h>\n\nvoid show_limit(const char *name, int resource) {\n    struct rlimit rl;\n    if (getrlimit(resource, &____) == 0) {\n        if (rl.rlim_cur == RLIM_INFINITY) printf(\"%-15s soft=unlimited\", name);\n        else printf(\"%-15s soft=%-10lu\", name, (unsigned long)rl.rlim_cur);\n        if (rl.rlim_max == RLIM_INFINITY) printf(\"  hard=unlimited\\n\");\n        else printf(\"  hard=%lu\\n\", (unsigned long)rl.____);\n    }\n}\n\nint main(void) {\n    show_limit(\"RLIMIT_NOFILE\", ____);\n    show_limit(\"RLIMIT_STACK\", RLIMIT_STACK);\n    show_limit(\"RLIMIT_FSIZE\", RLIMIT_FSIZE);\n    struct rlimit new_rl;\n    getrlimit(RLIMIT_NOFILE, &new_rl);\n    unsigned long old_soft = (unsigned long)new_rl.rlim_cur;\n    new_rl.rlim_cur = 64;\n    if (____(RLIMIT_NOFILE, &new_rl) == 0)\n        printf(\"\\nChanged NOFILE: %lu -> %lu\\n\", old_soft, 64UL);\n    show_limit(\"RLIMIT_NOFILE\", RLIMIT_NOFILE);\n    new_rl.rlim_cur = old_soft;\n    setrlimit(RLIMIT_NOFILE, &new_rl);\n    printf(\"Restored\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/resource.h>\n\n// show_limit(name, resource): getrlimit, afficher soft/hard\n// main: afficher NOFILE/STACK/FSIZE, réduire NOFILE à 64, restaurer\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/resource.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "id": "nsy103-s1-2022-2023",
+    "title": "NSY103 — Seconde session 2022–2023 (Groupe S1)",
+    "date": "2023",
+    "total_points": 15,
+    "questions": [
+      {
+        "number": 1,
+        "points": 3,
+        "title": "Processus vs Threads — fork et pthread",
+        "summary": "Analyser un programme créant des processus (fork) et threads (pthread). Déterminer les valeurs des variables i et j dans chaque contexte.",
+        "subjects": ["processes", "pthreads"],
+        "kc_ids": ["KC-C01", "KC-C02"]
+      },
+      {
+        "number": 2,
+        "points": 4.5,
+        "title": "Réservation de théâtre — sémaphores et mémoire partagée",
+        "summary": "Implémenter la synchronisation d'une salle de théâtre avec sem_wait/sem_post, et partager l'état via mémoire partagée (shm_open).",
+        "subjects": ["semaphores", "shared_memory"],
+        "kc_ids": ["KC-C07", "KC-C08"]
+      },
+      {
+        "number": 3,
+        "points": 2.5,
+        "title": "Système de fichiers Unix — blocs et indirection",
+        "summary": "Calculer les blocs nécessaires pour un fichier de 32 Mo avec des blocs de 1 Ko : blocs directs, indirects simples/doubles/triples.",
+        "subjects": ["filesystem"],
+        "kc_ids": []
+      },
+      {
+        "number": 4,
+        "points": 5,
+        "title": "fork/exec/pipe — enchaînement de processus",
+        "summary": "fork + execl pour lancer 'ps -l', décrire les descripteurs d'un pipe, gérer SIGPIPE lorsque le père écrit en boucle après la mort du fils.",
+        "subjects": ["processes", "pipes", "signals"],
+        "kc_ids": ["KC-C01", "KC-C04", "KC-C05"]
+      }
+    ]
+  },
+  {
+    "id": "nsy103-s2-2022-2023",
+    "title": "NSY103 — Seconde session 2022–2023 (Groupe S2)",
+    "date": "2023",
+    "total_points": 15,
+    "questions": [
+      {
+        "number": 1,
+        "points": 5,
+        "title": "Threads vs Processus — race condition horloge",
+        "summary": "Différences conceptuelles entre threads et processus. Identifier une race condition sur un tableau tab_heure partagé entre threads pthread.",
+        "subjects": ["pthreads", "processes"],
+        "kc_ids": ["KC-C02", "KC-C01"]
+      },
+      {
+        "number": 2,
+        "points": 4,
+        "title": "Bugs fork/pipe/exec — analyse de code",
+        "summary": "Identifier les bugs dans un code fork/pipe/exec : pipe créé après fork, variable ret non initialisée, write après execl jamais atteint.",
+        "subjects": ["processes", "pipes"],
+        "kc_ids": ["KC-C01", "KC-C04"]
+      },
+      {
+        "number": 3,
+        "points": 4,
+        "title": "Pipes — anonymes, nommés et SIGPIPE",
+        "summary": "Distinguer pipe anonyme vs nommé (FIFO), rôles de desc[0]/desc[1], comportement SIGPIPE quand le père écrit en boucle infinie.",
+        "subjects": ["pipes", "signals"],
+        "kc_ids": ["KC-C04", "KC-C05"]
+      },
+      {
+        "number": 4,
+        "points": 2,
+        "title": "Fichier 2 Go — inode et blocs d'indirection",
+        "summary": "Calculer la taille max d'un fichier avec blocs de 512 octets et inode à 15 entrées (12 directes + 3 niveaux d'indirection).",
+        "subjects": ["filesystem"],
+        "kc_ids": []
+      }
+    ]
+  },
+  {
+    "id": "nsy103-s1-2023-2024",
+    "title": "NSY103 — Première session 2023–2024",
+    "date": "2024",
+    "total_points": 15,
+    "questions": [
+      {
+        "number": 1,
+        "points": 8,
+        "title": "fork/pthread — graphe de processus et IPC",
+        "summary": "Tracer le graphe de processus créés dans une boucle fork (while i<3). Enchaîner fork+exec+pipe. Analyser le comportement de threads accédant à des variables globales.",
+        "subjects": ["processes", "pthreads", "pipes"],
+        "kc_ids": ["KC-C01", "KC-C02", "KC-C04"]
+      },
+      {
+        "number": 2,
+        "points": 3,
+        "title": "Système de fichiers — tailles et blocs",
+        "summary": "Calculer taille minimale et maximale d'un fichier avec 512 octets/bloc et 128 pointeurs/bloc d'index. Déterminer les blocs pour un fichier de 256 Ko.",
+        "subjects": ["filesystem"],
+        "kc_ids": []
+      },
+      {
+        "number": 3,
+        "points": 4,
+        "title": "Files de messages POSIX — client/serveur addition",
+        "summary": "Implémenter un serveur de calcul avec msgget/msgsnd/msgrcv. Définir les structures requete/reponse. Le client envoie deux entiers, le serveur répond avec la somme.",
+        "subjects": ["message_queues"],
+        "kc_ids": ["KC-C09"]
+      }
+    ]
+  }
+]

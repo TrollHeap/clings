@@ -1,0 +1,101 @@
+{
+  "id": "sock-unix-01",
+  "subject": "sockets",
+  "lang": "c",
+  "difficulty": 5,
+  "title": "Sockets Unix domain (AF_UNIX)",
+  "description": "NSY103 — Les sockets Unix (AF_UNIX) communiquent via le système de fichiers, sans passer par la pile réseau. struct sockaddr_un contient le chemin du socket. Plus rapide que TCP loopback.\n\nCréez un socket AF_UNIX, forkez un serveur et un client qui échangent un message.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_unix_XXXXXX\";\n    snprintf(path, sizeof(path), \"/tmp/kf_unix_%d\", getpid());\n    int srv = socket(____, SOCK_STREAM, 0);\n    struct sockaddr_un addr;\n    memset(&addr, 0, sizeof(addr));\n    addr.sun_family = ____;\n    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);\n    bind(srv, (struct sockaddr *)&addr, sizeof(addr));\n    listen(srv, 1);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = socket(AF_UNIX, SOCK_STREAM, 0);\n        connect(fd, (struct sockaddr *)&addr, sizeof(addr));\n        send(fd, \"UNIX_MSG\", 8, 0);\n        close(fd);\n        return 0;\n    }\n    int cli = accept(srv, NULL, NULL);\n    char buf[64];\n    int n = recv(cli, buf, sizeof(buf) - 1, 0);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    printf(\"Domain: AF_UNIX\\n\");\n    close(cli);\n    close(srv);\n    unlink(path);\n    wait(NULL);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_unix_XXXXXX\";\n    snprintf(path, sizeof(path), \"/tmp/kf_unix_%d\", getpid());\n    int srv = socket(AF_UNIX, SOCK_STREAM, 0);\n    struct sockaddr_un addr;\n    memset(&addr, 0, sizeof(addr));\n    addr.sun_family = AF_UNIX;\n    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);\n    bind(srv, (struct sockaddr *)&addr, sizeof(addr));\n    listen(srv, 1);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = socket(AF_UNIX, SOCK_STREAM, 0);\n        connect(fd, (struct sockaddr *)&addr, sizeof(addr));\n        send(fd, \"UNIX_MSG\", 8, 0);\n        close(fd);\n        return 0;\n    }\n    int cli = accept(srv, NULL, NULL);\n    char buf[64];\n    int n = recv(cli, buf, sizeof(buf) - 1, 0);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    printf(\"Domain: AF_UNIX\\n\");\n    close(cli);\n    close(srv);\n    unlink(path);\n    wait(NULL);\n    return 0;\n}",
+  "hints": [
+    "AF_UNIX (ou AF_LOCAL) pour les sockets domaine Unix",
+    "struct sockaddr_un utilise sun_family et sun_path (chemin fichier)",
+    "unlink(path) supprime le fichier socket après usage"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Received: UNIX_MSG\nDomain: AF_UNIX\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "dataflow",
+    "steps": [
+      {
+        "label": "Socket Unix bind sur un chemin fichier",
+        "nodes": [
+          {
+            "id": "srv",
+            "label": "Server\nbind(/tmp/kf_unix_...)"
+          },
+          {
+            "id": "fs",
+            "label": "Filesystem\nsocket file"
+          }
+        ],
+        "edges": [
+          {
+            "source": "srv",
+            "target": "fs",
+            "label": "bind()"
+          }
+        ]
+      },
+      {
+        "label": "Client connect via le chemin",
+        "nodes": [
+          {
+            "id": "cli",
+            "label": "Client\nconnect()"
+          },
+          {
+            "id": "srv",
+            "label": "Server\naccept()"
+          }
+        ],
+        "edges": [
+          {
+            "source": "cli",
+            "target": "srv",
+            "label": "AF_UNIX path"
+          }
+        ]
+      },
+      {
+        "label": "Message échangé localement",
+        "nodes": [
+          {
+            "id": "cli",
+            "label": "Client\nsend(UNIX_MSG)"
+          },
+          {
+            "id": "srv",
+            "label": "Server\nrecv(UNIX_MSG)"
+          }
+        ],
+        "edges": [
+          {
+            "source": "cli",
+            "target": "srv",
+            "label": "UNIX_MSG (no network stack)"
+          }
+        ]
+      }
+    ]
+  },
+  "prerequisites": [
+    "sock-epoll-01"
+  ],
+  "exercise_type": "complete",
+  "key_concept": "AF_UNIX utilise le filesystem au lieu de la pile réseau — plus rapide pour l'IPC locale",
+  "common_mistake": "Oublier unlink() → le fichier socket reste et bind() échoue au prochain lancement",
+  "kc_ids": [
+    "KC-C14"
+  ],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\n/* == VOTRE EXERCICE ========================================\n * Sockets Unix domain (AF_UNIX)\n * ========================================================= */\n\nint main(void) {\n    char path[] = \"/tmp/kf_unix_XXXXXX\";\n    snprintf(path, sizeof(path), \"/tmp/kf_unix_%d\", getpid());\n    int srv = socket(AF_UNIX, SOCK_STREAM, 0);\n    struct sockaddr_un addr;\n    memset(&addr, 0, sizeof(addr));\n    addr.sun_family = AF_UNIX;\n    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);\n    bind(srv, (struct sockaddr *)&addr, sizeof(addr));\n    listen(srv, 1);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = socket(AF_UNIX, SOCK_STREAM, 0);\n        connect(fd, (struct sockaddr *)&addr, sizeof(addr));\n        /* TODO: send(fd, \"UNIX_MSG\", 8, 0); */\n        close(fd);\n        return 0;\n    }\n    int cli = accept(srv, NULL, NULL);\n    char buf[64];\n    int n = recv(cli, buf, sizeof(buf) - 1, 0);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    printf(\"Domain: AF_UNIX\\n\");\n    close(cli); close(srv);\n    unlink(path);\n    wait(NULL);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_unix_XXXXXX\";\n    snprintf(path, sizeof(path), \"/tmp/kf_unix_%d\", getpid());\n    int srv = socket(AF_UNIX, SOCK_STREAM, 0);\n    struct sockaddr_un addr;\n    memset(&addr, 0, sizeof(addr));\n    addr.sun_family = AF_UNIX;\n    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);\n    bind(srv, (struct sockaddr *)&addr, sizeof(addr));\n    listen(srv, 1);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = socket(AF_UNIX, SOCK_STREAM, 0);\n        connect(fd, (struct sockaddr *)&addr, sizeof(addr));\n        send(fd, \"UNIX_MSG\", 8, 0);\n        close(fd);\n        return 0;\n    }\n    int cli = accept(srv, NULL, NULL);\n    char buf[64];\n    int n = recv(cli, buf, sizeof(buf) - 1, 0);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    printf(\"Domain: ____\\n\");  // quel domaine?\n    close(cli); close(srv);\n    unlink(path);\n    wait(NULL);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\nint main(void) {\n    char path[] = \"/tmp/kf_unix_XXXXXX\";\n    snprintf(path, sizeof(path), \"/tmp/kf_unix_%d\", getpid());\n    int srv = socket(____, SOCK_STREAM, 0);\n    struct sockaddr_un addr;\n    memset(&addr, 0, sizeof(addr));\n    addr.sun_family = ____;\n    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);\n    bind(srv, (struct sockaddr *)&addr, sizeof(addr));\n    listen(srv, 1);\n    pid_t pid = fork();\n    if (pid == 0) {\n        int fd = socket(AF_UNIX, SOCK_STREAM, 0);\n        connect(fd, (struct sockaddr *)&addr, sizeof(addr));\n        send(fd, \"UNIX_MSG\", 8, 0);\n        close(fd);\n        return 0;\n    }\n    int cli = accept(srv, NULL, NULL);\n    char buf[64];\n    int n = recv(cli, buf, sizeof(buf) - 1, 0);\n    buf[n] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    printf(\"Domain: AF_UNIX\\n\");\n    close(cli); close(srv);\n    unlink(path);\n    wait(NULL);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n#include <sys/wait.h>\n\n// Socket AF_UNIX avec sockaddr_un\n// Fork serveur+client, échangent \"UNIX_MSG\"\n// Sortie: Received: UNIX_MSG, Domain: AF_UNIX\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <sys/socket.h>\n#include <sys/un.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

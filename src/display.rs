@@ -1,19 +1,52 @@
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
+use serde::Deserialize;
 
 use crate::chapters::{ChapterContext, CHAPTERS};
-use crate::models::{Exercise, Subject, ValidationMode};
+use crate::models::{Difficulty, Exercise, Subject, ValidationMode, VisVar};
 use crate::runner::RunResult;
+
+/// Une question d'annale NSY103.
+#[derive(Debug, Deserialize)]
+pub struct AnnaleQuestion {
+    pub number: u32,
+    pub points: f32,
+    pub title: String,
+    pub summary: String,
+    pub subjects: Vec<String>,
+}
+
+/// Un examen NSY103 avec ses questions et le mapping vers les exercices.
+#[derive(Debug, Deserialize)]
+pub struct AnnaleExam {
+    pub title: String,
+    pub date: String,
+    pub total_points: f32,
+    pub questions: Vec<AnnaleQuestion>,
+}
+
+/// Render difficulty as colored star string.
+pub fn difficulty_stars(d: Difficulty) -> ColoredString {
+    match d {
+        Difficulty::Easy => "★☆☆☆☆".green(),
+        Difficulty::Medium => "★★☆☆☆".yellow(),
+        Difficulty::Hard => "★★★☆☆".red(),
+        Difficulty::Advanced => "★★★★☆".magenta(),
+        Difficulty::Expert => "★★★★★".cyan(),
+    }
+}
 
 // ─── Box-drawing helpers ────────────────────────────────────────────
 
 const HEADER_WIDTH: usize = 56;
+/// Visible text width between the ║ chars (HEADER_WIDTH - 2 - 2 side spaces = 52).
+const INNER_W: usize = HEADER_WIDTH - 4;
 
 fn hr() -> String {
     "─".repeat(HEADER_WIDTH)
 }
 
 fn header_box(title: &str) -> String {
-    let pad = HEADER_WIDTH.saturating_sub(title.len() + 4);
+    let pad = HEADER_WIDTH.saturating_sub(title.chars().count() + 6);
     let left = pad / 2;
     let right = pad - left;
     format!(
@@ -38,10 +71,18 @@ pub fn clear_screen() {
 /// Display the main banner.
 fn show_banner() {
     println!("  {}", header_box("KERNELFORGE").bold().cyan());
+    let subtitle = "NSY103 — Programmation système Linux";
+    let subtitle_len = subtitle.chars().count();
+    let inner = HEADER_WIDTH - 2; // 54 chars between ║ and ║
+    let total_pad = inner.saturating_sub(subtitle_len);
+    let lp = total_pad / 2;
+    let rp = total_pad - lp;
     println!(
-        "  {}  {}  {}",
+        "  {}{}{}{}{}",
         "║".cyan(),
-        "  NSY103 — Programmation système Linux  ".dimmed(),
+        " ".repeat(lp),
+        subtitle.dimmed(),
+        " ".repeat(rp),
         "║".cyan()
     );
     println!("  {}", footer_box().cyan());
@@ -156,15 +197,11 @@ pub fn show_exercise_watch(
         _ => "S2 Blancs",
     };
     println!(
-        "  {}  {}   {}  {:?}   {}  {}   {}  {}",
+        "  {}  {}   {}  {}   {}  {}   {}  {}",
         "│".dimmed(),
-        match exercise.difficulty {
-            crate::models::Difficulty::Easy => "★☆☆".green(),
-            crate::models::Difficulty::Medium => "★★☆".yellow(),
-            crate::models::Difficulty::Hard => "★★★".red(),
-        },
+        difficulty_stars(exercise.difficulty),
         "│".dimmed(),
-        exercise.exercise_type,
+        exercise.exercise_type.to_string().dimmed(),
         "│".dimmed(),
         exercise.subject.dimmed(),
         "│".dimmed(),
@@ -175,7 +212,13 @@ pub fn show_exercise_watch(
     println!();
 
     for line in exercise.description.lines() {
-        println!("  {line}");
+        if line.chars().count() > 72 {
+            for wrapped in wrap_text(line, 72) {
+                println!("  {wrapped}");
+            }
+        } else {
+            println!("  {line}");
+        }
     }
     println!();
 
@@ -213,6 +256,186 @@ pub fn show_keybinds() {
     println!();
 }
 
+/// Show keybind hints with optional visualizer key.
+pub fn show_keybinds_with_vis(has_visualizer: bool) {
+    if has_visualizer {
+        println!(
+            "  {} {} hint  {} skip  {} quit  {} list  {} check  {} visualiser",
+            "Keys".bold().cyan(),
+            "[h]".bold(),
+            "[n]".bold(),
+            "[q]".bold(),
+            "[l]".bold(),
+            "[c]".bold(),
+            "[v]".bold(),
+        );
+    } else {
+        show_keybinds();
+        return;
+    }
+    println!();
+}
+
+/// Render a row of the visualizer with two equal columns (plain strings, colored inside).
+/// Both args must be plain (no ANSI) so format! can count visible chars correctly.
+fn vis_row(left: &str, right: &str) {
+    const COL_W: usize = 26;
+    let lp = format!("{:<COL_W$}", left).green();
+    let rp = format!("{:<COL_W$}", right).cyan();
+    println!("  {} {} {}{}", "║".yellow(), lp, rp, "║".yellow());
+}
+
+/// Like vis_row but right column is dimmed (e.g. heap vide).
+fn vis_row_dim_right(left: &str, right: &str) {
+    const COL_W: usize = 26;
+    let lp = format!("{:<COL_W$}", left).green();
+    let rp = format!("{:<COL_W$}", right).dimmed();
+    println!("  {} {} {}{}", "║".yellow(), lp, rp, "║".yellow());
+}
+
+/// Word-wrap `text` to at most `width` visible chars per line.
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        if current.is_empty() {
+            current = word.to_string();
+        } else if current.len() + 1 + word.len() <= width {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(current.clone());
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
+/// Render a single variable line.
+fn fmt_var(v: &VisVar) -> String {
+    format!("{}: {}", v.name, v.value)
+}
+
+/// Display a visualizer step for the given exercise.
+/// Returns the number of terminal lines printed, so the caller can erase them
+/// with `\x1b[{n}A\x1b[J` before redrawing on navigation.
+pub fn show_visualizer(exercise: &Exercise, step: usize) -> usize {
+    let steps = &exercise.visualizer.steps;
+    if steps.is_empty() {
+        return 0;
+    }
+    let step = step.min(steps.len() - 1);
+    let s = &steps[step];
+    let n = steps.len();
+    let mut lines = 0usize;
+
+    let title = format!("Visualiseur — {}/{}", step + 1, n);
+    println!("  {}", header_box(&title).yellow());
+    lines += 1;
+
+    // Step progress dots — printed char-by-char to avoid ANSI padding issues
+    print!("  {} ", "║".yellow());
+    let mut visible_len = 0usize;
+    for i in 0..n {
+        if i > 0 {
+            print!(" ");
+            visible_len += 1;
+        }
+        if i == step {
+            print!("{}", "●".yellow());
+        } else {
+            print!("{}", "○".dimmed());
+        }
+        visible_len += 1;
+    }
+    let step_info = format!("  Etape {}/{}", step + 1, n);
+    print!("{}", step_info);
+    visible_len += step_info.len();
+    let pad = INNER_W.saturating_sub(visible_len);
+    print!("{}", " ".repeat(pad));
+    println!(" {}", "║".yellow());
+    lines += 1;
+
+    // Label row — prefer step_label (more descriptive), fallback to label
+    let label_plain = if !s.step_label.is_empty() {
+        s.step_label.clone()
+    } else {
+        s.label.clone()
+    };
+    let padded_label = format!("{:<INNER_W$}", label_plain);
+    println!(
+        "  {} {} {}",
+        "║".yellow(),
+        padded_label.bold(),
+        "║".yellow()
+    );
+    lines += 1;
+
+    // Separator
+    println!(
+        "  {}",
+        format!("╠{}╣", "═".repeat(HEADER_WIDTH - 2)).yellow()
+    );
+    lines += 1;
+
+    // Column headers (plain strings → colored inside vis_row)
+    vis_row("STACK", "HEAP");
+    lines += 1;
+
+    // Variables
+    let max_rows = s.stack.len().max(s.heap.len()).max(1);
+    for i in 0..max_rows {
+        let left = s.stack.get(i).map(fmt_var).unwrap_or_default();
+        if s.heap.is_empty() && i == 0 {
+            vis_row_dim_right(&left, "(vide)");
+        } else {
+            let right = s.heap.get(i).map(fmt_var).unwrap_or_default();
+            vis_row(&left, &right);
+        }
+    }
+    lines += max_rows;
+
+    // Explanation separator
+    println!(
+        "  {}",
+        format!("╠{}╣", "═".repeat(HEADER_WIDTH - 2)).yellow()
+    );
+    lines += 1;
+
+    // Explanation — word-wrapped, padded, then dimmed
+    const WRAP_W: usize = HEADER_WIDTH - 6; // 50
+    if !s.explanation.is_empty() {
+        let exp_lines = wrap_text(&s.explanation, WRAP_W);
+        for line in &exp_lines {
+            let padded = format!("{:<INNER_W$}", line);
+            println!("  {} {} {}", "║".yellow(), padded.dimmed(), "║".yellow());
+        }
+        lines += exp_lines.len();
+    }
+
+    // Navigation hints — ASCII arrows to avoid raw-mode multi-byte issues
+    let nav = "[<] prec   [>] suiv   [v] fermer";
+    let padded_nav = format!("{:<INNER_W$}", nav);
+    println!(
+        "  {} {} {}",
+        "║".yellow(),
+        padded_nav.dimmed(),
+        "║".yellow()
+    );
+    lines += 1;
+
+    println!("  {}", footer_box().yellow());
+    lines += 1;
+
+    println!();
+    lines += 1;
+
+    lines
+}
+
 /// Show the "waiting for changes" status.
 pub fn show_watching(source_path: &std::path::Path) {
     println!(
@@ -242,11 +465,7 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
     println!(
         "  {}  {}   {}  {}",
         "│".dimmed(),
-        match exercise.difficulty {
-            crate::models::Difficulty::Easy => "★☆☆".green(),
-            crate::models::Difficulty::Medium => "★★☆".yellow(),
-            crate::models::Difficulty::Hard => "★★★".red(),
-        },
+        difficulty_stars(exercise.difficulty),
         "│".dimmed(),
         exercise.subject.dimmed(),
     );
@@ -254,7 +473,13 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
     println!();
 
     for line in exercise.description.lines() {
-        println!("  {line}");
+        if line.chars().count() > 72 {
+            for wrapped in wrap_text(line, 72) {
+                println!("  {wrapped}");
+            }
+        } else {
+            println!("  {line}");
+        }
     }
     println!();
 
@@ -323,13 +548,27 @@ pub fn show_result(result: &RunResult, exercise: &Exercise) {
         println!("  {} {}", "╔══".red(), "SORTIE INCORRECTE".bold().red());
 
         if let Some(expected) = &exercise.validation.expected_output {
-            println!("  {} {}", "║".red(), "Attendu:".bold().green());
-            for line in expected.trim().lines() {
-                println!("  {}   {}", "║".red(), line.green());
-            }
-            println!("  {} {}", "║".red(), "Obtenu:".bold().red());
-            for line in result.stdout.trim().lines() {
-                println!("  {}   {}", "║".red(), line.red());
+            println!("  {} {}", "║".red(), "Diff (- attendu  + obtenu):".bold());
+            let exp_lines: Vec<&str> = expected.trim().lines().collect();
+            let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
+            let max_len = exp_lines.len().max(got_lines.len());
+            for i in 0..max_len {
+                match (exp_lines.get(i), got_lines.get(i)) {
+                    (Some(e), Some(g)) if *e == *g => {
+                        println!("  {}   {}", "║".red(), format!("  {e}").green());
+                    }
+                    (Some(e), Some(g)) => {
+                        println!("  {}   {}", "║".red(), format!("- {e}").red());
+                        println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
+                    }
+                    (Some(e), None) => {
+                        println!("  {}   {}", "║".red(), format!("- {e}").red());
+                    }
+                    (None, Some(g)) => {
+                        println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
+                    }
+                    (None, None) => {}
+                }
             }
         }
 
@@ -432,22 +671,24 @@ pub fn show_exercise_list(
         );
 
         for ex in chapter_exercises {
-            let diff = match ex.difficulty {
-                crate::models::Difficulty::Easy => "★☆☆".green(),
-                crate::models::Difficulty::Medium => "★★☆".yellow(),
-                crate::models::Difficulty::Hard => "★★★".red(),
-            };
+            let diff = difficulty_stars(ex.difficulty);
             let mastery_info = subject_map
                 .get(ex.subject.as_str())
                 .map(|s| format!(" [{:.1}]", s.mastery_score))
                 .unwrap_or_default();
+            let kc_info = if !ex.kc_ids.is_empty() {
+                format!(" [{}]", ex.kc_ids.join(", "))
+            } else {
+                String::new()
+            };
 
             println!(
-                "    {} {} {}{}",
+                "    {} {} {}{}{}",
                 diff,
                 ex.id.dimmed(),
                 ex.title,
-                mastery_info.dimmed()
+                mastery_info.dimmed(),
+                kc_info.dimmed()
             );
         }
         println!();
@@ -467,11 +708,7 @@ pub fn show_exercise_list(
     if !uncategorized.is_empty() {
         println!("  {} {}", "▸".bold(), "Divers".bold());
         for ex in uncategorized {
-            let diff = match ex.difficulty {
-                crate::models::Difficulty::Easy => "★☆☆".green(),
-                crate::models::Difficulty::Medium => "★★☆".yellow(),
-                crate::models::Difficulty::Hard => "★★★".red(),
-            };
+            let diff = difficulty_stars(ex.difficulty);
             println!("    {} {} {}", diff, ex.id.dimmed(), ex.title);
         }
         println!();
@@ -551,7 +788,7 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
 }
 
 /// Create a visual mastery bar with block characters.
-fn mastery_bar(score: f64) -> String {
+pub fn mastery_bar(score: f64) -> String {
     let filled = (score / 5.0 * 10.0).round() as usize;
     let empty = 10 - filled.min(10);
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
@@ -563,4 +800,167 @@ fn mastery_bar(score: f64) -> String {
         bar.red().to_string()
     };
     format!("{} {:.1}", colored, score)
+}
+
+/// Show global statistics: streak, average mastery, top/bottom subjects.
+pub fn show_stats(subjects: &[Subject], streak: u32) {
+    println!();
+    show_banner();
+
+    println!("  {}", header_box("KernelForge — Statistiques").cyan());
+    println!();
+
+    // Streak
+    println!(
+        "  {} {}  {}",
+        "Série:".bold().cyan(),
+        streak.to_string().bold().yellow(),
+        "jours consécutifs".dimmed()
+    );
+
+    // Average mastery
+    if subjects.is_empty() {
+        println!("  {}", "Aucun sujet pratiqué pour l'instant.".dimmed());
+        println!();
+        println!("  {}", footer_box().cyan());
+        return;
+    }
+
+    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score).sum();
+    let avg = total_mastery / subjects.len() as f64;
+    println!(
+        "  {} {}",
+        "Maîtrise moyenne:".bold().cyan(),
+        mastery_bar(avg)
+    );
+    println!();
+
+    // Sort by mastery descending
+    let mut sorted: Vec<&Subject> = subjects.iter().collect();
+    sorted.sort_by(|a, b| {
+        b.mastery_score
+            .partial_cmp(&a.mastery_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Header row
+    println!("  {}", hr().dimmed());
+    println!(
+        "  {:<22} {:<16} {}",
+        "Sujet".bold(),
+        "Mastery".bold(),
+        "Bar".bold()
+    );
+    println!("  {}", hr().dimmed());
+
+    const TOP_N: usize = 5;
+
+    // Top subjects
+    if sorted.len() > TOP_N * 2 {
+        println!("  {}", "── Top sujets ──".dimmed());
+        for sub in sorted.iter().take(TOP_N) {
+            println!(
+                "  {:<22} {:<6.1}  {}",
+                sub.name,
+                sub.mastery_score,
+                mastery_bar(sub.mastery_score)
+            );
+        }
+        println!("  {}", "── À renforcer ──".dimmed());
+        for sub in sorted.iter().rev().take(TOP_N) {
+            println!(
+                "  {:<22} {:<6.1}  {}",
+                sub.name,
+                sub.mastery_score,
+                mastery_bar(sub.mastery_score)
+            );
+        }
+    } else {
+        for sub in &sorted {
+            println!(
+                "  {:<22} {:<6.1}  {}",
+                sub.name,
+                sub.mastery_score,
+                mastery_bar(sub.mastery_score)
+            );
+        }
+    }
+
+    println!("  {}", hr().dimmed());
+    println!();
+    println!("  {}", "Continuez à pratiquer !".bold().green());
+    println!();
+    println!("  {}", footer_box().cyan());
+    println!();
+}
+
+/// Affiche les annales NSY103 avec le mapping vers les exercices KernelForge.
+pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
+    println!();
+    show_banner();
+    println!(
+        "  {} {}\n",
+        "Annales NSY103".bold().cyan(),
+        "— correspondance exercices KernelForge".dimmed()
+    );
+
+    for exam in annales {
+        println!(
+            "  {} {} — {} ({}pt)",
+            "▸".bold().cyan(),
+            exam.title.bold(),
+            exam.date.dimmed(),
+            exam.total_points
+        );
+        println!("  {}", hr().dimmed());
+
+        for q in &exam.questions {
+            let pts = format!("({:.0}pt)", q.points);
+            println!(
+                "  Q{} {} {} — {}",
+                q.number,
+                pts.dimmed(),
+                q.title.bold(),
+                q.summary.dimmed()
+            );
+
+            if !q.subjects.is_empty() {
+                println!(
+                    "    {} {}",
+                    "Sujets:".dimmed(),
+                    q.subjects.join(", ").cyan()
+                );
+            }
+
+            let related: Vec<&Exercise> = exercises
+                .iter()
+                .filter(|e| q.subjects.iter().any(|s| s == &e.subject))
+                .collect();
+
+            if related.is_empty() {
+                println!("    {}", "Aucun exercice associé.".dimmed());
+            } else {
+                let ids: Vec<&str> = related.iter().map(|e| e.id.as_str()).collect();
+                let shown = &ids[..ids.len().min(5)];
+                let more = if ids.len() > 5 {
+                    format!(" +{} autres", ids.len() - 5)
+                } else {
+                    String::new()
+                };
+                println!(
+                    "    {} {}{}",
+                    "Exercices:".dimmed(),
+                    shown.join(", ").green(),
+                    more.dimmed()
+                );
+            }
+            println!();
+        }
+    }
+
+    println!(
+        "  {} `kf list --subject <sujet>` pour voir tous les exercices d'un sujet.",
+        "Astuce:".bold().yellow()
+    );
+    println!();
 }

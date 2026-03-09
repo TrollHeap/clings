@@ -1,0 +1,61 @@
+{
+  "id": "capstone-chat-01",
+  "subject": "capstones",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Chat client-serveur simplifié",
+  "description": "NSY103 — Capstone combinant sockets et pthreads. Implémentez un système de chat simplifié utilisant des pipes (pour la testabilité) au lieu de vrais sockets. Un thread serveur lit les messages et les affiche, un thread client envoie des messages prédéfinis.\n\nLe pattern est identique à un vrai chat TCP : un thread accepte/lit, un autre écrit.\n\n⚠ Cet exercice combine : pipe(), pthread_create(), pthread_join(), read(), write().",
+  "starter_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct {\n    int read_fd;\n    int write_fd;\n} ChatChannel;\n\nvoid *server_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    char buf[128];\n    ssize_t n;\n    while ((n = read(ch->____, buf, sizeof(buf) - 1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"[serveur] recu: %s\\n\", buf);\n    }\n    printf(\"[serveur] client deconnecte\\n\");\n    return NULL;\n}\n\nvoid *client_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    const char *messages[] = {\"Bonjour\", \"Comment ca va?\", \"Au revoir\"};\n    for (int i = 0; i < 3; i++) {\n        write(ch->____, messages[i], strlen(messages[i]));\n        printf(\"[client] envoye: %s\\n\", messages[i]);\n        usleep(10000);\n    }\n    close(ch->____);\n    return NULL;\n}\n\nint main(void) {\n    int pipefd[2];\n    ____(pipefd);\n\n    ChatChannel server_ch = {.read_fd = pipefd[____], .write_fd = -1};\n    ChatChannel client_ch = {.read_fd = -1, .write_fd = pipefd[____]};\n\n    pthread_t srv, cli;\n    pthread_create(&srv, NULL, ____, &server_ch);\n    pthread_create(&cli, NULL, ____, &client_ch);\n\n    pthread_join(cli, NULL);\n    pthread_join(srv, NULL);\n\n    close(pipefd[0]);\n    printf(\"[main] chat termine\\n\");\n    return 0;\n}",
+  "solution_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct {\n    int read_fd;\n    int write_fd;\n} ChatChannel;\n\nvoid *server_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    char buf[128];\n    ssize_t n;\n    while ((n = read(ch->read_fd, buf, sizeof(buf) - 1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"[serveur] recu: %s\\n\", buf);\n    }\n    printf(\"[serveur] client deconnecte\\n\");\n    return NULL;\n}\n\nvoid *client_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    const char *messages[] = {\"Bonjour\", \"Comment ca va?\", \"Au revoir\"};\n    for (int i = 0; i < 3; i++) {\n        write(ch->write_fd, messages[i], strlen(messages[i]));\n        printf(\"[client] envoye: %s\\n\", messages[i]);\n        usleep(10000);\n    }\n    close(ch->write_fd);\n    return NULL;\n}\n\nint main(void) {\n    int pipefd[2];\n    pipe(pipefd);\n\n    ChatChannel server_ch = {.read_fd = pipefd[0], .write_fd = -1};\n    ChatChannel client_ch = {.read_fd = -1, .write_fd = pipefd[1]};\n\n    pthread_t srv, cli;\n    pthread_create(&srv, NULL, server_thread, &server_ch);\n    pthread_create(&cli, NULL, client_thread, &client_ch);\n\n    pthread_join(cli, NULL);\n    pthread_join(srv, NULL);\n\n    close(pipefd[0]);\n    printf(\"[main] chat termine\\n\");\n    return 0;\n}",
+  "hints": [
+    "Le serveur lit depuis read_fd (pipefd[0]), le client écrit dans write_fd (pipefd[1])",
+    "Le client doit fermer write_fd après ses messages pour que le serveur reçoive EOF",
+    "pthread_join(cli) avant pthread_join(srv) garantit que le client finit d'écrire avant qu'on attende le serveur"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "[client] envoye: Bonjour\n[serveur] recu: Bonjour\n[client] envoye: Comment ca va?\n[serveur] recu: Comment ca va?\n[client] envoye: Au revoir\n[serveur] recu: Au revoir\n[serveur] client deconnecte\n[main] chat termine\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Création du canal de communication",
+        "stack": [
+          {"name": "pipefd[0]", "value": "3 (lecture serveur)"},
+          {"name": "pipefd[1]", "value": "4 (écriture client)"}
+        ],
+        "heap": [],
+        "arrows": [{"from": "pipefd[1]", "to": "pipefd[0]", "label": "kernel pipe buffer"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le pipe simule une connexion réseau : le client écrit, le serveur lit.",
+        "step_label": "pipe()"
+      },
+      {
+        "label": "Deux threads : serveur et client",
+        "stack": [
+          {"name": "srv", "value": "thread serveur (read loop)"},
+          {"name": "cli", "value": "thread client (write msgs)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "pthread_create lance les deux threads en parallèle, comme un vrai serveur de chat.",
+        "step_label": "threads"
+      }
+    ]
+  },
+  "prerequisites": ["pipe-01", "pthread-01"],
+  "exercise_type": "complete",
+  "key_concept": "Un chat = un canal bidirectionnel (ici pipe) + un thread lecteur (serveur) + un thread écrivain (client)",
+  "common_mistake": "Oublier de fermer le fd d'écriture dans le client — le serveur ne reçoit jamais EOF et bloque dans read()",
+  "kc_ids": ["KC-CAP"],
+  "starter_code_stages": [
+    "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\n/* == EXEMPLE =======================================\n * Producteur-consommateur via pipe + threads\n * Pattern: un thread ecrit, l'autre lit, pipe entre les deux.\n * ================================================= */\ntypedef struct { int fd; } Endpoint;\n\nvoid *producer(void *arg) {\n    Endpoint *e = (Endpoint *)arg;\n    for (int i = 1; i <= 3; i++) {\n        char msg[32];\n        int len = snprintf(msg, sizeof(msg), \"item-%d\", i);\n        write(e->fd, msg, len);\n    }\n    close(e->fd);\n    return NULL;\n}\n\nvoid *consumer(void *arg) {\n    Endpoint *e = (Endpoint *)arg;\n    char buf[64];\n    ssize_t n;\n    while ((n = read(e->fd, buf, sizeof(buf)-1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"Got: %s\\n\", buf);\n    }\n    return NULL;\n}\n\nvoid example_pipe_threads(void) {\n    int fd[2]; pipe(fd);\n    Endpoint wr = {fd[1]}, rd = {fd[0]};\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, producer, &wr);\n    pthread_create(&t2, NULL, consumer, &rd);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    close(fd[0]);\n}\n/* Resultat: Got: item-1item-2item-3 (ou separe selon timing) */\n\n/* == VOTRE EXERCICE ================================\n * Chat client-serveur avec pipe + pthreads\n * Un thread serveur lit les messages (boucle read)\n * Un thread client envoie 3 messages predéfinis\n * ================================================= */\n\ntypedef struct { int read_fd; int write_fd; } ChatChannel;\n\nint main(void) {\n    int pipefd[2]; pipe(pipefd);\n    ChatChannel server_ch = {.read_fd = pipefd[0], .write_fd = -1};\n    ChatChannel client_ch = {.read_fd = -1, .write_fd = pipefd[1]};\n    /* TODO: creer threads serveur et client */\n    /* TODO: join, afficher \"[main] chat termine\" */\n    (void)server_ch; (void)client_ch;\n    close(pipefd[0]); close(pipefd[1]);\n    return 0;\n}",
+    "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct { int read_fd; int write_fd; } ChatChannel;\n\nvoid *server_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    char buf[128]; ssize_t n;\n    while ((n = read(ch->read_fd, buf, sizeof(buf)-1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"[serveur] recu: %s\\n\", buf);\n    }\n    printf(\"[serveur] client deconnecte\\n\");\n    return NULL;\n}\n\nvoid *client_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    const char *messages[] = {\"Bonjour\", \"Comment ca va?\", \"Au revoir\"};\n    for (int i = 0; i < 3; i++) {\n        write(ch->write_fd, messages[i], strlen(messages[i]));\n        printf(\"[client] envoye: %s\\n\", messages[i]);\n        usleep(10000);\n    }\n    close(ch->____); /* fermer quel fd ? */\n    return NULL;\n}\n\nint main(void) {\n    int pipefd[2]; pipe(pipefd);\n    ChatChannel server_ch = {.read_fd = pipefd[0], .write_fd = -1};\n    ChatChannel client_ch = {.read_fd = -1, .write_fd = pipefd[1]};\n    pthread_t srv, cli;\n    pthread_create(&srv, NULL, server_thread, &server_ch);\n    pthread_create(&cli, NULL, client_thread, &client_ch);\n    pthread_join(cli, NULL);\n    pthread_join(srv, NULL);\n    close(pipefd[0]);\n    printf(\"[main] chat termine\\n\");\n    return 0;\n}",
+    "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct { int read_fd; int write_fd; } ChatChannel;\n\nvoid *server_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    char buf[128]; ssize_t n;\n    while ((n = read(ch->____, buf, sizeof(buf)-1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"[serveur] recu: %s\\n\", buf);\n    }\n    printf(\"[serveur] client deconnecte\\n\");\n    return NULL;\n}\n\nvoid *client_thread(void *arg) {\n    ChatChannel *ch = (ChatChannel *)arg;\n    const char *messages[] = {\"Bonjour\", \"Comment ca va?\", \"Au revoir\"};\n    for (int i = 0; i < 3; i++) {\n        write(ch->____, messages[i], strlen(messages[i]));\n        printf(\"[client] envoye: %s\\n\", messages[i]);\n        usleep(10000);\n    }\n    close(ch->____);\n    return NULL;\n}\n\nint main(void) {\n    int pipefd[2];\n    ____(pipefd);\n    ChatChannel server_ch = {.read_fd = pipefd[____], .write_fd = -1};\n    ChatChannel client_ch = {.read_fd = -1, .write_fd = pipefd[____]};\n    pthread_t srv, cli;\n    pthread_create(&srv, NULL, ____, &server_ch);\n    pthread_create(&cli, NULL, ____, &client_ch);\n    pthread_join(cli, NULL);\n    pthread_join(srv, NULL);\n    close(pipefd[0]);\n    printf(\"[main] chat termine\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\n// Chat simplifie: pipe + 2 threads\n// Thread serveur: boucle read() jusqu'a EOF, afficher messages\n// Thread client: envoyer 3 messages, fermer fd ecriture\n// Main: creer pipe, lancer threads, join, afficher termine\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <unistd.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

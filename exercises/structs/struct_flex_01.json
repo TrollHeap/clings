@@ -1,0 +1,73 @@
+{
+  "id": "struct-flex-01",
+  "subject": "structs",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Copie de struct et comparaison mémoire",
+  "description": "NSY103 — En C, l'affectation `a = b` copie une struct bit à bit (shallow copy). `memcmp` compare deux structs octet par octet. Attention : le padding entre les champs peut rendre memcmp non fiable si la struct n'est pas initialisée proprement.\n\nDémontrez la copie de struct, la comparaison avec memcmp, et la modification indépendante après copie.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\ntypedef struct {\n    int x;\n    int y;\n    char label[16];\n} Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x;\n    m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = ____;\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n\n    b.____ = 99;\n    strncpy(b.____, \"Beta\", sizeof(b.label) - 1);\n    printf(\"Apres modif b:\\n\");\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\ntypedef struct {\n    int x;\n    int y;\n    char label[16];\n} Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x;\n    m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n\n    b.x = 99;\n    strncpy(b.label, \"Beta\", sizeof(b.label) - 1);\n    printf(\"Apres modif b:\\n\");\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n    return 0;\n}",
+  "hints": [
+    "Copie de struct : `Marker b = a;` — copie bit à bit de tous les champs",
+    "Après copie, a et b sont indépendants — modifier b ne modifie pas a",
+    "`memcmp(&a, &b, sizeof(Marker))` retourne 0 si identiques. Fonctionne car {0} initialise tout (y compris le padding)."
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "a = (10, 20, Alpha)\nb = (10, 20, Alpha)\nEgaux (memcmp) : 1\nApres modif b:\na = (10, 20, Alpha)\nb = (99, 20, Beta)\nEgaux (memcmp) : 0\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Après b = a — copie identique",
+        "stack": [
+          {"name": "a.x", "value": "10"},
+          {"name": "a.y", "value": "20"},
+          {"name": "a.label", "value": "\"Alpha\""},
+          {"name": "b.x", "value": "10"},
+          {"name": "b.y", "value": "20"},
+          {"name": "b.label", "value": "\"Alpha\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "b = a copie sizeof(Marker) octets de a vers b. Les deux structs sont maintenant identiques mais occupent des emplacements mémoire différents. memcmp retourne 0.",
+        "step_label": "b = a — copie bit à bit"
+      },
+      {
+        "label": "Après modification de b",
+        "stack": [
+          {"name": "a.x", "value": "10"},
+          {"name": "a.y", "value": "20"},
+          {"name": "a.label", "value": "\"Alpha\""},
+          {"name": "b.x", "value": "99"},
+          {"name": "b.y", "value": "20"},
+          {"name": "b.label", "value": "\"Beta\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Modifier b.x et b.label n'affecte pas a — ce sont des copies indépendantes. C'est une copie profonde car label est un tableau (pas un pointeur). Si c'était char*, la copie serait shallow.",
+        "step_label": "Après modif — a inchangé, b modifié"
+      }
+    ]
+  },
+  "prerequisites": ["struct-array-01"],
+  "exercise_type": "complete",
+  "key_concept": "L'affectation de struct copie bit à bit — copie profonde si pas de pointeurs, shallow sinon",
+  "common_mistake": "Utiliser memcmp sur des structs non initialisées avec {0} — le padding peut contenir des valeurs aléatoires",
+  "kc_ids": ["KC-C03"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Copie de struct Vec2 et verification d'independance\n * =========================================================== */\ntypedef struct { float x, y; } Vec2;\n\nvoid example_demo(void) {\n    Vec2 v1 = {3.0f, 4.0f};\n    Vec2 v2 = v1;\n    printf(\"v1 = (%.1f, %.1f)\\n\", v1.x, v1.y);\n    printf(\"v2 = (%.1f, %.1f)\\n\", v2.x, v2.y);\n    v2.x = 0.0f;\n    printf(\"Apres v2.x=0 : v1.x=%.1f v2.x=%.1f\\n\", v1.x, v2.x);\n    printf(\"memcmp : %d\\n\", memcmp(&v1, &v2, sizeof(Vec2)) == 0);\n}\n/* Resultat: v1=(3.0,4.0) v2=(3.0,4.0) / v1.x=3.0 v2.x=0.0 / memcmp: 0 */\n\n/* == VOTRE EXERCICE =========================================\n * Struct Marker : copie, memcmp, modification independante\n * =========================================================== */\ntypedef struct { int x; int y; char label[16]; } Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x; m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    /* TODO: créer a, copier dans b, vérifier memcmp, modifier b */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int x; int y; char label[16]; } Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x; m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n\n    b.x = 99;\n    strncpy(b.label, \"Beta\", sizeof(b.label) - 1);\n    printf(\"Apres modif b:\\n\");\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, ____);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, ____);\n    printf(\"Egaux (memcmp) : %d\\n\", ____);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct {\n    int x;\n    int y;\n    char label[16];\n} Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x;\n    m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = ____;\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n\n    b.____ = 99;\n    strncpy(b.____, \"Beta\", sizeof(b.label) - 1);\n    printf(\"Apres modif b:\\n\");\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int x; int y; char label[16]; } Marker;\n\n// Créez make_marker, puis démontrez : copie, memcmp, modification\nint main(void) {\n    // TODO\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int x; int y; char label[16]; } Marker;\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

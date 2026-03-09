@@ -1,0 +1,65 @@
+{
+  "id": "sync-rwlock-01",
+  "subject": "sync_concepts",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Read-write lock",
+  "description": "NSY103 — Un read-write lock permet plusieurs lecteurs simultanés mais un seul écrivain exclusif. pthread_rwlock_rdlock pour la lecture, pthread_rwlock_wrlock pour l'écriture. Les lecteurs ne se bloquent pas entre eux.\n\nUtilisez un rwlock pour protéger un compteur avec 3 lecteurs et 1 écrivain.",
+  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\npthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;\nint shared_data = 0;\n\nvoid *writer(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 5; i++) {\n        pthread_rwlock_wrlock(______);\n        shared_data++;\n        pthread_rwlock_unlock(&rwlock);\n    }\n    return NULL;\n}\n\nvoid *reader(void *arg) {\n    int id = *(int *)arg;\n    pthread_rwlock_rdlock(______);\n    printf(\"Lecteur %d: data = %d\\n\", id, shared_data);\n    pthread_rwlock_unlock(&rwlock);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tw, tr[3];\n    int ids[3] = {0, 1, 2};\n    pthread_create(&tw, NULL, writer, NULL);\n    pthread_join(tw, NULL);\n    for (int i = 0; i < 3; i++)\n        pthread_create(&tr[i], NULL, ____, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(tr[i], NULL);\n    printf(\"Final: %d\\n\", shared_data);\n    pthread_rwlock_destroy(&rwlock);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\npthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;\nint shared_data = 0;\n\nvoid *writer(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 5; i++) {\n        pthread_rwlock_wrlock(&rwlock);\n        shared_data++;\n        pthread_rwlock_unlock(&rwlock);\n    }\n    return NULL;\n}\n\nvoid *reader(void *arg) {\n    int id = *(int *)arg;\n    pthread_rwlock_rdlock(&rwlock);\n    printf(\"Lecteur %d: data = %d\\n\", id, shared_data);\n    pthread_rwlock_unlock(&rwlock);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tw, tr[3];\n    int ids[3] = {0, 1, 2};\n    pthread_create(&tw, NULL, writer, NULL);\n    pthread_join(tw, NULL);\n    for (int i = 0; i < 3; i++)\n        pthread_create(&tr[i], NULL, reader, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(tr[i], NULL);\n    printf(\"Final: %d\\n\", shared_data);\n    pthread_rwlock_destroy(&rwlock);\n    return 0;\n}",
+  "hints": [
+    "pthread_rwlock_wrlock et rdlock prennent l'adresse : &rwlock",
+    "La fonction lecteur à passer à pthread_create est reader",
+    "rdlock permet plusieurs lecteurs simultanés, wrlock est exclusif"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:(?s)(?=.*Lecteur 0: data = 5)(?=.*Lecteur 1: data = 5)(?=.*Lecteur 2: data = 5)(?=.*Final: 5).*",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Écrivain — accès exclusif",
+        "stack": [
+          {"name": "rwlock", "value": "WRITE LOCKED"},
+          {"name": "shared_data", "value": "0 → 5"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "writer", "args": "void", "is_active": true}],
+        "explanation": "L'écrivain prend le write lock. Aucun lecteur ni écrivain ne peut accéder aux données pendant ce temps.",
+        "step_label": "Write"
+      },
+      {
+        "label": "Lecteurs — accès partagé",
+        "stack": [
+          {"name": "rwlock", "value": "READ LOCKED (x3)"},
+          {"name": "shared_data", "value": "5 (lecture seule)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "reader 0", "args": "id=0", "is_active": true},
+          {"function_name": "reader 1", "args": "id=1", "is_active": true},
+          {"function_name": "reader 2", "args": "id=2", "is_active": true}
+        ],
+        "explanation": "Les 3 lecteurs prennent le read lock simultanément. Ils lisent tous la même valeur 5 sans se bloquer entre eux.",
+        "step_label": "Read"
+      }
+    ]
+  },
+  "prerequisites": ["sync-mutex-order-01", "sync-condvar-01"],
+  "exercise_type": "complete",
+  "key_concept": "rwlock : N lecteurs simultanés OU 1 écrivain exclusif — optimal quand les lectures sont fréquentes et les écritures rares",
+  "common_mistake": "Utiliser rdlock pour une opération d'écriture — le read lock ne garantit pas l'exclusion mutuelle entre lecteurs",
+  "kc_ids": ["KC-C22"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\n/* == EXEMPLE ===============================================\n * rwlock : configuration partagée\n * Plusieurs threads lisent un config, un thread la met à jour.\n * ========================================================= */\npthread_rwlock_t ex_rwl = PTHREAD_RWLOCK_INITIALIZER;\nint ex_config = 100;\n\nvoid *config_reader(void *arg) {\n    int id = *(int *)arg;\n    pthread_rwlock_rdlock(&ex_rwl);\n    printf(\"Config reader %d: %d\\n\", id, ex_config);\n    pthread_rwlock_unlock(&ex_rwl);\n    return NULL;\n}\n\nvoid *config_writer(void *arg) {\n    (void)arg;\n    pthread_rwlock_wrlock(&ex_rwl);\n    ex_config = 200;\n    pthread_rwlock_unlock(&ex_rwl);\n    return NULL;\n}\n\n/* rdlock = lecture partagée, wrlock = écriture exclusive */\n\n/* == VOTRE EXERCICE ========================================\n * 1 écrivain incrémente 5 fois, puis 3 lecteurs lisent.\n * ========================================================= */\n\npthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;\nint shared_data = 0;\n\nvoid *writer(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 5; i++) {\n        pthread_rwlock_wrlock(&rwlock);\n        shared_data++;\n        pthread_rwlock_unlock(&rwlock);\n    }\n    return NULL;\n}\n\nvoid *reader(void *arg) {\n    int id = *(int *)arg;\n    /* TODO: rdlock, lire, unlock */\n    printf(\"Lecteur %d: data = %d\\n\", id, shared_data);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tw, tr[3];\n    int ids[3] = {0, 1, 2};\n    pthread_create(&tw, NULL, writer, NULL);\n    pthread_join(tw, NULL);\n    for (int i = 0; i < 3; i++)\n        pthread_create(&tr[i], NULL, reader, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(tr[i], NULL);\n    printf(\"Final: %d\\n\", shared_data);\n    pthread_rwlock_destroy(&rwlock);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\npthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;\nint shared_data = 0;\n\nvoid *writer(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 5; i++) {\n        pthread_rwlock_wrlock(&rwlock);\n        shared_data++;\n        pthread_rwlock_unlock(&rwlock);\n    }\n    return NULL;\n}\n\nvoid *reader(void *arg) {\n    int id = *(int *)arg;\n    pthread_rwlock_rdlock(&rwlock);\n    printf(\"Lecteur %d: data = %d\\n\", id, shared_data);\n    pthread_rwlock_unlock(&rwlock);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tw, tr[3];\n    int ids[3] = {0, 1, 2};\n    pthread_create(&tw, NULL, writer, NULL);\n    pthread_join(tw, NULL);\n    for (int i = 0; i < 3; i++)\n        pthread_create(&tr[i], NULL, ____, &ids[i]); /* quelle fonction ? */\n    for (int i = 0; i < 3; i++)\n        pthread_join(tr[i], NULL);\n    printf(\"Final: %d\\n\", shared_data);\n    pthread_rwlock_destroy(&rwlock);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\npthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;\nint shared_data = 0;\n\nvoid *writer(void *arg) {\n    (void)arg;\n    for (int i = 0; i < 5; i++) {\n        pthread_rwlock_wrlock(______);\n        shared_data++;\n        pthread_rwlock_unlock(&rwlock);\n    }\n    return NULL;\n}\n\nvoid *reader(void *arg) {\n    int id = *(int *)arg;\n    pthread_rwlock_rdlock(______);\n    printf(\"Lecteur %d: data = %d\\n\", id, shared_data);\n    pthread_rwlock_unlock(&rwlock);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tw, tr[3];\n    int ids[3] = {0, 1, 2};\n    pthread_create(&tw, NULL, writer, NULL);\n    pthread_join(tw, NULL);\n    for (int i = 0; i < 3; i++)\n        pthread_create(&tr[i], NULL, ____, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(tr[i], NULL);\n    printf(\"Final: %d\\n\", shared_data);\n    pthread_rwlock_destroy(&rwlock);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\n// rwlock global, shared_data = 0\n// writer : 5 fois wrlock/increment/unlock\n// reader : rdlock, afficher data, unlock\n// main : writer puis 3 readers, afficher Final\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

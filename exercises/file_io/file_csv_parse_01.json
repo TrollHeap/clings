@@ -1,0 +1,78 @@
+{
+  "id": "file-csv-parse-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Parsing CSV",
+  "description": "NSY103 — Le parsing de fichiers CSV est une opération courante en programmation système. On utilise fgets pour lire ligne par ligne, puis strtok ou sscanf pour extraire les champs.\n\nParsez un fichier CSV simulé (nom,age,ville) et affichez un résumé formaté.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    FILE *f = fmemopen((void *)csv, strlen(csv), \"r\");\n    if (!f) return 1;\n\n    char line[256];\n    Person people[10];\n    int count = 0;\n\n    /* Skip header */\n    fgets(line, sizeof(line), f);\n\n    while (fgets(line, sizeof(line), f) && count < 10) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%31[^,],%d,%31[^,]\", ____[count].name, &____[count].age, ____[count].city) == 3)\n            count++;\n    }\n    fclose(f);\n\n    printf(\"Personnes: %d\\n\", ____);\n    for (int i = 0; i < count; i++)\n        printf(\"  %s (%d) - %s\\n\", people[i].name, people[i].____, people[i].____);    \n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    FILE *f = fmemopen((void *)csv, strlen(csv), \"r\");\n    if (!f) return 1;\n\n    char line[256];\n    Person people[10];\n    int count = 0;\n\n    /* Skip header */\n    fgets(line, sizeof(line), f);\n\n    while (fgets(line, sizeof(line), f) && count < 10) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%31[^,],%d,%31[^,]\", people[count].name, &people[count].age, people[count].city) == 3)\n            count++;\n    }\n    fclose(f);\n\n    printf(\"Personnes: %d\\n\", count);\n    for (int i = 0; i < count; i++)\n        printf(\"  %s (%d) - %s\\n\", people[i].name, people[i].age, people[i].city);\n    return 0;\n}",
+  "hints": [
+    "sscanf avec %[^,] lit jusqu'à la virgule suivante",
+    "people[count].name accède au champ name de l'élément courant",
+    "N'oubliez pas le & devant people[count].age pour sscanf"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Personnes: 3\n  Alice (30) - Paris\n  Bob (25) - Lyon\n  Charlie (35) - Marseille\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "CSV chargé, header sauté",
+        "stack": [
+          {"name": "csv", "value": "\"nom,age,ville\\nAlice,30...\""},
+          {"name": "count", "value": "0"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "La première ligne (header) est lue et ignorée",
+        "step_label": "Skip header"
+      },
+      {
+        "label": "Parsing ligne \"Alice,30,Paris\"",
+        "stack": [
+          {"name": "line", "value": "\"Alice,30,Paris\""},
+          {"name": "people[0].name", "value": "\"Alice\""},
+          {"name": "people[0].age", "value": "30"},
+          {"name": "people[0].city", "value": "\"Paris\""},
+          {"name": "count", "value": "1"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "sscanf extrait 3 champs séparés par des virgules",
+        "step_label": "Parse ligne 1"
+      },
+      {
+        "label": "Toutes les lignes parsées",
+        "stack": [
+          {"name": "people[0]", "value": "{\"Alice\", 30, \"Paris\"}"},
+          {"name": "people[1]", "value": "{\"Bob\", 25, \"Lyon\"}"},
+          {"name": "people[2]", "value": "{\"Charlie\", 35, \"Marseille\"}"},
+          {"name": "count", "value": "3"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "3 personnes extraites du CSV",
+        "step_label": "Résultat"
+      }
+    ]
+  },
+  "prerequisites": ["file-getline-01"],
+  "exercise_type": "complete",
+  "key_concept": "sscanf avec %[^,] est un moyen simple de parser des champs CSV sans bibliothèque externe",
+  "common_mistake": "Oublier de limiter la taille dans %[^,] — buffer overflow si le champ est trop long",
+  "kc_ids": ["KC-C06"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\n/* == EXEMPLE =======================================\n * Parser un fichier INI (key=value) en struct\n * Même pattern : fgets + sscanf + tableau de struct\n * ================================================= */\ntypedef struct { char key[32]; char val[32]; } KV;\n\nvoid example_parse_ini(void) {\n    const char *ini = \"host=localhost\\nport=8080\\n\";\n    FILE *f = fmemopen((void *)ini, strlen(ini), \"r\");\n    if (!f) return;\n    char line[128];\n    KV entries[10];\n    int n = 0;\n    while (fgets(line, sizeof(line), f) && n < 10) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%31[^=]=%31s\", entries[n].key, entries[n].val) == 2)\n            n++;\n    }\n    fclose(f);\n    for (int i = 0; i < n; i++)\n        printf(\"%s => %s\\n\", entries[i].key, entries[i].val);\n}\n/* Resultat: host => localhost, port => 8080 */\n\n/* == VOTRE EXERCICE ================================\n * Parser un CSV nom,age,ville en tableau de Person\n * Inspirez-vous de example_parse_ini.\n * N'oubliez pas de sauter la ligne header.\n * ================================================= */\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    /* TODO: fmemopen, skip header, boucle fgets+sscanf */\n    (void)csv;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    FILE *f = fmemopen((void *)csv, strlen(csv), \"r\");\n    if (!f) return 1;\n    char line[256];\n    Person people[10];\n    int count = 0;\n    fgets(line, sizeof(line), f); /* skip header */\n    while (fgets(line, sizeof(line), f) && count < 10) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%31[^,],%d,%31[^,]\", people[count].name, &people[count].age, ____) == 3) // city\n            count++;\n    }\n    fclose(f);\n    printf(\"Personnes: %d\\n\", count);\n    for (int i = 0; i < count; i++)\n        printf(\"  %s (%d) - %s\\n\", people[i].name, people[i].age, people[i].city);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    FILE *f = fmemopen((void *)csv, strlen(csv), \"r\");\n    if (!f) return 1;\n\n    char line[256];\n    Person people[10];\n    int count = 0;\n\n    fgets(line, sizeof(line), f);\n\n    while (fgets(line, sizeof(line), f) && count < 10) {\n        line[strcspn(line, \"\\n\")] = 0;\n        if (sscanf(line, \"%31[^,],%d,%31[^,]\", ____[count].name, &____[count].age, ____[count].city) == 3)\n            count++;\n    }\n    fclose(f);\n\n    printf(\"Personnes: %d\\n\", ____);\n    for (int i = 0; i < count; i++)\n        printf(\"  %s (%d) - %s\\n\", people[i].name, people[i].____, people[i].____);    \n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef struct { char name[32]; int age; char city[32]; } Person;\n\nint main(void) {\n    const char *csv =\n        \"nom,age,ville\\n\"\n        \"Alice,30,Paris\\n\"\n        \"Bob,25,Lyon\\n\"\n        \"Charlie,35,Marseille\\n\";\n    // fmemopen en lecture\n    // Sauter la première ligne (header)\n    // Boucle fgets + sscanf pour remplir tableau Person\n    // Afficher le nombre de personnes et chaque entrée\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

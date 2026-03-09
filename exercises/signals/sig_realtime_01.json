@@ -1,0 +1,77 @@
+{
+  "id": "sig-realtime-01",
+  "subject": "signals",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "Signaux temps réel (SIGRTMIN)",
+  "description": "NSY103 — Les signaux temps réel (SIGRTMIN à SIGRTMAX) ont des garanties supplémentaires par rapport aux signaux standard : ils sont mis en file (pas de perte si plusieurs arrivent), délivrés dans l'ordre, et peuvent transporter une valeur entière via sigqueue().\n\nUtilisez sigqueue() pour envoyer des signaux temps réel avec des données.",
+  "starter_code": "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t rt_count = 0;\nvolatile int last_value = 0;\n\nvoid rt_handler(int sig, siginfo_t *info, void *ctx) {\n    (void)sig; (void)ctx;\n    last_value = info->si_value.____;\n    rt_count++;\n}\n\nint main(void) {\n    int signo = SIGRTMIN + 1;\n    printf(\"Using RT signal: %d\\n\", signo);\n    printf(\"SIGRTMIN=%d SIGRTMAX=%d range=%d\\n\",\n           SIGRTMIN, SIGRTMAX, SIGRTMAX - SIGRTMIN);\n\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_sigaction = ____;\n    sa.sa_flags = ____;\n    sigemptyset(&sa.sa_mask);\n    sigaction(signo, &sa, NULL);\n    printf(\"RT handler installed\\n\");\n\n    /* Envoyer 3 signaux avec des valeurs differentes */\n    union sigval val;\n    for (int i = 1; i <= 3; i++) {\n        val.sival_int = i * 10;\n        ____(getpid(), signo, val);\n    }\n\n    printf(\"RT signals received: %d\\n\", rt_count);\n    printf(\"Last value: %d\\n\", last_value);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t rt_count = 0;\nvolatile int last_value = 0;\n\nvoid rt_handler(int sig, siginfo_t *info, void *ctx) {\n    (void)sig; (void)ctx;\n    last_value = info->si_value.sival_int;\n    rt_count++;\n}\n\nint main(void) {\n    int signo = SIGRTMIN + 1;\n    printf(\"Using RT signal: %d\\n\", signo);\n    printf(\"SIGRTMIN=%d SIGRTMAX=%d range=%d\\n\",\n           SIGRTMIN, SIGRTMAX, SIGRTMAX - SIGRTMIN);\n\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_sigaction = rt_handler;\n    sa.sa_flags = SA_SIGINFO;\n    sigemptyset(&sa.sa_mask);\n    sigaction(signo, &sa, NULL);\n    printf(\"RT handler installed\\n\");\n\n    /* Envoyer 3 signaux avec des valeurs differentes */\n    union sigval val;\n    for (int i = 1; i <= 3; i++) {\n        val.sival_int = i * 10;\n        sigqueue(getpid(), signo, val);\n    }\n\n    printf(\"RT signals received: %d\\n\", rt_count);\n    printf(\"Last value: %d\\n\", last_value);\n    return 0;\n}",
+  "hints": [
+    "SA_SIGINFO active le prototype void handler(int, siginfo_t*, void*) au lieu de void handler(int)",
+    "sigqueue(pid, sig, val) envoie un signal avec une union sigval (sival_int ou sival_ptr)",
+    "Les signaux RT sont mis en file — 3 envois = 3 délivrances garanties"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "REGEX:Using RT signal: \\d+\nSIGRTMIN=\\d+ SIGRTMAX=\\d+ range=\\d+\nRT handler installed\nRT signals received: 3\nLast value: 30\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "SA_SIGINFO active le handler étendu",
+        "stack": [
+          {"name": "sa.sa_sigaction", "value": "rt_handler(sig, info, ctx)"},
+          {"name": "sa.sa_flags", "value": "SA_SIGINFO"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "SA_SIGINFO utilise sa_sigaction au lieu de sa_handler — accès à siginfo_t",
+        "step_label": "Setup"
+      },
+      {
+        "label": "sigqueue envoie 3 signaux RT avec valeurs",
+        "stack": [
+          {"name": "signal 1", "value": "sival_int=10"},
+          {"name": "signal 2", "value": "sival_int=20"},
+          {"name": "signal 3", "value": "sival_int=30"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Les 3 signaux sont mis en file — aucun n'est perdu (garantie RT)",
+        "step_label": "sigqueue x3"
+      },
+      {
+        "label": "Les 3 handlers sont appelés dans l'ordre",
+        "stack": [
+          {"name": "rt_count", "value": "3"},
+          {"name": "last_value", "value": "30 (dernier reçu)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main"},
+          {"function_name": "rt_handler", "args": "info->si_value", "is_active": true}
+        ],
+        "explanation": "Contrairement aux signaux standard, les RT sont délivrés dans l'ordre FIFO",
+        "step_label": "Délivrance"
+      }
+    ]
+  },
+  "prerequisites": ["sig-pipe-01"],
+  "exercise_type": "complete",
+  "key_concept": "Les signaux RT sont mis en file (pas de perte), ordonnés, et transportent des données via sigqueue",
+  "common_mistake": "Utiliser sa_handler au lieu de sa_sigaction avec SA_SIGINFO — comportement indéfini",
+  "kc_ids": ["KC-C08"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n\n/* == EXEMPLE =======================================\n * Signal RT simple sans données\n * ================================================= */\nvolatile sig_atomic_t ex_rt = 0;\nvoid ex_rt_handler(int sig) { (void)sig; ex_rt++; }\nvoid example_rt(void) {\n    int s = SIGRTMIN;\n    struct sigaction sa = {.sa_handler = ex_rt_handler};\n    sigemptyset(&sa.sa_mask);\n    sigaction(s, &sa, NULL);\n    raise(s); raise(s);\n    printf(\"example: %d RT signals\\n\", ex_rt);\n}\n\n/* == VOTRE EXERCICE ================================\n * SA_SIGINFO + sigqueue avec sival_int\n * ================================================= */\nint main(void) {\n    /* TODO */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t rt_count = 0;\nvolatile int last_value = 0;\nvoid rt_handler(int sig, siginfo_t *info, void *ctx) {\n    (void)sig; (void)ctx;\n    last_value = info->si_value.sival_int;\n    rt_count++;\n}\n\nint main(void) {\n    int signo = SIGRTMIN + 1;\n    printf(\"Using RT signal: %d\\n\", signo);\n    printf(\"SIGRTMIN=%d SIGRTMAX=%d range=%d\\n\", SIGRTMIN, SIGRTMAX, SIGRTMAX - SIGRTMIN);\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_sigaction = rt_handler;\n    sa.sa_flags = SA_SIGINFO;\n    sigemptyset(&sa.sa_mask);\n    sigaction(signo, &sa, NULL);\n    printf(\"RT handler installed\\n\");\n    union sigval val;\n    for (int i = 1; i <= 3; i++) {\n        val.sival_int = i * 10;\n        ____(getpid(), signo, val); // quelle fonction?\n    }\n    printf(\"RT signals received: %d\\n\", rt_count);\n    printf(\"Last value: %d\\n\", last_value);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <string.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t rt_count = 0;\nvolatile int last_value = 0;\nvoid rt_handler(int sig, siginfo_t *info, void *ctx) {\n    (void)sig; (void)ctx;\n    last_value = info->si_value.____;\n    rt_count++;\n}\n\nint main(void) {\n    int signo = SIGRTMIN + 1;\n    printf(\"Using RT signal: %d\\n\", signo);\n    printf(\"SIGRTMIN=%d SIGRTMAX=%d range=%d\\n\", SIGRTMIN, SIGRTMAX, SIGRTMAX - SIGRTMIN);\n    struct sigaction sa;\n    memset(&sa, 0, sizeof(sa));\n    sa.sa_sigaction = ____;\n    sa.sa_flags = ____;\n    sigemptyset(&sa.sa_mask);\n    sigaction(signo, &sa, NULL);\n    printf(\"RT handler installed\\n\");\n    union sigval val;\n    for (int i = 1; i <= 3; i++) {\n        val.sival_int = i * 10;\n        ____(getpid(), signo, val);\n    }\n    printf(\"RT signals received: %d\\n\", rt_count);\n    printf(\"Last value: %d\\n\", last_value);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n#include <unistd.h>\n\n// handler SA_SIGINFO: int sig, siginfo_t *info, void *ctx\n// info->si_value.sival_int pour lire la valeur\n// main: sigaction SA_SIGINFO, sigqueue x3 avec valeurs 10,20,30\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

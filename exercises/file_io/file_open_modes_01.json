@@ -1,0 +1,84 @@
+{
+  "id": "file-open-modes-01",
+  "subject": "file_io",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Modes d'ouverture fopen",
+  "description": "NSY103 — fopen() ouvre un fichier avec un mode : \"r\" (lecture), \"w\" (écriture, tronque), \"a\" (ajout), \"r+\" (lecture+écriture). Le mode détermine le comportement initial du curseur et l'accès.\n\nDémontrez les différents modes en écrivant et lisant un buffer mémoire via fmemopen.",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n\n    /* Mode \"w\" : ecriture, tronque */\n    FILE *f = fmemopen(buf, sizeof(buf), ____);\n    if (!f) return 1;\n    fprintf(f, \"Hello\");\n    fclose(f);\n    printf(\"After w: \\\"%s\\\"\\n\", buf);\n\n    /* Mode \"a\" : ajout a la fin */\n    f = fmemopen(buf, sizeof(buf), ____);\n    if (!f) return 1;\n    fprintf(f, \" World\");\n    fclose(f);\n    printf(\"After a: \\\"%s\\\"\\n\", buf);\n\n    /* Mode \"r\" : lecture seule */\n    f = fmemopen(buf, strlen(buf), ____);\n    if (!f) return 1;\n    char read_buf[256];\n    if (fgets(read_buf, sizeof(read_buf), f))\n        printf(\"After r: \\\"%s\\\"\\n\", read_buf);\n    fclose(f);\n\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n\n    /* Mode \"w\" : ecriture, tronque */\n    FILE *f = fmemopen(buf, sizeof(buf), \"w\");\n    if (!f) return 1;\n    fprintf(f, \"Hello\");\n    fclose(f);\n    printf(\"After w: \\\"%s\\\"\\n\", buf);\n\n    /* Mode \"a\" : ajout a la fin */\n    f = fmemopen(buf, sizeof(buf), \"a\");\n    if (!f) return 1;\n    fprintf(f, \" World\");\n    fclose(f);\n    printf(\"After a: \\\"%s\\\"\\n\", buf);\n\n    /* Mode \"r\" : lecture seule */\n    f = fmemopen(buf, strlen(buf), \"r\");\n    if (!f) return 1;\n    char read_buf[256];\n    if (fgets(read_buf, sizeof(read_buf), f))\n        printf(\"After r: \\\"%s\\\"\\n\", read_buf);\n    fclose(f);\n\n    return 0;\n}",
+  "hints": [
+    "\"w\" ouvre en écriture et tronque le contenu existant",
+    "\"a\" ouvre en ajout : le curseur se place à la fin du contenu",
+    "\"r\" ouvre en lecture seule, le fichier doit exister"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "After w: \"Hello\"\nAfter a: \"Hello World\"\nAfter r: \"Hello World\"\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "fmemopen mode \"w\" — écriture",
+        "stack": [
+          {"name": "buf[256]", "value": "(vide)"},
+          {"name": "f", "value": "FILE* (w)"}
+        ],
+        "heap": [],
+        "arrows": [{"from": "f", "to": "buf[256]", "label": "écrit"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "fmemopen ouvre buf en mode écriture, curseur au début",
+        "step_label": "Mode w"
+      },
+      {
+        "label": "Après fprintf + fclose en mode w",
+        "stack": [
+          {"name": "buf", "value": "\"Hello\\0...\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "\"Hello\" est écrit au début du buffer, fclose flush",
+        "step_label": "Résultat w"
+      },
+      {
+        "label": "fmemopen mode \"a\" — ajout",
+        "stack": [
+          {"name": "buf", "value": "\"Hello\\0...\""},
+          {"name": "f", "value": "FILE* (a)"}
+        ],
+        "heap": [],
+        "arrows": [{"from": "f", "to": "buf", "label": "ajout après Hello"}],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "En mode \"a\", le curseur se place après le contenu existant",
+        "step_label": "Mode a"
+      },
+      {
+        "label": "fmemopen mode \"r\" — lecture",
+        "stack": [
+          {"name": "buf", "value": "\"Hello World\""},
+          {"name": "read_buf", "value": "\"Hello World\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "fgets lit le contenu complet depuis le début",
+        "step_label": "Mode r"
+      }
+    ]
+  },
+  "prerequisites": ["file-read-lines-01"],
+  "exercise_type": "complete",
+  "key_concept": "\"w\" tronque, \"a\" ajoute à la fin, \"r\" lit depuis le début — le mode détermine tout",
+  "common_mistake": "Confondre \"w\" et \"a\" : \"w\" écrase le contenu existant, \"a\" le préserve",
+  "kc_ids": ["KC-C06"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE =======================================\n * Démonstration des modes sur un seul buffer\n * fmemopen permet de simuler un fichier en mémoire\n * ================================================= */\nvoid example_modes(void) {\n    char demo[64];\n    memset(demo, 0, sizeof(demo));\n    FILE *f = fmemopen(demo, sizeof(demo), \"w\");\n    fprintf(f, \"ABC\");\n    fclose(f);\n    printf(\"demo after w: %s\\n\", demo); /* ABC */\n\n    f = fmemopen(demo, sizeof(demo), \"a\");\n    fprintf(f, \"DEF\");\n    fclose(f);\n    printf(\"demo after a: %s\\n\", demo); /* ABCDEF */\n}\n\n/* == VOTRE EXERCICE ================================\n * Utilisez fmemopen avec les modes w, a, r\n * pour écrire \"Hello\", ajouter \" World\", puis relire.\n * Inspirez-vous de example_modes ci-dessus.\n * ================================================= */\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n    /* TODO: ouvrir buf en mode \"w\", écrire \"Hello\", fermer */\n    /* TODO: ouvrir buf en mode \"a\", écrire \" World\", fermer */\n    /* TODO: ouvrir buf en mode \"r\", lire avec fgets, afficher */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n\n    FILE *f = fmemopen(buf, sizeof(buf), \"w\");\n    if (!f) return 1;\n    fprintf(f, \"Hello\");\n    fclose(f);\n    printf(\"After w: \\\"%s\\\"\\n\", buf);\n\n    f = fmemopen(buf, sizeof(buf), \"a\");\n    if (!f) return 1;\n    fprintf(f, \" World\");\n    fclose(f);\n    printf(\"After a: \\\"%s\\\"\\n\", buf);\n\n    f = fmemopen(buf, strlen(buf), ____); // mode lecture\n    if (!f) return 1;\n    char read_buf[256];\n    if (fgets(read_buf, sizeof(read_buf), f))\n        printf(\"After r: \\\"%s\\\"\\n\", read_buf);\n    fclose(f);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n\n    FILE *f = fmemopen(buf, sizeof(buf), ____);\n    if (!f) return 1;\n    fprintf(f, \"Hello\");\n    fclose(f);\n    printf(\"After w: \\\"%s\\\"\\n\", buf);\n\n    f = fmemopen(buf, sizeof(buf), ____);\n    if (!f) return 1;\n    fprintf(f, \" World\");\n    fclose(f);\n    printf(\"After a: \\\"%s\\\"\\n\", buf);\n\n    f = fmemopen(buf, strlen(buf), ____);\n    if (!f) return 1;\n    char read_buf[256];\n    if (fgets(read_buf, sizeof(read_buf), f))\n        printf(\"After r: \\\"%s\\\"\\n\", read_buf);\n    fclose(f);\n\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char buf[256];\n    memset(buf, 0, sizeof(buf));\n    // Ouvrir buf avec fmemopen en mode \"w\", écrire \"Hello\"\n    // Ouvrir buf avec fmemopen en mode \"a\", écrire \" World\"\n    // Ouvrir buf avec fmemopen en mode \"r\", lire avec fgets\n    // Afficher après chaque étape\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "id": "pthread-pool-01",
+  "subject": "pthreads",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Pool de threads workers",
+  "description": "NSY103 — Un pool de threads pré-crée N workers qui traitent des tâches depuis une file. Cela évite le coût de création/destruction répétée de threads.\n\nImplémentez un pool de 3 workers qui traitent chacun une tâche numérotée.",
+  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n\ntypedef struct {\n    int task_id;\n    int result;\n} Task;\n\nvoid *worker(void *arg) {\n    Task *t = (____*)arg;\n    t->result = t->task_id * t->task_id;\n    printf(\"Worker task %d: result = %d\\n\", t->task_id, t->result);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t threads[3];\n    Task tasks[3];\n    for (int i = 0; i < 3; i++) {\n        tasks[i].task_id = i + 1;\n        tasks[i].result = 0;\n        pthread_create(&threads[i], NULL, ____, &tasks[i]);\n        ____;\n    }\n    printf(\"All tasks done.\\n\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n\ntypedef struct {\n    int task_id;\n    int result;\n} Task;\n\nvoid *worker(void *arg) {\n    Task *t = (Task *)arg;\n    t->result = t->task_id * t->task_id;\n    printf(\"Worker task %d: result = %d\\n\", t->task_id, t->result);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t threads[3];\n    Task tasks[3];\n    for (int i = 0; i < 3; i++) {\n        tasks[i].task_id = i + 1;\n        tasks[i].result = 0;\n        pthread_create(&threads[i], NULL, worker, &tasks[i]);\n        pthread_join(threads[i], NULL);\n    }\n    printf(\"All tasks done.\\n\");\n    return 0;\n}",
+  "hints": [
+    "Chaque worker reçoit un pointeur vers sa Task — cast en (Task *)",
+    "pthread_join après chaque create garantit l'ordre séquentiel",
+    "task_id * task_id donne 1, 4, 9 pour les tâches 1, 2, 3"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Worker task 1: result = 1\nWorker task 2: result = 4\nWorker task 3: result = 9\nAll tasks done.\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Tâches initialisées",
+        "stack": [
+          {"name": "tasks[0]", "value": "{id=1, result=0}"},
+          {"name": "tasks[1]", "value": "{id=2, result=0}"},
+          {"name": "tasks[2]", "value": "{id=3, result=0}"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "3 tâches avec task_id 1, 2, 3 — résultats à 0",
+        "step_label": "1. Init"
+      },
+      {
+        "label": "Worker traite task 1",
+        "stack": [
+          {"name": "t->task_id", "value": "1"},
+          {"name": "t->result", "value": "1 (1*1)"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "worker", "args": "Task *t", "is_active": true}],
+        "explanation": "Le worker calcule 1*1=1 et stocke dans result",
+        "step_label": "2. Worker 1"
+      },
+      {
+        "label": "Tous les workers terminés",
+        "stack": [
+          {"name": "tasks[0].result", "value": "1"},
+          {"name": "tasks[1].result", "value": "4"},
+          {"name": "tasks[2].result", "value": "9"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Chaque tâche est traitée séquentiellement par son worker",
+        "step_label": "3. Résultats"
+      }
+    ]
+  },
+  "prerequisites": ["pthread-cond-01"],
+  "exercise_type": "complete",
+  "key_concept": "Un pool de threads distribue des tâches — chaque worker reçoit une struct avec les données de sa tâche",
+  "common_mistake": "Lancer tous les threads puis join → ordre non déterministe des printf",
+  "kc_ids": ["KC-C09"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Pool simple : 2 workers calculent des factorielles\n * ========================================================= */\ntypedef struct { int n; int fact; } ExTask;\nvoid *ex_worker(void *arg) {\n    ExTask *t = (ExTask *)arg;\n    t->fact = 1;\n    for (int i = 2; i <= t->n; i++) t->fact *= i;\n    printf(\"Fact(%d) = %d\\n\", t->n, t->fact);\n    return NULL;\n}\n/* Resultat: Fact(5)=120, Fact(3)=6 etc. */\n\n/* == VOTRE EXERCICE ========================================\n * 3 workers calculent le carré de leur task_id\n * ========================================================= */\n\ntypedef struct { int task_id; int result; } Task;\n\nvoid *worker(void *arg) {\n    Task *t = (Task *)arg;\n    t->result = t->task_id * t->task_id;\n    printf(\"Worker task %d: result = %d\\n\", t->task_id, t->result);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t threads[3];\n    Task tasks[3];\n    for (int i = 0; i < 3; i++) {\n        tasks[i].task_id = i + 1;\n        tasks[i].result = 0;\n        /* TODO: create thread, join immediately */\n    }\n    printf(\"All tasks done.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\ntypedef struct { int task_id; int result; } Task;\n\nvoid *worker(void *arg) {\n    Task *t = (Task *)arg;\n    t->result = t->task_id * t->task_id;\n    printf(\"Worker task %d: result = %d\\n\", t->task_id, t->result);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t threads[3];\n    Task tasks[3];\n    for (int i = 0; i < 3; i++) {\n        tasks[i].task_id = i + 1;\n        tasks[i].result = 0;\n        pthread_create(&threads[i], NULL, worker, &tasks[i]);\n        ____(threads[i], NULL);  // attendre\n    }\n    printf(\"All tasks done.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\ntypedef struct {\n    int task_id;\n    int result;\n} Task;\n\nvoid *worker(void *arg) {\n    Task *t = (____*)arg;\n    t->result = t->task_id * t->task_id;\n    printf(\"Worker task %d: result = %d\\n\", t->task_id, t->result);\n    return NULL;\n}\n\nint main(void) {\n    pthread_t threads[3];\n    Task tasks[3];\n    for (int i = 0; i < 3; i++) {\n        tasks[i].task_id = i + 1;\n        tasks[i].result = 0;\n        pthread_create(&threads[i], NULL, ____, &tasks[i]);\n        ____;\n    }\n    printf(\"All tasks done.\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\n// Struct Task avec task_id et result\n// worker calcule result = task_id * task_id\n// main: 3 tâches, create+join séquentiel\n// Sortie: Worker task 1: result = 1, ..., All tasks done.\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

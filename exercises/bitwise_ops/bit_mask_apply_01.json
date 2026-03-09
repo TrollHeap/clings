@@ -1,0 +1,64 @@
+{
+  "id": "bit-mask-apply-01",
+  "subject": "bitwise_ops",
+  "lang": "c",
+  "difficulty": 1,
+  "title": "Application de masque (extraction de bits)",
+  "description": "NSY103 — Un masque bitwise isole des bits spécifiques. AND avec le masque extrait les bits, OR les active, XOR les inverse. Extraire les octets d'un entier 32-bit est une opération fondamentale.\n\nExtrayez les 4 octets d'un entier 32 bits en utilisant des masques et des décalages.",
+  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0xDEADBEEF;\n    unsigned int byte0 = val & ____;\n    unsigned int byte1 = (val >> 8) & ____;\n    unsigned int byte2 = (val >> ____) & 0xFF;\n    unsigned int byte3 = (val >> ____) & 0xFF;\n    printf(\"val    = 0x%08X\\n\", val);\n    printf(\"byte0  = 0x%02X\\n\", byte0);\n    printf(\"byte1  = 0x%02X\\n\", byte1);\n    printf(\"byte2  = 0x%02X\\n\", byte2);\n    printf(\"byte3  = 0x%02X\\n\", byte3);\n    unsigned int nibble_lo = val & 0x0F;\n    unsigned int nibble_hi = (val >> 4) & 0x0F;\n    printf(\"lo nib = 0x%X\\n\", nibble_lo);\n    printf(\"hi nib = 0x%X\\n\", nibble_hi);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0xDEADBEEF;\n    unsigned int byte0 = val & 0xFF;\n    unsigned int byte1 = (val >> 8) & 0xFF;\n    unsigned int byte2 = (val >> 16) & 0xFF;\n    unsigned int byte3 = (val >> 24) & 0xFF;\n    printf(\"val    = 0x%08X\\n\", val);\n    printf(\"byte0  = 0x%02X\\n\", byte0);\n    printf(\"byte1  = 0x%02X\\n\", byte1);\n    printf(\"byte2  = 0x%02X\\n\", byte2);\n    printf(\"byte3  = 0x%02X\\n\", byte3);\n    unsigned int nibble_lo = val & 0x0F;\n    unsigned int nibble_hi = (val >> 4) & 0x0F;\n    printf(\"lo nib = 0x%X\\n\", nibble_lo);\n    printf(\"hi nib = 0x%X\\n\", nibble_hi);\n    return 0;\n}",
+  "hints": [
+    "0xFF masque les 8 bits de poids faible (un octet)",
+    "Décaler puis masquer: (val >> N) & 0xFF extrait l'octet à la position N",
+    "0x0F masque les 4 bits de poids faible (un nibble)"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "val    = 0xDEADBEEF\nbyte0  = 0xEF\nbyte1  = 0xBE\nbyte2  = 0xAD\nbyte3  = 0xDE\nlo nib = 0xF\nhi nib = 0xE\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Extraction d'octets par masquage",
+        "stack": [
+          {"name": "val", "value": "0xDEADBEEF"},
+          {"name": "byte0 (& 0xFF)", "value": "0xEF"},
+          {"name": "byte1 (>>8 & 0xFF)", "value": "0xBE"},
+          {"name": "byte2 (>>16 & 0xFF)", "value": "0xAD"},
+          {"name": "byte3 (>>24 & 0xFF)", "value": "0xDE"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Shift + mask isole chaque octet: DE|AD|BE|EF",
+        "step_label": "1. Octets"
+      },
+      {
+        "label": "Extraction de nibbles (4 bits)",
+        "stack": [
+          {"name": "lo nibble (& 0x0F)", "value": "0xF"},
+          {"name": "hi nibble (>>4 & 0x0F)", "value": "0xE"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "0x0F masque 4 bits — un nibble est un demi-octet",
+        "step_label": "2. Nibbles"
+      }
+    ]
+  },
+  "prerequisites": ["bit-shift-01"],
+  "exercise_type": "complete",
+  "key_concept": "(val >> N) & mask extrait un champ de bits — pattern fondamental pour parser des protocoles et registres",
+  "common_mistake": "Oublier le masque après le décalage → bits parasites des octets supérieurs",
+  "kc_ids": ["KC-C04"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Masquage: extraire des champs de bits\n * =========================================================== */\nvoid example_mask(void) {\n    unsigned int x = 0xABCD;\n    printf(\"lo byte = 0x%02X\\n\", x & 0xFF);       /* 0xCD */\n    printf(\"hi byte = 0x%02X\\n\", (x >> 8) & 0xFF); /* 0xAB */\n}\n\n/* == VOTRE EXERCICE =========================================\n * Extraire les 4 octets et 2 nibbles de 0xDEADBEEF\n * =========================================================== */\n\nint main(void) {\n    unsigned int val = 0xDEADBEEF;\n    unsigned int byte0 = val & 0xFF;\n    unsigned int byte1 = (val >> 8) & 0xFF;\n    unsigned int byte2 = (val >> 16) & 0xFF;\n    unsigned int byte3 = (val >> 24) & 0xFF;\n    printf(\"val    = 0x%08X\\n\", val);\n    printf(\"byte0  = 0x%02X\\n\", byte0);\n    printf(\"byte1  = 0x%02X\\n\", byte1);\n    printf(\"byte2  = 0x%02X\\n\", byte2);\n    printf(\"byte3  = 0x%02X\\n\", byte3);\n    /* TODO: nibbles */\n    unsigned int nibble_lo = val & 0x0F;\n    unsigned int nibble_hi = (val >> 4) & 0x0F;\n    printf(\"lo nib = 0x%X\\n\", nibble_lo);\n    printf(\"hi nib = 0x%X\\n\", nibble_hi);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0xDEADBEEF;\n    unsigned int byte0 = val & 0xFF;\n    unsigned int byte1 = (val >> 8) & 0xFF;\n    unsigned int byte2 = (val >> 16) & ____;\n    unsigned int byte3 = (val >> ____) & 0xFF;\n    printf(\"val    = 0x%08X\\n\", val);\n    printf(\"byte0  = 0x%02X\\n\", byte0);\n    printf(\"byte1  = 0x%02X\\n\", byte1);\n    printf(\"byte2  = 0x%02X\\n\", byte2);\n    printf(\"byte3  = 0x%02X\\n\", byte3);\n    unsigned int nibble_lo = val & 0x0F;\n    unsigned int nibble_hi = (val >> 4) & 0x0F;\n    printf(\"lo nib = 0x%X\\n\", nibble_lo);\n    printf(\"hi nib = 0x%X\\n\", nibble_hi);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0xDEADBEEF;\n    unsigned int byte0 = val & ____;\n    unsigned int byte1 = (val >> 8) & ____;\n    unsigned int byte2 = (val >> ____) & 0xFF;\n    unsigned int byte3 = (val >> ____) & 0xFF;\n    printf(\"val    = 0x%08X\\n\", val);\n    printf(\"byte0  = 0x%02X\\n\", byte0);\n    printf(\"byte1  = 0x%02X\\n\", byte1);\n    printf(\"byte2  = 0x%02X\\n\", byte2);\n    printf(\"byte3  = 0x%02X\\n\", byte3);\n    unsigned int nibble_lo = val & 0x0F;\n    unsigned int nibble_hi = (val >> 4) & 0x0F;\n    printf(\"lo nib = 0x%X\\n\", nibble_lo);\n    printf(\"hi nib = 0x%X\\n\", nibble_hi);\n    return 0;\n}",
+    "#include <stdio.h>\n\n// val=0xDEADBEEF\n// Extraire byte0-byte3 avec (val >> N) & 0xFF\n// Extraire nibbles lo/hi du dernier octet\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

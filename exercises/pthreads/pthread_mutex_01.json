@@ -1,0 +1,73 @@
+{
+  "id": "pthread-mutex-01",
+  "subject": "pthreads",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Mutex: protéger un compteur partagé",
+  "description": "NSY103 — Un mutex (mutual exclusion) empêche deux threads d'accéder simultanément à une ressource partagée. pthread_mutex_lock/unlock encadrent la section critique.\n\nUtilisez un mutex pour protéger l'incrémentation d'un compteur partagé par 3 threads.",
+  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\npthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *increment(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 0; i < 3; i++) {\n        ____(&lock);\n        counter++;\n        printf(\"Thread %d: counter = %d\\n\", id, counter);\n        ____(&lock);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[3];\n    int ids[3] = {0, 1, 2};\n    for (int i = 0; i < 3; i++)\n        pthread_create(&t[i], NULL, increment, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(t[i], NULL);\n    printf(\"Final: %d\\n\", counter);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\npthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *increment(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 0; i < 3; i++) {\n        pthread_mutex_lock(&lock);\n        counter++;\n        printf(\"Thread %d: counter = %d\\n\", id, counter);\n        pthread_mutex_unlock(&lock);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[3];\n    int ids[3] = {0, 1, 2};\n    for (int i = 0; i < 3; i++) {\n        pthread_create(&t[i], NULL, increment, &ids[i]);\n        pthread_join(t[i], NULL);\n    }\n    printf(\"Final: %d\\n\", counter);\n    return 0;\n}",
+  "hints": [
+    "pthread_mutex_lock(&lock) verrouille le mutex avant la section critique",
+    "pthread_mutex_unlock(&lock) le déverrouille après",
+    "PTHREAD_MUTEX_INITIALIZER initialise statiquement un mutex"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Thread 0: counter = 1\nThread 0: counter = 2\nThread 0: counter = 3\nThread 1: counter = 4\nThread 1: counter = 5\nThread 1: counter = 6\nThread 2: counter = 7\nThread 2: counter = 8\nThread 2: counter = 9\nFinal: 9\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "État initial — mutex déverrouillé",
+        "stack": [
+          {"name": "counter", "value": "0"},
+          {"name": "lock", "value": "UNLOCKED"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "Le compteur est à 0, le mutex est libre",
+        "step_label": "1. Init"
+      },
+      {
+        "label": "Thread 0 — lock, incrément, unlock",
+        "stack": [
+          {"name": "counter", "value": "1"},
+          {"name": "lock", "value": "LOCKED by T0"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "increment", "args": "id=0", "is_active": true}],
+        "explanation": "T0 verrouille, incrémente counter à 1, puis déverrouille",
+        "step_label": "2. Section critique"
+      },
+      {
+        "label": "Tous les threads terminés",
+        "stack": [
+          {"name": "counter", "value": "9"},
+          {"name": "lock", "value": "UNLOCKED"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "explanation": "3 threads × 3 incréments = 9, grâce au mutex aucune race condition",
+        "step_label": "3. Final"
+      }
+    ]
+  },
+  "prerequisites": ["pthread-args-01"],
+  "exercise_type": "complete",
+  "key_concept": "pthread_mutex_lock/unlock protège une section critique — garantit qu'un seul thread modifie la ressource à la fois",
+  "common_mistake": "Oublier unlock → deadlock, ou ne pas protéger du tout → race condition sur counter",
+  "kc_ids": ["KC-C09"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Mutex pour protéger un solde bancaire\n * ========================================================= */\nint balance = 1000;\npthread_mutex_t bank_lock = PTHREAD_MUTEX_INITIALIZER;\nvoid *example_withdraw(void *arg) {\n    int amount = *(int *)arg;\n    pthread_mutex_lock(&bank_lock);\n    balance -= amount;\n    printf(\"Withdrew %d, balance: %d\\n\", amount, balance);\n    pthread_mutex_unlock(&bank_lock);\n    return NULL;\n}\n/* Resultat: accès sérialisé au solde */\n\n/* == VOTRE EXERCICE ========================================\n * Protégez un compteur partagé avec un mutex\n * ========================================================= */\n\nint counter = 0;\npthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *increment(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 0; i < 3; i++) {\n        /* TODO: lock */\n        counter++;\n        printf(\"Thread %d: counter = %d\\n\", id, counter);\n        /* TODO: unlock */\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[3];\n    int ids[3] = {0, 1, 2};\n    for (int i = 0; i < 3; i++) {\n        pthread_create(&t[i], NULL, increment, &ids[i]);\n        pthread_join(t[i], NULL);\n    }\n    printf(\"Final: %d\\n\", counter);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\npthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *increment(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 0; i < 3; i++) {\n        pthread_mutex_lock(&lock);\n        counter++;\n        printf(\"Thread %d: counter = %d\\n\", id, counter);\n        ____(&lock);  // déverrouiller\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[3];\n    int ids[3] = {0, 1, 2};\n    for (int i = 0; i < 3; i++) {\n        pthread_create(&t[i], NULL, increment, &ids[i]);\n        pthread_join(t[i], NULL);\n    }\n    printf(\"Final: %d\\n\", counter);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint counter = 0;\npthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *increment(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 0; i < 3; i++) {\n        ____(&lock);\n        counter++;\n        printf(\"Thread %d: counter = %d\\n\", id, counter);\n        ____(&lock);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[3];\n    int ids[3] = {0, 1, 2};\n    for (int i = 0; i < 3; i++)\n        pthread_create(&t[i], NULL, increment, &ids[i]);\n    for (int i = 0; i < 3; i++)\n        pthread_join(t[i], NULL);\n    printf(\"Final: %d\\n\", counter);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\n// Compteur global protégé par mutex\n// 3 threads incrémentent 3 fois chacun\n// Sortie: Thread X: counter = Y pour chaque incrément, puis Final: 9\n\nint main(void) {\n    return 0;\n}",
+    "#include <stdio.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "id": "format-custom-01",
+  "subject": "string_formatting",
+  "lang": "c",
+  "difficulty": 4,
+  "title": "Mini-printf personnalisé",
+  "description": "NSY103 — Comprendre printf de l'intérieur en implémentant une version simplifiée. Utiliser va_list, va_start, va_arg, va_end pour traiter un nombre variable d'arguments. Supporter %d, %s, %x, %% et les caractères littéraux.\n\nImplémentez my_printf qui supporte %d, %s, %x et %%.",
+  "starter_code": "#include <stdio.h>\n#include <stdarg.h>\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    ____(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = ____(args, int);\n                printf(\"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                printf(\"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                printf(\"%x\", val);\n                break;\n            }\n            case '%':\n                putchar('%');\n                break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    ____(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdarg.h>\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = va_arg(args, int);\n                printf(\"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                printf(\"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                printf(\"%x\", val);\n                break;\n            }\n            case '%':\n                putchar('%');\n                break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    va_end(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+  "hints": [
+    "va_start(args, last_named_param) initialise la liste d'arguments variables",
+    "va_arg(args, type) extrait le prochain argument du type spécifié",
+    "va_end(args) termine le parcours — toujours l'appeler avant de retourner"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Hello world! num=42 hex=0xff %done\n10 + 20 = 30\nname=KF code=beef\n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "va_start initialise la liste",
+        "stack": [
+          {"name": "fmt", "value": "\"Hello %s! num=%d...\""},
+          {"name": "args", "value": "→ {\"world\", 42, 255}"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "explanation": "va_start positionne args sur le premier argument variable",
+        "step_label": "1. Init"
+      },
+      {
+        "label": "va_arg extrait séquentiellement",
+        "stack": [
+          {"name": "%s → va_arg(char*)", "value": "\"world\""},
+          {"name": "%d → va_arg(int)", "value": "42"},
+          {"name": "%x → va_arg(uint)", "value": "255 → \"ff\""}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "explanation": "Chaque va_arg avance au prochain argument dans la pile",
+        "step_label": "2. Extraction"
+      },
+      {
+        "label": "Parcours du format complet",
+        "stack": [
+          {"name": "sortie", "value": "\"Hello world! num=42 hex=0xff %done\""},
+          {"name": "va_end", "value": "nettoyage de args"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "explanation": "%% produit un littéral %, les autres chars sont copiés tels quels",
+        "step_label": "3. Résultat"
+      }
+    ]
+  },
+  "prerequisites": ["snprintf-safe-01"],
+  "exercise_type": "complete",
+  "key_concept": "va_list/va_start/va_arg/va_end — le mécanisme C pour les fonctions variadiques comme printf",
+  "common_mistake": "Mauvais type dans va_arg (ex: float au lieu de double) → comportement indéfini",
+  "kc_ids": ["KC-C05"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n#include <stdarg.h>\n\n/* == EXEMPLE ================================================\n * Fonction variadique simple avec va_list\n * =========================================================== */\nvoid print_ints(int count, ...) {\n    va_list args;\n    va_start(args, count);\n    for (int i = 0; i < count; i++)\n        printf(\"%d \", va_arg(args, int));\n    printf(\"\\n\");\n    va_end(args);\n}\n\n/* == VOTRE EXERCICE =========================================\n * Implémenter my_printf avec %d, %s, %x, %%\n * =========================================================== */\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': printf(\"%d\", va_arg(args, int)); break;\n            case 's': printf(\"%s\", va_arg(args, char *)); break;\n            case 'x': printf(\"%x\", va_arg(args, unsigned int)); break;\n            case '%': putchar('%'); break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    va_end(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdarg.h>\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': printf(\"%d\", va_arg(args, int)); break;\n            case 's': printf(\"%s\", ____(args, ____)); break;\n            case 'x': printf(\"%x\", ____(args, ____)); break;\n            case '%': putchar('%'); break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    va_end(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdarg.h>\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    ____(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = ____(args, int);\n                printf(\"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                printf(\"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                printf(\"%x\", val);\n                break;\n            }\n            case '%':\n                putchar('%');\n                break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    ____(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdarg.h>\n\n// Implémenter my_printf(fmt, ...) avec va_list\n// Supporter: %d (int), %s (char*), %x (unsigned), %% (littéral %)\n// Parcourir fmt char par char, putchar pour les littéraux\n\nvoid my_printf(const char *fmt, ...) {\n    (void)fmt;\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdarg.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

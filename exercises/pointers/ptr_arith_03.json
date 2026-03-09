@@ -1,0 +1,89 @@
+{
+  "id": "ptr-arith-03",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Pointeur vers fonction callback",
+  "description": "NSY103 — Un pointeur de fonction stocke l'adresse d'une fonction. Sa syntaxe est `type_retour (*nom)(params)`. On peut passer une fonction en argument d'une autre pour créer des callbacks.\n\nImplémentez une fonction `apply` qui applique une fonction callback à chaque élément d'un tableau.",
+  "starter_code": "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nvoid apply(int *arr, int n, ____ (*fn)(____)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____;\n    }\n}\n\nvoid print_arr(const int *arr, int n) {\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int a[] = {1, 2, 3, 4};\n    apply(a, 4, ____);\n    printf(\"Doubles : \");\n    print_arr(a, 4);\n    int b[] = {1, 2, 3, 4};\n    apply(b, 4, ____);\n    printf(\"Carres : \");\n    print_arr(b, 4);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = fn(arr[i]);\n    }\n}\n\nvoid print_arr(const int *arr, int n) {\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int a[] = {1, 2, 3, 4};\n    apply(a, 4, doubler);\n    printf(\"Doubles : \");\n    print_arr(a, 4);\n    int b[] = {1, 2, 3, 4};\n    apply(b, 4, carre);\n    printf(\"Carres : \");\n    print_arr(b, 4);\n    return 0;\n}",
+  "hints": [
+    "Syntaxe pointeur de fonction : `int (*fn)(int)` — fn est un pointeur vers une fonction prenant int et retournant int",
+    "Appeler via pointeur : `fn(arr[i])` — pas besoin de `*` pour appeler",
+    "Passer le nom de la fonction directement : `apply(a, 4, doubler)` — le nom se convertit automatiquement en pointeur"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Doubles : 2 4 6 8 \nCarres : 1 4 9 16 \n",
+    "test_code": null
+  },
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Appel apply(a, 4, doubler)",
+        "stack": [
+          {"name": "a[0]", "value": "1"},
+          {"name": "a[1]", "value": "2"},
+          {"name": "a[2]", "value": "3"},
+          {"name": "a[3]", "value": "4"},
+          {"name": "fn", "value": "→doubler"}
+        ],
+        "heap": [],
+        "arrows": [
+          {"from": "fn", "to": "doubler", "label": "callback"}
+        ],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": false},
+          {"function_name": "apply", "args": "a, 4, doubler", "is_active": true}
+        ],
+        "explanation": "fn est un pointeur de fonction qui pointe vers doubler. Le nom 'doubler' se convertit implicitement en adresse. fn(arr[i]) appelle doubler(arr[i]).",
+        "step_label": "fn = doubler — pointeur de fonction"
+      },
+      {
+        "label": "Après apply(a, doubler) — éléments doublés",
+        "stack": [
+          {"name": "a[0]", "value": "2"},
+          {"name": "a[1]", "value": "4"},
+          {"name": "a[2]", "value": "6"},
+          {"name": "a[3]", "value": "8"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Chaque élément a été remplacé par fn(a[i]) = doubler(a[i]) = a[i]*2. Le même pattern sera utilisé avec carre pour b[].",
+        "step_label": "Résultat — a[] doublé"
+      },
+      {
+        "label": "Après apply(b, carre) — éléments au carré",
+        "stack": [
+          {"name": "b[0]", "value": "1"},
+          {"name": "b[1]", "value": "4"},
+          {"name": "b[2]", "value": "9"},
+          {"name": "b[3]", "value": "16"}
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {"function_name": "main", "args": "void", "is_active": true}
+        ],
+        "explanation": "Même fonction apply, callback différent. Le pointeur de fonction permet le polymorphisme en C — un seul code pour des comportements variés.",
+        "step_label": "Résultat — b[] au carré"
+      }
+    ]
+  },
+  "prerequisites": ["ptr-arith-02"],
+  "exercise_type": "complete",
+  "key_concept": "int (*fn)(int) déclare un pointeur vers une fonction — callback pattern",
+  "common_mistake": "Confondre int *fn(int) (fonction retournant int*) avec int (*fn)(int) (pointeur de fonction)",
+  "kc_ids": ["KC-C01"],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Pointeur de fonction pour choisir une operation\n * int (*op)(int, int) pointe vers une fonction a 2 args.\n * =========================================================== */\nint example_add(int a, int b) { return a + b; }\nint example_mul(int a, int b) { return a * b; }\n\nint example_compute(int a, int b, int (*op)(int, int)) {\n    return op(a, b);\n}\nvoid example_demo(void) {\n    printf(\"add(3,4) = %d\\n\", example_compute(3, 4, example_add));\n    printf(\"mul(3,4) = %d\\n\", example_compute(3, 4, example_mul));\n}\n/* Resultat: add(3,4) = 7 / mul(3,4) = 12 */\n\n/* == VOTRE EXERCICE =========================================\n * Appliquer un callback a chaque element d'un tableau\n * Inspirez-vous de example_compute ci-dessus.\n * Implementez apply(arr, n, fn) qui fait arr[i] = fn(arr[i]).\n * =========================================================== */\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    (void)arr; (void)n; (void)fn; /* TODO */\n}\n\nvoid print_arr(const int *arr, int n) {\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int a[] = {1, 2, 3, 4};\n    apply(a, 4, doubler);\n    printf(\"Doubles : \");\n    print_arr(a, 4);\n    int b[] = {1, 2, 3, 4};\n    apply(b, 4, carre);\n    printf(\"Carres : \");\n    print_arr(b, 4);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____; // appeler fn sur arr[i]\n    }\n}\n\nvoid print_arr(const int *arr, int n) {\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int a[] = {1, 2, 3, 4};\n    apply(a, 4, ____);\n    printf(\"Doubles : \");\n    print_arr(a, 4);\n    int b[] = {1, 2, 3, 4};\n    apply(b, 4, ____);\n    printf(\"Carres : \");\n    print_arr(b, 4);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nvoid apply(int *arr, int n, ____ (*fn)(____)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = ____;\n    }\n}\n\nvoid print_arr(const int *arr, int n) {\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int a[] = {1, 2, 3, 4};\n    apply(a, 4, ____);\n    printf(\"Doubles : \");\n    print_arr(a, 4);\n    int b[] = {1, 2, 3, 4};\n    apply(b, 4, ____);\n    printf(\"Carres : \");\n    print_arr(b, 4);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\n// Implémentez apply(int *arr, int n, int (*fn)(int))\n// qui applique fn à chaque élément du tableau\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    (void)arr; (void)n; (void)fn;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}",
+    "#include <stdio.h>\n\nint doubler(int x) { return x * 2; }\nint carre(int x) { return x * x; }\n\nint main(void) {\n    return 0;\n}"
+  ]
+}
