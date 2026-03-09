@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// Erreurs applicatives de KernelForge CLI.
+/// Erreurs applicatives de clings.
 #[derive(Debug, Error)]
 pub enum KfError {
     /// Erreur SQLite propagée depuis rusqlite

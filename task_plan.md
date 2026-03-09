@@ -1,11 +1,11 @@
-# task_plan.md — Plan d'amélioration KernelForge CLI
+# task_plan.md — Plan d'amélioration clings
 
 Date: 2026-03-09
 Basé sur: audit d'alignement NSY103/UTC502 (voir findings.md)
 
 ## Contexte
 
-KernelForge CLI (`kf`) est un entraîneur TUI de programmation système C, aligné sur NSY103 et UTC502.
+clings (`clings`) est un entraîneur TUI de programmation système C, aligné sur NSY103 et UTC502.
 **274 exercices** existent dans 21 sujets sur 15 chapitres. L'alignement global est ~85-90%.
 
 ## Objectif
@@ -108,7 +108,7 @@ Combler les lacunes identifiées dans findings.md pour atteindre un alignement ~
 
 Date: 2026-03-09
 
-### F1: `kf review` — Renforcement mastery orienté pratique
+### F1: `clings review` — Renforcement mastery orienté pratique
 - **Fichiers à modifier**: `src/progress.rs`, `src/main.rs`, `src/display.rs`
 - **Fonctions à créer**:
   - `progress.rs`: `get_due_subjects(conn) -> Vec<Subject>` — WHERE `next_review_at <= unixepoch()`
@@ -133,7 +133,7 @@ Date: 2026-03-09
   - Batch C: `pipes/`, `sockets/`, `file_io/`, `shared_memory/`, `message_queues/`, `memory_allocation/` — déjà remplis
 - **Status**: [x] DONE
 
-### F3: `kf stats` — Statistiques mastery par sujet
+### F3: `clings stats` — Statistiques mastery par sujet
 - **Fichiers à modifier**: `src/main.rs`, `src/display.rs`
 - **Fonctions à créer**:
   - `main.rs`: `cmd_stats(conn, exercises)` — agrège par sujet

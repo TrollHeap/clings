@@ -126,7 +126,7 @@ impl std::fmt::Display for ExerciseType {
 /// Fichier auxiliaire fourni avec un exercice (en-tête, données…).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExerciseFile {
-    /// Nom du fichier tel qu'il sera écrit dans `~/.kernelforge/`
+    /// Nom du fichier tel qu'il sera écrit dans `~/.clings/`
     pub name: String,
     /// Contenu textuel du fichier
     pub content: String,
@@ -150,7 +150,7 @@ pub struct Exercise {
     pub title: String,
     /// Énoncé complet affiché à l'apprenant
     pub description: String,
-    /// Code de départ écrit dans `~/.kernelforge/current.c`
+    /// Code de départ écrit dans `~/.clings/current.c`
     pub starter_code: String,
     /// Corrigé (non sérialisé pour éviter la triche)
     #[serde(skip_serializing)]

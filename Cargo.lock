@@ -185,6 +185,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
+name = "clings"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "colored",
+ "ctrlc",
+ "libc",
+ "notify",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,24 +419,6 @@ checksum = "b49715b7073f385ba4bc528e5747d02e66cb39c6146efb66b781f131f0fb399c"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "kernelforge-cli"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "colored",
- "ctrlc",
- "libc",
- "notify",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror",
- "uuid",
 ]
 
 [[package]]

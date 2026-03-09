@@ -737,7 +737,7 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
     if subjects.is_empty() {
         println!(
             "  {}",
-            "Pas encore de progrès. Lancez `kf watch` !".dimmed()
+            "Pas encore de progrès. Lancez `clings watch` !".dimmed()
         );
         return;
     }
@@ -807,7 +807,7 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     println!();
     show_banner();
 
-    println!("  {}", header_box("KernelForge — Statistiques").cyan());
+    println!("  {}", header_box("clings — Statistiques").cyan());
     println!();
 
     // Streak
@@ -894,14 +894,14 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     println!();
 }
 
-/// Affiche les annales NSY103 avec le mapping vers les exercices KernelForge.
+/// Affiche les annales NSY103 avec le mapping vers les exercices clings.
 pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
     println!();
     show_banner();
     println!(
         "  {} {}\n",
         "Annales NSY103".bold().cyan(),
-        "— correspondance exercices KernelForge".dimmed()
+        "— correspondance exercices clings".dimmed()
     );
 
     for exam in annales {
@@ -959,7 +959,7 @@ pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
     }
 
     println!(
-        "  {} `kf list --subject <sujet>` pour voir tous les exercices d'un sujet.",
+        "  {} `clings list --subject <sujet>` pour voir tous les exercices d'un sujet.",
         "Astuce:".bold().yellow()
     );
     println!();

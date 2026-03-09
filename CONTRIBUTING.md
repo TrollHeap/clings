@@ -1,4 +1,4 @@
-# Contribuer à KernelForge CLI
+# Contribuer à clings
 
 ## Prérequis
 
@@ -9,7 +9,7 @@
 ## Build & test
 
 ```bash
-cargo build                    # Compilation debug (binaire : target/debug/kf)
+cargo build                    # Compilation debug (binaire : target/debug/clings)
 cargo build --release          # Compilation optimisée
 cargo clippy -- -D warnings    # Lint — doit passer sans erreur
 cargo test                     # Tests unitaires

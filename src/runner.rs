@@ -274,7 +274,7 @@ pub fn work_dir() -> PathBuf {
     let dir = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".kernelforge");
+        .join(".clings");
     #[cfg(unix)]
     {
         use std::fs::DirBuilder;

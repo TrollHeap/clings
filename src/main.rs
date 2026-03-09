@@ -23,9 +23,9 @@ use crate::watcher::WatchAction;
 
 #[derive(Parser)]
 #[command(
-    name = "kf",
+    name = "clings",
     version,
-    about = "KernelForge CLI — C Systems Programming Trainer"
+    about = "clings — C Systems Programming Trainer"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -362,12 +362,12 @@ fn cmd_watch() -> Result<()> {
     let done = completed.iter().filter(|&&c| c).count();
     if done == total {
         println!(
-            "\n  {} Tous les exercices complétés ! Lancez `kf progress` pour voir vos stats.",
+            "\n  {} Tous les exercices complétés ! Lancez `clings progress` pour voir vos stats.",
             "Félicitations !".bold().green()
         );
     } else {
         println!(
-            "\n  {} {}/{} exercices complétés. Lancez `kf watch` pour continuer.",
+            "\n  {} {}/{} exercices complétés. Lancez `clings watch` pour continuer.",
             "Session terminée.".bold(),
             done,
             total
@@ -555,7 +555,7 @@ fn cmd_solution(exercise_id: &str) -> Result<()> {
             "  {} You must attempt the exercise at least once before viewing the solution.",
             "Locked:".bold().yellow()
         );
-        println!("  Run: kf run {exercise_id}");
+        println!("  Run: clings run {exercise_id}");
         return Ok(());
     }
 
