@@ -158,5 +158,5 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     println!();
 
     // Lancer une session piscine avec ces exercices uniquement
-    crate::piscine::run_exam_piscine(exam_exercises, Some(duration))
+    crate::piscine::run_exam_piscine(exam_exercises, Some(duration), Some(sid))
 }
