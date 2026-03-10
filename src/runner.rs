@@ -84,42 +84,19 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
 
     let user_code = match std::fs::read_to_string(source_path) {
         Ok(c) => c,
-        Err(e) => {
-            return RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Failed to read source file: {e}"),
-                duration_ms: 0,
-                compile_error: true,
-                timeout: false,
-            }
-        }
+        Err(e) => return make_compile_error(format!("Failed to read source file: {e}")),
     };
 
     let harness = exercise.validation.test_code.as_deref().unwrap_or("");
     let combined = format!("{}\n{}", user_code, harness);
 
     if let Err(e) = std::fs::write(&test_source_path, combined.as_bytes()) {
-        return RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: format!("Failed to write test source: {e}"),
-            duration_ms: 0,
-            compile_error: true,
-            timeout: false,
-        };
+        return make_compile_error(format!("Failed to write test source: {e}"));
     }
 
     // Write additional files (headers etc.)
     if let Err(e) = write_exercise_files(exercise, work_dir) {
-        return RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: format!("Failed to write exercise files: {e}"),
-            duration_ms: 0,
-            compile_error: true,
-            timeout: false,
-        };
+        return make_compile_error(format!("Failed to write exercise files: {e}"));
     }
 
     let mut gcc = Command::new(GCC_BINARY);
@@ -136,26 +113,12 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
     let compile_result = match gcc.output() {
         Ok(r) => r,
         Err(e) => {
-            return RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Failed to run gcc: {e}. Is gcc installed?"),
-                duration_ms: 0,
-                compile_error: true,
-                timeout: false,
-            };
+            return make_compile_error(format!("Failed to run gcc: {e}. Is gcc installed?"));
         }
     };
 
     if !compile_result.status.success() {
-        return RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: String::from_utf8_lossy(&compile_result.stderr).to_string(),
-            duration_ms: 0,
-            compile_error: true,
-            timeout: false,
-        };
+        return make_compile_error(String::from_utf8_lossy(&compile_result.stderr).to_string());
     }
 
     let start = Instant::now();
@@ -179,26 +142,8 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         }
     };
 
-    let stdout_handle = child.stdout.take();
-    let stderr_handle = child.stderr.take();
-    let stdout_thread = std::thread::spawn(move || -> String {
-        stdout_handle
-            .map(|mut s| {
-                let mut buf = String::new();
-                std::io::Read::read_to_string(&mut s, &mut buf).ok();
-                buf
-            })
-            .unwrap_or_default()
-    });
-    let stderr_thread = std::thread::spawn(move || -> String {
-        stderr_handle
-            .map(|mut s| {
-                let mut buf = String::new();
-                std::io::Read::read_to_string(&mut s, &mut buf).ok();
-                buf
-            })
-            .unwrap_or_default()
-    });
+    let (stdout_thread, stderr_thread) =
+        spawn_drain_threads(child.stdout.take().unwrap(), child.stderr.take().unwrap());
 
     let timeout = exercise
         .validation
@@ -325,14 +270,7 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
 
     // Write additional files (headers etc.)
     if let Err(e) = write_exercise_files(exercise, work_dir) {
-        return RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: format!("Failed to write exercise files: {e}"),
-            duration_ms: 0,
-            compile_error: true,
-            timeout: false,
-        };
+        return make_compile_error(format!("Failed to write exercise files: {e}"));
     }
 
     // Compile
@@ -353,26 +291,12 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     let compile_result = match gcc.output() {
         Ok(r) => r,
         Err(e) => {
-            return RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Failed to run gcc: {e}. Is gcc installed?"),
-                duration_ms: 0,
-                compile_error: true,
-                timeout: false,
-            };
+            return make_compile_error(format!("Failed to run gcc: {e}. Is gcc installed?"));
         }
     };
 
     if !compile_result.status.success() {
-        return RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: String::from_utf8_lossy(&compile_result.stderr).to_string(),
-            duration_ms: 0,
-            compile_error: true,
-            timeout: false,
-        };
+        return make_compile_error(String::from_utf8_lossy(&compile_result.stderr).to_string());
     }
 
     // Execute with timeout
@@ -400,26 +324,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     // Drain stdout/stderr in background threads to prevent pipe buffer deadlock.
     // If the child writes more than ~64 KB without being read, write() blocks
     // and wait() never returns (classic pipe deadlock). Reading concurrently avoids it.
-    let stdout_handle = child.stdout.take();
-    let stderr_handle = child.stderr.take();
-    let stdout_thread = std::thread::spawn(move || -> String {
-        stdout_handle
-            .map(|mut s| {
-                let mut buf = String::new();
-                std::io::Read::read_to_string(&mut s, &mut buf).ok();
-                buf
-            })
-            .unwrap_or_default()
-    });
-    let stderr_thread = std::thread::spawn(move || -> String {
-        stderr_handle
-            .map(|mut s| {
-                let mut buf = String::new();
-                std::io::Read::read_to_string(&mut s, &mut buf).ok();
-                buf
-            })
-            .unwrap_or_default()
-    });
+    let (stdout_thread, stderr_thread) =
+        spawn_drain_threads(child.stdout.take().unwrap(), child.stderr.take().unwrap());
 
     let timeout = exercise
         .validation
@@ -620,6 +526,43 @@ pub fn prepare_exercise_source(
     let current_stage = subject_mastery.map(mastery_to_stage);
     let source_path = write_starter_code(exercise, subject_mastery)?;
     Ok((source_path, current_stage))
+}
+
+/// Spawn background threads to drain stdout and stderr from a child process.
+/// Returns (stdout_thread, stderr_thread) handles so the caller can join them.
+/// Taking the handles prevents pipe-buffer deadlock when the child writes > ~64 KB.
+fn spawn_drain_threads(
+    stdout: std::process::ChildStdout,
+    stderr: std::process::ChildStderr,
+) -> (
+    std::thread::JoinHandle<String>,
+    std::thread::JoinHandle<String>,
+) {
+    let stdout_thread = std::thread::spawn(move || -> String {
+        let mut buf = String::new();
+        let mut s = stdout;
+        std::io::Read::read_to_string(&mut s, &mut buf).ok();
+        buf
+    });
+    let stderr_thread = std::thread::spawn(move || -> String {
+        let mut buf = String::new();
+        let mut s = stderr;
+        std::io::Read::read_to_string(&mut s, &mut buf).ok();
+        buf
+    });
+    (stdout_thread, stderr_thread)
+}
+
+/// Construct a RunResult representing a compile failure.
+fn make_compile_error(stderr: String) -> RunResult {
+    RunResult {
+        success: false,
+        stdout: String::new(),
+        stderr,
+        duration_ms: 0,
+        compile_error: true,
+        timeout: false,
+    }
 }
 
 /// Kill the entire process group of a child to avoid zombie fork-bombs.
