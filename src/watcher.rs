@@ -43,7 +43,10 @@ where
         let stdin = std::io::stdin();
         let mut buf = [0u8; 1];
         loop {
-            if stdin.lock().read_exact(&mut buf).is_ok() && key_tx.send(buf[0]).is_err() {
+            if stdin.lock().read_exact(&mut buf).is_err() {
+                break;
+            }
+            if key_tx.send(buf[0]).is_err() {
                 break;
             }
         }

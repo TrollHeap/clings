@@ -11,6 +11,7 @@ mod tmux;
 mod watcher;
 
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -68,6 +69,20 @@ enum Commands {
     Stats,
     /// Afficher les annales NSY103 et leur correspondance avec les exercices
     Annales,
+    /// Exporter la progression en JSON
+    Export {
+        /// Fichier de sortie (défaut : stdout)
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
+    /// Importer une progression JSON exportée
+    Import {
+        /// Fichier JSON à importer
+        input: PathBuf,
+        /// Écraser avec les valeurs importées (défaut : fusion max)
+        #[arg(long)]
+        overwrite: bool,
+    },
 }
 
 fn main() {
@@ -85,6 +100,8 @@ fn main() {
         Some(Commands::Review) => cmd_review(),
         Some(Commands::Stats) => cmd_stats(),
         Some(Commands::Annales) => cmd_annales(),
+        Some(Commands::Export { output }) => cmd_export(output.as_deref()),
+        Some(Commands::Import { input, overwrite }) => cmd_import(&input, overwrite),
         None => cmd_watch(),
     };
 
@@ -181,52 +198,13 @@ fn cmd_watch() -> Result<()> {
         let mut vis_lines: usize = 0;
         let mut escape_buf: Vec<u8> = Vec::new();
         let already_recorded = Arc::new(AtomicBool::new(false));
-        let already_recorded_key = Arc::clone(&already_recorded);
+        let mut consecutive_failures: u32 = 0;
 
         let action = watcher::watch_file_interactive(
             &source_path,
-            // On file change
+            // On file change: notify only, no auto-compile
             || {
-                let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-
-                // Redraw screen with result
-                display::show_exercise_watch(
-                    &exercise_clone,
-                    index,
-                    total,
-                    &completed,
-                    None,
-                    current_stage,
-                );
-                display::show_result(&result, &exercise_clone);
-
-                if result.success && !already_recorded.swap(true, Ordering::SeqCst) {
-                    record_and_show(
-                        &conn_for_watch,
-                        &exercise_clone.subject,
-                        &exercise_clone.id,
-                        true,
-                    );
-                    println!(
-                        "  {}",
-                        "Exercice résolu ! Avancement dans 2s...".bold().green()
-                    );
-                    std::thread::sleep(std::time::Duration::from_secs(2));
-                    return WatchAction::Advance;
-                } else if result.success {
-                    std::thread::sleep(std::time::Duration::from_secs(2));
-                    return WatchAction::Advance;
-                }
-
-                if !result.compile_error {
-                    record_and_show(
-                        &conn_for_watch,
-                        &exercise_clone.subject,
-                        &exercise_clone.id,
-                        false,
-                    );
-                }
-
+                display::show_file_saved();
                 display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty());
                 WatchAction::Continue
             },
@@ -298,7 +276,7 @@ fn cmd_watch() -> Result<()> {
                         None
                     }
                     b'n' | b'N' => Some(WatchAction::Skip),
-                    b'q' | b'Q' => Some(WatchAction::Quit),
+                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                     b'l' | b'L' => {
                         // Quick exercise list
                         let conn = progress::open_db().ok();
@@ -311,12 +289,13 @@ fn cmd_watch() -> Result<()> {
                         println!("  {}", "Press any key to return...".dimmed());
                         None
                     }
-                    b'c' | b'C' => {
-                        // Manual check: compile and run now
+                    b'r' | b'R' => {
+                        // Explicit run: compile and check now
                         let result = runner::compile_and_run(&source_for_change, &exercise_clone);
                         display::show_result(&result, &exercise_clone);
                         if result.success {
-                            if !already_recorded_key.swap(true, Ordering::SeqCst) {
+                            consecutive_failures = 0;
+                            if !already_recorded.swap(true, Ordering::SeqCst) {
                                 record_and_show(
                                     &conn_for_watch,
                                     &exercise_clone.subject,
@@ -324,9 +303,21 @@ fn cmd_watch() -> Result<()> {
                                     true,
                                 );
                             }
-                            println!("  {}", "Exercise solved! Advancing...".bold().green());
+                            println!(
+                                "  {}",
+                                "Exercice résolu ! Avancement dans 2s...".bold().green()
+                            );
                             std::thread::sleep(std::time::Duration::from_secs(2));
                             return Some(WatchAction::Advance);
+                        }
+                        consecutive_failures += 1;
+                        if consecutive_failures >= 3 && !exercise_clone.hints.is_empty() {
+                            println!();
+                            println!(
+                                "  {}",
+                                "Indice automatique après 3 tentatives :".dimmed().yellow()
+                            );
+                            display::show_hints(&exercise_clone);
                         }
                         display::show_keybinds_with_vis(
                             !exercise_clone.visualizer.steps.is_empty(),
@@ -403,7 +394,7 @@ pub(crate) fn enable_raw_mode() -> Option<RawModeGuard> {
                 if let Ok(mut guard) = ORIGINAL_TERMIOS.lock() {
                     guard.replace(original);
                 }
-                termios.c_lflag &= !(libc::ICANON | libc::ECHO);
+                termios.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
                 termios.c_cc[libc::VMIN] = 1;
                 termios.c_cc[libc::VTIME] = 0;
                 if libc::tcsetattr(fd, libc::TCSANOW, &termios) == 0 {
@@ -509,7 +500,7 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
             WatchAction::Continue
         },
         |key| {
-            if key == b'q' || key == b'Q' {
+            if matches!(key, b'q' | b'Q' | 0x03 | 0x1a) {
                 Some(WatchAction::Quit)
             } else {
                 None
@@ -649,6 +640,32 @@ fn cmd_annales() -> Result<()> {
         .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
     let (all_exercises, _) = exercises::load_all_exercises()?;
     display::show_annales(&annales, &all_exercises);
+    Ok(())
+}
+
+fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
+    let conn = progress::open_db()?;
+    let subjects = progress::get_all_subjects(&conn)?;
+    let count = subjects.len();
+    let json = progress::export_progress(&conn)?;
+    match output {
+        Some(path) => {
+            std::fs::write(path, &json)?;
+            display::show_export_done(Some(path), count);
+        }
+        None => {
+            print!("{json}");
+            display::show_export_done(None, count);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
+    let json = std::fs::read_to_string(input)?;
+    let mut conn = progress::open_db()?;
+    let count = progress::import_progress(&mut conn, &json, overwrite)?;
+    display::show_import_done(count, overwrite);
     Ok(())
 }
 

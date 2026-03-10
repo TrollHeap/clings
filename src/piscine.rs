@@ -114,41 +114,11 @@ pub fn cmd_piscine() -> Result<()> {
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let already_recorded = Arc::new(AtomicBool::new(false));
-        let already_recorded_key = Arc::clone(&already_recorded);
 
         let action = crate::watcher::watch_file_interactive(
             &source_path,
             || {
-                let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-                display::show_result(&result, &exercise_clone);
-
-                if result.success && !already_recorded.swap(true, Ordering::SeqCst) {
-                    crate::record_and_show(
-                        &conn_for_watch,
-                        &exercise_clone.subject,
-                        &exercise_clone.id,
-                        true,
-                    );
-                    println!(
-                        "  {}",
-                        "Exercice résolu ! Avancement dans 2s...".bold().green()
-                    );
-                    std::thread::sleep(std::time::Duration::from_secs(2));
-                    return WatchAction::Advance;
-                } else if result.success {
-                    std::thread::sleep(std::time::Duration::from_secs(2));
-                    return WatchAction::Advance;
-                }
-
-                if !result.compile_error {
-                    crate::record_and_show(
-                        &conn_for_watch,
-                        &exercise_clone.subject,
-                        &exercise_clone.id,
-                        false,
-                    );
-                }
-
+                display::show_file_saved();
                 display::show_keybinds();
                 WatchAction::Continue
             },
@@ -162,12 +132,12 @@ pub fn cmd_piscine() -> Result<()> {
                     None
                 }
                 b'n' | b'N' => Some(WatchAction::Skip),
-                b'q' | b'Q' => Some(WatchAction::Quit),
-                b'c' | b'C' => {
+                b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                b'r' | b'R' => {
                     let result = runner::compile_and_run(&source_for_change, &exercise_clone);
                     display::show_result(&result, &exercise_clone);
                     if result.success {
-                        if !already_recorded_key.swap(true, Ordering::SeqCst) {
+                        if !already_recorded.swap(true, Ordering::SeqCst) {
                             crate::record_and_show(
                                 &conn_for_watch,
                                 &exercise_clone.subject,
@@ -175,7 +145,10 @@ pub fn cmd_piscine() -> Result<()> {
                                 true,
                             );
                         }
-                        println!("  {}", "Exercise solved! Advancing...".bold().green());
+                        println!(
+                            "  {}",
+                            "Exercice résolu ! Avancement dans 2s...".bold().green()
+                        );
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         return Some(WatchAction::Advance);
                     }

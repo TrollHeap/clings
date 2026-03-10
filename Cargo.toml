@@ -2,6 +2,11 @@
 name = "clings"
 version = "0.1.0"
 edition = "2021"
+description = "NSY103 C systems programming trainer — rustlings-style TUI"
+license = "MIT"
+repository = "https://github.com/trollheap/clings"
+keywords = ["linux", "systems-programming", "nsy103", "tui", "c"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "clings"
