@@ -55,5 +55,15 @@ Exercises are JSON files in `exercises/<subject>/` directories. Required fields:
 - `ValidationMode::Test` and `Both` are stubbed — exercises with these modes are skipped silently in `watch` and `piscine`. Only `Output` validation works.
 - Working directory for user code: `~/.clings/`
 - Exercise ordering is curriculum-driven, not alphabetical
-- Watch-mode keybinds: `[h]` hint, `[n]` skip, `[q]` quit, `[r]` compile+check (no auto-compile on save), `[l]` list exercises, `[v]` open memory visualizer (arrow keys to step through, any key to close). Piscine lacks `[l]` and `[v]`.
+- Watch-mode keybinds: `[h]` hint, `[j]` next, `[k]` prev, `[n]` skip, `[q]` quit, `[r]` compile+check (no auto-compile on save), `[l]` list exercises, `[v]` open memory visualizer (arrow keys to step through, any key to close). Piscine lacks `[j]`, `[k]`, `[l]` and `[v]`.
 - Tests exist in both `mastery.rs` and `models.rs`
+
+## Curricula
+
+- **NSY103-core** : structs, pointers, string_formatting, bitwise_ops, memory_allocation, errno,
+  file_io, fd_basics, filesystem, processes, signals, pipes, message_queues, shared_memory,
+  semaphores, sync_concepts, pthreads, sockets, proc_memory
+- **UTC502-extended** : scheduling (Ch.1/Ch.6), virtual_memory (Ch.4 — page replacement)
+- **Annales de référence** :
+  - NSY103 : 3 annales dans `docs/nsy103/`
+  - UTC502 : 2 annales + TPs dans `docs/utc502/`

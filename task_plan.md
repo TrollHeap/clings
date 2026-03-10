@@ -98,7 +98,7 @@ Combler les lacunes identifiées dans findings.md pour atteindre un alignement ~
 - Ajouter dans CLAUDE.md ou README.md:
   - Exercices marqués NSY103-core vs UTC502-extended
   - Quelle annale sert de référence pour chaque chapitre
-- **Status**: [ ]
+- **Status**: [x]
 
 ---
 
