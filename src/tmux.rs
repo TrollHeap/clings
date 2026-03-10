@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::constants::{TMUX_EDITOR, TMUX_PANE_WIDTH_PERCENT};
 
@@ -53,6 +53,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
 pub fn kill_pane(pane_id: &str) {
     let _ = Command::new("tmux")
         .args(["kill-pane", "-t", pane_id])
+        .stderr(Stdio::null())
         .status();
 }
 
