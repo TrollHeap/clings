@@ -247,6 +247,11 @@ pub fn reset_subject(conn: &Connection, subject_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Reset all progress: removes every row from `practice_log` and `subjects`.
+///
+/// This is a destructive, irreversible operation. Both tables are truncated
+/// atomically via `execute_batch`. Used by `clings reset` (full reset only;
+/// for subject-scoped reset see [`reset_subject`]).
 pub fn reset_progress(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "DELETE FROM practice_log;

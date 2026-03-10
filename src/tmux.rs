@@ -58,3 +58,40 @@ pub fn update_editor_pane(old_pane: Option<&str>, new_file: &Path) -> Option<Str
     }
     open_editor_pane(new_file)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_tmux_matches_env_contract() {
+        // is_tmux() must exactly mirror whether TMUX env var is present.
+        let expected = std::env::var("TMUX").is_ok();
+        assert_eq!(is_tmux(), expected);
+    }
+
+    #[test]
+    fn test_open_editor_pane_none_without_tmux() {
+        // If TMUX is not set, open_editor_pane should short-circuit and return None
+        // without attempting to spawn any process.
+        if std::env::var("TMUX").is_ok() {
+            // Running inside tmux: skip this test to avoid spawning a real pane.
+            return;
+        }
+        let result = open_editor_pane(Path::new("/tmp/test_clings.c"));
+        assert!(
+            result.is_none(),
+            "should return None when not in a tmux session"
+        );
+    }
+
+    #[test]
+    fn test_update_editor_pane_none_without_tmux() {
+        if std::env::var("TMUX").is_ok() {
+            return;
+        }
+        // No old pane, no tmux → must return None
+        let result = update_editor_pane(None, Path::new("/tmp/test_clings.c"));
+        assert!(result.is_none());
+    }
+}

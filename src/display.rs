@@ -1204,4 +1204,49 @@ mod tests {
         };
         assert_eq!(fmt_var(&v), ": ");
     }
+
+    // ── difficulty_stars ────────────────────────────────────────────────
+
+    #[test]
+    fn difficulty_stars_contains_correct_count() {
+        // Each variant must contain the right number of filled (★) and empty (☆) stars
+        let easy = difficulty_stars(Difficulty::Easy).to_string();
+        let medium = difficulty_stars(Difficulty::Medium).to_string();
+        let hard = difficulty_stars(Difficulty::Hard).to_string();
+        let advanced = difficulty_stars(Difficulty::Advanced).to_string();
+        let expert = difficulty_stars(Difficulty::Expert).to_string();
+
+        assert_eq!(easy.chars().filter(|&c| c == '★').count(), 1);
+        assert_eq!(easy.chars().filter(|&c| c == '☆').count(), 4);
+
+        assert_eq!(medium.chars().filter(|&c| c == '★').count(), 2);
+        assert_eq!(medium.chars().filter(|&c| c == '☆').count(), 3);
+
+        assert_eq!(hard.chars().filter(|&c| c == '★').count(), 3);
+        assert_eq!(hard.chars().filter(|&c| c == '☆').count(), 2);
+
+        assert_eq!(advanced.chars().filter(|&c| c == '★').count(), 4);
+        assert_eq!(advanced.chars().filter(|&c| c == '☆').count(), 1);
+
+        assert_eq!(expert.chars().filter(|&c| c == '★').count(), 5);
+        assert_eq!(expert.chars().filter(|&c| c == '☆').count(), 0);
+    }
+
+    #[test]
+    fn difficulty_stars_total_five_per_variant() {
+        for d in [
+            Difficulty::Easy,
+            Difficulty::Medium,
+            Difficulty::Hard,
+            Difficulty::Advanced,
+            Difficulty::Expert,
+        ] {
+            let s = difficulty_stars(d).to_string();
+            let star_count = s.chars().filter(|&c| c == '★' || c == '☆').count();
+            assert_eq!(
+                star_count, 5,
+                "Difficulty {d:?} should have exactly 5 star chars"
+            );
+        }
+    }
 }

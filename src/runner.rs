@@ -278,6 +278,27 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
 }
 
 /// Compile and run a C source file, validating output against expected.
+///
+/// Dispatches to [`compile_and_run_test`] for `Test` and `Both` validation
+/// modes. For `Output` mode: compiles with `gcc -Wall -Wextra -std=c11`,
+/// runs with a 10-second timeout, then compares normalized stdout to
+/// `exercise.validation.expected_output` (exact or regex).
+///
+/// Returns a [`RunResult`] with `success`, compiler/runtime `message`, and
+/// updated `mastery` score delta.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use clings::runner::compile_and_run;
+/// use clings::exercises::load_exercises;
+///
+/// let exercises = load_exercises().unwrap();
+/// let ex = exercises.iter().find(|e| e.id == "ptr-deref-01").unwrap();
+/// let result = compile_and_run(Path::new("/home/user/.clings/current.c"), ex);
+/// if result.success { println!("Passed!"); }
+/// ```
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     // Dispatch to test harness runner for Test and Both modes.
     if matches!(
