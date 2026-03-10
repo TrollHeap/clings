@@ -8,6 +8,7 @@ thread_local! {
 }
 
 use crate::chapters::{ChapterContext, CHAPTERS};
+use crate::constants::{HEADER_WIDTH, MINIMAP_MAX_ITEMS, PROGRESS_BAR_WIDTH, TEXT_WRAP_WIDTH};
 use crate::models::{Difficulty, Exercise, Subject, ValidationMode, VisVar};
 use crate::runner::RunResult;
 
@@ -19,6 +20,9 @@ pub struct AnnaleQuestion {
     pub title: String,
     pub summary: String,
     pub subjects: Vec<String>,
+    /// Exercices clings spécifiquement alignés sur cette question d'examen.
+    #[serde(default)]
+    pub exercises: Vec<String>,
 }
 
 /// Un examen NSY103 avec ses questions et le mapping vers les exercices.
@@ -43,7 +47,6 @@ pub fn difficulty_stars(d: Difficulty) -> ColoredString {
 
 // ─── Box-drawing helpers ────────────────────────────────────────────
 
-const HEADER_WIDTH: usize = 56;
 /// Visible text width between the ║ chars (HEADER_WIDTH - 2 - 2 side spaces = 52).
 const INNER_W: usize = HEADER_WIDTH - 4;
 
@@ -114,7 +117,7 @@ pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
     let pct = if total > 0 { done * 100 / total } else { 0 };
 
     // Block progress bar
-    let bar_width = 30;
+    let bar_width = PROGRESS_BAR_WIDTH;
     let filled = if total > 0 {
         (done * bar_width) / total
     } else {
@@ -152,7 +155,7 @@ pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
     );
 
     // Mini-map with Unicode dots
-    if total <= 60 {
+    if total <= MINIMAP_MAX_ITEMS {
         let mut dots = String::with_capacity(total * 3);
         for (i, &d) in completed.iter().enumerate() {
             if i == current {
@@ -218,8 +221,8 @@ pub fn show_exercise_watch(
     println!();
 
     for line in exercise.description.lines() {
-        if line.chars().count() > 72 {
-            for wrapped in wrap_text(line, 72) {
+        if line.chars().count() > TEXT_WRAP_WIDTH {
+            for wrapped in wrap_text(line, TEXT_WRAP_WIDTH) {
                 println!("  {wrapped}");
             }
         } else {
@@ -258,6 +261,21 @@ pub fn show_keybinds() {
         "[q]".bold(),
         "[l]".bold(),
         "[r]".bold(),
+    );
+    println!();
+}
+
+/// Show keybind hints for piscine mode (no [l] list, shows [j] next + [k] prev).
+pub fn show_keybinds_piscine() {
+    println!(
+        "  {} {} hint  {} suivant  {} précédent  {} skip  {} run  {} quit",
+        "Keys".bold().cyan(),
+        "[h]".bold(),
+        "[j]".bold(),
+        "[k]".bold(),
+        "[n]".bold(),
+        "[r]".bold(),
+        "[q]".bold(),
     );
     println!();
 }
@@ -484,8 +502,8 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
     println!();
 
     for line in exercise.description.lines() {
-        if line.chars().count() > 72 {
-            for wrapped in wrap_text(line, 72) {
+        if line.chars().count() > TEXT_WRAP_WIDTH {
+            for wrapped in wrap_text(line, TEXT_WRAP_WIDTH) {
                 println!("  {wrapped}");
             }
         } else {
@@ -983,15 +1001,21 @@ pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
                 );
             }
 
-            let related: Vec<&Exercise> = exercises
-                .iter()
-                .filter(|e| q.subjects.iter().any(|s| s == &e.subject))
-                .collect();
+            // Prefer the curated exercise list from the annales map; fall back to subject filter.
+            let ids: Vec<String> = if !q.exercises.is_empty() {
+                // Curated list: show all (they're already hand-picked for this question)
+                q.exercises.clone()
+            } else {
+                exercises
+                    .iter()
+                    .filter(|e| q.subjects.iter().any(|s| s == &e.subject))
+                    .map(|e| e.id.clone())
+                    .collect()
+            };
 
-            if related.is_empty() {
+            if ids.is_empty() {
                 println!("    {}", "Aucun exercice associé.".dimmed());
             } else {
-                let ids: Vec<&str> = related.iter().map(|e| e.id.as_str()).collect();
                 let shown = &ids[..ids.len().min(5)];
                 let more = if ids.len() > 5 {
                     format!(" +{} autres", ids.len() - 5)

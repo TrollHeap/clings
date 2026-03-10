@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
+use crate::constants::{DEBOUNCE_INTERVAL_MS, KEY_CHECK_TIMEOUT_MS};
 use crate::error::{KfError, Result};
 
 /// Action returned by the watch callback or keyboard input.
@@ -57,11 +58,11 @@ where
     });
 
     let mut last_event = Instant::now();
-    let debounce = Duration::from_millis(200);
+    let debounce = Duration::from_millis(DEBOUNCE_INTERVAL_MS);
 
     loop {
         // Check for file changes
-        match rx.recv_timeout(Duration::from_millis(50)) {
+        match rx.recv_timeout(Duration::from_millis(KEY_CHECK_TIMEOUT_MS)) {
             Ok(Ok(event)) => match event.kind {
                 EventKind::Modify(_) | EventKind::Create(_) => {
                     if last_event.elapsed() >= debounce {

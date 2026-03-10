@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::process::Command;
 
+use crate::constants::{TMUX_EDITOR, TMUX_PANE_WIDTH_PERCENT};
+
 /// Check if we're running inside a tmux session.
 pub fn is_tmux() -> bool {
     std::env::var("TMUX").is_ok()
@@ -18,11 +20,11 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
             "split-window",
             "-h",
             "-p",
-            "50",
+            TMUX_PANE_WIDTH_PERCENT,
             "-P",
             "-F",
             "#{pane_id}",
-            "nvim",
+            TMUX_EDITOR,
             "--",
         ])
         .arg(file)

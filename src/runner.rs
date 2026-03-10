@@ -4,6 +4,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+use crate::constants::{
+    CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
+    POLL_INTERVAL_MS, REGEX_PREFIX,
+};
 use crate::models::{Exercise, ValidationMode};
 
 // Per-thread cache of compiled regexes: pattern string → compiled Regex (or None if invalid).
@@ -118,8 +122,8 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         };
     }
 
-    let mut gcc = Command::new("gcc");
-    gcc.args(["-Wall", "-Wextra", "-std=c11", "-D_GNU_SOURCE"])
+    let mut gcc = Command::new(GCC_BINARY);
+    gcc.args(GCC_FLAGS)
         .arg("-o")
         .arg(&output_path)
         .arg(&test_source_path)
@@ -200,7 +204,7 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         .validation
         .max_duration_ms
         .map(Duration::from_millis)
-        .unwrap_or(Duration::from_secs(10));
+        .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
     match child.wait_timeout(timeout) {
         Ok(Some(status)) => {
@@ -214,7 +218,7 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
                     if let Some(expected) = &exercise.validation.expected_output {
                         let norm_out = normalize(&stdout);
                         let norm_exp = normalize(expected);
-                        if let Some(pattern) = norm_exp.strip_prefix("REGEX:") {
+                        if let Some(pattern) = norm_exp.strip_prefix(REGEX_PREFIX) {
                             let key = pattern.trim().to_string();
                             REGEX_CACHE.with(|cache| {
                                 let mut map = cache.borrow_mut();
@@ -324,8 +328,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     }
 
     // Compile
-    let mut gcc = Command::new("gcc");
-    gcc.args(["-Wall", "-Wextra", "-std=c11", "-D_GNU_SOURCE"])
+    let mut gcc = Command::new(GCC_BINARY);
+    gcc.args(GCC_FLAGS)
         .arg("-o")
         .arg(&output_path)
         .arg(source_path);
@@ -413,7 +417,7 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         .validation
         .max_duration_ms
         .map(Duration::from_millis)
-        .unwrap_or(Duration::from_secs(10));
+        .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
     match child.wait_timeout(timeout) {
         Ok(Some(status)) => {
@@ -488,7 +492,7 @@ fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
             if let Some(expected) = &exercise.validation.expected_output {
                 let norm_out = normalize(stdout);
                 let norm_exp = normalize(expected);
-                if let Some(pattern) = norm_exp.strip_prefix("REGEX:") {
+                if let Some(pattern) = norm_exp.strip_prefix(REGEX_PREFIX) {
                     let key = pattern.trim().to_string();
                     REGEX_CACHE.with(|cache| {
                         let mut map = cache.borrow_mut();
@@ -530,7 +534,7 @@ pub fn work_dir() -> std::io::Result<PathBuf> {
             "Variable $HOME non définie — impossible de localiser ~/.clings",
         )
     })?;
-    let dir = PathBuf::from(home).join(".clings");
+    let dir = PathBuf::from(home).join(CLINGS_DIR);
     #[cfg(unix)]
     {
         use std::fs::DirBuilder;
@@ -574,7 +578,7 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
 /// If mastery is provided, selects the appropriate stage.
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
     let dir = work_dir()?;
-    let source_path = dir.join("current.c");
+    let source_path = dir.join(CURRENT_C_FILENAME);
     let code = match mastery {
         Some(m) => select_starter_code(exercise, m),
         None => &exercise.starter_code,
@@ -631,7 +635,7 @@ impl ChildExt for std::process::Child {
                     if start.elapsed() >= timeout {
                         return Ok(None);
                     }
-                    std::thread::sleep(Duration::from_millis(50));
+                    std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
                 }
             }
         }
