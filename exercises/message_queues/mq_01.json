@@ -10,7 +10,8 @@
   "hints": [
     "msgsnd_sim reçoit `type` en paramètre — affectez-le à queue[qtail].mtype",
     "msgrcv_sim lit depuis queue[qhead] et incrémente qhead après la lecture (post-incrément)",
-    "En vrai IPC POSIX : msgget() crée la file dans le noyau, msgsnd/msgrcv passent par le kernel"
+    "En vrai IPC POSIX : msgget() crée la file dans le noyau, msgsnd/msgrcv passent par le kernel",
+    "Exercice suivant (API POSIX réelle) : mq-create-01 — mq_open/mq_send/mq_receive avec vraies files nommées"
   ],
   "validation": {
     "mode": "output",

@@ -11,7 +11,8 @@
         "title": "Processus vs Threads — fork et pthread",
         "summary": "Analyser un programme créant des processus (fork) et threads (pthread). Déterminer les valeurs des variables i et j dans chaque contexte.",
         "subjects": ["processes", "pthreads"],
-        "kc_ids": ["KC-C01", "KC-C02"]
+        "kc_ids": ["KC-C01", "KC-C02"],
+        "exercises": ["fork-basic-01", "fork-multi-01", "waitpid-01", "pthread-create-01", "pthread-mutex-01"]
       },
       {
         "number": 2,
@@ -19,7 +20,8 @@
         "title": "Réservation de théâtre — sémaphores et mémoire partagée",
         "summary": "Implémenter la synchronisation d'une salle de théâtre avec sem_wait/sem_post, et partager l'état via mémoire partagée (shm_open).",
         "subjects": ["semaphores", "shared_memory"],
-        "kc_ids": ["KC-C07", "KC-C08"]
+        "kc_ids": ["KC-C07", "KC-C08"],
+        "exercises": ["sem-named-01", "sem-mutex-01", "shm-create-01", "shm-struct-01"]
       },
       {
         "number": 3,
@@ -27,7 +29,8 @@
         "title": "Système de fichiers Unix — blocs et indirection",
         "summary": "Calculer les blocs nécessaires pour un fichier de 32 Mo avec des blocs de 1 Ko : blocs directs, indirects simples/doubles/triples.",
         "subjects": ["filesystem"],
-        "kc_ids": []
+        "kc_ids": [],
+        "exercises": ["fs-inode-01", "fs-blocks-01", "fs-inode-calc-01", "fs-inode-calc-02"]
       },
       {
         "number": 4,
@@ -35,7 +38,8 @@
         "title": "fork/exec/pipe — enchaînement de processus",
         "summary": "fork + execl pour lancer 'ps -l', décrire les descripteurs d'un pipe, gérer SIGPIPE lorsque le père écrit en boucle après la mort du fils.",
         "subjects": ["processes", "pipes", "signals"],
-        "kc_ids": ["KC-C01", "KC-C04", "KC-C05"]
+        "kc_ids": ["KC-C01", "KC-C04", "KC-C05"],
+        "exercises": ["fork-exec-01", "pipe-01", "pipe-dup2-01", "sig-pipe-01"]
       }
     ]
   },
@@ -51,7 +55,8 @@
         "title": "Threads vs Processus — race condition horloge",
         "summary": "Différences conceptuelles entre threads et processus. Identifier une race condition sur un tableau tab_heure partagé entre threads pthread.",
         "subjects": ["pthreads", "processes"],
-        "kc_ids": ["KC-C02", "KC-C01"]
+        "kc_ids": ["KC-C02", "KC-C01"],
+        "exercises": ["pthread-race-01", "pthread-mutex-01", "fork-basic-01"]
       },
       {
         "number": 2,
@@ -59,7 +64,8 @@
         "title": "Bugs fork/pipe/exec — analyse de code",
         "summary": "Identifier les bugs dans un code fork/pipe/exec : pipe créé après fork, variable ret non initialisée, write après execl jamais atteint.",
         "subjects": ["processes", "pipes"],
-        "kc_ids": ["KC-C01", "KC-C04"]
+        "kc_ids": ["KC-C01", "KC-C04"],
+        "exercises": ["fork-exec-01", "pipe-01", "pipe-basic-01"]
       },
       {
         "number": 3,
@@ -67,7 +73,8 @@
         "title": "Pipes — anonymes, nommés et SIGPIPE",
         "summary": "Distinguer pipe anonyme vs nommé (FIFO), rôles de desc[0]/desc[1], comportement SIGPIPE quand le père écrit en boucle infinie.",
         "subjects": ["pipes", "signals"],
-        "kc_ids": ["KC-C04", "KC-C05"]
+        "kc_ids": ["KC-C04", "KC-C05"],
+        "exercises": ["pipe-01", "pipe-fifo-named-01", "sig-pipe-01"]
       },
       {
         "number": 4,
@@ -75,7 +82,8 @@
         "title": "Fichier 2 Go — inode et blocs d'indirection",
         "summary": "Calculer la taille max d'un fichier avec blocs de 512 octets et inode à 15 entrées (12 directes + 3 niveaux d'indirection).",
         "subjects": ["filesystem"],
-        "kc_ids": []
+        "kc_ids": [],
+        "exercises": ["fs-inode-01", "fs-blocks-01", "fs-inode-calc-02", "fs-inode-calc-03"]
       }
     ]
   },
@@ -91,7 +99,8 @@
         "title": "fork/pthread — graphe de processus et IPC",
         "summary": "Tracer le graphe de processus créés dans une boucle fork (while i<3). Enchaîner fork+exec+pipe. Analyser le comportement de threads accédant à des variables globales.",
         "subjects": ["processes", "pthreads", "pipes"],
-        "kc_ids": ["KC-C01", "KC-C02", "KC-C04"]
+        "kc_ids": ["KC-C01", "KC-C02", "KC-C04"],
+        "exercises": ["fork-basic-01", "fork-multi-01", "fork-tree-01", "pthread-01", "pipe-01"]
       },
       {
         "number": 2,
@@ -99,7 +108,8 @@
         "title": "Système de fichiers — tailles et blocs",
         "summary": "Calculer taille minimale et maximale d'un fichier avec 512 octets/bloc et 128 pointeurs/bloc d'index. Déterminer les blocs pour un fichier de 256 Ko.",
         "subjects": ["filesystem"],
-        "kc_ids": []
+        "kc_ids": [],
+        "exercises": ["fs-inode-01", "fs-inode-calc-01", "fs-inode-calc-02"]
       },
       {
         "number": 3,
@@ -107,7 +117,96 @@
         "title": "Files de messages POSIX — client/serveur addition",
         "summary": "Implémenter un serveur de calcul avec msgget/msgsnd/msgrcv. Définir les structures requete/reponse. Le client envoie deux entiers, le serveur répond avec la somme.",
         "subjects": ["message_queues"],
-        "kc_ids": ["KC-C09"]
+        "kc_ids": ["KC-C09"],
+        "exercises": ["mq-create-01", "mq-sendrecv-01", "mq-02", "mq-03"]
+      }
+    ]
+  },
+  {
+    "id": "utc502-s1-2021-2022",
+    "title": "UTC502 — Première session 2021–2022",
+    "date": "2022",
+    "total_points": 15,
+    "questions": [
+      {
+        "number": 1,
+        "points": 6,
+        "title": "Système de fichiers Unix — calcul de blocs inode (2 Mo, blocs 512 B, ptr 4 B)",
+        "summary": "Fichier progcalcul.exe de 2 Mo, blocs de 512 octets, numéro de bloc = 4 octets. Calculer : nombre de blocs de données (4096), entrées dans un bloc d'adresses indirect (128), nombre de blocs d'adresses indirect nécessaires (32). Accès disque pour lire 2000 premiers blocs avec buffer cache. Droits fichier et chemins relatifs/absolus.",
+        "subjects": ["filesystem"],
+        "kc_ids": [],
+        "exercises": ["fs-inode-01", "fs-blocks-01", "fs-inode-calc-02", "fs-perms-01", "fs-path-01"]
+      },
+      {
+        "number": 2,
+        "points": 3,
+        "title": "Ordonnancement FIFO, par priorité et Round-Robin (Q=2)",
+        "summary": "4 processus arrivant à t=0 : P1(burst=12, prio=4), P2(burst=8, prio=2), P3(burst=4, prio=1), P4(burst=10, prio=3). Calculer l'ordre d'exécution et les temps de réponse pour FIFO, par priorité (valeur min = priorité max) et Round-Robin avec quantum Q=2.",
+        "subjects": ["scheduling"],
+        "kc_ids": [],
+        "exercises": ["sched-fifo-01", "sched-priority-01", "sched-rr-01", "sched-rr-gantt-01"]
+      },
+      {
+        "number": 3,
+        "points": 2,
+        "title": "Remplacement de pages — FIFO et LRU (3 cases, séquence 14 références)",
+        "summary": "3 cases mémoire initialement vides. Séquence de références aux pages : 6,2,1,4,5,2,6,2,3,4,2,1,5,6. Compléter le diagramme d'évolution et compter les défauts de pages pour FIFO puis LRU.",
+        "subjects": ["virtual_memory"],
+        "kc_ids": [],
+        "exercises": ["vm-page-replacement-fifo-01", "vm-page-replacement-lru-01"]
+      },
+      {
+        "number": 4,
+        "points": 4,
+        "title": "Synchronisation sémaphores — impression partagée (P1 lit F1, P2 lit F2)",
+        "summary": "P1 lit le fichier F1 toutes les 5 unités et imprime. P2 lit F2 toutes les 10 unités et imprime. Chaque impression doit être cohérente (F1 seul ou F1+F2). Montrer une incohérence possible, puis résoudre avec des sémaphores (sem_wait/sem_post).",
+        "subjects": ["semaphores"],
+        "kc_ids": [],
+        "exercises": ["sem-01", "sem-mutex-01", "sem-barrier-01"]
+      }
+    ]
+  },
+  {
+    "id": "utc502-s2-2021-2022",
+    "title": "UTC502 — Seconde session 2021–2022",
+    "date": "2022",
+    "total_points": 15,
+    "questions": [
+      {
+        "number": 1,
+        "points": 3,
+        "title": "Ordonnancement FIFO, par priorité et Round-Robin (Q=2)",
+        "summary": "4 processus arrivant à t=0 : P1(burst=8, prio=1), P2(burst=4, prio=4), P3(burst=12, prio=3), P4(burst=6, prio=2). Calculer l'ordre et les temps de réponse pour FIFO, par priorité (valeur min = priorité max) et Round-Robin Q=2.",
+        "subjects": ["scheduling"],
+        "kc_ids": [],
+        "exercises": ["sched-fifo-01", "sched-priority-01", "sched-rr-01", "sched-rr-gantt-01"]
+      },
+      {
+        "number": 2,
+        "points": 3,
+        "title": "Ordonnancement par priorités avec dates d'arrivée — préemptif et non-préemptif",
+        "summary": "4 processus avec arrivées différentes : P1(arr=4, burst=6, prio=1), P2(arr=0, burst=2, prio=4), P3(arr=0, burst=5, prio=3), P4(arr=8, burst=6, prio=2). Représenter l'exécution en ordonnancement par priorités préemptives puis non-préemptives. Calculer le temps de réponse de chaque processus.",
+        "subjects": ["scheduling"],
+        "kc_ids": [],
+        "exercises": ["sched-priority-arrival-01", "sched-priority-01"]
+      },
+      {
+        "number": 3,
+        "points": 3,
+        "title": "Système de fichiers Unix — calcul de blocs inode (64 Mo, blocs 1 Ko, ptr 2 B)",
+        "summary": "Fichier Unix de 64 Mo. Blocs de 1024 octets, numéro de bloc = 2 octets. Calculer : nombre total de blocs (65536), entrées dans un bloc d'indirection (512). Avec buffer cache (10 ms/accès disque), calculer le nombre d'accès disque nécessaires et le temps de lecture total en secondes.",
+        "subjects": ["filesystem"],
+        "kc_ids": [],
+        "exercises": ["fs-inode-01", "fs-blocks-01", "fs-inode-calc-03"]
+      },
+      {
+        "number": 4,
+        "points": 6,
+        "title": "Mémoire virtuelle segmentée et paginée — tables de pages et adresses physiques",
+        "summary": "3 processus (PA, PB, PC) avec espaces d'adressage segmentés et paginés. PA : 2 segments (5+3 pages). PB : 3 segments (2+3+2 pages). PC : 1 segment (3 pages). Mémoire de 20 cases de 1024 octets. Représenter les tables de segments et de pages. Traduire les adresses linéaires 2012 (PA) et 6154 (PB) en adresses physiques.",
+        "subjects": ["virtual_memory", "proc_memory"],
+        "kc_ids": [],
+        "exercises": ["vm-addr-01", "vm-page-01", "pmem-layout-01"]
       }
     ]
   }

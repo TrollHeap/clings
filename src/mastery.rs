@@ -22,8 +22,8 @@ pub const UNLOCK_D4_THRESHOLD: f64 = 4.5;
 /// Score requis pour déverrouiller la difficulté 5
 pub const UNLOCK_D5_THRESHOLD: f64 = 5.0;
 
-const SRS_MULTIPLIER: f64 = 2.5;
-const SRS_MAX_INTERVAL_DAYS: i64 = 30;
+const SRS_MULTIPLIER: f64 = 1.8;
+const SRS_MAX_INTERVAL_DAYS: i64 = 14;
 const SECS_PER_DAY: i64 = 86_400;
 
 /// Retourne le delta de score correspondant à un succès ou un échec.
@@ -166,9 +166,10 @@ mod tests {
 
     #[test]
     fn test_srs_success() {
+        // SRS_MULTIPLIER = 1.8 : round(1 * 1.8) = 2
         let (next, interval) = compute_next_review(1, true, 1_000_000);
-        assert_eq!(interval, 3);
-        assert_eq!(next, 1_000_000 + 3 * 86400);
+        assert_eq!(interval, 2);
+        assert_eq!(next, 1_000_000 + 2 * 86400);
     }
 
     #[test]
