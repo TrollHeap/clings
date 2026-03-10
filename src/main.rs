@@ -118,7 +118,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("{} {e}", "Error:".bold().red());
+        eprintln!("{} {e}", "Erreur:".bold().red());
         std::process::exit(1);
     }
 }
@@ -572,10 +572,10 @@ fn cmd_solution(exercise_id: &str) -> Result<()> {
 
     if count == 0 {
         println!(
-            "  {} You must attempt the exercise at least once before viewing the solution.",
-            "Locked:".bold().yellow()
+            "  {} Vous devez tenter l'exercice au moins une fois avant de voir la solution.",
+            "Verrouillé:".bold().yellow()
         );
-        println!("  Run: clings run {exercise_id}");
+        println!("  Lancer : clings run {exercise_id}");
         return Ok(());
     }
 
@@ -598,22 +598,42 @@ fn cmd_review() -> Result<()> {
 
     let (all_exercises, _) = exercises::load_all_exercises()?;
 
-    // Find first exercise per due subject, sorted by mastery (lowest first)
+    // Build subject map: name → Subject (mastery_score + next_review_at)
     let subjects = progress::get_all_subjects(&conn)?;
-    let mastery_map: std::collections::HashMap<&str, f64> = subjects
-        .iter()
-        .map(|s| (s.name.as_str(), s.mastery_score))
-        .collect();
+    let subject_map: std::collections::HashMap<&str, &crate::models::Subject> =
+        subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
-    // Collect one exercise per due subject, sorted by mastery ascending
+    // For each due subject, prefer the most-recently-failed exercise; fallback to first
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
-        .filter_map(|subject_name| all_exercises.iter().find(|e| &e.subject == subject_name))
+        .filter_map(|subject_name| {
+            // Try to find the last failed exercise for this subject
+            let failed_id = progress::get_failed_exercise(&conn, subject_name)
+                .ok()
+                .flatten();
+            if let Some(ref id) = failed_id {
+                if let Some(ex) = all_exercises.iter().find(|e| &e.id == id) {
+                    return Some(ex);
+                }
+            }
+            // Fallback: first exercise belonging to this subject
+            all_exercises.iter().find(|e| &e.subject == subject_name)
+        })
         .collect();
+
+    // Sort by (mastery_score ASC, next_review_at ASC) — weakest and most-overdue first
     due_exercises.sort_by(|a, b| {
-        let ma = mastery_map.get(a.subject.as_str()).copied().unwrap_or(0.0);
-        let mb = mastery_map.get(b.subject.as_str()).copied().unwrap_or(0.0);
-        ma.partial_cmp(&mb).unwrap_or(std::cmp::Ordering::Equal)
+        let sa = subject_map.get(a.subject.as_str());
+        let sb = subject_map.get(b.subject.as_str());
+        let ma = sa.map(|s| s.mastery_score).unwrap_or(0.0);
+        let mb = sb.map(|s| s.mastery_score).unwrap_or(0.0);
+        ma.partial_cmp(&mb)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                let ra = sa.and_then(|s| s.next_review_at).unwrap_or(i64::MAX);
+                let rb = sb.and_then(|s| s.next_review_at).unwrap_or(i64::MAX);
+                ra.cmp(&rb)
+            })
     });
 
     let total = due_exercises.len();
@@ -717,8 +737,8 @@ fn cmd_reset(subject: Option<&str>) -> Result<()> {
         }
     } else {
         print!(
-            "  {} This will delete ALL progress. Type 'yes' to confirm: ",
-            "Warning!".bold().red()
+            "  {} Ceci supprimera TOUTE la progression. Tapez 'yes' pour confirmer : ",
+            "Attention !".bold().red()
         );
         io::stdout().flush().ok();
         let mut input = String::new();
@@ -726,9 +746,9 @@ fn cmd_reset(subject: Option<&str>) -> Result<()> {
         if input.trim() == "yes" {
             let conn = progress::open_db()?;
             progress::reset_progress(&conn)?;
-            println!("  {}", "Progress reset.".green());
+            println!("  {}", "Progression réinitialisée.".green());
         } else {
-            println!("  {}", "Cancelled.".dimmed());
+            println!("  {}", "Annulé.".dimmed());
         }
     }
     Ok(())
