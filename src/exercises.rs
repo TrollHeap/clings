@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::constants::EXERCISES_ENV_VAR;
 use crate::error::{KfError, Result};
 use crate::models::Exercise;
 
@@ -36,13 +37,13 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
 /// Resolve the exercises directory path.
 /// Priority: CLINGS_EXERCISES env var > auto-detect exercises/ relative to binary or CWD
 pub fn resolve_exercises_dir() -> Result<PathBuf> {
-    if let Ok(env_path) = std::env::var("CLINGS_EXERCISES") {
+    if let Ok(env_path) = std::env::var(EXERCISES_ENV_VAR) {
         let p = PathBuf::from(env_path);
         if p.exists() {
             return Ok(p);
         }
         return Err(KfError::Config(format!(
-            "CLINGS_EXERCISES path does not exist: {}",
+            "{EXERCISES_ENV_VAR} path does not exist: {}",
             p.display()
         )));
     }

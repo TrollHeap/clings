@@ -3,6 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use serde::Deserialize;
 
+use crate::constants::{CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, PISCINE_CHECKPOINT_KEY};
 use crate::error::Result;
 use crate::mastery;
 use crate::models::Subject;
@@ -40,15 +41,15 @@ pub fn open_db() -> Result<Connection> {
             "Variable $HOME non définie — impossible de localiser ~/.clings".to_string(),
         )
     })?;
-    let dir = std::path::PathBuf::from(home).join(".clings");
+    let dir = std::path::PathBuf::from(home).join(CLINGS_DIR);
     std::fs::create_dir_all(&dir)?;
 
-    let db_path = dir.join("progress.db");
+    let db_path = dir.join(DB_FILENAME);
     let conn = Connection::open(&db_path)?;
 
-    conn.execute_batch(
-        "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;",
-    )?;
+    conn.execute_batch(&format!(
+        "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout={DB_BUSY_TIMEOUT_MS};"
+    ))?;
     conn.execute_batch(SCHEMA)?;
 
     Ok(conn)
@@ -271,7 +272,7 @@ fn open_test_db() -> Result<Connection> {
 /// Save piscine checkpoint (current exercise index).
 pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
     conn.execute(
-        "INSERT OR REPLACE INTO kv (key, value) VALUES ('piscine_checkpoint', ?1)",
+        &format!("INSERT OR REPLACE INTO kv (key, value) VALUES ('{PISCINE_CHECKPOINT_KEY}', ?1)"),
         params![index.to_string()],
     )?;
     Ok(())
@@ -279,7 +280,9 @@ pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
 
 /// Load piscine checkpoint, returns None if no checkpoint saved.
 pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
-    let mut stmt = conn.prepare_cached("SELECT value FROM kv WHERE key = 'piscine_checkpoint'")?;
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT value FROM kv WHERE key = '{PISCINE_CHECKPOINT_KEY}'"
+    ))?;
     let result = stmt
         .query_row([], |row| row.get::<_, String>(0))
         .ok()
@@ -289,7 +292,10 @@ pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
 
 /// Clear piscine checkpoint (called when piscine is fully completed).
 pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM kv WHERE key = 'piscine_checkpoint'", [])?;
+    conn.execute(
+        &format!("DELETE FROM kv WHERE key = '{PISCINE_CHECKPOINT_KEY}'"),
+        [],
+    )?;
     Ok(())
 }
 
@@ -676,8 +682,8 @@ mod tests {
         let conn = open_test_db().unwrap();
         ensure_subject(&conn, "pipes").unwrap();
         let sub = record_attempt(&conn, "pipes", "pipe-01", true).unwrap();
-        // Après un succès, intervalle SRS = round(1 * 1.8) = 2
-        assert_eq!(sub.srs_interval_days, 2);
+        // Après un succès, intervalle SRS = round(1 * 2.5) = 3
+        assert_eq!(sub.srs_interval_days, 3);
         assert!(sub.next_review_at.is_some());
         // Vérifier la persistance en DB
         let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();

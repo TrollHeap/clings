@@ -1,4 +1,5 @@
 mod chapters;
+pub mod constants;
 mod display;
 mod error;
 mod exercises;
@@ -18,6 +19,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
+use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
 use crate::error::{KfError, Result};
 use crate::models::ValidationMode;
 use crate::watcher::WatchAction;
@@ -331,11 +333,13 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                 "  {}",
                                 "Exercice résolu ! Avancement dans 2s...".bold().green()
                             );
-                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                             return Some(WatchAction::Advance);
                         }
                         consecutive_failures += 1;
-                        if consecutive_failures >= 3 && !exercise_clone.hints.is_empty() {
+                        if consecutive_failures >= CONSECUTIVE_FAILURE_THRESHOLD as u32
+                            && !exercise_clone.hints.is_empty()
+                        {
                             println!();
                             println!(
                                 "  {}",

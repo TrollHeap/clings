@@ -1,37 +1,21 @@
 use chrono::Utc;
 
+use crate::constants::{
+    DIFFICULTY_2_UNLOCK, DIFFICULTY_3_UNLOCK, DIFFICULTY_4_UNLOCK, DIFFICULTY_5_UNLOCK,
+    MASTERY_DECAY_DAYS, MASTERY_FAILURE_DELTA, MASTERY_MAX, MASTERY_MIN, MASTERY_SUCCESS_DELTA,
+    SRS_BASE_INTERVAL_DAYS, SRS_INTERVAL_MULTIPLIER, SRS_MAX_INTERVAL_DAYS,
+};
 use crate::models::Subject;
 
-const DECAY_INTERVAL_DAYS: i64 = 14;
 const DECAY_AMOUNT: f64 = 0.5;
-
-/// Score de maîtrise maximal atteignable
-pub const MAX_MASTERY: f64 = 5.0;
-/// Score de maîtrise minimal (plancher)
-pub const MIN_MASTERY: f64 = 0.0;
-/// Incrément appliqué au score lors d'une réussite
-pub const SUCCESS_DELTA: f64 = 1.0;
-/// Décrément appliqué au score lors d'un échec
-pub const FAILURE_DELTA: f64 = -0.5;
-/// Score requis pour déverrouiller la difficulté 2
-pub const UNLOCK_D2_THRESHOLD: f64 = 2.0;
-/// Score requis pour déverrouiller la difficulté 3
-pub const UNLOCK_D3_THRESHOLD: f64 = 4.0;
-/// Score requis pour déverrouiller la difficulté 4
-pub const UNLOCK_D4_THRESHOLD: f64 = 4.5;
-/// Score requis pour déverrouiller la difficulté 5
-pub const UNLOCK_D5_THRESHOLD: f64 = 5.0;
-
-const SRS_MULTIPLIER: f64 = 1.8;
-const SRS_MAX_INTERVAL_DAYS: i64 = 14;
 const SECS_PER_DAY: i64 = 86_400;
 
 /// Retourne le delta de score correspondant à un succès ou un échec.
 pub fn mastery_delta(success: bool) -> f64 {
     if success {
-        SUCCESS_DELTA
+        MASTERY_SUCCESS_DELTA
     } else {
-        FAILURE_DELTA
+        -MASTERY_FAILURE_DELTA
     }
 }
 
@@ -39,20 +23,20 @@ pub fn mastery_delta(success: bool) -> f64 {
 /// Le score est borné entre `MIN_MASTERY` et `MAX_MASTERY`.
 pub fn update_mastery(subject: &mut Subject, success: bool) {
     subject.mastery_score =
-        (subject.mastery_score + mastery_delta(success)).clamp(MIN_MASTERY, MAX_MASTERY);
+        (subject.mastery_score + mastery_delta(success)).clamp(MASTERY_MIN, MASTERY_MAX);
     subject.attempts_total += 1;
     if success {
         subject.attempts_success += 1;
     }
     subject.last_practiced_at = Some(Utc::now().timestamp());
 
-    if subject.mastery_score >= UNLOCK_D5_THRESHOLD {
+    if subject.mastery_score >= DIFFICULTY_5_UNLOCK {
         subject.difficulty_unlocked = subject.difficulty_unlocked.max(5);
-    } else if subject.mastery_score >= UNLOCK_D4_THRESHOLD {
+    } else if subject.mastery_score >= DIFFICULTY_4_UNLOCK {
         subject.difficulty_unlocked = subject.difficulty_unlocked.max(4);
-    } else if subject.mastery_score >= UNLOCK_D3_THRESHOLD {
+    } else if subject.mastery_score >= DIFFICULTY_3_UNLOCK {
         subject.difficulty_unlocked = subject.difficulty_unlocked.max(3);
-    } else if subject.mastery_score >= UNLOCK_D2_THRESHOLD {
+    } else if subject.mastery_score >= DIFFICULTY_2_UNLOCK {
         subject.difficulty_unlocked = subject.difficulty_unlocked.max(2);
     }
 }
@@ -68,10 +52,10 @@ pub fn apply_decay(subject: &mut Subject) {
     let now = Utc::now().timestamp();
     let days_since = (now - last_epoch) / SECS_PER_DAY;
 
-    if days_since >= DECAY_INTERVAL_DAYS {
-        let intervals = days_since / DECAY_INTERVAL_DAYS;
+    if days_since >= MASTERY_DECAY_DAYS {
+        let intervals = days_since / MASTERY_DECAY_DAYS;
         let decay = intervals as f64 * DECAY_AMOUNT;
-        subject.mastery_score = (subject.mastery_score - decay).max(MIN_MASTERY);
+        subject.mastery_score = (subject.mastery_score - decay).max(MASTERY_MIN);
     }
 }
 
@@ -80,10 +64,10 @@ pub fn apply_decay(subject: &mut Subject) {
 /// Retourne `(next_review_at_unix, new_interval_days)`.
 pub fn compute_next_review(current_interval_days: i64, success: bool, now: i64) -> (i64, i64) {
     let new_interval = if success {
-        let expanded = ((current_interval_days as f64) * SRS_MULTIPLIER).round() as i64;
-        expanded.clamp(1, SRS_MAX_INTERVAL_DAYS)
+        let expanded = ((current_interval_days as f64) * SRS_INTERVAL_MULTIPLIER).round() as i64;
+        expanded.clamp(SRS_BASE_INTERVAL_DAYS, SRS_MAX_INTERVAL_DAYS)
     } else {
-        1
+        SRS_BASE_INTERVAL_DAYS
     };
     let next_review_at = now + new_interval * SECS_PER_DAY;
     (next_review_at, new_interval)
@@ -92,6 +76,9 @@ pub fn compute_next_review(current_interval_days: i64, success: bool, now: i64) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SUCCESS_DELTA: f64 = crate::constants::MASTERY_SUCCESS_DELTA;
+    const FAILURE_DELTA: f64 = -(crate::constants::MASTERY_FAILURE_DELTA);
 
     fn make_subject(name: &str, score: f64) -> Subject {
         let mut s = Subject::new(name.to_string());
@@ -166,22 +153,22 @@ mod tests {
 
     #[test]
     fn test_srs_success() {
-        // SRS_MULTIPLIER = 1.8 : round(1 * 1.8) = 2
+        // SRS_INTERVAL_MULTIPLIER = 2.5 : round(1 * 2.5) = 3
         let (next, interval) = compute_next_review(1, true, 1_000_000);
-        assert_eq!(interval, 2);
-        assert_eq!(next, 1_000_000 + 2 * 86400);
+        assert_eq!(interval, 3);
+        assert_eq!(next, 1_000_000 + 3 * 86400);
     }
 
     #[test]
     fn test_srs_failure_resets() {
         let (_, interval) = compute_next_review(30, false, 1_000_000);
-        assert_eq!(interval, 1);
+        assert_eq!(interval, SRS_BASE_INTERVAL_DAYS);
     }
 
     #[test]
     fn test_srs_interval_capped_at_max() {
-        // Succès répétés : l'intervalle doit être plafonné à SRS_MAX_INTERVAL_DAYS (30)
-        let (_, interval) = compute_next_review(20, true, 1_000_000);
+        // Succès répétés : l'intervalle doit être plafonné à SRS_MAX_INTERVAL_DAYS (60)
+        let (_, interval) = compute_next_review(50, true, 1_000_000);
         assert_eq!(interval, SRS_MAX_INTERVAL_DAYS);
     }
 

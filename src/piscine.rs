@@ -5,6 +5,7 @@ use std::time::Instant;
 use colored::Colorize;
 
 use crate::chapters;
+use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
 use crate::error::Result;
 use crate::models::ValidationMode;
 use crate::watcher::WatchAction;
@@ -108,7 +109,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             }
             .dimmed(),
         );
-        println!("  {}", "─".repeat(56).dimmed());
+        println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
         println!();
 
         for line in exercise.description.lines() {
@@ -116,7 +117,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         }
         println!();
         display::show_watching(&source_path);
-        display::show_keybinds();
+        display::show_keybinds_piscine();
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
@@ -130,7 +131,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds();
+                display::show_keybinds_piscine();
                 WatchAction::Continue
             },
             |key| match key {
@@ -161,10 +162,10 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
                             "  {}",
                             "Exercice résolu ! Avancement dans 2s...".bold().green()
                         );
-                        std::thread::sleep(std::time::Duration::from_secs(2));
+                        std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                         return Some(WatchAction::Advance);
                     }
-                    display::show_keybinds();
+                    display::show_keybinds_piscine();
                     None
                 }
                 _ => None,
