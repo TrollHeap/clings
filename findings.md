@@ -153,3 +153,41 @@ Tous les exercices lus montrent:
 - Progressions pédagogiques cohérentes au sein de chaque sujet
 - Niveaux de difficulté appropriés au contenu
 - `exercise_type: "complete"` uniformément (complétion de code)
+
+## 8. Qualité du code (audit 2026-03-10)
+
+### Couverture API docs
+
+| État | Avant | Après |
+|------|-------|-------|
+| Symboles publics documentés | ~92% | ~98% |
+| Fonctions sans doc `///` | `compile_and_run`, `reset_progress` | 0 critique |
+| Exemples (`# Examples`) | 0 | 1 (`compile_and_run`) |
+
+### Couverture tests
+
+| État | Avant | Après |
+|------|-------|-------|
+| Tests totaux | 124 | 134 |
+| Fichiers avec tests | 7 | 9 |
+| Nouveaux fichiers testés | — | `error.rs`, `tmux.rs` |
+| Tests display ajoutés | — | `difficulty_stars` (×2) |
+
+### Sécurité (commits bdff318)
+
+| Fix | Fichier | Nature |
+|-----|---------|--------|
+| Path traversal | `src/runner.rs` | `canonicalize()` après création fichier |
+| Atomic write | `src/runner.rs` | `rename()` depuis `.tmp` |
+| HOME hard-fail | `src/progress.rs`, `src/runner.rs` | Erreur explicite si `$HOME` absent |
+
+### Gaps non résolus (TUI/terminal — intentionnel)
+
+| Fichier | Raison |
+|---------|--------|
+| `src/main.rs` | `cmd_*` : I/O + DB, nécessite injection de dépendances |
+| `src/watcher.rs` | boucle inotify + stdin thread, fd mock difficile |
+| `src/piscine.rs` | boucle raw mode TUI, pas testable sans terminal |
+
+Ces 3 fichiers représentent la couche d'entrée/TUI — les tests unitaires seraient fragiles.
+La logique métier sous-jacente (mastery, progress, runner) est couverte.

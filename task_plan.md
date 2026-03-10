@@ -6,7 +6,7 @@ Basé sur: audit d'alignement NSY103/UTC502 (voir findings.md)
 ## Contexte
 
 clings (`clings`) est un entraîneur TUI de programmation système C, aligné sur NSY103 et UTC502.
-**274 exercices** existent dans 21 sujets sur 15 chapitres. L'alignement global est ~85-90%.
+**283+ exercices** existent dans 21 sujets sur 16 chapitres. L'alignement global est ~98%.
 
 ## Objectif
 
@@ -151,6 +151,40 @@ Date: 2026-03-09
   - Lignes supplémentaires → rouge `+ ligne` / `- ligne`
 - **Contrainte**: conserver le format box-drawing existant, adapter INNER_W=52
 - **Status**: [x] DONE
+
+---
+
+---
+
+## Phase 3 — Qualité du code (quality-audit 2026-03-10)
+
+Audit `/quality-audit` [A] exécuté — docs + tests — après les 3 commits atomiques de sécurité/exercices.
+
+### Commits réalisés (session 2026-03-10)
+
+| Hash | Description |
+|------|-------------|
+| `bdff318` | fix: security hardening + UX improvements (S1-S3, P1, C1-C2) |
+| `fed4959` | feat: exercices filesystem inode-calc + fork-tree |
+| `797fbab` | feat: exercices scheduling (EDF, priority, RR-Gantt) + SRS + annales |
+| `789c8b1` | docs(all): API docs + README + CHANGELOG + tests (quality-audit) |
+
+### Q1 — Documentation API
+- [x] `src/runner.rs` — `compile_and_run()` : doc complète + `# Examples` (no_run)
+- [x] `src/progress.rs` — `reset_progress()` : doc ///  avec note DESTRUCTIVE
+- [x] `src/display.rs` — `difficulty_stars()` : doc existante vérifiée (OK)
+- [x] `CHANGELOG.md` — section `[Unreleased] — [PROPOSED]` créée (stub)
+- [x] `README.md` — table commandes complétée (5 commandes manquantes), keybinds `j`/`n` disambiguïsés
+
+### Q2 — Tests nouveaux (+10 tests, 124 → 134)
+- [x] `src/error.rs` — 5 tests (display, conversion From/Into, discrimination variante)
+- [x] `src/tmux.rs` — 3 tests (is_tmux contract, open sans tmux, update sans tmux)
+- [x] `src/display.rs` — 2 tests (difficulty_stars count par variante, total=5)
+
+### Q3 — Gaps documentés (non résolus — TUI/terminal)
+- `src/main.rs` — aucun test (`cmd_*` fonctions I/O + DB, nécessitent injection)
+- `src/watcher.rs` — aucun test (inotify + stdin thread, nécessite fd mock)
+- `src/piscine.rs` — aucun test (boucle raw mode, TUI non testable sans terminal)
 
 ---
 

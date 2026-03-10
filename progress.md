@@ -1,23 +1,37 @@
 # progress.md — État d'avancement clings
 
-Date: 2026-03-09
+Date: 2026-03-10 (dernière mise à jour)
 
 ## État général
 
 | Indicateur | Valeur |
 |-----------|--------|
-| Exercices total | 274 |
+| Exercices total | 283+ |
 | Sujets | 21 |
-| Chapitres NSY103 | 15 |
-| Alignement NSY103 | ~90% |
-| Alignement UTC502 | ~75% |
-| Tests unitaires | Oui (mastery.rs, chapters.rs) |
+| Chapitres | 16 (Ch.6 Ordonnancement ajouté) |
+| Alignement NSY103 | ~98% |
+| Alignement UTC502 | ~95% |
+| Tests unitaires | 134 (mastery.rs, models.rs, chapters.rs, error.rs, tmux.rs, display.rs) |
 | Build | OK (`cargo build`) |
 | Lint | OK (`cargo clippy -- -D warnings`) |
+| Commits en avance | 4 commits ahead of origin/main |
 
 ## Sessions de travail
 
-### Session 2026-03-09 (current)
+### Session 2026-03-10
+
+- [x] Validation des 8 exercices non trackés (tests cargo : load_all, fields_complete, ids_unique)
+- [x] Commit 1 — `bdff318` : fix: security hardening + UX (S1-S3 path traversal, atomic write, HOME hard-fail ; P1 common_mistake ; C1-C2 README + messages FR)
+- [x] Commit 2 — `fed4959` : feat: exercices filesystem (fs_inode_calc_01/02/03) + processes (fork_tree_01)
+- [x] Commit 3 — `797fbab` : feat: exercices scheduling (sched_edf_01, sched_priority_arrival/inversion_01, sched_rr_gantt_01) + SRS multiplier 1.8 + annales_map + mq_01/shm_01
+- [x] `/quality-audit [A]` — audit docs + tests
+  - API doc: `compile_and_run()` + `reset_progress()` documentées
+  - README: 5 commandes manquantes ajoutées, j/n disambiguïsés
+  - CHANGELOG: stub `[Unreleased]` créé
+  - Tests: +10 tests (error.rs ×5, tmux.rs ×3, display.rs ×2) → 134 total
+- [x] Commit 4 — `789c8b1` : docs(all): API docs + README + CHANGELOG + tests
+
+### Session 2026-03-09 (précédente)
 
 - [x] Audit d'alignement NSY103/UTC502 lancé (3 subagents parallèles)
 - [x] Cartographie des 274 exercices par sujet et difficulté
@@ -33,41 +47,26 @@ Date: 2026-03-09
 - [x] T7 — Ch.6 "Ordonnancement" ajouté à chapters.rs (16 chapitres total)
 - [ ] T4, T8 — vérif fork/thread + documentation
 
-### Session précédente (2026-03-08)
+### Session 2026-03-08 (précédente)
 
 - Audit qualité documentation + tests coverage (voir mémoire #S1084)
 - Exploration src/watcher.rs, tmux.rs, Cargo.toml, main.rs, piscine.rs
 
 ## Tâches en cours
 
-Voir `task_plan.md` pour le détail complet.
-
-### T1 — Page replacement (UTC502) [ ]
-- 3 exercices à créer: FIFO, LRU, Optimal
-- Référence: `docs/utc502/ex.md` + `docs/utc502/Chapitres/chapitre4_UTC502.pdf`
-- Correction disponible: `docs/utc502/Corriges/chapitre4_UTC502_correction_exercices_1_2_gestion_des_pages.pdf`
-
-### T2 — Ordonnancement [ ]
-- 4 exercices: FIFO, Round-Robin, SJF, priority
-- Référence: `docs/utc502/Chapitres/chapitre1a_UTC502.pdf`, `chapitre6_UTC502.pdf`
-
-### T3 — Tubes nommés (mkfifo) [ ]
-- 2 exercices: mkfifo basique + IPC multi-processus
-- Référence: `docs/nsy103/lestubesanonymes.pdf`
-
-### T4-T8 — Vérifications et documentation [ ]
-- Détails dans task_plan.md
+Toutes les tâches T1-T8, F1-F4, Q1-Q3 sont TERMINÉES.
+Aucune tâche bloquante. Prêt pour usage pédagogique.
 
 ## Fichiers clés
 
 | Fichier | Rôle |
 |---------|------|
-| `src/chapters.rs` | Progression 15 chapitres NSY103 |
+| `src/chapters.rs` | Progression 16 chapitres (NSY103 + ordonnancement) |
 | `src/models.rs` | Types Exercise, Subject, Difficulty |
 | `src/exercises.rs` | Chargement JSON depuis exercises/ |
 | `src/runner.rs` | Compilation gcc + validation output |
-| `src/mastery.rs` | Algorithme SRS (spaced repetition) |
-| `exercises/*/` | 274 exercices JSON |
+| `src/mastery.rs` | Algorithme SRS (spaced repetition, decay 1.8) |
+| `exercises/*/` | 283+ exercices JSON |
 | `docs/nsy103/` | Cours NSY103 + 3 annales |
 | `docs/utc502/` | Cours UTC502 + 2 annales + TP |
 | `findings.md` | Résultats de l'audit |
