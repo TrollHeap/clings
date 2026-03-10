@@ -31,7 +31,7 @@ exercises/*.json → exercises.rs (load/parse) → chapters.rs (order by NSY103 
 ### Module responsibilities
 
 - **`main.rs`** — CLI entry point (clap). Subcommands: `watch` (default), `list`, `run`, `progress`, `hint`, `solution`, `reset`. Manages terminal raw mode via `libc::termios` directly.
-- **`exercises.rs`** — Loads exercise JSON files recursively from `exercises/` directory. Resolution order: `KERNELFORGE_EXERCISES` env var → ancestors of binary path → CWD-relative.
+- **`exercises.rs`** — Loads exercise JSON files recursively from `exercises/` directory. Resolution order: `CLINGS_EXERCISES` env var → ancestors of binary path → CWD-relative.
 - **`chapters.rs`** — Hardcoded NSY103 chapter progression (12 chapters mapping subjects to curriculum order). Orders exercises: chapter → difficulty → SRS priority (lowest mastery first).
 - **`runner.rs`** — Compiles C code with `gcc -Wall -Wextra -std=c11`, writes starter code to `~/.clings/current.c`, validates program output against expected. Subject-specific linker flags (`-lpthread`, `-lrt`). Custom `wait_timeout` trait on `Child` for 10s execution limit.
 - **`progress.rs`** — SQLite database at `~/.clings/progress.db` with WAL mode. Two tables: `subjects` (mastery tracking) and `practice_log` (attempt history). Handles streak calculation.
