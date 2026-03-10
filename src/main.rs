@@ -76,6 +76,9 @@ enum Commands {
         /// Restreindre à un seul chapitre (1-16)
         #[arg(long, short = 'c')]
         chapter: Option<u8>,
+        /// Durée limite en minutes (mode exam simulé, ex: 150 pour 2h30)
+        #[arg(long, short = 't')]
+        timed: Option<u64>,
     },
     /// Reinforce due subjects via SRS scheduling
     Review,
@@ -110,7 +113,7 @@ fn main() {
         Some(Commands::Hint { exercise_id }) => cmd_hint(&exercise_id),
         Some(Commands::Solution { exercise_id }) => cmd_solution(&exercise_id),
         Some(Commands::Reset { subject }) => cmd_reset(subject.as_deref()),
-        Some(Commands::Piscine { chapter }) => piscine::cmd_piscine(chapter),
+        Some(Commands::Piscine { chapter, timed }) => piscine::cmd_piscine(chapter, timed),
         Some(Commands::Review) => cmd_review(),
         Some(Commands::Stats) => cmd_stats(),
         Some(Commands::Annales) => cmd_annales(),
