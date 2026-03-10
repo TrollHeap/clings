@@ -10,7 +10,8 @@
   "hints": [
     "malloc(sizeof(SharedData)) alloue exactement la taille de la struct",
     "data->value accède au champ int via le pointeur",
-    "free(data) libère la région simulée (= shmdt + shmctl(IPC_RMID) en vrai IPC)"
+    "free(data) libère la région simulée (= shmdt + shmctl(IPC_RMID) en vrai IPC)",
+    "Exercice suivant (API POSIX réelle) : shm-create-01 — shm_open/mmap/munmap avec vrai segment partagé entre processus"
   ],
   "validation": {
     "mode": "output",
