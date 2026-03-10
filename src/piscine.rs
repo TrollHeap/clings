@@ -69,6 +69,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     }
     while index < total {
         let exercise = exercise_order[index];
+        let ex_start = Instant::now();
 
         if matches!(exercise.validation.mode, ValidationMode::Test) {
             println!(
@@ -286,6 +287,14 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         match action {
             WatchAction::Advance => {
                 completed[index] = true;
+                let ex_elapsed = ex_start.elapsed();
+                let ex_secs = ex_elapsed.as_secs();
+                println!(
+                    "  {} Résolu en {}m{:02}s",
+                    "⏱".dimmed(),
+                    ex_secs / 60,
+                    ex_secs % 60,
+                );
                 index += 1;
                 save_checkpoint(&conn, index);
             }
@@ -314,6 +323,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     let elapsed = start_time.elapsed();
     let hours = elapsed.as_secs() / 3600;
     let mins = (elapsed.as_secs() % 3600) / 60;
+    let secs = elapsed.as_secs() % 60;
 
     if done == total {
         progress::clear_piscine_checkpoint(&conn).ok();
@@ -322,21 +332,23 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     println!();
     if done == total {
         println!(
-            "  {} Piscine complétée ! {}/{} en {}h{:02}m",
+            "  {} Piscine complétée ! {}/{} en {}h{:02}m{:02}s",
             "BRAVO !".bold().green(),
             done,
             total,
             hours,
-            mins
+            mins,
+            secs
         );
     } else {
         println!(
-            "  {} {}/{} exercices complétés en {}h{:02}m. `clings piscine` pour reprendre.",
+            "  {} {}/{} exercices complétés en {}h{:02}m{:02}s. `clings piscine` pour reprendre.",
             "Session piscine terminée.".bold(),
             done,
             total,
             hours,
-            mins
+            mins,
+            secs
         );
     }
 
@@ -441,6 +453,7 @@ mod tests {
 fn show_piscine_header(current: usize, total: usize, start: &Instant) {
     let elapsed = start.elapsed();
     let mins = elapsed.as_secs() / 60;
+    let secs = elapsed.as_secs() % 60;
     let pct = if total > 0 {
         (current * 100) / total
     } else {
@@ -468,13 +481,14 @@ fn show_piscine_header(current: usize, total: usize, start: &Instant) {
             .yellow()
     );
     println!(
-        "  {} {}/{}  ({}%)   {} {}min",
+        "  {} {}/{}  ({}%)   {} {}m{:02}s",
         "Progression:".bold(),
         current,
         total,
         pct,
         "⏱".dimmed(),
         mins,
+        secs,
     );
     println!();
 }
