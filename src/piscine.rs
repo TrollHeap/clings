@@ -117,6 +117,17 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             println!("  {line}");
         }
         println!();
+
+        if let Some(kc) = &exercise.key_concept {
+            println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+        }
+        if let Some(cm) = &exercise.common_mistake {
+            println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+        }
+        if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
+            println!();
+        }
+
         display::show_watching(&source_path);
         display::show_keybinds_piscine(!exercise.visualizer.steps.is_empty());
 
@@ -208,6 +219,17 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
                         println!("  {line}");
                     }
                     println!();
+
+                    if let Some(kc) = &exercise.key_concept {
+                        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+                    }
+                    if let Some(cm) = &exercise.common_mistake {
+                        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+                    }
+                    if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
+                        println!();
+                    }
+
                     display::show_watching(&source_path);
                     display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
                     return None;
