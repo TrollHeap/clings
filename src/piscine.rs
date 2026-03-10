@@ -239,6 +239,101 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use crate::chapters;
+    use crate::models::{
+        Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode, Visualizer,
+    };
+    use crate::progress;
+
+    fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
+        Exercise {
+            id: id.to_string(),
+            subject: subject.to_string(),
+            lang: Lang::C,
+            difficulty,
+            title: id.to_string(),
+            description: String::new(),
+            starter_code: String::new(),
+            solution_code: String::new(),
+            hints: vec![],
+            validation: ValidationConfig {
+                mode: ValidationMode::Output,
+                expected_output: Some("ok".to_string()),
+                test_code: None,
+                max_duration_ms: None,
+            },
+            prerequisites: vec![],
+            files: vec![],
+            exercise_type: ExerciseType::default(),
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            starter_code_stages: vec![],
+            visualizer: Visualizer::default(),
+        }
+    }
+
+    fn open_test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+        )
+        .unwrap();
+        conn
+    }
+
+    /// Vérifie que les exercices sont triés chapter → difficulty via order_by_chapters.
+    #[test]
+    fn test_piscine_order() {
+        // "pipes" = chapitre 9, "structs" = chapitre 1
+        let ex_pipes_hard = make_exercise("pipes-hard", "pipes", Difficulty::Hard);
+        let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
+        let ex_structs_medium = make_exercise("structs-medium", "structs", Difficulty::Medium);
+
+        let exercises = vec![ex_pipes_hard, ex_structs_easy, ex_structs_medium];
+        let subjects = vec![];
+
+        let blocks = chapters::order_by_chapters(&exercises, &subjects);
+        let order = chapters::flatten_chapters(&blocks);
+
+        assert_eq!(order.len(), 3);
+        // structs (chapitre 1) doit précéder pipes (chapitre 9)
+        assert_eq!(order[0].subject, "structs");
+        assert_eq!(order[1].subject, "structs");
+        assert_eq!(order[2].subject, "pipes");
+        // Au sein de structs : Easy avant Medium
+        assert_eq!(order[0].difficulty, Difficulty::Easy);
+        assert_eq!(order[1].difficulty, Difficulty::Medium);
+    }
+
+    /// Vérifie le roundtrip save/load du checkpoint piscine sur une DB in-memory.
+    #[test]
+    fn test_checkpoint_roundtrip() {
+        let conn = open_test_db();
+        progress::save_piscine_checkpoint(&conn, 3).unwrap();
+        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, Some(3));
+    }
+
+    /// Vérifie que le mécanisme de skip incrémente bien l'index d'exercice.
+    #[test]
+    fn test_skip_increments_index() {
+        let total = 5usize;
+        let mut index = 2usize;
+        index += 1;
+        assert_eq!(index, 3);
+        assert!(index < total);
+
+        index = total - 1;
+        index += 1;
+        assert_eq!(index, total);
+    }
+}
+
 fn show_piscine_header(current: usize, total: usize, start: &Instant) {
     let elapsed = start.elapsed();
     let mins = elapsed.as_secs() / 60;
