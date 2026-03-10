@@ -35,10 +35,12 @@ CREATE TABLE IF NOT EXISTS kv (
 
 /// Open (or create) the progress database.
 pub fn open_db() -> Result<Connection> {
-    let dir = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".clings");
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        crate::error::KfError::Config(
+            "Variable $HOME non définie — impossible de localiser ~/.clings".to_string(),
+        )
+    })?;
+    let dir = std::path::PathBuf::from(home).join(".clings");
     std::fs::create_dir_all(&dir)?;
 
     let db_path = dir.join("progress.db");
@@ -297,6 +299,22 @@ pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
         .query_map([], |row| row.get(0))?
         .collect::<std::result::Result<Vec<String>, _>>()?;
     Ok(names)
+}
+
+/// Retourne l'exercise_id raté le plus récemment pour un sujet donné.
+/// Utilisé par `clings review` pour cibler les exercices échoués.
+/// Retourne None si aucun échec n'est enregistré pour ce sujet.
+pub fn get_failed_exercise(conn: &Connection, subject: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT exercise_id FROM practice_log
+         WHERE subject = ?1 AND success = 0
+         ORDER BY practiced_at DESC
+         LIMIT 1",
+    )?;
+    let result = stmt
+        .query_row([subject], |row| row.get::<_, String>(0))
+        .optional()?;
+    Ok(result)
 }
 
 /// Apply decay to all subjects (batched in single transaction).
@@ -653,8 +671,8 @@ mod tests {
         let conn = open_test_db().unwrap();
         ensure_subject(&conn, "pipes").unwrap();
         let sub = record_attempt(&conn, "pipes", "pipe-01", true).unwrap();
-        // Après un succès, intervalle SRS = round(1 * 2.5) = 3
-        assert_eq!(sub.srs_interval_days, 3);
+        // Après un succès, intervalle SRS = round(1 * 1.8) = 2
+        assert_eq!(sub.srs_interval_days, 2);
         assert!(sub.next_review_at.is_some());
         // Vérifier la persistance en DB
         let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();

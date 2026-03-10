@@ -644,7 +644,7 @@ pub fn show_mastery_update(subject: &Subject, success: bool) {
 
 /// Show hints for an exercise.
 pub fn show_hints(exercise: &Exercise) {
-    if exercise.hints.is_empty() {
+    if exercise.hints.is_empty() && exercise.common_mistake.is_none() {
         println!("{}", "  Aucun indice disponible.".dimmed());
         return;
     }
@@ -656,6 +656,14 @@ pub fn show_hints(exercise: &Exercise) {
     println!("  {}", hr().dimmed());
     for (i, hint) in exercise.hints.iter().enumerate() {
         println!("  {}. {hint}", i + 1);
+    }
+    if let Some(mistake) = &exercise.common_mistake {
+        println!();
+        println!(
+            "  {} {}",
+            "⚠ Erreur fréquente :".bold().yellow(),
+            mistake.dimmed()
+        );
     }
     println!();
 }

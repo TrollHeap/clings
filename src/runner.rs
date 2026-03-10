@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -43,6 +42,10 @@ fn linker_flags(subject: &str) -> Vec<&'static str> {
 
 /// Write exercise files (headers etc.) to a temp directory.
 fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result<()> {
+    if exercise.files.is_empty() {
+        return Ok(());
+    }
+    let canonical_work = work_dir.canonicalize()?;
     for file in &exercise.files {
         if file.name.contains("..") || file.name.starts_with('/') {
             eprintln!(
@@ -54,6 +57,13 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
         let file_path = work_dir.join(&file.name);
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent)?;
+            let canonical_parent = parent.canonicalize()?;
+            if !canonical_parent.starts_with(&canonical_work) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!("Fichier hors répertoire de travail : {}", file.name),
+                ));
+            }
         }
         std::fs::write(&file_path, &file.content)?;
     }
@@ -492,11 +502,14 @@ fn normalize(s: &str) -> String {
 }
 
 /// Get the working directory for exercises.
-pub fn work_dir() -> PathBuf {
-    let dir = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".clings");
+pub fn work_dir() -> std::io::Result<PathBuf> {
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Variable $HOME non définie — impossible de localiser ~/.clings",
+        )
+    })?;
+    let dir = PathBuf::from(home).join(".clings");
     #[cfg(unix)]
     {
         use std::fs::DirBuilder;
@@ -511,7 +524,7 @@ pub fn work_dir() -> PathBuf {
     {
         std::fs::create_dir_all(&dir).ok();
     }
-    dir
+    Ok(dir)
 }
 
 /// Map mastery score to stage index (0-4).
@@ -539,16 +552,17 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
 /// Write starter code to the current.c file.
 /// If mastery is provided, selects the appropriate stage.
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
-    let dir = work_dir();
+    let dir = work_dir()?;
     let source_path = dir.join("current.c");
     let code = match mastery {
         Some(m) => select_starter_code(exercise, m),
         None => &exercise.starter_code,
     };
-    let mut f = std::fs::File::create(&source_path)?;
-    f.write_all(code.as_bytes())?;
+    // Atomic write: temp file + rename (POSIX guarantee, no corruption window)
+    let temp_path = source_path.with_extension("c.tmp");
+    std::fs::write(&temp_path, code.as_bytes())?;
+    std::fs::rename(&temp_path, &source_path)?;
 
-    // Write additional files
     write_exercise_files(exercise, &dir)?;
 
     Ok(source_path)

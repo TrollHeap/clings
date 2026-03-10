@@ -2,7 +2,7 @@
 
 **Entraîneur interactif de programmation systèmes C, aligné sur le cursus NSY103 — Linux : noyau et programmation système.**
 
-Résolvez 260 exercices C directement dans votre éditeur. `clings` surveille vos sauvegardes, compile avec `gcc`, valide la sortie, et mesure votre maîtrise via un algorithme de répétition espacée (SRS).
+Résolvez 283 exercices C directement dans votre éditeur. `clings` surveille vos sauvegardes, compile avec `gcc`, valide la sortie, et mesure votre maîtrise via un algorithme de répétition espacée (SRS).
 
 ---
 
@@ -41,9 +41,11 @@ cargo install --path .
 | Touche | Action |
 |---|---|
 | `h` | Afficher un indice |
-| `n` | Passer à l'exercice suivant |
-| `c` | Compiler et vérifier maintenant |
+| `j` ou `n` | Passer à l'exercice suivant |
+| `k` | Revenir à l'exercice précédent |
+| `r` | Compiler et vérifier maintenant |
 | `l` | Afficher la liste des exercices |
+| `v` | Ouvrir le visualiseur mémoire |
 | `q` | Quitter |
 
 ---
@@ -66,7 +68,7 @@ cargo install --path .
 
 ### Contenu
 
-- **260+ exercices** répartis sur **21 sujets**
+- **283+ exercices** répartis sur **21 sujets**
 - **15 chapitres NSY103** : Fondamentaux C → Chaînes & bits → Allocation mémoire → E/S → Système de fichiers → Processus → Signaux → Tubes → Sockets → Mémoire partagée → Sémaphores → Threads POSIX → Mémoire virtuelle → Projets intégrateurs
 - Niveaux de difficulté D1 à D5
 - Code de départ adaptatif par stades (S0–S4) selon la maîtrise
@@ -114,5 +116,4 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-[TODO: choisir licence]
-# clings
+MIT
