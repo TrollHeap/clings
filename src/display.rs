@@ -70,7 +70,7 @@ pub fn clear_screen() {
 
 /// Display the main banner.
 fn show_banner() {
-    println!("  {}", header_box("KERNELFORGE").bold().cyan());
+    println!("  {}", header_box("CLINGS").bold().cyan());
     let subtitle = "NSY103 — Programmation système Linux";
     let subtitle_len = subtitle.chars().count();
     let inner = HEADER_WIDTH - 2; // 54 chars between ║ and ║

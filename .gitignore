@@ -1,0 +1,5 @@
+target/
+.claude/
+docs/
+log.txt
+output.txt

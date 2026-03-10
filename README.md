@@ -99,7 +99,7 @@ Exercices supplémentaires alignés sur UTC502 : algorithmes de remplacement de 
 | Paramètre | Valeur par défaut | Description |
 |---|---|---|
 | Répertoire de travail | `~/.clings/` | Fichier courant, base de données SQLite |
-| `KERNELFORGE_EXERCISES` | _(non défini)_ | Chemin alternatif vers le dossier `exercises/` |
+| `CLINGS_EXERCISES` | _(non défini)_ | Chemin alternatif vers le dossier `exercises/` |
 | Intégration tmux | automatique | Si `clings` tourne dans tmux, ouvre neovim dans un split |
 
 La base de données de progression se trouve dans `~/.clings/progress.db`.

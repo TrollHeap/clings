@@ -34,15 +34,15 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
 }
 
 /// Resolve the exercises directory path.
-/// Priority: KERNELFORGE_EXERCISES env var > auto-detect exercises/ relative to binary or CWD
+/// Priority: CLINGS_EXERCISES env var > auto-detect exercises/ relative to binary or CWD
 pub fn resolve_exercises_dir() -> Result<PathBuf> {
-    if let Ok(env_path) = std::env::var("KERNELFORGE_EXERCISES") {
+    if let Ok(env_path) = std::env::var("CLINGS_EXERCISES") {
         let p = PathBuf::from(env_path);
         if p.exists() {
             return Ok(p);
         }
         return Err(KfError::Config(format!(
-            "KERNELFORGE_EXERCISES path does not exist: {}",
+            "CLINGS_EXERCISES path does not exist: {}",
             p.display()
         )));
     }
@@ -68,7 +68,7 @@ pub fn resolve_exercises_dir() -> Result<PathBuf> {
     }
 
     Err(KfError::Config(
-        "Cannot find exercises directory. Set KERNELFORGE_EXERCISES or run from project root."
+        "Cannot find exercises directory. Set CLINGS_EXERCISES or run from project root."
             .to_string(),
     ))
 }
