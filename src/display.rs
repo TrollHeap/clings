@@ -4,7 +4,7 @@ use serde::Deserialize;
 thread_local! {
     static GCC_RE: regex::Regex = regex::Regex::new(
         r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
-    ).unwrap();
+    ).expect("static regex pattern is valid");
 }
 
 use crate::chapters::{ChapterContext, CHAPTERS};

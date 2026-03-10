@@ -34,7 +34,11 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
     if output.status.success() {
         let pane_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
         // Validate pane_id format: must be "%N" where N is all digits
-        if !pane_id.starts_with('%') || !pane_id[1..].chars().all(|c| c.is_ascii_digit()) {
+        if !pane_id
+            .strip_prefix('%')
+            .map(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
+            .unwrap_or(false)
+        {
             return None;
         }
         // Return focus to the original pane (left)

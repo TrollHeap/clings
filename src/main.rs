@@ -463,12 +463,13 @@ static ORIGINAL_TERMIOS: std::sync::Mutex<Option<libc::termios>> = std::sync::Mu
 
 /// Install Ctrl+C handler to restore terminal and clean up tmux panes.
 pub(crate) fn install_ctrlc_handler() {
-    ctrlc::set_handler(move || {
+    if let Err(e) = ctrlc::set_handler(move || {
         disable_raw_mode();
         println!();
         std::process::exit(0);
-    })
-    .ok();
+    }) {
+        eprintln!("Warning: failed to install Ctrl-C handler: {e}");
+    }
 }
 
 /// Record a practice attempt and display the mastery update.
