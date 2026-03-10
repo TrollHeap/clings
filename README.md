@@ -35,13 +35,19 @@ cargo install --path .
 | `clings solution <id>` | Affiche la solution (nécessite au moins une tentative) |
 | `clings reset` | Réinitialise toute la progression (confirmation requise) |
 | `clings piscine` | Mode piscine : parcours linéaire intégral, tous les exercices déverrouillés d'emblée |
+| `clings review` | Révision SRS : exercices dus selon les intervalles de répétition espacée |
+| `clings stats` | Statistiques globales : taux de réussite, distribution de maîtrise |
+| `clings annales` | Correspondance exercices ↔ sujets des annales NSY103/UTC502 |
+| `clings export` | Exporte la progression vers un fichier JSON |
+| `clings import <fichier>` | Importe une progression depuis un fichier JSON |
 
 ### Raccourcis clavier (mode watch)
 
 | Touche | Action |
 |---|---|
 | `h` | Afficher un indice |
-| `j` ou `n` | Passer à l'exercice suivant |
+| `j` | Exercice suivant (ordre curriculum) |
+| `n` | Passer (skip) l'exercice courant |
 | `k` | Revenir à l'exercice précédent |
 | `r` | Compiler et vérifier maintenant |
 | `l` | Afficher la liste des exercices |
