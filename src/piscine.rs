@@ -26,6 +26,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let mut conn = progress::open_db()?;
 
+    progress::apply_all_decay(&mut conn)?;
     progress::ensure_subjects_batch(&mut conn, &all_exercises)?;
 
     let subjects = progress::get_all_subjects(&conn)?;
