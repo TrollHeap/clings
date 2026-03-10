@@ -149,16 +149,13 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         .collect();
 
     let mut chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
-    if let Some(n) = filter_chapter {
-        chapter_blocks.retain(|b| b.chapter.number == n);
-        if chapter_blocks.is_empty() {
-            println!(
-                "  {} Chapitre {} introuvable ou aucun exercice disponible.",
-                "⚠".yellow(),
-                n
-            );
-            return Ok(());
-        }
+    if !chapters::filter_by_chapter(&mut chapter_blocks, filter_chapter) {
+        println!(
+            "  {} Chapitre {} introuvable ou aucun exercice disponible.",
+            "⚠".yellow(),
+            filter_chapter.unwrap_or(0)
+        );
+        return Ok(());
     }
     let exercise_order = chapters::flatten_chapters(&chapter_blocks);
 
@@ -191,10 +188,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         }
 
         // Select starter code stage based on subject mastery
-        let subject_mastery =
-            progress::get_subject(&conn, &exercise.subject)?.map(|s| s.mastery_score);
-        let current_stage = subject_mastery.map(runner::mastery_to_stage);
-        let source_path = runner::write_starter_code(exercise, subject_mastery)?;
+        let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
         // Display exercise
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);

@@ -216,6 +216,15 @@ pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> Chapter
     }
 }
 
+/// Filtre les blocs par numéro de chapitre. Retourne `false` si le résultat est vide.
+pub fn filter_by_chapter(blocks: &mut Vec<ChapterBlock<'_>>, chapter: Option<u8>) -> bool {
+    if let Some(n) = chapter {
+        blocks.retain(|b| b.chapter.number == n);
+        return !blocks.is_empty();
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
