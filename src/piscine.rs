@@ -179,30 +179,37 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                 // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
                 if !escape_buf.is_empty() {
                     escape_buf.push(key);
-                    if escape_buf.len() == 3 {
-                        let seq = std::mem::take(&mut escape_buf);
-                        if vis_active {
-                            let n = exercise_clone.visualizer.steps.len();
-                            match seq.as_slice() {
-                                [0x1b, b'[', b'C'] => {
-                                    // Arrow right → next step
-                                    vis_step = (vis_step + 1).min(n.saturating_sub(1));
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = std::io::stdout().flush().ok();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter key normalement
+                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+                        escape_buf.clear();
+                    } else {
+                        if escape_buf.len() == 3 {
+                            let seq = std::mem::take(&mut escape_buf);
+                            if vis_active {
+                                let n = exercise_clone.visualizer.steps.len();
+                                match seq.as_slice() {
+                                    [0x1b, b'[', b'C'] => {
+                                        // Arrow right → next step
+                                        vis_step = (vis_step + 1).min(n.saturating_sub(1));
+                                        print!("\x1b[{}A\x1b[J", vis_lines);
+                                        let _ = std::io::stdout().flush().ok();
+                                        vis_lines =
+                                            display::show_visualizer(&exercise_clone, vis_step);
+                                    }
+                                    [0x1b, b'[', b'D'] => {
+                                        // Arrow left → previous step
+                                        vis_step = vis_step.saturating_sub(1);
+                                        print!("\x1b[{}A\x1b[J", vis_lines);
+                                        let _ = std::io::stdout().flush().ok();
+                                        vis_lines =
+                                            display::show_visualizer(&exercise_clone, vis_step);
+                                    }
+                                    _ => {}
                                 }
-                                [0x1b, b'[', b'D'] => {
-                                    // Arrow left → previous step
-                                    vis_step = vis_step.saturating_sub(1);
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = std::io::stdout().flush().ok();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
-                                }
-                                _ => {}
                             }
                         }
+                        return None;
                     }
-                    return None;
                 }
                 if key == 0x1b {
                     escape_buf.push(key);
@@ -512,28 +519,35 @@ pub fn run_exam_piscine(
             |key| {
                 if !escape_buf.is_empty() {
                     escape_buf.push(key);
-                    if escape_buf.len() == 3 {
-                        let seq = std::mem::take(&mut escape_buf);
-                        if vis_active {
-                            let n = exercise_clone.visualizer.steps.len();
-                            match seq.as_slice() {
-                                [0x1b, b'[', b'C'] => {
-                                    vis_step = (vis_step + 1).min(n.saturating_sub(1));
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = std::io::stdout().flush().ok();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter key normalement
+                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+                        escape_buf.clear();
+                    } else {
+                        if escape_buf.len() == 3 {
+                            let seq = std::mem::take(&mut escape_buf);
+                            if vis_active {
+                                let n = exercise_clone.visualizer.steps.len();
+                                match seq.as_slice() {
+                                    [0x1b, b'[', b'C'] => {
+                                        vis_step = (vis_step + 1).min(n.saturating_sub(1));
+                                        print!("\x1b[{}A\x1b[J", vis_lines);
+                                        let _ = std::io::stdout().flush().ok();
+                                        vis_lines =
+                                            display::show_visualizer(&exercise_clone, vis_step);
+                                    }
+                                    [0x1b, b'[', b'D'] => {
+                                        vis_step = vis_step.saturating_sub(1);
+                                        print!("\x1b[{}A\x1b[J", vis_lines);
+                                        let _ = std::io::stdout().flush().ok();
+                                        vis_lines =
+                                            display::show_visualizer(&exercise_clone, vis_step);
+                                    }
+                                    _ => {}
                                 }
-                                [0x1b, b'[', b'D'] => {
-                                    vis_step = vis_step.saturating_sub(1);
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = std::io::stdout().flush().ok();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
-                                }
-                                _ => {}
                             }
                         }
+                        return None;
                     }
-                    return None;
                 }
                 if key == 0x1b {
                     escape_buf.push(key);
