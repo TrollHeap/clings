@@ -44,6 +44,13 @@ fn linker_flags(subject: &str) -> Vec<&'static str> {
 /// Write exercise files (headers etc.) to a temp directory.
 fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result<()> {
     for file in &exercise.files {
+        if file.name.contains("..") || file.name.starts_with('/') {
+            eprintln!(
+                "  Warning: fichier ignoré (chemin invalide) : {}",
+                file.name
+            );
+            continue;
+        }
         let file_path = work_dir.join(&file.name);
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -230,7 +237,7 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
             }
         }
         Ok(None) => {
-            let _ = child.kill();
+            kill_process_group(&child);
             let _ = child.wait();
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
@@ -244,7 +251,8 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
             }
         }
         Err(e) => {
-            let _ = child.kill();
+            kill_process_group(&child);
+            let _ = child.wait();
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
             RunResult {
@@ -409,8 +417,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
             }
         }
         Ok(None) => {
-            // Timeout — kill the process, then join readers (pipe close unblocks them)
-            let _ = child.kill();
+            // Timeout — kill the process group, then join readers (pipe close unblocks them)
+            kill_process_group(&child);
             let _ = child.wait();
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
@@ -424,7 +432,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
             }
         }
         Err(e) => {
-            let _ = child.kill();
+            kill_process_group(&child);
+            let _ = child.wait();
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
             RunResult {
@@ -543,6 +552,27 @@ pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io:
     write_exercise_files(exercise, &dir)?;
 
     Ok(source_path)
+}
+
+/// Charge la mastery d'un sujet et écrit le starter code adapté au stage.
+/// Retourne (source_path, current_stage).
+pub fn prepare_exercise_source(
+    conn: &rusqlite::Connection,
+    exercise: &crate::models::Exercise,
+) -> crate::error::Result<(std::path::PathBuf, Option<u8>)> {
+    let subject_mastery =
+        crate::progress::get_subject(conn, &exercise.subject)?.map(|s| s.mastery_score);
+    let current_stage = subject_mastery.map(mastery_to_stage);
+    let source_path = write_starter_code(exercise, subject_mastery)?;
+    Ok((source_path, current_stage))
+}
+
+/// Kill the entire process group of a child to avoid zombie fork-bombs.
+fn kill_process_group(child: &std::process::Child) {
+    let pid = child.id() as libc::pid_t;
+    unsafe {
+        libc::kill(-pid, libc::SIGKILL);
+    }
 }
 
 /// Trait to add wait_timeout to Child (not in std).

@@ -10,6 +10,12 @@ use crate::models::ValidationMode;
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
 
+fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
+    if let Err(e) = progress::save_piscine_checkpoint(conn, index) {
+        eprintln!("  Warning: checkpoint not saved: {e}");
+    }
+}
+
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
@@ -24,16 +30,13 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
 
     // Order by chapters, then difficulty within each chapter (no gating)
     let mut chapter_blocks = chapters::order_by_chapters(&all_exercises, &subjects);
-    if let Some(n) = filter_chapter {
-        chapter_blocks.retain(|b| b.chapter.number == n);
-        if chapter_blocks.is_empty() {
-            println!(
-                "  {} Chapitre {} introuvable ou aucun exercice disponible.",
-                "⚠".yellow(),
-                n
-            );
-            return Ok(());
-        }
+    if !chapters::filter_by_chapter(&mut chapter_blocks, filter_chapter) {
+        println!(
+            "  {} Chapitre {} introuvable ou aucun exercice disponible.",
+            "⚠".yellow(),
+            filter_chapter.unwrap_or(0)
+        );
+        return Ok(());
     }
     let exercise_order = chapters::flatten_chapters(&chapter_blocks);
 
@@ -75,10 +78,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             continue;
         }
 
-        let subject_mastery =
-            progress::get_subject(&conn, &exercise.subject)?.map(|s| s.mastery_score);
-        let current_stage = subject_mastery.map(runner::mastery_to_stage);
-        let source_path = runner::write_starter_code(exercise, subject_mastery)?;
+        let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
         // Piscine display
         display::clear_screen();
@@ -175,26 +175,18 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             WatchAction::Advance => {
                 completed[index] = true;
                 index += 1;
-                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
-                    eprintln!("  Warning: checkpoint not saved: {e}");
-                }
+                save_checkpoint(&conn, index);
             }
             WatchAction::Skip | WatchAction::Next => {
                 index += 1;
-                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
-                    eprintln!("  Warning: checkpoint not saved: {e}");
-                }
+                save_checkpoint(&conn, index);
             }
             WatchAction::Prev => {
                 index = index.saturating_sub(1);
-                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
-                    eprintln!("  Warning: checkpoint not saved: {e}");
-                }
+                save_checkpoint(&conn, index);
             }
             WatchAction::Quit => {
-                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
-                    eprintln!("  Warning: checkpoint not saved: {e}");
-                }
+                save_checkpoint(&conn, index);
                 break;
             }
             WatchAction::Continue => {}
