@@ -53,8 +53,222 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
     Ok(())
 }
 
+/// Compile and run a C source file for Test/Both modes.
+/// Reads user code from `source_path`, appends the test harness, writes to a
+/// temporary file, compiles it, and validates by exit code (and optionally stdout).
+fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
+    let work_dir = source_path.parent().unwrap_or(Path::new("/tmp"));
+    let output_path = work_dir.join("kf_run_test");
+    let test_source_path = work_dir.join("kf_test.c");
+
+    let user_code = match std::fs::read_to_string(source_path) {
+        Ok(c) => c,
+        Err(e) => {
+            return RunResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to read source file: {e}"),
+                duration_ms: 0,
+                compile_error: true,
+                timeout: false,
+            }
+        }
+    };
+
+    let harness = exercise.validation.test_code.as_deref().unwrap_or("");
+    let combined = format!("{}\n{}", user_code, harness);
+
+    if let Err(e) = std::fs::write(&test_source_path, combined.as_bytes()) {
+        return RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to write test source: {e}"),
+            duration_ms: 0,
+            compile_error: true,
+            timeout: false,
+        };
+    }
+
+    // Write additional files (headers etc.)
+    if let Err(e) = write_exercise_files(exercise, work_dir) {
+        return RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to write exercise files: {e}"),
+            duration_ms: 0,
+            compile_error: true,
+            timeout: false,
+        };
+    }
+
+    let mut gcc = Command::new("gcc");
+    gcc.args(["-Wall", "-Wextra", "-std=c11", "-D_GNU_SOURCE"])
+        .arg("-o")
+        .arg(&output_path)
+        .arg(&test_source_path)
+        .arg(format!("-I{}", work_dir.display()));
+
+    for flag in linker_flags(&exercise.subject) {
+        gcc.arg(flag);
+    }
+
+    let compile_result = match gcc.output() {
+        Ok(r) => r,
+        Err(e) => {
+            return RunResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to run gcc: {e}. Is gcc installed?"),
+                duration_ms: 0,
+                compile_error: true,
+                timeout: false,
+            };
+        }
+    };
+
+    if !compile_result.status.success() {
+        return RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: String::from_utf8_lossy(&compile_result.stderr).to_string(),
+            duration_ms: 0,
+            compile_error: true,
+            timeout: false,
+        };
+    }
+
+    let start = Instant::now();
+    let child = Command::new(&output_path)
+        .current_dir(work_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+
+    let mut child = match child {
+        Ok(c) => c,
+        Err(e) => {
+            return RunResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to execute: {e}"),
+                duration_ms: 0,
+                compile_error: false,
+                timeout: false,
+            };
+        }
+    };
+
+    let stdout_handle = child.stdout.take();
+    let stderr_handle = child.stderr.take();
+    let stdout_thread = std::thread::spawn(move || -> String {
+        stdout_handle
+            .map(|mut s| {
+                let mut buf = String::new();
+                std::io::Read::read_to_string(&mut s, &mut buf).ok();
+                buf
+            })
+            .unwrap_or_default()
+    });
+    let stderr_thread = std::thread::spawn(move || -> String {
+        stderr_handle
+            .map(|mut s| {
+                let mut buf = String::new();
+                std::io::Read::read_to_string(&mut s, &mut buf).ok();
+                buf
+            })
+            .unwrap_or_default()
+    });
+
+    let timeout = exercise
+        .validation
+        .max_duration_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_secs(10));
+
+    match child.wait_timeout(timeout) {
+        Ok(Some(status)) => {
+            let duration_ms = start.elapsed().as_millis() as u64;
+            let stdout = stdout_thread.join().unwrap_or_default();
+            let stderr = stderr_thread.join().unwrap_or_default();
+
+            let exit_ok = status.success();
+            let output_ok = match exercise.validation.mode {
+                ValidationMode::Both => {
+                    if let Some(expected) = &exercise.validation.expected_output {
+                        let norm_out = normalize(&stdout);
+                        let norm_exp = normalize(expected);
+                        if let Some(pattern) = norm_exp.strip_prefix("REGEX:") {
+                            let key = pattern.trim().to_string();
+                            REGEX_CACHE.with(|cache| {
+                                let mut map = cache.borrow_mut();
+                                let re = map
+                                    .entry(key.clone())
+                                    .or_insert_with(|| regex::Regex::new(&key).ok());
+                                re.as_ref().map(|r| r.is_match(&norm_out)).unwrap_or(false)
+                            })
+                        } else {
+                            norm_out == norm_exp
+                        }
+                    } else {
+                        true
+                    }
+                }
+                _ => true,
+            };
+
+            RunResult {
+                success: exit_ok && output_ok,
+                stdout,
+                stderr: if !exit_ok && stderr.is_empty() {
+                    format!("Process exited with {status}")
+                } else {
+                    stderr
+                },
+                duration_ms,
+                compile_error: false,
+                timeout: false,
+            }
+        }
+        Ok(None) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_thread.join();
+            let _ = stderr_thread.join();
+            RunResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Execution timed out ({:.1}s limit)", timeout.as_secs_f64()),
+                duration_ms: timeout.as_millis() as u64,
+                compile_error: false,
+                timeout: true,
+            }
+        }
+        Err(e) => {
+            let _ = child.kill();
+            let _ = stdout_thread.join();
+            let _ = stderr_thread.join();
+            RunResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Wait error: {e}"),
+                duration_ms: start.elapsed().as_millis() as u64,
+                compile_error: false,
+                timeout: false,
+            }
+        }
+    }
+}
+
 /// Compile and run a C source file, validating output against expected.
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
+    // Dispatch to test harness runner for Test and Both modes.
+    if matches!(
+        exercise.validation.mode,
+        ValidationMode::Test | ValidationMode::Both
+    ) {
+        return compile_and_run_test(source_path, exercise);
+    }
+
     let work_dir = source_path.parent().unwrap_or(Path::new("/tmp"));
     let output_path = work_dir.join("kf_run");
 
@@ -251,10 +465,9 @@ fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
                 true
             }
         }
-        ValidationMode::Test | ValidationMode::Both => {
-            // Test mode not supported in CLI MVP — warn
-            false
-        }
+        // Test and Both are handled in compile_and_run_test before validate_output is called.
+        // This branch is unreachable in normal execution.
+        ValidationMode::Test | ValidationMode::Both => false,
     }
 }
 
@@ -714,5 +927,124 @@ mod tests {
         assert_eq!(select_starter_code(&exercise, 1.5), "stage1");
         // mastery 4.5 → stage 4, but only 3 stages available → fall back to default
         assert_eq!(select_starter_code(&exercise, 4.5), "default");
+    }
+
+    fn make_exercise_with_test_code(test_code: Option<String>) -> Exercise {
+        Exercise {
+            id: "test".to_string(),
+            subject: "pointers".to_string(),
+            lang: Lang::C,
+            difficulty: Difficulty::Easy,
+            title: "Test".to_string(),
+            description: "Test".to_string(),
+            starter_code: String::new(),
+            solution_code: String::new(),
+            hints: vec![],
+            validation: ValidationConfig {
+                mode: ValidationMode::Test,
+                expected_output: None,
+                test_code,
+                max_duration_ms: None,
+            },
+            prerequisites: vec![],
+            files: vec![],
+            exercise_type: ExerciseType::Complete,
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            starter_code_stages: vec![],
+            visualizer: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_compile_and_run_test_mode_success() {
+        // Harness that exits 0 — should succeed
+        let harness = "int main(void) { return 0; }";
+        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
+        exercise.validation.mode = ValidationMode::Test;
+
+        let tmp = std::env::temp_dir().join(format!("clings_test_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source_path = tmp.join("current.c");
+        // User code is empty — harness provides main
+        std::fs::write(&source_path, b"").unwrap();
+
+        let result = compile_and_run_test(&source_path, &exercise);
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(
+            result.success,
+            "Expected success but stderr: {}",
+            result.stderr
+        );
+        assert!(!result.compile_error);
+        assert!(!result.timeout);
+    }
+
+    #[test]
+    fn test_compile_and_run_test_mode_failure() {
+        // Harness that exits 1 — should fail
+        let harness = "int main(void) { return 1; }";
+        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
+        exercise.validation.mode = ValidationMode::Test;
+
+        let tmp = std::env::temp_dir().join(format!("clings_test_fail_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source_path = tmp.join("current.c");
+        std::fs::write(&source_path, b"").unwrap();
+
+        let result = compile_and_run_test(&source_path, &exercise);
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(!result.success, "Expected failure");
+        assert!(!result.compile_error);
+        assert!(!result.timeout);
+    }
+
+    #[test]
+    fn test_compile_and_run_both_mode_success() {
+        // Both mode: exit 0 AND stdout matches expected
+        let user_code = "#include <stdio.h>\n";
+        let harness = "int main(void) { printf(\"ok\\n\"); return 0; }";
+
+        let tmp = std::env::temp_dir().join(format!("clings_test_both_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source_path = tmp.join("current.c");
+        std::fs::write(&source_path, user_code.as_bytes()).unwrap();
+
+        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
+        exercise.validation.mode = ValidationMode::Both;
+        exercise.validation.expected_output = Some("ok".to_string());
+
+        let result = compile_and_run_test(&source_path, &exercise);
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(
+            result.success,
+            "Expected success but stderr: {}",
+            result.stderr
+        );
+    }
+
+    #[test]
+    fn test_compile_and_run_both_mode_output_mismatch() {
+        // Both mode: exit 0 but stdout doesn't match — should fail
+        let harness = "int main(void) { return 0; }";
+
+        let tmp = std::env::temp_dir().join(format!("clings_test_both_mm_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source_path = tmp.join("current.c");
+        std::fs::write(&source_path, b"").unwrap();
+
+        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
+        exercise.validation.mode = ValidationMode::Both;
+        exercise.validation.expected_output = Some("expected_output".to_string());
+
+        let result = compile_and_run_test(&source_path, &exercise);
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(!result.success, "Expected failure due to stdout mismatch");
+        assert!(!result.compile_error);
     }
 }

@@ -4,7 +4,7 @@ use serde::Deserialize;
 thread_local! {
     static GCC_RE: regex::Regex = regex::Regex::new(
         r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
-    ).expect("GCC_RE regex is statically valid");
+    ).unwrap();
 }
 
 use crate::chapters::{ChapterContext, CHAPTERS};
@@ -251,15 +251,13 @@ pub fn show_exercise_watch(
 /// Show keybind hints.
 pub fn show_keybinds() {
     println!(
-        "  {} {} hint  {} next  {} prev  {} skip  {} run  {} list  {} quit",
+        "  {} {} hint  {} skip  {} quit  {} list  {} run",
         "Keys".bold().cyan(),
         "[h]".bold(),
-        "[j]".bold(),
-        "[k]".bold(),
         "[n]".bold(),
-        "[r]".bold(),
-        "[l]".bold(),
         "[q]".bold(),
+        "[l]".bold(),
+        "[r]".bold(),
     );
     println!();
 }
@@ -268,16 +266,14 @@ pub fn show_keybinds() {
 pub fn show_keybinds_with_vis(has_visualizer: bool) {
     if has_visualizer {
         println!(
-            "  {} {} hint  {} next  {} prev  {} skip  {} run  {} list  {} vis  {} quit",
+            "  {} {} hint  {} skip  {} quit  {} list  {} run  {} visualiser",
             "Keys".bold().cyan(),
             "[h]".bold(),
-            "[j]".bold(),
-            "[k]".bold(),
             "[n]".bold(),
-            "[r]".bold(),
-            "[l]".bold(),
-            "[v]".bold(),
             "[q]".bold(),
+            "[l]".bold(),
+            "[r]".bold(),
+            "[v]".bold(),
         );
     } else {
         show_keybinds();
@@ -1042,4 +1038,162 @@ pub fn show_import_done(count: usize, overwrite: bool) {
         count,
         mode.dimmed()
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::VisVar;
+
+    // ── mastery_bar ─────────────────────────────────────────────────────
+
+    #[test]
+    fn mastery_bar_zero_score() {
+        let result = mastery_bar(0.0);
+        // Score 0 → 0 filled blocks, 10 empty, then " 0.0"
+        assert!(
+            result.ends_with(" 0.0"),
+            "should end with ' 0.0', got: {result}"
+        );
+        // The raw bar before coloring has 10 empty blocks
+        assert!(result.contains("░░░░░░░░░░"), "should have 10 empty blocks");
+        assert!(!result.contains('█'), "should have no filled blocks");
+    }
+
+    #[test]
+    fn mastery_bar_full_score() {
+        let result = mastery_bar(5.0);
+        assert!(
+            result.ends_with(" 5.0"),
+            "should end with ' 5.0', got: {result}"
+        );
+        assert!(
+            result.contains("██████████"),
+            "should have 10 filled blocks"
+        );
+        assert!(!result.contains('░'), "should have no empty blocks");
+    }
+
+    #[test]
+    fn mastery_bar_mid_score() {
+        // score 2.5 → 5 filled, 5 empty
+        let result = mastery_bar(2.5);
+        assert!(
+            result.ends_with(" 2.5"),
+            "should end with ' 2.5', got: {result}"
+        );
+        assert!(result.contains("█████"), "should contain 5 filled blocks");
+        assert!(result.contains("░░░░░"), "should contain 5 empty blocks");
+    }
+
+    #[test]
+    fn mastery_bar_score_above_threshold_green() {
+        // score >= 4.0 renders green — we verify the numeric label
+        let result = mastery_bar(4.0);
+        assert!(
+            result.ends_with(" 4.0"),
+            "should end with ' 4.0', got: {result}"
+        );
+    }
+
+    // ── wrap_text ────────────────────────────────────────────────────────
+
+    #[test]
+    fn wrap_text_short_line_unchanged() {
+        let lines = wrap_text("hello world", 80);
+        assert_eq!(lines, vec!["hello world"]);
+    }
+
+    #[test]
+    fn wrap_text_empty_input() {
+        let lines = wrap_text("", 80);
+        assert!(lines.is_empty(), "empty input should produce no lines");
+    }
+
+    #[test]
+    fn wrap_text_splits_at_width() {
+        // "one two" = 7 chars; width=4 forces split after "one"
+        let lines = wrap_text("one two", 4);
+        assert_eq!(lines, vec!["one", "two"]);
+    }
+
+    #[test]
+    fn wrap_text_long_sentence() {
+        // width=11: "alpha beta"=10 fits, "gamma delta"=11 fits, "epsilon"=7 fits
+        let text = "alpha beta gamma delta epsilon";
+        let lines = wrap_text(text, 11);
+        assert_eq!(lines[0], "alpha beta");
+        assert_eq!(lines[1], "gamma delta");
+        assert_eq!(lines[2], "epsilon");
+    }
+
+    #[test]
+    fn wrap_text_single_word_longer_than_width() {
+        // A word longer than width still goes on its own line
+        let lines = wrap_text("superlongword", 5);
+        assert_eq!(lines, vec!["superlongword"]);
+    }
+
+    // ── hr ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn hr_has_correct_width() {
+        let line = hr();
+        // hr() = "─".repeat(HEADER_WIDTH) where HEADER_WIDTH = 56
+        // Each "─" is one Unicode char (3 bytes), visible width 1
+        assert_eq!(line.chars().count(), HEADER_WIDTH);
+    }
+
+    // ── header_box ──────────────────────────────────────────────────────
+
+    #[test]
+    fn header_box_contains_title() {
+        let title = "TEST";
+        let result = header_box(title);
+        assert!(
+            result.contains(title),
+            "header_box should contain the title"
+        );
+        assert!(result.starts_with('╔'), "should start with ╔");
+        assert!(result.ends_with('╗'), "should end with ╗");
+    }
+
+    #[test]
+    fn header_box_empty_title() {
+        let result = header_box("");
+        assert!(result.starts_with('╔'));
+        assert!(result.ends_with('╗'));
+    }
+
+    // ── footer_box ──────────────────────────────────────────────────────
+
+    #[test]
+    fn footer_box_structure() {
+        let result = footer_box();
+        assert!(result.starts_with('╚'), "should start with ╚");
+        assert!(result.ends_with('╝'), "should end with ╝");
+        // Inner content is (HEADER_WIDTH - 2) '═' chars
+        let inner: String = result.chars().skip(1).take_while(|&c| c == '═').collect();
+        assert_eq!(inner.chars().count(), HEADER_WIDTH - 2);
+    }
+
+    // ── fmt_var ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn fmt_var_nominal() {
+        let v = VisVar {
+            name: "x".to_string(),
+            value: "42".to_string(),
+        };
+        assert_eq!(fmt_var(&v), "x: 42");
+    }
+
+    #[test]
+    fn fmt_var_empty_fields() {
+        let v = VisVar {
+            name: String::new(),
+            value: String::new(),
+        };
+        assert_eq!(fmt_var(&v), ": ");
+    }
 }
