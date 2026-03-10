@@ -144,6 +144,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
         let mut escape_buf: Vec<u8> = Vec::new();
+        let mut fail_count: u32 = 0;
 
         let action = crate::watcher::watch_file_interactive(
             &source_path,
@@ -261,6 +262,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
                         let result = runner::compile_and_run(&source_for_change, &exercise_clone);
                         display::show_result(&result, &exercise_clone);
                         if result.success {
+                            fail_count = 0;
                             if !already_recorded.swap(true, Ordering::SeqCst) {
                                 crate::record_and_show(
                                     &conn_for_watch,
@@ -275,6 +277,18 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
                             );
                             std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                             return Some(WatchAction::Advance);
+                        }
+                        if !result.compile_error {
+                            fail_count += 1;
+                            if fail_count >= 2 {
+                                if let Some(cm) = &exercise_clone.common_mistake {
+                                    println!(
+                                        "  {} {}",
+                                        "⚠ Piège fréquent:".bold().red(),
+                                        cm.yellow()
+                                    );
+                                }
+                            }
                         }
                         display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
                         None
