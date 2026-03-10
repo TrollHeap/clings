@@ -1,0 +1,33 @@
+{
+  "id": "fs-inode-calc-02",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Inode : indirection simple pour un fichier 2 Mo (blocs 512 B, ptr 4 B)",
+  "description": "NSY103/UTC502 — Même structure que les annales UTC502 1ère session 2021-2022 (Ex.1).\n\nParamètres :\n- Taille de bloc : 512 octets\n- Numéro de bloc (pointeur) : 4 octets\n- Fichier de 2 Mo (2 × 1024 × 1024 = 2 097 152 octets)\n\nCalculez :\n1. Nombre de blocs de données : file_size / block_size = 4096\n2. Entrées dans un bloc d'adresses : block_size / ptr_size = 128\n3. Blocs directs utilisés : 12 (tous remplis)\n4. Blocs restants après directs : 4096 - 12 = 4084\n5. Blocs d'indirection simple nécessaires : ceil(4084 / 128) = 32\n\nRéponse exacte de l'annale UTC502 2021-2022 : blocs=4096, entrées=128, indirects=32.",
+  "starter_code": "#include <stdio.h>\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = ____;\n    int entries_per_block = ____;\n    int remaining         = ____;\n    /* ceil(remaining / entries_per_block) */\n    int i1_blocks         = (remaining + entries_per_block - 1) / ____;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs restants après directs: %d\\n\", remaining);\n    printf(\"Blocs d'indirection simple: %d\\n\", i1_blocks);\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    int remaining         = data_blocks - DIRECT_BLOCKS;\n    /* ceil(remaining / entries_per_block) */\n    int i1_blocks         = (remaining + entries_per_block - 1) / entries_per_block;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs restants après directs: %d\\n\", remaining);\n    printf(\"Blocs d'indirection simple: %d\\n\", i1_blocks);\n    return 0;\n}",
+  "hints": [
+    "data_blocks = FILE_SIZE / BLOCK_SIZE = 2097152 / 512 = 4096 ; entries_per_block = BLOCK_SIZE / PTR_SIZE = 512 / 4 = 128",
+    "Les 12 blocs directs couvrent les 12 premiers blocs ; remaining = data_blocks - DIRECT_BLOCKS = 4096 - 12 = 4084",
+    "Nombre de blocs I1 = ceil(remaining / entries_per_block) = ceil(4084 / 128) = 32 (formule entière : (remaining + entries_per_block - 1) / entries_per_block)"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Blocs de données: 4096\nEntrées par bloc indirect: 128\nBlocs restants après directs: 4084\nBlocs d'indirection simple: 32\n",
+    "test_code": null
+  },
+  "prerequisites": ["fs-inode-01", "fs-inode-calc-01"],
+  "exercise_type": "fill_blank",
+  "key_concept": "Avec blocs de 512 B et pointeurs 4 B : 128 entrées/bloc indirect ; un fichier 2 Mo nécessite 32 blocs d'indirection simple",
+  "common_mistake": "Utiliser la taille de fichier au lieu du nombre de blocs restants pour calculer les blocs d'indirection",
+  "kc_ids": ["KC-C5"],
+  "files": [],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == RAPPEL =================================================\n * Annale UTC502 1ère session 2021-2022, Exercice 1\n *\n * Avec BLOCK_SIZE=512, PTR_SIZE=4, FILE_SIZE=2Mo :\n *   data_blocks       = 2097152 / 512  = 4096\n *   entries_per_block = 512 / 4        = 128\n *   remaining         = 4096 - 12      = 4084\n *   i1_blocks         = ceil(4084/128) = 32\n *\n * Formule plafond entier : ceil(a/b) = (a + b - 1) / b\n * =========================================================== */\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    int remaining         = data_blocks - DIRECT_BLOCKS;\n    int i1_blocks         = (remaining + entries_per_block - 1) / entries_per_block;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs restants après directs: %d\\n\", remaining);\n    printf(\"Blocs d'indirection simple: %d\\n\", i1_blocks);\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    /* blocs non couverts par les 12 pointeurs directs */\n    int remaining         = data_blocks - ____;\n    int i1_blocks         = (remaining + entries_per_block - 1) / ____;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs restants après directs: %d\\n\", remaining);\n    printf(\"Blocs d'indirection simple: %d\\n\", i1_blocks);\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = ____;\n    int entries_per_block = ____;\n    int remaining         = ____;\n    int i1_blocks         = (remaining + entries_per_block - 1) / ____;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs restants après directs: %d\\n\", remaining);\n    printf(\"Blocs d'indirection simple: %d\\n\", i1_blocks);\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE    512\n#define PTR_SIZE      4\n#define FILE_SIZE     (2 * 1024 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    // data_blocks       = FILE_SIZE / BLOCK_SIZE\n    // entries_per_block = BLOCK_SIZE / PTR_SIZE\n    // remaining         = data_blocks - DIRECT_BLOCKS\n    // i1_blocks         = ceil(remaining / entries_per_block)\n    //                   = (remaining + entries_per_block - 1) / entries_per_block\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}

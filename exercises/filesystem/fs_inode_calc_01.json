@@ -1,0 +1,33 @@
+{
+  "id": "fs-inode-calc-01",
+  "subject": "filesystem",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Inode : blocs directs pour un petit fichier (32 Ko)",
+  "description": "NSY103 — Un inode Unix classique comporte 12 blocs directs (D0–D11), 1 bloc indirect simple (I1), 1 bloc indirect double (I2), 1 bloc indirect triple (I3).\n\nParamètres :\n- Taille de bloc : 1024 octets\n- Numéro de bloc : 2 octets\n- Fichier de 32 Ko\n\nCalculez :\n1. Nombre de blocs de données (file_size / block_size)\n2. Entrées par bloc d'adresses (block_size / ptr_size)\n3. Les blocs directs suffisent-ils ? (32 blocs <= 12 ?)",
+  "starter_code": "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks    = ____;\n    int entries_per_block = ____;\n    int direct_ok      = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
+  "hints": [
+    "Nombre de blocs de données = FILE_SIZE / BLOCK_SIZE — ici 32768 / 1024 = 32 blocs",
+    "Entrées par bloc d'adresses = BLOCK_SIZE / PTR_SIZE — ici 1024 / 2 = 512 entrées par bloc indirect",
+    "12 blocs directs peuvent adresser au maximum 12 Ko (avec des blocs de 1 Ko) ; un fichier de 32 blocs dépasse ce seuil"
+  ],
+  "validation": {
+    "mode": "output",
+    "expected_output": "Blocs de données: 32\nEntrées par bloc indirect: 512\nBlocs directs suffisants: non\n",
+    "test_code": null
+  },
+  "prerequisites": ["fs-inode-01"],
+  "exercise_type": "fill_blank",
+  "key_concept": "Un inode a 12 blocs directs (max 12 Ko avec blocs 1 Ko) ; au-delà, il faut l'indirection simple",
+  "common_mistake": "Oublier que les entrées par bloc dépendent de la taille du pointeur (block_size / ptr_size, pas block_size seul)",
+  "kc_ids": ["KC-C5"],
+  "files": [],
+  "starter_code_stages": [
+    "#include <stdio.h>\n\n/* == RAPPEL =================================================\n * Structure d'un inode Unix :\n *   - 12 blocs directs (D0..D11)\n *   - 1 bloc indirect simple  (I1)\n *   - 1 bloc indirect double  (I2)\n *   - 1 bloc indirect triple  (I3)\n *\n * Exemple avec BLOCK_SIZE=512, PTR_SIZE=2, fichier 1 Ko :\n *   data_blocks       = 1024 / 512  = 2\n *   entries_per_block = 512  / 2    = 256\n *   direct_ok         = (2 <= 12)   = oui\n * =========================================================== */\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    /* data_blocks = taille_fichier / taille_bloc */\n    int data_blocks       = FILE_SIZE / ____;\n    int entries_per_block = ____ / PTR_SIZE;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = ____;\n    int entries_per_block = ____;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
+    "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    // Calculer :\n    // data_blocks       = FILE_SIZE / BLOCK_SIZE\n    // entries_per_block = BLOCK_SIZE / PTR_SIZE\n    // direct_ok         = (data_blocks <= DIRECT_BLOCKS)\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+  ]
+}
