@@ -18,6 +18,14 @@ fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
     }
 }
 
+fn save_exam_ckpt(conn: &rusqlite::Connection, session_id: Option<&str>, index: usize) {
+    if let Some(sid) = session_id {
+        if let Err(e) = progress::save_exam_checkpoint(conn, sid, index) {
+            eprintln!("  Warning: exam checkpoint not saved: {e}");
+        }
+    }
+}
+
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
@@ -412,6 +420,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 pub fn run_exam_piscine(
     exercises: Vec<crate::models::Exercise>,
     timed_minutes: Option<u64>,
+    session_id: Option<&str>,
 ) -> crate::error::Result<()> {
     crate::install_ctrlc_handler();
     let mut conn = progress::open_db()?;
@@ -427,7 +436,23 @@ pub fn run_exam_piscine(
 
     let _raw_guard = crate::enable_raw_mode();
 
-    let mut index = 0;
+    let mut index = if let Some(sid) = session_id {
+        progress::load_exam_checkpoint(&conn, sid)
+            .ok()
+            .flatten()
+            .map(|i| i.min(total.saturating_sub(1)))
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    if index > 0 {
+        println!(
+            "  {} Reprise depuis l'exercice {}/{}",
+            "⏩".dimmed(),
+            index + 1,
+            total
+        );
+    }
     while index < total {
         // Deadline check
         if let Some(dl) = deadline {
@@ -674,14 +699,18 @@ pub fn run_exam_piscine(
                     ex_secs % 60,
                 );
                 index += 1;
+                save_exam_ckpt(&conn, session_id, index);
             }
             WatchAction::Skip | WatchAction::Next => {
                 index += 1;
+                save_exam_ckpt(&conn, session_id, index);
             }
             WatchAction::Prev => {
                 index = index.saturating_sub(1);
+                save_exam_ckpt(&conn, session_id, index);
             }
             WatchAction::Quit => {
+                save_exam_ckpt(&conn, session_id, index);
                 break;
             }
             WatchAction::Continue => {}
@@ -694,6 +723,10 @@ pub fn run_exam_piscine(
     }
 
     let done = completed.iter().filter(|&&c| c).count();
+    if done == total {
+        progress::clear_exam_checkpoint(&conn).ok();
+    }
+
     let elapsed = start_time.elapsed();
     let hours = elapsed.as_secs() / 3600;
     let mins = (elapsed.as_secs() % 3600) / 60;

@@ -43,6 +43,7 @@ pub const DB_FILENAME: &str = "progress.db";
 pub const CURRENT_C_FILENAME: &str = "current.c";
 pub const EXERCISES_ENV_VAR: &str = "CLINGS_EXERCISES";
 pub const PISCINE_CHECKPOINT_KEY: &str = "piscine_checkpoint";
+pub const EXAM_CHECKPOINT_KEY: &str = "exam_checkpoint";
 
 // === tmux ===
 pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";

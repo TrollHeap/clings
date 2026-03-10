@@ -3,7 +3,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use serde::Deserialize;
 
-use crate::constants::{CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, PISCINE_CHECKPOINT_KEY};
+use crate::constants::{
+    CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, EXAM_CHECKPOINT_KEY, PISCINE_CHECKPOINT_KEY,
+};
 use crate::error::Result;
 use crate::mastery;
 use crate::models::Subject;
@@ -286,6 +288,42 @@ pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
 pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
     conn.execute(
         &format!("DELETE FROM kv WHERE key = '{PISCINE_CHECKPOINT_KEY}'"),
+        [],
+    )?;
+    Ok(())
+}
+
+/// Save exam checkpoint: stores "{session_id}:{index}" under exam_checkpoint key.
+pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -> Result<()> {
+    let value = format!("{session_id}:{index}");
+    conn.execute(
+        &format!("INSERT OR REPLACE INTO kv (key, value) VALUES ('{EXAM_CHECKPOINT_KEY}', ?1)"),
+        params![value],
+    )?;
+    Ok(())
+}
+
+/// Load exam checkpoint for the given session_id. Returns None if no checkpoint exists or if the
+/// stored session differs (i.e. the user switched to a different exam session).
+pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Option<usize>> {
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT value FROM kv WHERE key = '{EXAM_CHECKPOINT_KEY}'"
+    ))?;
+    let result = stmt
+        .query_row([], |row| row.get::<_, String>(0))
+        .ok()
+        .and_then(|s| {
+            let prefix = format!("{session_id}:");
+            s.strip_prefix(&prefix)
+                .and_then(|rest| rest.parse::<usize>().ok())
+        });
+    Ok(result)
+}
+
+/// Clear exam checkpoint (called when exam session is fully completed).
+pub fn clear_exam_checkpoint(conn: &Connection) -> Result<()> {
+    conn.execute(
+        &format!("DELETE FROM kv WHERE key = '{EXAM_CHECKPOINT_KEY}'"),
         [],
     )?;
     Ok(())
