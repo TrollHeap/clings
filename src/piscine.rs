@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -117,7 +118,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         }
         println!();
         display::show_watching(&source_path);
-        display::show_keybinds_piscine();
+        display::show_keybinds_piscine(!exercise.visualizer.steps.is_empty());
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
@@ -126,49 +127,136 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let already_recorded = Arc::new(AtomicBool::new(false));
+        let mut vis_active = false;
+        let mut vis_step: usize = 0;
+        let mut vis_lines: usize = 0;
+        let mut escape_buf: Vec<u8> = Vec::new();
 
         let action = crate::watcher::watch_file_interactive(
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_piscine();
+                display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
                 WatchAction::Continue
             },
-            |key| match key {
-                b'h' | b'H' => {
-                    if !hint_shown {
-                        println!();
-                        display::show_hints(&exercise_clone);
-                        hint_shown = true;
-                    }
-                    None
-                }
-                b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
-                b'k' | b'K' => Some(WatchAction::Prev),
-                b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
-                b'r' | b'R' => {
-                    let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-                    display::show_result(&result, &exercise_clone);
-                    if result.success {
-                        if !already_recorded.swap(true, Ordering::SeqCst) {
-                            crate::record_and_show(
-                                &conn_for_watch,
-                                &exercise_clone.subject,
-                                &exercise_clone.id,
-                                true,
-                            );
+            |key| {
+                // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
+                if !escape_buf.is_empty() {
+                    escape_buf.push(key);
+                    if escape_buf.len() == 3 {
+                        let seq = std::mem::take(&mut escape_buf);
+                        if vis_active {
+                            let n = exercise_clone.visualizer.steps.len();
+                            match seq.as_slice() {
+                                [0x1b, b'[', b'C'] => {
+                                    // Arrow right → next step
+                                    vis_step = (vis_step + 1).min(n.saturating_sub(1));
+                                    print!("\x1b[{}A\x1b[J", vis_lines);
+                                    let _ = std::io::stdout().flush().ok();
+                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                }
+                                [0x1b, b'[', b'D'] => {
+                                    // Arrow left → previous step
+                                    vis_step = vis_step.saturating_sub(1);
+                                    print!("\x1b[{}A\x1b[J", vis_lines);
+                                    let _ = std::io::stdout().flush().ok();
+                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                }
+                                _ => {}
+                            }
                         }
-                        println!(
-                            "  {}",
-                            "Exercice résolu ! Avancement dans 2s...".bold().green()
-                        );
-                        std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
-                        return Some(WatchAction::Advance);
                     }
-                    display::show_keybinds_piscine();
-                    None
+                    return None;
                 }
-                _ => None,
+                if key == 0x1b {
+                    escape_buf.push(key);
+                    return None;
+                }
+
+                // Any non-arrow key closes the visualizer
+                if vis_active {
+                    vis_active = false;
+                    display::clear_screen();
+                    // Re-display the piscine header and exercise
+                    show_piscine_header(index, total, &start_time);
+                    let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
+                    display::show_chapter(&ch_ctx);
+                    println!();
+                    println!(
+                        "  {} [{}/{}]  {}",
+                        "Exercise".bold().green(),
+                        (index + 1).to_string().bold(),
+                        total,
+                        exercise.title.bold(),
+                    );
+                    println!(
+                        "  {}  {}   {}  {}   {}  {}",
+                        "│".dimmed(),
+                        display::difficulty_stars(exercise.difficulty),
+                        "│".dimmed(),
+                        exercise.subject.dimmed(),
+                        "│".dimmed(),
+                        match current_stage {
+                            Some(s) => format!("S{s}"),
+                            None => "S2".to_string(),
+                        }
+                        .dimmed(),
+                    );
+                    println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
+                    println!();
+                    for line in exercise.description.lines() {
+                        println!("  {line}");
+                    }
+                    println!();
+                    display::show_watching(&source_path);
+                    display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                    return None;
+                }
+
+                match key {
+                    b'v' | b'V' => {
+                        if !exercise_clone.visualizer.steps.is_empty() {
+                            vis_step = 0;
+                            vis_active = true;
+                            vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                        }
+                        None
+                    }
+                    b'h' | b'H' => {
+                        if !hint_shown {
+                            println!();
+                            display::show_hints(&exercise_clone);
+                            hint_shown = true;
+                        }
+                        None
+                    }
+                    b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
+                    b'k' | b'K' => Some(WatchAction::Prev),
+                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                    b'r' | b'R' => {
+                        let result = runner::compile_and_run(&source_for_change, &exercise_clone);
+                        display::show_result(&result, &exercise_clone);
+                        if result.success {
+                            if !already_recorded.swap(true, Ordering::SeqCst) {
+                                crate::record_and_show(
+                                    &conn_for_watch,
+                                    &exercise_clone.subject,
+                                    &exercise_clone.id,
+                                    true,
+                                );
+                            }
+                            println!(
+                                "  {}",
+                                "Exercice résolu ! Avancement dans 2s...".bold().green()
+                            );
+                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
+                            return Some(WatchAction::Advance);
+                        }
+                        display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                        None
+                    }
+                    _ => None,
+                }
             },
         )?;
 
