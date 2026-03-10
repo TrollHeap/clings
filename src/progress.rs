@@ -1,6 +1,8 @@
 use chrono::Utc;
 use rusqlite::{params, Connection};
 
+use serde::Deserialize;
+
 use crate::error::Result;
 use crate::mastery;
 use crate::models::Subject;
@@ -298,6 +300,89 @@ pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
     }
     tx.commit()?;
     Ok(())
+}
+
+/// Sérialise tous les sujets + métadonnées en JSON (pour sauvegarde/transfert).
+pub fn export_progress(conn: &Connection) -> Result<String> {
+    let subjects = get_all_subjects(conn)?;
+
+    #[derive(serde::Serialize)]
+    struct ExportData<'a> {
+        version: u32,
+        exported_at: String,
+        subjects: &'a [Subject],
+    }
+
+    let data = ExportData {
+        version: 1,
+        exported_at: chrono::Utc::now().to_rfc3339(),
+        subjects: &subjects,
+    };
+
+    serde_json::to_string_pretty(&data)
+        .map_err(|e| crate::error::KfError::Config(format!("serialization error: {e}")))
+}
+
+/// Importe les sujets depuis un JSON exporté.
+/// Si `overwrite` est true, remplace les valeurs existantes.
+/// Si false, prend le max(mastery existant, mastery importé).
+/// Retourne le nombre de sujets importés/mis à jour.
+pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Result<usize> {
+    #[derive(Deserialize)]
+    struct ImportData {
+        subjects: Vec<Subject>,
+    }
+
+    let data: ImportData = serde_json::from_str(json)
+        .map_err(|e| crate::error::KfError::Config(format!("invalid JSON: {e}")))?;
+
+    let tx = conn.transaction()?;
+    let mut count = 0usize;
+
+    for sub in &data.subjects {
+        if overwrite {
+            tx.execute(
+                "INSERT OR REPLACE INTO subjects
+                 (name, mastery_score, last_practiced_at, attempts_total, attempts_success,
+                  difficulty_unlocked, next_review_at, srs_interval_days)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    sub.name,
+                    sub.mastery_score,
+                    sub.last_practiced_at,
+                    sub.attempts_total,
+                    sub.attempts_success,
+                    sub.difficulty_unlocked,
+                    sub.next_review_at,
+                    sub.srs_interval_days,
+                ],
+            )?;
+        } else {
+            tx.execute(
+                "INSERT INTO subjects
+                 (name, mastery_score, last_practiced_at, attempts_total, attempts_success,
+                  difficulty_unlocked, next_review_at, srs_interval_days)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(name) DO UPDATE SET
+                   mastery_score = MAX(mastery_score, excluded.mastery_score),
+                   difficulty_unlocked = MAX(difficulty_unlocked, excluded.difficulty_unlocked)",
+                params![
+                    sub.name,
+                    sub.mastery_score,
+                    sub.last_practiced_at,
+                    sub.attempts_total,
+                    sub.attempts_success,
+                    sub.difficulty_unlocked,
+                    sub.next_review_at,
+                    sub.srs_interval_days,
+                ],
+            )?;
+        }
+        count += 1;
+    }
+
+    tx.commit()?;
+    Ok(count)
 }
 
 #[cfg(test)]

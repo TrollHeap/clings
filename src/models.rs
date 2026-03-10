@@ -281,7 +281,7 @@ impl<'de> serde::Deserialize<'de> for VisVar {
 }
 
 /// État de maîtrise d'un sujet, persisté en base SQLite.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Subject {
     /// Nom du sujet correspondant au champ `subject` des exercices
     pub name: String,

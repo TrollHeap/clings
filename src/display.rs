@@ -1,6 +1,12 @@
 use colored::{ColoredString, Colorize};
 use serde::Deserialize;
 
+thread_local! {
+    static GCC_RE: regex::Regex = regex::Regex::new(
+        r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
+    ).unwrap();
+}
+
 use crate::chapters::{ChapterContext, CHAPTERS};
 use crate::models::{Difficulty, Exercise, Subject, ValidationMode, VisVar};
 use crate::runner::RunResult;
@@ -245,13 +251,13 @@ pub fn show_exercise_watch(
 /// Show keybind hints.
 pub fn show_keybinds() {
     println!(
-        "  {} {} hint  {} skip  {} quit  {} list  {} check",
+        "  {} {} hint  {} skip  {} quit  {} list  {} run",
         "Keys".bold().cyan(),
         "[h]".bold(),
         "[n]".bold(),
         "[q]".bold(),
         "[l]".bold(),
-        "[c]".bold(),
+        "[r]".bold(),
     );
     println!();
 }
@@ -260,13 +266,13 @@ pub fn show_keybinds() {
 pub fn show_keybinds_with_vis(has_visualizer: bool) {
     if has_visualizer {
         println!(
-            "  {} {} hint  {} skip  {} quit  {} list  {} check  {} visualiser",
+            "  {} {} hint  {} skip  {} quit  {} list  {} run  {} visualiser",
             "Keys".bold().cyan(),
             "[h]".bold(),
             "[n]".bold(),
             "[q]".bold(),
             "[l]".bold(),
-            "[c]".bold(),
+            "[r]".bold(),
             "[v]".bold(),
         );
     } else {
@@ -445,9 +451,14 @@ pub fn show_watching(source_path: &std::path::Path) {
     );
     println!(
         "  {}",
-        "Sauvegardez le fichier pour compiler & valider...".dimmed()
+        "Sauvegardez, puis [r] pour compiler & valider...".dimmed()
     );
     println!();
+}
+
+/// Show notification when a file save is detected (no auto-compile).
+pub fn show_file_saved() {
+    println!("  {}", "fichier sauvegardé — [r] pour compiler".dimmed());
 }
 
 /// Display exercise info before editing (single run mode).
@@ -521,7 +532,39 @@ pub fn show_result(result: &RunResult, exercise: &Exercise) {
     if result.compile_error {
         println!("  {} {}", "╔══".red(), "ERREUR DE COMPILATION".bold().red());
         for line in result.stderr.lines() {
-            println!("  {} {}", "║".red(), line.red());
+            let formatted = GCC_RE.with(|re| {
+                if let Some(caps) = re.captures(line) {
+                    let lineno = &caps[1];
+                    let sev = &caps[2];
+                    let msg = &caps[3];
+                    match sev {
+                        "error" => format!(
+                            "  {}  {} {} │ {}",
+                            "║".red(),
+                            format!("ligne {lineno}").red().bold(),
+                            "error".red(),
+                            msg.red()
+                        ),
+                        "warning" => format!(
+                            "  {}  {} {} │ {}",
+                            "║".red(),
+                            format!("ligne {lineno}").yellow().bold(),
+                            "warning".yellow(),
+                            msg.yellow()
+                        ),
+                        _ => format!(
+                            "  {}  {} {} │ {}",
+                            "║".red(),
+                            format!("ligne {lineno}").cyan().bold(),
+                            "note".cyan(),
+                            msg.cyan()
+                        ),
+                    }
+                } else {
+                    format!("  {}  {}", "║".red(), line.dimmed())
+                }
+            });
+            println!("{formatted}");
         }
         println!("  {}", "╚══".red());
     } else if result.timeout {
@@ -963,4 +1006,36 @@ pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
         "Astuce:".bold().yellow()
     );
     println!();
+}
+
+/// Confirmation after `clings export`.
+pub fn show_export_done(path: Option<&std::path::Path>, count: usize) {
+    match path {
+        Some(p) => println!(
+            "  {} {} sujets exportés → {}",
+            "✓".bold().green(),
+            count,
+            p.display().to_string().bold()
+        ),
+        None => println!(
+            "  {} {} sujets exportés (stdout)",
+            "✓".bold().green(),
+            count
+        ),
+    }
+}
+
+/// Confirmation after `clings import`.
+pub fn show_import_done(count: usize, overwrite: bool) {
+    let mode = if overwrite {
+        "écrasement"
+    } else {
+        "fusion max"
+    };
+    println!(
+        "  {} {} sujets importés ({})",
+        "✓".bold().green(),
+        count,
+        mode.dimmed()
+    );
 }

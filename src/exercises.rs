@@ -149,4 +149,101 @@ mod tests {
         let total_in_map: usize = by_subject.values().map(|v| v.len()).sum();
         assert_eq!(exercises.len(), total_in_map);
     }
+
+    #[test]
+    fn test_exercise_ids_unique() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        let ids: std::collections::HashSet<&str> =
+            exercises.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            exercises.len(),
+            ids.len(),
+            "Exercise IDs must be unique ({} exercises, {} unique IDs)",
+            exercises.len(),
+            ids.len()
+        );
+    }
+
+    #[test]
+    fn test_exercises_fields_complete() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        for ex in &exercises {
+            assert!(!ex.title.is_empty(), "Exercise {} has empty title", ex.id);
+            assert!(
+                !ex.description.is_empty(),
+                "Exercise {} has empty description",
+                ex.id
+            );
+            assert!(
+                !ex.starter_code.is_empty(),
+                "Exercise {} has empty starter_code",
+                ex.id
+            );
+            assert!(
+                !ex.solution_code.is_empty(),
+                "Exercise {} has empty solution_code",
+                ex.id
+            );
+            assert!(!ex.hints.is_empty(), "Exercise {} has no hints", ex.id);
+        }
+    }
+
+    #[test]
+    fn test_starter_code_stages_count() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        for ex in &exercises {
+            if !ex.starter_code_stages.is_empty() {
+                assert_eq!(
+                    ex.starter_code_stages.len(),
+                    5,
+                    "Exercise {} has {} stages, expected 5",
+                    ex.id,
+                    ex.starter_code_stages.len()
+                );
+                for (i, stage) in ex.starter_code_stages.iter().enumerate() {
+                    assert!(
+                        !stage.is_empty(),
+                        "Exercise {} stage S{} is empty",
+                        ex.id,
+                        i
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_output_validation_has_expected() {
+        use crate::models::ValidationMode;
+        let (exercises, _) = load_all_exercises().unwrap();
+        for ex in &exercises {
+            if matches!(ex.validation.mode, ValidationMode::Output) {
+                assert!(
+                    ex.validation.expected_output.is_some(),
+                    "Exercise {} uses Output mode but has no expected_output",
+                    ex.id
+                );
+                let expected = ex.validation.expected_output.as_ref().unwrap();
+                assert!(
+                    !expected.is_empty(),
+                    "Exercise {} has empty expected_output",
+                    ex.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_difficulty_range() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        for ex in &exercises {
+            let d = ex.difficulty as u8;
+            assert!(
+                (1..=5).contains(&d),
+                "Exercise {} has invalid difficulty {}",
+                ex.id,
+                d
+            );
+        }
+    }
 }
