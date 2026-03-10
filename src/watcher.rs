@@ -16,6 +16,10 @@ pub enum WatchAction {
     Skip,
     /// User wants to quit
     Quit,
+    /// Navigate to next exercise (j)
+    Next,
+    /// Navigate to previous exercise (k)
+    Prev,
 }
 
 /// Watch a file for modifications while also listening for keyboard commands.

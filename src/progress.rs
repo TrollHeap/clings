@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use serde::Deserialize;
 
@@ -181,7 +181,7 @@ pub fn get_subject(conn: &Connection, name: &str) -> Result<Option<Subject>> {
                 srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
             })
         })
-        .ok();
+        .optional()?;
 
     Ok(subject)
 }
@@ -230,6 +230,19 @@ pub fn get_streak(conn: &Connection) -> Result<i64> {
 }
 
 /// Reset all progress (with confirmation handled by caller).
+/// Réinitialise la progression d'un seul sujet (mastery + logs).
+pub fn reset_subject(conn: &Connection, subject_name: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM subjects WHERE name = ?1",
+        params![subject_name],
+    )?;
+    conn.execute(
+        "DELETE FROM practice_log WHERE subject = ?1",
+        params![subject_name],
+    )?;
+    Ok(())
+}
+
 pub fn reset_progress(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "DELETE FROM practice_log;
@@ -448,6 +461,40 @@ mod tests {
         let conn = open_test_db().unwrap();
         let sub = get_subject(&conn, "nonexistent").unwrap();
         assert!(sub.is_none());
+    }
+
+    #[test]
+    fn test_reset_subject_isolated() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
+        record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
+
+        reset_subject(&conn, "pointers").unwrap();
+
+        // pointers supprimé
+        assert!(get_subject(&conn, "pointers").unwrap().is_none());
+        // structs intact
+        let s = get_subject(&conn, "structs").unwrap().unwrap();
+        assert_eq!(s.mastery_score, 1.0);
+        // log pointers supprimé, log structs intact
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM practice_log WHERE subject = 'structs'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+        let count_ptr: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM practice_log WHERE subject = 'pointers'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_ptr, 0);
     }
 
     #[test]

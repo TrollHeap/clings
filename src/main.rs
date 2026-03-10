@@ -36,7 +36,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start watch mode: SRS-prioritized exercises with auto-advance
-    Watch,
+    Watch {
+        /// Restreindre à un seul chapitre (1-16)
+        #[arg(long, short = 'c')]
+        chapter: Option<u8>,
+    },
     /// List all exercises (optionally filtered by subject)
     List {
         #[arg(long)]
@@ -60,9 +64,17 @@ enum Commands {
         exercise_id: String,
     },
     /// Reset all progress (with confirmation)
-    Reset,
+    Reset {
+        /// Réinitialiser uniquement ce sujet (ex: pointers)
+        #[arg(long, short = 's')]
+        subject: Option<String>,
+    },
     /// Mode piscine: intensive linear progression (all exercises unlocked)
-    Piscine,
+    Piscine {
+        /// Restreindre à un seul chapitre (1-16)
+        #[arg(long, short = 'c')]
+        chapter: Option<u8>,
+    },
     /// Reinforce due subjects via SRS scheduling
     Review,
     /// Show global statistics
@@ -89,20 +101,20 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Some(Commands::Watch) => cmd_watch(),
+        Some(Commands::Watch { chapter }) => cmd_watch(chapter),
         Some(Commands::List { subject }) => cmd_list(subject.as_deref()),
         Some(Commands::Run { exercise_id }) => cmd_run(&exercise_id),
         Some(Commands::Progress) => cmd_progress(),
         Some(Commands::Hint { exercise_id }) => cmd_hint(&exercise_id),
         Some(Commands::Solution { exercise_id }) => cmd_solution(&exercise_id),
-        Some(Commands::Reset) => cmd_reset(),
-        Some(Commands::Piscine) => piscine::cmd_piscine(),
+        Some(Commands::Reset { subject }) => cmd_reset(subject.as_deref()),
+        Some(Commands::Piscine { chapter }) => piscine::cmd_piscine(chapter),
         Some(Commands::Review) => cmd_review(),
         Some(Commands::Stats) => cmd_stats(),
         Some(Commands::Annales) => cmd_annales(),
         Some(Commands::Export { output }) => cmd_export(output.as_deref()),
         Some(Commands::Import { input, overwrite }) => cmd_import(&input, overwrite),
-        None => cmd_watch(),
+        None => cmd_watch(None),
     };
 
     if let Err(e) = result {
@@ -111,7 +123,7 @@ fn main() {
     }
 }
 
-fn cmd_watch() -> Result<()> {
+fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
     install_ctrlc_handler();
 
     let (all_exercises, _) = exercises::load_all_exercises()?;
@@ -136,7 +148,18 @@ fn cmd_watch() -> Result<()> {
         })
         .collect();
 
-    let chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
+    let mut chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
+    if let Some(n) = filter_chapter {
+        chapter_blocks.retain(|b| b.chapter.number == n);
+        if chapter_blocks.is_empty() {
+            println!(
+                "  {} Chapitre {} introuvable ou aucun exercice disponible.",
+                "⚠".yellow(),
+                n
+            );
+            return Ok(());
+        }
+    }
     let exercise_order = chapters::flatten_chapters(&chapter_blocks);
 
     if exercise_order.is_empty() {
@@ -276,15 +299,22 @@ fn cmd_watch() -> Result<()> {
                         None
                     }
                     b'n' | b'N' => Some(WatchAction::Skip),
+                    b'j' | b'J' => Some(WatchAction::Next),
+                    b'k' | b'K' => Some(WatchAction::Prev),
                     b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                     b'l' | b'L' => {
                         // Quick exercise list
-                        let conn = progress::open_db().ok();
-                        if let Some(c) = &conn {
-                            if let Ok(subjects) = progress::get_all_subjects(c) {
-                                let (all, _) = exercises::load_all_exercises().unwrap_or_default();
-                                display::show_exercise_list(&all, &subjects, None);
-                            }
+                        match progress::open_db() {
+                            Err(e) => eprintln!("  {} {e}", "DB Error:".red()),
+                            Ok(c) => match progress::get_all_subjects(&c) {
+                                Err(e) => eprintln!("  {} {e}", "DB Error:".red()),
+                                Ok(subjects) => match exercises::load_all_exercises() {
+                                    Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
+                                    Ok((all, _)) => {
+                                        display::show_exercise_list(&all, &subjects, None);
+                                    }
+                                },
+                            },
                         }
                         println!("  {}", "Press any key to return...".dimmed());
                         None
@@ -334,8 +364,13 @@ fn cmd_watch() -> Result<()> {
                 completed[index] = true;
                 index += 1;
             }
-            WatchAction::Skip => {
-                index += 1;
+            WatchAction::Skip | WatchAction::Next => {
+                if index + 1 < total {
+                    index += 1;
+                }
+            }
+            WatchAction::Prev => {
+                index = index.saturating_sub(1);
             }
             WatchAction::Quit => {
                 break;
@@ -669,22 +704,38 @@ fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_reset() -> Result<()> {
-    print!(
-        "  {} This will delete ALL progress. Type 'yes' to confirm: ",
-        "Warning!".bold().red()
-    );
-    io::stdout().flush().ok();
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-
-    if input.trim() == "yes" {
-        let conn = progress::open_db()?;
-        progress::reset_progress(&conn)?;
-        println!("  {}", "Progress reset.".green());
+fn cmd_reset(subject: Option<&str>) -> Result<()> {
+    if let Some(name) = subject {
+        print!(
+            "  {} Supprimer la progression de '{}'. Taper 'yes' pour confirmer : ",
+            "Attention !".bold().red(),
+            name
+        );
+        io::stdout().flush().ok();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if input.trim() == "yes" {
+            let conn = progress::open_db()?;
+            progress::reset_subject(&conn, name)?;
+            println!("  {} Progression de '{}' réinitialisée.", "✓".green(), name);
+        } else {
+            println!("  {}", "Annulé.".dimmed());
+        }
     } else {
-        println!("  {}", "Cancelled.".dimmed());
+        print!(
+            "  {} This will delete ALL progress. Type 'yes' to confirm: ",
+            "Warning!".bold().red()
+        );
+        io::stdout().flush().ok();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if input.trim() == "yes" {
+            let conn = progress::open_db()?;
+            progress::reset_progress(&conn)?;
+            println!("  {}", "Progress reset.".green());
+        } else {
+            println!("  {}", "Cancelled.".dimmed());
+        }
     }
     Ok(())
 }

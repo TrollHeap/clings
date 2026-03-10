@@ -12,7 +12,7 @@ use crate::{display, exercises, progress, runner, tmux};
 
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
-pub fn cmd_piscine() -> Result<()> {
+pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     crate::install_ctrlc_handler();
 
     let (all_exercises, _) = exercises::load_all_exercises()?;
@@ -23,7 +23,18 @@ pub fn cmd_piscine() -> Result<()> {
     let subjects = progress::get_all_subjects(&conn)?;
 
     // Order by chapters, then difficulty within each chapter (no gating)
-    let chapter_blocks = chapters::order_by_chapters(&all_exercises, &subjects);
+    let mut chapter_blocks = chapters::order_by_chapters(&all_exercises, &subjects);
+    if let Some(n) = filter_chapter {
+        chapter_blocks.retain(|b| b.chapter.number == n);
+        if chapter_blocks.is_empty() {
+            println!(
+                "  {} Chapitre {} introuvable ou aucun exercice disponible.",
+                "⚠".yellow(),
+                n
+            );
+            return Ok(());
+        }
+    }
     let exercise_order = chapters::flatten_chapters(&chapter_blocks);
 
     if exercise_order.is_empty() {
@@ -131,7 +142,8 @@ pub fn cmd_piscine() -> Result<()> {
                     }
                     None
                 }
-                b'n' | b'N' => Some(WatchAction::Skip),
+                b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
+                b'k' | b'K' => Some(WatchAction::Prev),
                 b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                 b'r' | b'R' => {
                     let result = runner::compile_and_run(&source_for_change, &exercise_clone);
@@ -163,14 +175,26 @@ pub fn cmd_piscine() -> Result<()> {
             WatchAction::Advance => {
                 completed[index] = true;
                 index += 1;
-                progress::save_piscine_checkpoint(&conn, index).ok();
+                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
+                    eprintln!("  Warning: checkpoint not saved: {e}");
+                }
             }
-            WatchAction::Skip => {
+            WatchAction::Skip | WatchAction::Next => {
                 index += 1;
-                progress::save_piscine_checkpoint(&conn, index).ok();
+                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
+                    eprintln!("  Warning: checkpoint not saved: {e}");
+                }
+            }
+            WatchAction::Prev => {
+                index = index.saturating_sub(1);
+                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
+                    eprintln!("  Warning: checkpoint not saved: {e}");
+                }
             }
             WatchAction::Quit => {
-                progress::save_piscine_checkpoint(&conn, index).ok();
+                if let Err(e) = progress::save_piscine_checkpoint(&conn, index) {
+                    eprintln!("  Warning: checkpoint not saved: {e}");
+                }
                 break;
             }
             WatchAction::Continue => {}

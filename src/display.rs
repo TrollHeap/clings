@@ -4,7 +4,7 @@ use serde::Deserialize;
 thread_local! {
     static GCC_RE: regex::Regex = regex::Regex::new(
         r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
-    ).unwrap();
+    ).expect("GCC_RE regex is statically valid");
 }
 
 use crate::chapters::{ChapterContext, CHAPTERS};
@@ -251,13 +251,15 @@ pub fn show_exercise_watch(
 /// Show keybind hints.
 pub fn show_keybinds() {
     println!(
-        "  {} {} hint  {} skip  {} quit  {} list  {} run",
+        "  {} {} hint  {} next  {} prev  {} skip  {} run  {} list  {} quit",
         "Keys".bold().cyan(),
         "[h]".bold(),
+        "[j]".bold(),
+        "[k]".bold(),
         "[n]".bold(),
-        "[q]".bold(),
-        "[l]".bold(),
         "[r]".bold(),
+        "[l]".bold(),
+        "[q]".bold(),
     );
     println!();
 }
@@ -266,14 +268,16 @@ pub fn show_keybinds() {
 pub fn show_keybinds_with_vis(has_visualizer: bool) {
     if has_visualizer {
         println!(
-            "  {} {} hint  {} skip  {} quit  {} list  {} run  {} visualiser",
+            "  {} {} hint  {} next  {} prev  {} skip  {} run  {} list  {} vis  {} quit",
             "Keys".bold().cyan(),
             "[h]".bold(),
+            "[j]".bold(),
+            "[k]".bold(),
             "[n]".bold(),
-            "[q]".bold(),
-            "[l]".bold(),
             "[r]".bold(),
+            "[l]".bold(),
             "[v]".bold(),
+            "[q]".bold(),
         );
     } else {
         show_keybinds();
