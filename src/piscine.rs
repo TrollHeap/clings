@@ -544,6 +544,48 @@ pub fn run_exam_piscine(
                     vis_active = false;
                     display::clear_screen();
                     show_piscine_header(index, total, &start_time, deadline);
+                    // Re-afficher l'exercice
+                    println!(
+                        "  {} [{}/{}]  {}",
+                        "Exercise".bold().green(),
+                        (index + 1).to_string().bold(),
+                        total,
+                        exercise_clone.title.bold(),
+                    );
+                    println!(
+                        "  {}  {}   {}  {}   {}  {}",
+                        "│".dimmed(),
+                        display::difficulty_stars(exercise_clone.difficulty),
+                        "│".dimmed(),
+                        exercise_clone.subject.dimmed(),
+                        "│".dimmed(),
+                        match current_stage {
+                            Some(s) => format!("S{s}"),
+                            None => "S2".to_string(),
+                        }
+                        .dimmed(),
+                    );
+                    println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
+                    println!();
+                    for line in exercise_clone.description.lines() {
+                        println!("  {line}");
+                    }
+                    println!();
+
+                    if let Some(kc) = &exercise_clone.key_concept {
+                        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+                    }
+                    if let Some(cm) = &exercise_clone.common_mistake {
+                        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+                    }
+                    if exercise_clone.key_concept.is_some()
+                        || exercise_clone.common_mistake.is_some()
+                    {
+                        println!();
+                    }
+
+                    display::show_watching(&source_for_change);
+                    display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
                     return None;
                 }
                 match key {
