@@ -27,15 +27,27 @@ pub fn show_keybinds() {
 }
 
 /// Show keybind hints for piscine mode (no [l] list, shows [j] next + [k] prev).
-pub fn show_keybinds_piscine() {
-    show_keybinds_list(&[
-        ('h', "hint"),
-        ('j', "suivant"),
-        ('k', "précédent"),
-        ('n', "skip"),
-        ('r', "run"),
-        ('q', "quit"),
-    ]);
+pub fn show_keybinds_piscine(has_visualizer: bool) {
+    if has_visualizer {
+        show_keybinds_list(&[
+            ('h', "hint"),
+            ('j', "suivant"),
+            ('k', "précédent"),
+            ('n', "skip"),
+            ('r', "run"),
+            ('v', "visualiser"),
+            ('q', "quit"),
+        ]);
+    } else {
+        show_keybinds_list(&[
+            ('h', "hint"),
+            ('j', "suivant"),
+            ('k', "précédent"),
+            ('n', "skip"),
+            ('r', "run"),
+            ('q', "quit"),
+        ]);
+    }
 }
 
 /// Show keybind hints with optional visualizer key.
