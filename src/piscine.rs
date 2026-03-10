@@ -401,6 +401,286 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     Ok(())
 }
 
+/// Lancer une session piscine avec une liste d'exercices préfiltrée (mode exam).
+pub fn run_exam_piscine(
+    exercises: Vec<crate::models::Exercise>,
+    timed_minutes: Option<u64>,
+) -> crate::error::Result<()> {
+    crate::install_ctrlc_handler();
+    let mut conn = progress::open_db()?;
+    progress::apply_all_decay(&mut conn)?;
+    progress::ensure_subjects_batch(&mut conn, &exercises)?;
+
+    let total = exercises.len();
+    let mut completed = vec![false; total];
+    let mut editor_pane: Option<String> = None;
+    let start_time = Instant::now();
+    let deadline: Option<std::time::Instant> =
+        timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
+
+    let _raw_guard = crate::enable_raw_mode();
+
+    let mut index = 0;
+    while index < total {
+        // Deadline check
+        if let Some(dl) = deadline {
+            if std::time::Instant::now() >= dl {
+                println!();
+                println!(
+                    "  {} Temps écoulé ! Session exam terminée.",
+                    "⏰".bold().red()
+                );
+                break;
+            }
+        }
+
+        let exercise = &exercises[index];
+
+        if matches!(exercise.validation.mode, ValidationMode::Test) {
+            completed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        let ex_start = Instant::now();
+        let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
+
+        display::clear_screen();
+        show_piscine_header(index, total, &start_time, deadline);
+
+        println!(
+            "  {} [{}/{}]  {}",
+            "Exercise".bold().green(),
+            (index + 1).to_string().bold(),
+            total,
+            exercise.title.bold(),
+        );
+        println!(
+            "  {}  {}   {}  {}   {}  {}",
+            "│".dimmed(),
+            display::difficulty_stars(exercise.difficulty),
+            "│".dimmed(),
+            exercise.subject.dimmed(),
+            "│".dimmed(),
+            match current_stage {
+                Some(s) => format!("S{s}"),
+                None => "S2".to_string(),
+            }
+            .dimmed(),
+        );
+        println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
+        println!();
+
+        for line in exercise.description.lines() {
+            println!("  {line}");
+        }
+        println!();
+
+        if let Some(kc) = &exercise.key_concept {
+            println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+        }
+        if let Some(cm) = &exercise.common_mistake {
+            println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+        }
+        if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
+            println!();
+        }
+
+        display::show_watching(&source_path);
+        display::show_keybinds_piscine(!exercise.visualizer.steps.is_empty());
+
+        editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
+
+        let exercise_clone = exercise.clone();
+        let conn_for_watch = progress::open_db()?;
+        let source_for_change = source_path.clone();
+        let mut hint_shown = false;
+        let already_recorded = Arc::new(AtomicBool::new(false));
+        let mut vis_active = false;
+        let mut vis_step: usize = 0;
+        let mut vis_lines: usize = 0;
+        let mut escape_buf: Vec<u8> = Vec::new();
+        let mut fail_count: u32 = 0;
+
+        let action = crate::watcher::watch_file_interactive(
+            &source_path,
+            || {
+                display::show_file_saved();
+                display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                WatchAction::Continue
+            },
+            |key| {
+                if !escape_buf.is_empty() {
+                    escape_buf.push(key);
+                    if escape_buf.len() == 3 {
+                        let seq = std::mem::take(&mut escape_buf);
+                        if vis_active {
+                            let n = exercise_clone.visualizer.steps.len();
+                            match seq.as_slice() {
+                                [0x1b, b'[', b'C'] => {
+                                    vis_step = (vis_step + 1).min(n.saturating_sub(1));
+                                    print!("\x1b[{}A\x1b[J", vis_lines);
+                                    let _ = std::io::stdout().flush().ok();
+                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                }
+                                [0x1b, b'[', b'D'] => {
+                                    vis_step = vis_step.saturating_sub(1);
+                                    print!("\x1b[{}A\x1b[J", vis_lines);
+                                    let _ = std::io::stdout().flush().ok();
+                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    return None;
+                }
+                if key == 0x1b {
+                    escape_buf.push(key);
+                    return None;
+                }
+
+                if vis_active {
+                    vis_active = false;
+                    display::clear_screen();
+                    show_piscine_header(index, total, &start_time, deadline);
+                    return None;
+                }
+                match key {
+                    b'v' | b'V' => {
+                        if !exercise_clone.visualizer.steps.is_empty() {
+                            vis_step = 0;
+                            vis_active = true;
+                            vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                        }
+                        None
+                    }
+                    b'h' | b'H' => {
+                        if !hint_shown {
+                            println!();
+                            display::show_hints(&exercise_clone);
+                            hint_shown = true;
+                        }
+                        None
+                    }
+                    b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
+                    b'k' | b'K' => Some(WatchAction::Prev),
+                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                    b'r' | b'R' => {
+                        let result = runner::compile_and_run(&source_for_change, &exercise_clone);
+                        display::show_result(&result, &exercise_clone);
+                        if result.success {
+                            fail_count = 0;
+                            if !already_recorded.swap(true, Ordering::SeqCst) {
+                                crate::record_and_show(
+                                    &conn_for_watch,
+                                    &exercise_clone.subject,
+                                    &exercise_clone.id,
+                                    true,
+                                );
+                            }
+                            println!(
+                                "  {}",
+                                "Exercice résolu ! Avancement dans 2s...".bold().green()
+                            );
+                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
+                            return Some(WatchAction::Advance);
+                        }
+                        if !result.compile_error {
+                            fail_count += 1;
+                            if fail_count >= 2 {
+                                if let Some(cm) = &exercise_clone.common_mistake {
+                                    println!(
+                                        "  {} {}",
+                                        "⚠ Piège fréquent:".bold().red(),
+                                        cm.yellow()
+                                    );
+                                }
+                            }
+                        }
+                        display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                        None
+                    }
+                    _ => None,
+                }
+            },
+        )?;
+
+        match action {
+            WatchAction::Advance => {
+                completed[index] = true;
+                let ex_elapsed = ex_start.elapsed();
+                let ex_secs = ex_elapsed.as_secs();
+                println!(
+                    "  {} Résolu en {}m{:02}s",
+                    "⏱".dimmed(),
+                    ex_secs / 60,
+                    ex_secs % 60,
+                );
+                index += 1;
+            }
+            WatchAction::Skip | WatchAction::Next => {
+                index += 1;
+            }
+            WatchAction::Prev => {
+                index = index.saturating_sub(1);
+            }
+            WatchAction::Quit => {
+                break;
+            }
+            WatchAction::Continue => {}
+        }
+    }
+
+    drop(_raw_guard);
+    if let Some(pane) = &editor_pane {
+        tmux::kill_pane(pane);
+    }
+
+    let done = completed.iter().filter(|&&c| c).count();
+    let elapsed = start_time.elapsed();
+    let hours = elapsed.as_secs() / 3600;
+    let mins = (elapsed.as_secs() % 3600) / 60;
+    let secs = elapsed.as_secs() % 60;
+
+    println!();
+    if timed_minutes.is_some() {
+        let pct = if total > 0 { (done * 100) / total } else { 0 };
+        println!(
+            "  {} Score exam: {}/{} ({}%) en {}h{:02}m{:02}s",
+            "🎓".bold(),
+            done,
+            total,
+            pct,
+            hours,
+            mins,
+            secs,
+        );
+    } else if done == total {
+        println!(
+            "  {} Exam complété ! {}/{} en {}h{:02}m{:02}s",
+            "BRAVO !".bold().green(),
+            done,
+            total,
+            hours,
+            mins,
+            secs,
+        );
+    } else {
+        println!(
+            "  {} {}/{} exercices en {}h{:02}m{:02}s.",
+            "Session terminée.".bold(),
+            done,
+            total,
+            hours,
+            mins,
+            secs,
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;

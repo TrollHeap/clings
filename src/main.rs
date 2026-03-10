@@ -2,6 +2,7 @@ mod chapters;
 pub mod constants;
 mod display;
 mod error;
+mod exam;
 mod exercises;
 mod mastery;
 mod models;
@@ -86,6 +87,15 @@ enum Commands {
     Stats,
     /// Afficher les annales NSY103 et leur correspondance avec les exercices
     Annales,
+    /// Mode exam simulé : reproduit une annale NSY103/UTC502 avec timer
+    Exam {
+        /// ID de session (ex: nsy103-s1-2022-2023). Laisser vide pour lister.
+        #[arg(long, short = 's')]
+        session: Option<String>,
+        /// Lister les sessions disponibles
+        #[arg(long, short = 'l')]
+        list: bool,
+    },
     /// Exporter la progression en JSON
     Export {
         /// Fichier de sortie (défaut : stdout)
@@ -117,6 +127,7 @@ fn main() {
         Some(Commands::Review) => cmd_review(),
         Some(Commands::Stats) => cmd_stats(),
         Some(Commands::Annales) => cmd_annales(),
+        Some(Commands::Exam { session, list }) => exam::cmd_exam(session.as_deref(), list),
         Some(Commands::Export { output }) => cmd_export(output.as_deref()),
         Some(Commands::Import { input, overwrite }) => cmd_import(&input, overwrite),
         None => cmd_watch(None),
