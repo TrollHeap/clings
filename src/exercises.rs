@@ -15,7 +15,14 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
         Ok(e) => e,
         Err(_) => return exercises,
     };
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(err) => {
+                eprintln!("Warning: skipping directory entry: {err}");
+                continue;
+            }
+        };
         let path = entry.path();
         if path.is_dir() {
             exercises.extend(load_exercises_from_dir(&path));

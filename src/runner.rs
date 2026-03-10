@@ -253,8 +253,12 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         Ok(None) => {
             kill_process_group(&child);
             let _ = child.wait();
-            let _ = stdout_thread.join();
-            let _ = stderr_thread.join();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
             RunResult {
                 success: false,
                 stdout: String::new(),
@@ -267,8 +271,12 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         Err(e) => {
             kill_process_group(&child);
             let _ = child.wait();
-            let _ = stdout_thread.join();
-            let _ = stderr_thread.join();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
             RunResult {
                 success: false,
                 stdout: String::new(),
@@ -455,8 +463,12 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
             // Timeout — kill the process group, then join readers (pipe close unblocks them)
             kill_process_group(&child);
             let _ = child.wait();
-            let _ = stdout_thread.join();
-            let _ = stderr_thread.join();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
             RunResult {
                 success: false,
                 stdout: String::new(),
@@ -469,8 +481,12 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         Err(e) => {
             kill_process_group(&child);
             let _ = child.wait();
-            let _ = stdout_thread.join();
-            let _ = stderr_thread.join();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
             RunResult {
                 success: false,
                 stdout: String::new(),
@@ -608,9 +624,15 @@ pub fn prepare_exercise_source(
 
 /// Kill the entire process group of a child to avoid zombie fork-bombs.
 fn kill_process_group(child: &std::process::Child) {
-    let pid = child.id() as libc::pid_t;
+    let pid = child.id();
+    if pid == 0 {
+        return;
+    }
+    // SAFETY: pid was obtained from Child::id() which guarantees a valid positive PID.
+    // Negating it sends SIGKILL to the entire process group, which is intentional
+    // to clean up any subprocesses spawned by the C program.
     unsafe {
-        libc::kill(-pid, libc::SIGKILL);
+        libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
 
