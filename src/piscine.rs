@@ -20,7 +20,7 @@ fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
 
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
-pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
+pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
     crate::install_ctrlc_handler();
 
     let (all_exercises, _) = exercises::load_all_exercises()?;
@@ -52,6 +52,17 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
     let mut completed = vec![false; total];
     let mut editor_pane: Option<String> = None;
     let start_time = Instant::now();
+    let deadline: Option<std::time::Instant> =
+        timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
+
+    if let Some(mins) = timed_minutes {
+        println!(
+            "  {} Mode exam — {} minutes. Bonne chance !",
+            "⏰".bold().yellow(),
+            mins
+        );
+        println!();
+    }
 
     let _raw_guard = crate::enable_raw_mode();
 
@@ -68,6 +79,17 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
         );
     }
     while index < total {
+        if let Some(dl) = deadline {
+            if std::time::Instant::now() >= dl {
+                println!();
+                println!(
+                    "  {} Temps écoulé ! Session exam terminée.",
+                    "⏰".bold().red()
+                );
+                break;
+            }
+        }
+
         let exercise = exercise_order[index];
         let ex_start = Instant::now();
 
@@ -86,7 +108,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
 
         // Piscine display
         display::clear_screen();
-        show_piscine_header(index, total, &start_time);
+        show_piscine_header(index, total, &start_time, deadline);
 
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
         display::show_chapter(&ch_ctx);
@@ -192,7 +214,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
                     vis_active = false;
                     display::clear_screen();
                     // Re-display the piscine header and exercise
-                    show_piscine_header(index, total, &start_time);
+                    show_piscine_header(index, total, &start_time, deadline);
                     let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
                     display::show_chapter(&ch_ctx);
                     println!();
@@ -365,6 +387,16 @@ pub fn cmd_piscine(filter_chapter: Option<u8>) -> Result<()> {
             secs
         );
     }
+    if timed_minutes.is_some() {
+        let pct = if total > 0 { (done * 100) / total } else { 0 };
+        println!(
+            "  {} Score exam: {}/{} ({}%)",
+            "🎓".bold(),
+            done,
+            total,
+            pct
+        );
+    }
 
     Ok(())
 }
@@ -464,7 +496,12 @@ mod tests {
     }
 }
 
-fn show_piscine_header(current: usize, total: usize, start: &Instant) {
+fn show_piscine_header(
+    current: usize,
+    total: usize,
+    start: &Instant,
+    deadline: Option<std::time::Instant>,
+) {
     let elapsed = start.elapsed();
     let mins = elapsed.as_secs() / 60;
     let secs = elapsed.as_secs() % 60;
@@ -504,5 +541,25 @@ fn show_piscine_header(current: usize, total: usize, start: &Instant) {
         mins,
         secs,
     );
+    if let Some(dl) = deadline {
+        let now = std::time::Instant::now();
+        if now < dl {
+            let remaining = dl - now;
+            let rem_mins = remaining.as_secs() / 60;
+            let rem_secs = remaining.as_secs() % 60;
+            let remaining_str = format!("⏰ Restant: {}m{:02}s", rem_mins, rem_secs);
+            if remaining.as_secs() < 300 {
+                println!("  {} {}", "│".bold().yellow(), remaining_str.bold().red());
+            } else {
+                println!("  {} {}", "│".bold().yellow(), remaining_str.bold());
+            }
+        } else {
+            println!(
+                "  {} {}",
+                "│".bold().yellow(),
+                "⏰ TEMPS ÉCOULÉ".bold().red()
+            );
+        }
+    }
     println!();
 }
