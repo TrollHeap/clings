@@ -82,6 +82,22 @@ pub fn ensure_subjects_batch(
     Ok(())
 }
 
+/// Map a rusqlite row (columns 0-7: name, mastery_score, last_practiced_at,
+/// attempts_total, attempts_success, difficulty_unlocked, next_review_at,
+/// srs_interval_days) to a Subject.
+fn row_to_subject(row: &rusqlite::Row) -> rusqlite::Result<Subject> {
+    Ok(Subject {
+        name: row.get(0)?,
+        mastery_score: row.get(1)?,
+        last_practiced_at: row.get(2)?,
+        attempts_total: row.get(3)?,
+        attempts_success: row.get(4)?,
+        difficulty_unlocked: row.get(5)?,
+        next_review_at: row.get(6)?,
+        srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
+    })
+}
+
 /// Get all subjects from DB.
 pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
     let mut stmt = conn.prepare_cached(
@@ -91,18 +107,7 @@ pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
     )?;
 
     let subjects = stmt
-        .query_map([], |row| {
-            Ok(Subject {
-                name: row.get(0)?,
-                mastery_score: row.get(1)?,
-                last_practiced_at: row.get(2)?,
-                attempts_total: row.get(3)?,
-                attempts_success: row.get(4)?,
-                difficulty_unlocked: row.get(5)?,
-                next_review_at: row.get(6)?,
-                srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
-            })
-        })?
+        .query_map([], row_to_subject)?
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(subjects)
@@ -173,20 +178,7 @@ pub fn get_subject(conn: &Connection, name: &str) -> Result<Option<Subject>> {
          FROM subjects WHERE name = ?1",
     )?;
 
-    let subject = stmt
-        .query_row(params![name], |row| {
-            Ok(Subject {
-                name: row.get(0)?,
-                mastery_score: row.get(1)?,
-                last_practiced_at: row.get(2)?,
-                attempts_total: row.get(3)?,
-                attempts_success: row.get(4)?,
-                difficulty_unlocked: row.get(5)?,
-                next_review_at: row.get(6)?,
-                srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
-            })
-        })
-        .optional()?;
+    let subject = stmt.query_row(params![name], row_to_subject).optional()?;
 
     Ok(subject)
 }
