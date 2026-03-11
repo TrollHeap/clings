@@ -18,7 +18,7 @@ use std::sync::OnceLock;
 
 use colored::{ColoredString, Colorize};
 
-use crate::constants::HEADER_WIDTH;
+use crate::constants::{HEADER_WIDTH, MASTERY_MAX};
 use crate::models::Difficulty;
 
 pub use crate::models::AnnaleSession;
@@ -45,7 +45,7 @@ pub fn difficulty_stars(d: Difficulty) -> ColoredString {
 
 /// Create a visual mastery bar with block characters.
 pub fn mastery_bar(score: f64) -> String {
-    let filled = (score / 5.0 * 10.0).round() as usize;
+    let filled = (score / MASTERY_MAX * 10.0).round() as usize;
     let empty = 10 - filled.min(10);
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
     let colored = if score >= 4.0 {

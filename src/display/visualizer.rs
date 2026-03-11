@@ -5,6 +5,9 @@ use crate::models::{Exercise, VisVar};
 
 use super::{footer_box, header_box, wrap_text, INNER_W};
 
+/// Width of each column in the two-column memory visualizer layout.
+const COL_W: usize = 26;
+
 /// Render a single variable line.
 fn fmt_var(v: &VisVar) -> String {
     format!("{}: {}", v.name, v.value)
@@ -13,7 +16,6 @@ fn fmt_var(v: &VisVar) -> String {
 /// Render a row of the visualizer with two equal columns (plain strings, colored inside).
 /// Both args must be plain (no ANSI) so format! can count visible chars correctly.
 fn vis_row(left: &str, right: &str) {
-    const COL_W: usize = 26;
     let lp = format!("{:<COL_W$}", left).green();
     let rp = format!("{:<COL_W$}", right).cyan();
     println!("  {} {} {}{}", "║".yellow(), lp, rp, "║".yellow());
@@ -21,7 +23,6 @@ fn vis_row(left: &str, right: &str) {
 
 /// Like vis_row but right column is dimmed (e.g. heap vide).
 fn vis_row_dim_right(left: &str, right: &str) {
-    const COL_W: usize = 26;
     let lp = format!("{:<COL_W$}", left).green();
     let rp = format!("{:<COL_W$}", right).dimmed();
     println!("  {} {} {}{}", "║".yellow(), lp, rp, "║".yellow());

@@ -20,7 +20,6 @@ use colored::Colorize;
 
 use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
 use crate::error::{KfError, Result};
-use crate::models::ValidationMode;
 use crate::watcher::WatchAction;
 
 #[derive(Parser)]
@@ -191,18 +190,6 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
     while index < total {
         let exercise = exercise_order[index];
 
-        // Skip test-only exercises (not yet supported in CLI)
-        if matches!(exercise.validation.mode, ValidationMode::Test) {
-            println!(
-                "  {} Exercice {} ignoré (validation Test non supportée en CLI)",
-                "⚠".yellow(),
-                exercise.id
-            );
-            completed[index] = true;
-            index += 1;
-            continue;
-        }
-
         // Select starter code stage based on subject mastery
         let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
@@ -258,7 +245,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                     // Arrow right → next step
                                     vis_step = (vis_step + 1).min(n.saturating_sub(1));
                                     print!("\x1b[{}A\x1b[J", vis_lines);
-                                    io::stdout().flush().ok();
+                                    let _ = io::stdout().flush();
                                     vis_lines = display::show_visualizer(&exercise_clone, vis_step);
                                     return None;
                                 }
@@ -266,7 +253,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                     // Arrow left → previous step
                                     vis_step = vis_step.saturating_sub(1);
                                     print!("\x1b[{}A\x1b[J", vis_lines);
-                                    io::stdout().flush().ok();
+                                    let _ = io::stdout().flush();
                                     vis_lines = display::show_visualizer(&exercise_clone, vis_step);
                                     return None;
                                 }
@@ -331,8 +318,12 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         match exercises::load_all_exercises() {
                             Ok((all, _)) => match progress::get_all_subjects(&conn) {
                                 Ok(subjects) => display::show_exercise_list(&all, &subjects, None),
+                                // Dégradation gracieuse : l'affichage de la liste est optionnel ;
+                                // une erreur DB ne doit pas interrompre la session watch.
                                 Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
                             },
+                            // Dégradation gracieuse : échec de rechargement des exercices,
+                            // on reste sur l'exercice courant.
                             Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
                         }
                         println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
@@ -449,6 +440,8 @@ pub(crate) fn enable_raw_mode() -> Option<RawModeGuard> {
             let mut termios: libc::termios = std::mem::zeroed();
             if libc::tcgetattr(fd, &mut termios) == 0 {
                 let original = termios;
+                // SAFETY: lock poison is acceptable — Option<termios> is always
+                // structurally valid regardless of which thread last held the lock.
                 ORIGINAL_TERMIOS
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
@@ -476,6 +469,8 @@ fn disable_raw_mode() {
         let fd = std::io::stdin().as_raw_fd();
         // SAFETY: original est une valeur tcgetattr valide conservée depuis enable_raw_mode.
         // fd est le même stdin que lors de l'appel à tcgetattr.
+        // SAFETY: lock poison is acceptable — Option<termios> is always
+        // structurally valid regardless of which thread last held the lock.
         if let Some(original) = ORIGINAL_TERMIOS
             .lock()
             .unwrap_or_else(|p| p.into_inner())
@@ -496,6 +491,9 @@ pub(crate) fn install_ctrlc_handler() {
     if let Err(e) = ctrlc::set_handler(move || {
         disable_raw_mode();
         println!();
+        // process::exit bypasses Drop of all RAII guards (RawModeGuard, tmux panes).
+        // This is intentional: the handler runs asynchronously and cannot safely
+        // unwind the call stack. Terminal cleanup is done explicitly above.
         std::process::exit(0);
     }) {
         eprintln!("Avertissement : échec de l'installation du gestionnaire Ctrl-C : {e}");
@@ -537,7 +535,8 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
     display::show_exercise(exercise, 0, 1);
 
     let conn = progress::open_db()?;
-    let subject_mastery = progress::get_subject(&conn, &exercise.subject)?.map(|s| s.mastery_score);
+    let subject_mastery =
+        progress::get_subject(&conn, &exercise.subject)?.map(|s| s.mastery_score.get());
     let source_path = runner::write_starter_code(exercise, subject_mastery)?;
 
     display::show_edit_instructions(&source_path);
@@ -604,12 +603,7 @@ fn cmd_solution(exercise_id: &str) -> Result<()> {
     let conn = progress::open_db()?;
     let mut stmt =
         conn.prepare_cached("SELECT COUNT(*) FROM practice_log WHERE exercise_id = ?1")?;
-    let count: i64 = stmt
-        .query_row([exercise_id], |row| row.get(0))
-        .unwrap_or_else(|e| {
-            eprintln!("DB error checking attempts: {e}");
-            0
-        });
+    let count: i64 = stmt.query_row([exercise_id], |row| row.get(0))?;
 
     if count == 0 {
         println!(
@@ -648,7 +642,8 @@ fn cmd_review() -> Result<()> {
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
         .filter_map(|subject_name| {
-            // Try to find the last failed exercise for this subject
+            // Try to find the last failed exercise for this subject.
+            // .ok(): DB error (ex. sujet absent) → None, on tombe dans le fallback ci-dessous.
             let failed_id = progress::get_failed_exercise(&conn, subject_name)
                 .ok()
                 .flatten();
@@ -666,8 +661,8 @@ fn cmd_review() -> Result<()> {
     due_exercises.sort_by(|a, b| {
         let sa = subject_map.get(a.subject.as_str());
         let sb = subject_map.get(b.subject.as_str());
-        let ma = sa.map(|s| s.mastery_score).unwrap_or(0.0);
-        let mb = sb.map(|s| s.mastery_score).unwrap_or(0.0);
+        let ma = sa.map_or(0.0, |s| s.mastery_score.get());
+        let mb = sb.map_or(0.0, |s| s.mastery_score.get());
         ma.partial_cmp(&mb)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| {
@@ -766,7 +761,7 @@ fn cmd_reset(subject: Option<&str>) -> Result<()> {
             "Attention !".bold().red(),
             name
         );
-        io::stdout().flush().ok();
+        let _ = io::stdout().flush();
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         if input.trim() == "yes" {
@@ -781,7 +776,7 @@ fn cmd_reset(subject: Option<&str>) -> Result<()> {
             "  {} Ceci supprimera TOUTE la progression. Tapez 'yes' pour confirmer : ",
             "Attention !".bold().red()
         );
-        io::stdout().flush().ok();
+        let _ = io::stdout().flush();
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         if input.trim() == "yes" {

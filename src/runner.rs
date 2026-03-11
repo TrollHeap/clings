@@ -9,7 +9,7 @@ use crate::constants::{
     POLL_INTERVAL_MS, REGEX_PREFIX,
 };
 use crate::error::KfError;
-use crate::models::{Exercise, ValidationMode};
+use crate::models::Exercise;
 
 /// Préfixe des messages de timeout — utilisé pour la création du message et les pattern matches.
 const TIMEOUT_MSG_PREFIX: &str = "Délai d'exécution dépassé";
@@ -64,7 +64,16 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
         }
         let file_path = work_dir.join(&file.name);
         if let Some(parent) = file_path.parent() {
+            // Pre-flight lexical check (no I/O): reject path traversal before
+            // creating any directories on disk.
+            if !parent.starts_with(work_dir) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!("Fichier hors répertoire de travail : {}", file.name),
+                ));
+            }
             std::fs::create_dir_all(parent)?;
+            // Post-creation canonical check: catch symlink-based traversal.
             let canonical_parent = parent.canonicalize()?;
             if !canonical_parent.starts_with(&canonical_work) {
                 return Err(std::io::Error::new(
@@ -108,25 +117,11 @@ fn spawn_gcc_and_collect(
 
     // Derive the output binary path: gcc writes it via "-o <output_path>" which is the
     // first extra_arg after "-o". We locate it by scanning extra_args.
-    let output_path = {
-        let mut it = extra_args.iter();
-        loop {
-            match it.next() {
-                Some(&"-o") => {
-                    let p = it
-                        .next()
-                        .ok_or_else(|| KfError::Config("-o flag missing argument".to_string()))?;
-                    break PathBuf::from(p);
-                }
-                None => {
-                    return Err(KfError::Config(
-                        "extra_args must contain -o <output>".to_string(),
-                    ))
-                }
-                _ => {}
-            }
-        }
-    };
+    let output_path = extra_args
+        .windows(2)
+        .find(|w| w[0] == "-o")
+        .ok_or_else(|| KfError::Config("extra_args must contain -o <output>".to_string()))
+        .map(|w| PathBuf::from(w[1]))?;
 
     let _ = source_path; // consumed by gcc via extra_args; kept in signature for clarity
 
@@ -138,23 +133,31 @@ fn spawn_gcc_and_collect(
         .spawn()
         .map_err(KfError::Io)?;
 
-    // INVARIANT: Stdio::piped() was set on Command — stdout/stderr always present.
-    let (stdout_thread, stderr_thread) = spawn_drain_threads(
-        child.stdout.take().expect("stdout piped"),
-        child.stderr.take().expect("stderr piped"),
-    );
+    // INVARIANT: Stdio::piped() was requested — take() returns None only if already consumed,
+    // which cannot happen here. Propagate as Config error rather than panic.
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| KfError::Config("stdout pipe non disponible".to_owned()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| KfError::Config("stderr pipe non disponible".to_owned()))?;
+    let (stdout_thread, stderr_thread) = spawn_drain_threads(stdout, stderr);
 
     match child.wait_timeout(timeout) {
         Ok(Some(status)) => {
-            // drain thread cannot panic: only calls read_to_end on a pipe
-            let stdout = stdout_thread.join().unwrap_or_default();
-            // drain thread cannot panic: only calls read_to_end on a pipe
-            let stderr = stderr_thread.join().unwrap_or_default();
+            let stdout = stdout_thread
+                .join()
+                .map_err(|_| KfError::Config("stdout reader thread paniqué".to_owned()))?;
+            let stderr = stderr_thread
+                .join()
+                .map_err(|_| KfError::Config("stderr reader thread paniqué".to_owned()))?;
             Ok((stdout, stderr, status))
         }
         Ok(None) => {
             kill_process_group(&child);
-            let _ = child.wait();
+            let _ = child.wait(); // reap zombie; error already handled by timeout path
             if let Err(e) = stdout_thread.join() {
                 eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
             }
@@ -169,7 +172,7 @@ fn spawn_gcc_and_collect(
         }
         Err(e) => {
             kill_process_group(&child);
-            let _ = child.wait();
+            let _ = child.wait(); // reap zombie; real error propagated below
             if let Err(e) = stdout_thread.join() {
                 eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
             }
@@ -181,130 +184,15 @@ fn spawn_gcc_and_collect(
     }
 }
 
-/// Compile and run a C source file for Test/Both modes.
-/// Reads user code from `source_path`, appends the test harness, writes to a
-/// temporary file, compiles it, and validates by exit code (and optionally stdout).
-fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
-    let tmp_fallback = std::path::PathBuf::from("/tmp");
-    let work_dir = source_path.parent().unwrap_or_else(|| {
-        eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
-        tmp_fallback.as_path()
-    });
-    let output_path = work_dir.join("kf_run_test");
-    let test_source_path = work_dir.join("kf_test.c");
-
-    let user_code = match std::fs::read_to_string(source_path) {
-        Ok(c) => c,
-        Err(e) => return make_compile_error(format!("Impossible de lire le fichier source : {e}")),
-    };
-
-    let harness = exercise.validation.test_code.as_deref().unwrap_or("");
-    let combined = format!("{}\n{}", user_code, harness);
-
-    if let Err(e) = std::fs::write(&test_source_path, combined.as_bytes()) {
-        return make_compile_error(format!("Impossible d'écrire la source de test : {e}"));
-    }
-
-    // Write additional files (headers etc.)
-    if let Err(e) = write_exercise_files(exercise, work_dir) {
-        return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
-    }
-
-    let output_path_str = output_path.to_string_lossy().into_owned();
-    let test_source_str = test_source_path.to_string_lossy().into_owned();
-    let include_flag = format!("-I{}", work_dir.display());
-    let linker = linker_flags(&exercise.subject);
-
-    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &test_source_str, &include_flag];
-    for flag in &linker {
-        extra_args.push(flag);
-    }
-
-    let timeout = exercise
-        .validation
-        .max_duration_ms
-        .map(Duration::from_millis)
-        .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
-
-    let start = std::time::Instant::now();
-    let gcc_result = spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout);
-    dispatch_gcc_result(
-        gcc_result,
-        timeout,
-        start,
-        |stdout, stderr, status, duration_ms| {
-            let exit_ok = status.success();
-            let output_ok = match exercise.validation.mode {
-                ValidationMode::Both => {
-                    if let Some(expected) = &exercise.validation.expected_output {
-                        let norm_out = normalize(&stdout);
-                        let norm_exp = normalize(expected);
-                        if let Some(pattern) = norm_exp.strip_prefix(REGEX_PREFIX) {
-                            let key = pattern.trim().to_string();
-                            REGEX_CACHE.with(|cache| {
-                                let mut map = cache.borrow_mut();
-                                let re = map
-                                    .entry(key.clone())
-                                    .or_insert_with(|| regex::Regex::new(&key).ok());
-                                re.as_ref().map(|r| r.is_match(&norm_out)).unwrap_or(false)
-                            })
-                        } else {
-                            norm_out == norm_exp
-                        }
-                    } else {
-                        true
-                    }
-                }
-                _ => true,
-            };
-
-            RunResult {
-                success: exit_ok && output_ok,
-                stdout,
-                stderr: if !exit_ok && stderr.is_empty() {
-                    format!("Process exited with {status}")
-                } else {
-                    stderr
-                },
-                duration_ms,
-                compile_error: false,
-                timeout: false,
-            }
-        },
-    )
-}
-
 /// Compile and run a C source file, validating output against expected.
 ///
-/// Dispatches to [`compile_and_run_test`] for `Test` and `Both` validation
-/// modes. For `Output` mode: compiles with `gcc -Wall -Wextra -std=c11`,
-/// runs with a 10-second timeout, then compares normalized stdout to
-/// `exercise.validation.expected_output` (exact or regex).
+/// Compiles with `gcc -Wall -Wextra -std=c11`, runs with a 10-second timeout,
+/// then compares normalized stdout to `exercise.validation.expected_output`
+/// (exact or regex).
 ///
 /// Returns a [`RunResult`] with `success`, compiler/runtime `message`, and
 /// updated `mastery` score delta.
-///
-/// # Examples
-///
-/// ```no_run
-/// use std::path::Path;
-/// use clings::runner::compile_and_run;
-/// use clings::exercises::load_exercises;
-///
-/// let exercises = load_exercises().unwrap();
-/// let ex = exercises.iter().find(|e| e.id == "ptr-deref-01").unwrap();
-/// let result = compile_and_run(Path::new("/home/user/.clings/current.c"), ex);
-/// if result.success { println!("Passed!"); }
-/// ```
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
-    // Dispatch to test harness runner for Test and Both modes.
-    if matches!(
-        exercise.validation.mode,
-        ValidationMode::Test | ValidationMode::Both
-    ) {
-        return compile_and_run_test(source_path, exercise);
-    }
-
     let tmp_fallback2 = std::path::PathBuf::from("/tmp");
     let work_dir = source_path.parent().unwrap_or_else(|| {
         eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
@@ -371,8 +259,7 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
 
 /// Dispatch le résultat de `spawn_gcc_and_collect` vers un `RunResult`.
 ///
-/// Le bras `Ok` est délégué à `on_ok(stdout, stderr, status, duration_ms)` pour permettre
-/// des validations différentes entre les modes Output et Test/Both.
+/// Le bras `Ok` est délégué à `on_ok(stdout, stderr, status, duration_ms)`.
 /// Les bras d'erreur communs (timeout, io, config) sont traités ici.
 fn dispatch_gcc_result(
     gcc_result: crate::error::Result<(String, String, std::process::ExitStatus)>,
@@ -410,31 +297,29 @@ fn dispatch_gcc_result(
 /// If expected_output starts with "REGEX:" the remainder is compiled as a regex
 /// and matched against the full (normalized) stdout.
 fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
-    match exercise.validation.mode {
-        ValidationMode::Output => {
-            if let Some(expected) = &exercise.validation.expected_output {
-                let norm_out = normalize(stdout);
-                let norm_exp = normalize(expected);
-                if let Some(pattern) = norm_exp.strip_prefix(REGEX_PREFIX) {
-                    let key = pattern.trim().to_string();
-                    REGEX_CACHE.with(|cache| {
-                        let mut map = cache.borrow_mut();
-                        let re = map
-                            .entry(key.clone())
-                            .or_insert_with(|| regex::Regex::new(&key).ok());
-                        re.as_ref().map(|r| r.is_match(&norm_out)).unwrap_or(false)
-                    })
-                } else {
-                    norm_out == norm_exp
-                }
-            } else {
-                // No expected output defined — just check it compiled and ran
-                true
-            }
+    if let Some(expected) = &exercise.validation.expected_output {
+        let norm_out = normalize(stdout);
+        let norm_exp = normalize(expected);
+        if let Some(pattern) = norm_exp.strip_prefix(REGEX_PREFIX) {
+            let key = pattern.trim().to_string();
+            REGEX_CACHE.with(|cache| {
+                let mut map = cache.borrow_mut();
+                let re = map.entry(key.clone()).or_insert_with(|| {
+                    let compiled = regex::Regex::new(&key);
+                    if let Err(ref e) = compiled {
+                        eprintln!("Avertissement : regex invalide dans l'exercice ({key:?}): {e}");
+                    }
+                    // .ok(): invalid regex → logged above; None causes is_match to return false
+                    compiled.ok()
+                });
+                re.as_ref().map(|r| r.is_match(&norm_out)).unwrap_or(false)
+            })
+        } else {
+            norm_out == norm_exp
         }
-        // Test and Both are handled in compile_and_run_test before validate_output is called.
-        // This branch is unreachable in normal execution.
-        ValidationMode::Test | ValidationMode::Both => false,
+    } else {
+        // No expected output defined — just check it compiled and ran
+        true
     }
 }
 
@@ -526,7 +411,7 @@ pub fn prepare_exercise_source(
     exercise: &crate::models::Exercise,
 ) -> crate::error::Result<(std::path::PathBuf, Option<u8>)> {
     let subject_mastery =
-        crate::progress::get_subject(conn, &exercise.subject)?.map(|s| s.mastery_score);
+        crate::progress::get_subject(conn, &exercise.subject)?.map(|s| s.mastery_score.get());
     let current_stage = subject_mastery.map(mastery_to_stage);
     let source_path = write_starter_code(exercise, subject_mastery)?;
     Ok((source_path, current_stage))
@@ -545,12 +430,14 @@ fn spawn_drain_threads(
     const MAX_OUTPUT_BYTES: u64 = 1024 * 1024; // 1 MiB — protection contre les programmes bavards
     let stdout_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
+        // .ok(): partial read is acceptable — we cap at MAX_OUTPUT_BYTES anyway
         std::io::Read::read_to_string(&mut std::io::Read::take(stdout, MAX_OUTPUT_BYTES), &mut buf)
             .ok();
         buf
     });
     let stderr_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
+        // .ok(): partial read is acceptable — we cap at MAX_OUTPUT_BYTES anyway
         std::io::Read::read_to_string(&mut std::io::Read::take(stderr, MAX_OUTPUT_BYTES), &mut buf)
             .ok();
         buf
@@ -597,6 +484,9 @@ impl ChildExt for std::process::Child {
         &mut self,
         timeout: Duration,
     ) -> std::io::Result<Option<std::process::ExitStatus>> {
+        // Poll-based busy-wait: std does not expose async wait.
+        // POLL_INTERVAL_MS (50 ms) keeps CPU usage negligible while staying
+        // responsive enough for a 10-second exercise timeout.
         let start = Instant::now();
         loop {
             match self.try_wait()? {
@@ -615,13 +505,9 @@ impl ChildExt for std::process::Child {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Difficulty, ExerciseType, Lang, ValidationConfig, ValidationMode};
+    use crate::models::{Difficulty, ExerciseType, Lang, ValidationConfig};
 
-    fn make_exercise(
-        subject: &str,
-        validation_mode: ValidationMode,
-        expected: Option<String>,
-    ) -> Exercise {
+    fn make_exercise(subject: &str, expected: Option<String>) -> Exercise {
         Exercise {
             id: "test".to_string(),
             subject: subject.to_string(),
@@ -633,10 +519,10 @@ mod tests {
             solution_code: "int main() { return 0; }".to_string(),
             hints: vec![],
             validation: ValidationConfig {
-                mode: validation_mode,
                 expected_output: expected,
-                test_code: None,
                 max_duration_ms: None,
+                mode: None,
+                test_code: None,
             },
             prerequisites: vec![],
             files: vec![],
@@ -680,74 +566,46 @@ mod tests {
 
     #[test]
     fn test_validate_output_exact_match() {
-        let exercise = make_exercise("pointers", ValidationMode::Output, Some("42".to_string()));
+        let exercise = make_exercise("pointers", Some("42".to_string()));
         assert!(validate_output("42", &exercise));
     }
 
     #[test]
     fn test_validate_output_mismatch() {
-        let exercise = make_exercise("pointers", ValidationMode::Output, Some("42".to_string()));
+        let exercise = make_exercise("pointers", Some("42".to_string()));
         assert!(!validate_output("43", &exercise));
     }
 
     #[test]
     fn test_validate_output_whitespace_normalization() {
-        let exercise = make_exercise(
-            "pointers",
-            ValidationMode::Output,
-            Some("hello\n  world".to_string()),
-        );
+        let exercise = make_exercise("pointers", Some("hello\n  world".to_string()));
         assert!(validate_output("hello  \n  world  ", &exercise));
     }
 
     #[test]
     fn test_validate_output_regex() {
-        let exercise = make_exercise(
-            "pointers",
-            ValidationMode::Output,
-            Some("REGEX:^[0-9]+$".to_string()),
-        );
+        let exercise = make_exercise("pointers", Some("REGEX:^[0-9]+$".to_string()));
         assert!(validate_output("42", &exercise));
         assert!(!validate_output("abc", &exercise));
     }
 
     #[test]
     fn test_validate_output_regex_with_whitespace() {
-        let exercise = make_exercise(
-            "pointers",
-            ValidationMode::Output,
-            Some("REGEX:^hello\\s+world$".to_string()),
-        );
+        let exercise = make_exercise("pointers", Some("REGEX:^hello\\s+world$".to_string()));
         assert!(validate_output("hello   world", &exercise));
         assert!(!validate_output("hello world extra", &exercise));
     }
 
     #[test]
     fn test_validate_output_regex_invalid() {
-        let exercise = make_exercise(
-            "pointers",
-            ValidationMode::Output,
-            Some("REGEX:[invalid(".to_string()),
-        );
+        let exercise = make_exercise("pointers", Some("REGEX:[invalid(".to_string()));
         assert!(!validate_output("anything", &exercise));
     }
 
     #[test]
     fn test_validate_output_no_expected() {
-        let exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let exercise = make_exercise("pointers", None);
         assert!(validate_output("anything", &exercise));
-    }
-
-    #[test]
-    fn test_validate_output_test_mode() {
-        let exercise = make_exercise("pointers", ValidationMode::Test, Some("42".to_string()));
-        assert!(!validate_output("42", &exercise));
-    }
-
-    #[test]
-    fn test_validate_output_both_mode() {
-        let exercise = make_exercise("pointers", ValidationMode::Both, Some("42".to_string()));
-        assert!(!validate_output("42", &exercise));
     }
 
     #[test]
@@ -868,7 +726,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_stage_zero() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "stage0".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -882,7 +740,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_stage_one() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "stage0".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -896,7 +754,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_stage_two() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "stage0".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -910,7 +768,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_stage_three() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "stage0".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -924,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_stage_four() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "stage0".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -938,7 +796,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_fallback_empty_stages() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "default".to_string();
         exercise.starter_code_stages = vec![];
         assert_eq!(select_starter_code(&exercise, 3.5), "default");
@@ -946,7 +804,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_fallback_insufficient_stages() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "default".to_string();
         exercise.starter_code_stages = vec!["stage0".to_string(), "stage1".to_string()];
         // mastery 4.5 → stage 4, but only 2 stages available → fall back to default
@@ -955,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_select_starter_code_partial_stages() {
-        let mut exercise = make_exercise("pointers", ValidationMode::Output, None);
+        let mut exercise = make_exercise("pointers", None);
         exercise.starter_code = "default".to_string();
         exercise.starter_code_stages = vec![
             "stage0".to_string(),
@@ -966,124 +824,5 @@ mod tests {
         assert_eq!(select_starter_code(&exercise, 1.5), "stage1");
         // mastery 4.5 → stage 4, but only 3 stages available → fall back to default
         assert_eq!(select_starter_code(&exercise, 4.5), "default");
-    }
-
-    fn make_exercise_with_test_code(test_code: Option<String>) -> Exercise {
-        Exercise {
-            id: "test".to_string(),
-            subject: "pointers".to_string(),
-            lang: Lang::C,
-            difficulty: Difficulty::Easy,
-            title: "Test".to_string(),
-            description: "Test".to_string(),
-            starter_code: String::new(),
-            solution_code: String::new(),
-            hints: vec![],
-            validation: ValidationConfig {
-                mode: ValidationMode::Test,
-                expected_output: None,
-                test_code,
-                max_duration_ms: None,
-            },
-            prerequisites: vec![],
-            files: vec![],
-            exercise_type: ExerciseType::Complete,
-            key_concept: None,
-            common_mistake: None,
-            kc_ids: vec![],
-            starter_code_stages: vec![],
-            visualizer: Default::default(),
-        }
-    }
-
-    #[test]
-    fn test_compile_and_run_test_mode_success() {
-        // Harness that exits 0 — should succeed
-        let harness = "int main(void) { return 0; }";
-        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
-        exercise.validation.mode = ValidationMode::Test;
-
-        let tmp = std::env::temp_dir().join(format!("clings_test_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let source_path = tmp.join("current.c");
-        // User code is empty — harness provides main
-        std::fs::write(&source_path, b"").unwrap();
-
-        let result = compile_and_run_test(&source_path, &exercise);
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        assert!(
-            result.success,
-            "Expected success but stderr: {}",
-            result.stderr
-        );
-        assert!(!result.compile_error);
-        assert!(!result.timeout);
-    }
-
-    #[test]
-    fn test_compile_and_run_test_mode_failure() {
-        // Harness that exits 1 — should fail
-        let harness = "int main(void) { return 1; }";
-        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
-        exercise.validation.mode = ValidationMode::Test;
-
-        let tmp = std::env::temp_dir().join(format!("clings_test_fail_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let source_path = tmp.join("current.c");
-        std::fs::write(&source_path, b"").unwrap();
-
-        let result = compile_and_run_test(&source_path, &exercise);
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        assert!(!result.success, "Expected failure");
-        assert!(!result.compile_error);
-        assert!(!result.timeout);
-    }
-
-    #[test]
-    fn test_compile_and_run_both_mode_success() {
-        // Both mode: exit 0 AND stdout matches expected
-        let user_code = "#include <stdio.h>\n";
-        let harness = "int main(void) { printf(\"ok\\n\"); return 0; }";
-
-        let tmp = std::env::temp_dir().join(format!("clings_test_both_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let source_path = tmp.join("current.c");
-        std::fs::write(&source_path, user_code.as_bytes()).unwrap();
-
-        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
-        exercise.validation.mode = ValidationMode::Both;
-        exercise.validation.expected_output = Some("ok".to_string());
-
-        let result = compile_and_run_test(&source_path, &exercise);
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        assert!(
-            result.success,
-            "Expected success but stderr: {}",
-            result.stderr
-        );
-    }
-
-    #[test]
-    fn test_compile_and_run_both_mode_output_mismatch() {
-        // Both mode: exit 0 but stdout doesn't match — should fail
-        let harness = "int main(void) { return 0; }";
-
-        let tmp = std::env::temp_dir().join(format!("clings_test_both_mm_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let source_path = tmp.join("current.c");
-        std::fs::write(&source_path, b"").unwrap();
-
-        let mut exercise = make_exercise_with_test_code(Some(harness.to_string()));
-        exercise.validation.mode = ValidationMode::Both;
-        exercise.validation.expected_output = Some("expected_output".to_string());
-
-        let result = compile_and_run_test(&source_path, &exercise);
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        assert!(!result.success, "Expected failure due to stdout mismatch");
-        assert!(!result.compile_error);
     }
 }

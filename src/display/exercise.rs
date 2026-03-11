@@ -1,7 +1,7 @@
 use colored::Colorize;
 
 use crate::constants::TEXT_WRAP_WIDTH;
-use crate::models::{Exercise, ValidationMode};
+use crate::models::Exercise;
 use crate::runner::RunResult;
 
 use super::{difficulty_stars, gcc_re, hr, show_banner, wrap_text};
@@ -25,16 +25,6 @@ fn render_exercise_body(exercise: &Exercise) {
     }
     if let Some(cm) = &exercise.common_mistake {
         println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-    }
-
-    match exercise.validation.mode {
-        ValidationMode::Test | ValidationMode::Both => {
-            println!(
-                "\n  {} Validation par tests (non supporté en CLI)",
-                "⚠".yellow()
-            );
-        }
-        _ => {}
     }
 
     println!();

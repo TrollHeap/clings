@@ -49,7 +49,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
         {
             return None;
         }
-        // Return focus to the original pane (left)
+        // Return focus to the original pane (left) — best-effort, ignore error
         let _ = Command::new("tmux").args(["select-pane", "-L"]).status();
         Some(pane_id)
     } else {
@@ -59,6 +59,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
 
 /// Kill a tmux pane by ID.
 pub fn kill_pane(pane_id: &str) {
+    // Pane cleanup is best-effort — ignore error (pane may already be dead)
     let _ = Command::new("tmux")
         .args(["kill-pane", "-t", pane_id])
         .stderr(Stdio::null())

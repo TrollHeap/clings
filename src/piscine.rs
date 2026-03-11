@@ -1,14 +1,15 @@
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Instant;
 
 use colored::Colorize;
 
 use crate::chapters;
 use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
+
+const CTRL_C: u8 = 0x03;
+const CTRL_Z: u8 = 0x1a;
 use crate::error::Result;
-use crate::models::{Exercise, ValidationMode};
+use crate::models::Exercise;
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
 
@@ -112,7 +113,7 @@ fn redisplay_piscine_exercise(
         "│".dimmed(),
         match current_stage {
             Some(s) => format!("S{s}"),
-            None => "S2".to_string(),
+            None => "S2".to_owned(),
         }
         .dimmed(),
     );
@@ -211,17 +212,6 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         let exercise = exercise_order[index];
         let ex_start = Instant::now();
 
-        if matches!(exercise.validation.mode, ValidationMode::Test) {
-            println!(
-                "  {} Exercice {} ignoré (validation Test non supportée en CLI)",
-                "⚠".yellow(),
-                exercise.id
-            );
-            completed[index] = true;
-            index += 1;
-            continue;
-        }
-
         let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
@@ -238,10 +228,8 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
-        let exercise_clone = exercise.clone();
-        let source_for_change = source_path.clone();
         let mut hint_shown = false;
-        let already_recorded = Arc::new(AtomicBool::new(false));
+        let mut already_recorded = false;
         let mut vis_active = false;
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
@@ -252,7 +240,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), true);
+                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
                 WatchAction::Continue
             },
             |key| {
@@ -264,8 +252,8 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                     vis_active,
                     &mut vis_step,
                     &mut vis_lines,
-                    exercise_clone.visualizer.steps.len(),
-                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                    exercise.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(exercise, step),
                 )
                 .is_some()
                 {
@@ -290,34 +278,35 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 
                 match key {
                     b'v' | b'V' => {
-                        if !exercise_clone.visualizer.steps.is_empty() {
+                        if !exercise.visualizer.steps.is_empty() {
                             vis_step = 0;
                             vis_active = true;
-                            vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                            vis_lines = display::show_visualizer(exercise, vis_step);
                         }
                         None
                     }
                     b'h' | b'H' => {
                         if !hint_shown {
                             println!();
-                            display::show_hints(&exercise_clone);
+                            display::show_hints(exercise);
                             hint_shown = true;
                         }
                         None
                     }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
                     b'k' | b'K' => Some(WatchAction::Prev),
-                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                    b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
                     b'r' | b'R' => {
-                        let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-                        display::show_result(&result, &exercise_clone);
+                        let result = runner::compile_and_run(&source_path, exercise);
+                        display::show_result(&result, exercise);
                         if result.success {
                             fail_count = 0;
-                            if !already_recorded.swap(true, Ordering::SeqCst) {
+                            if !already_recorded {
+                                already_recorded = true;
                                 crate::record_and_show(
                                     &conn,
-                                    &exercise_clone.subject,
-                                    &exercise_clone.id,
+                                    &exercise.subject,
+                                    &exercise.id,
                                     true,
                                 );
                             }
@@ -331,7 +320,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         if !result.compile_error {
                             fail_count += 1;
                             if fail_count >= 2 {
-                                if let Some(cm) = &exercise_clone.common_mistake {
+                                if let Some(cm) = &exercise.common_mistake {
                                     println!(
                                         "  {} {}",
                                         "⚠ Piège fréquent:".bold().red(),
@@ -341,7 +330,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                             }
                         }
                         display::show_keybinds_with_vis(
-                            !exercise_clone.visualizer.steps.is_empty(),
+                            !exercise.visualizer.steps.is_empty(),
                             true,
                         );
                         None
@@ -485,12 +474,6 @@ pub fn run_exam_piscine(
 
         let exercise = &exercises[index];
 
-        if matches!(exercise.validation.mode, ValidationMode::Test) {
-            completed[index] = true;
-            index += 1;
-            continue;
-        }
-
         let ex_start = Instant::now();
         let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
@@ -507,10 +490,8 @@ pub fn run_exam_piscine(
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
-        let exercise_clone = exercise.clone();
-        let source_for_change = source_path.clone();
         let mut hint_shown = false;
-        let already_recorded = Arc::new(AtomicBool::new(false));
+        let mut already_recorded = false;
         let mut vis_active = false;
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
@@ -521,7 +502,7 @@ pub fn run_exam_piscine(
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), true);
+                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
                 WatchAction::Continue
             },
             |key| {
@@ -531,8 +512,8 @@ pub fn run_exam_piscine(
                     vis_active,
                     &mut vis_step,
                     &mut vis_lines,
-                    exercise_clone.visualizer.steps.len(),
-                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                    exercise.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(exercise, step),
                 )
                 .is_some()
                 {
@@ -547,42 +528,43 @@ pub fn run_exam_piscine(
                         &start_time,
                         deadline,
                         None,
-                        &exercise_clone,
+                        exercise,
                         current_stage,
-                        &source_for_change,
+                        &source_path,
                     );
                     return None;
                 }
                 match key {
                     b'v' | b'V' => {
-                        if !exercise_clone.visualizer.steps.is_empty() {
+                        if !exercise.visualizer.steps.is_empty() {
                             vis_step = 0;
                             vis_active = true;
-                            vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                            vis_lines = display::show_visualizer(exercise, vis_step);
                         }
                         None
                     }
                     b'h' | b'H' => {
                         if !hint_shown {
                             println!();
-                            display::show_hints(&exercise_clone);
+                            display::show_hints(exercise);
                             hint_shown = true;
                         }
                         None
                     }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
                     b'k' | b'K' => Some(WatchAction::Prev),
-                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                    b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
                     b'r' | b'R' => {
-                        let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-                        display::show_result(&result, &exercise_clone);
+                        let result = runner::compile_and_run(&source_path, exercise);
+                        display::show_result(&result, exercise);
                         if result.success {
                             fail_count = 0;
-                            if !already_recorded.swap(true, Ordering::SeqCst) {
+                            if !already_recorded {
+                                already_recorded = true;
                                 crate::record_and_show(
                                     &conn,
-                                    &exercise_clone.subject,
-                                    &exercise_clone.id,
+                                    &exercise.subject,
+                                    &exercise.id,
                                     true,
                                 );
                             }
@@ -596,7 +578,7 @@ pub fn run_exam_piscine(
                         if !result.compile_error {
                             fail_count += 1;
                             if fail_count >= 2 {
-                                if let Some(cm) = &exercise_clone.common_mistake {
+                                if let Some(cm) = &exercise.common_mistake {
                                     println!(
                                         "  {} {}",
                                         "⚠ Piège fréquent:".bold().red(),
@@ -606,7 +588,7 @@ pub fn run_exam_piscine(
                             }
                         }
                         display::show_keybinds_with_vis(
-                            !exercise_clone.visualizer.steps.is_empty(),
+                            !exercise.visualizer.steps.is_empty(),
                             true,
                         );
                         None
@@ -697,121 +679,6 @@ pub fn run_exam_piscine(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use rusqlite::Connection;
-
-    use crate::chapters;
-    use crate::models::{
-        Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode, Visualizer,
-    };
-    use crate::progress;
-
-    fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
-        Exercise {
-            id: id.to_string(),
-            subject: subject.to_string(),
-            lang: Lang::C,
-            difficulty,
-            title: id.to_string(),
-            description: String::new(),
-            starter_code: String::new(),
-            solution_code: String::new(),
-            hints: vec![],
-            validation: ValidationConfig {
-                mode: ValidationMode::Output,
-                expected_output: Some("ok".to_string()),
-                test_code: None,
-                max_duration_ms: None,
-            },
-            prerequisites: vec![],
-            files: vec![],
-            exercise_type: ExerciseType::default(),
-            key_concept: None,
-            common_mistake: None,
-            kc_ids: vec![],
-            starter_code_stages: vec![],
-            visualizer: Visualizer::default(),
-        }
-    }
-
-    fn open_test_db() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS subjects (
-                name TEXT PRIMARY KEY,
-                mastery_score REAL NOT NULL DEFAULT 0.0,
-                last_practiced_at INTEGER,
-                attempts_total INTEGER NOT NULL DEFAULT 0,
-                attempts_success INTEGER NOT NULL DEFAULT 0,
-                difficulty_unlocked INTEGER NOT NULL DEFAULT 1,
-                next_review_at INTEGER,
-                srs_interval_days INTEGER NOT NULL DEFAULT 1
-            );
-            CREATE TABLE IF NOT EXISTS practice_log (
-                id TEXT PRIMARY KEY,
-                subject TEXT NOT NULL,
-                exercise_id TEXT NOT NULL,
-                success INTEGER NOT NULL DEFAULT 0,
-                practiced_at INTEGER NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS kv (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );",
-        )
-        .unwrap();
-        conn
-    }
-
-    /// Vérifie que les exercices sont triés chapter → difficulty via order_by_chapters.
-    #[test]
-    fn test_piscine_order() {
-        // "pipes" = chapitre 9, "structs" = chapitre 1
-        let ex_pipes_hard = make_exercise("pipes-hard", "pipes", Difficulty::Hard);
-        let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
-        let ex_structs_medium = make_exercise("structs-medium", "structs", Difficulty::Medium);
-
-        let exercises = vec![ex_pipes_hard, ex_structs_easy, ex_structs_medium];
-        let subjects = vec![];
-
-        let blocks = chapters::order_by_chapters(&exercises, &subjects);
-        let order = chapters::flatten_chapters(&blocks);
-
-        assert_eq!(order.len(), 3);
-        // structs (chapitre 1) doit précéder pipes (chapitre 9)
-        assert_eq!(order[0].subject, "structs");
-        assert_eq!(order[1].subject, "structs");
-        assert_eq!(order[2].subject, "pipes");
-        // Au sein de structs : Easy avant Medium
-        assert_eq!(order[0].difficulty, Difficulty::Easy);
-        assert_eq!(order[1].difficulty, Difficulty::Medium);
-    }
-
-    /// Vérifie le roundtrip save/load du checkpoint piscine sur une DB in-memory.
-    #[test]
-    fn test_checkpoint_roundtrip() {
-        let conn = open_test_db();
-        progress::save_piscine_checkpoint(&conn, 3).unwrap();
-        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
-        assert_eq!(loaded, Some(3));
-    }
-
-    /// Vérifie que le mécanisme de skip incrémente bien l'index d'exercice.
-    #[test]
-    fn test_skip_increments_index() {
-        let total = 5usize;
-        let mut index = 2usize;
-        index += 1;
-        assert_eq!(index, 3);
-        assert!(index < total);
-
-        index = total - 1;
-        index += 1;
-        assert_eq!(index, total);
-    }
-}
-
 fn show_piscine_header(
     current: usize,
     total: usize,
@@ -878,4 +745,117 @@ fn show_piscine_header(
         }
     }
     println!();
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use crate::chapters;
+    use crate::models::{Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, Visualizer};
+    use crate::progress;
+
+    fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
+        Exercise {
+            id: id.to_string(),
+            subject: subject.to_string(),
+            lang: Lang::C,
+            difficulty,
+            title: id.to_string(),
+            description: String::new(),
+            starter_code: String::new(),
+            solution_code: String::new(),
+            hints: vec![],
+            validation: ValidationConfig {
+                expected_output: Some("ok".to_string()),
+                max_duration_ms: None,
+                mode: None,
+                test_code: None,
+            },
+            prerequisites: vec![],
+            files: vec![],
+            exercise_type: ExerciseType::default(),
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            starter_code_stages: vec![],
+            visualizer: Visualizer::default(),
+        }
+    }
+
+    fn open_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("failed to create in-memory test DB");
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS subjects (
+                name TEXT PRIMARY KEY,
+                mastery_score REAL NOT NULL DEFAULT 0.0,
+                last_practiced_at INTEGER,
+                attempts_total INTEGER NOT NULL DEFAULT 0,
+                attempts_success INTEGER NOT NULL DEFAULT 0,
+                difficulty_unlocked INTEGER NOT NULL DEFAULT 1,
+                next_review_at INTEGER,
+                srs_interval_days INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS practice_log (
+                id TEXT PRIMARY KEY,
+                subject TEXT NOT NULL,
+                exercise_id TEXT NOT NULL,
+                success INTEGER NOT NULL DEFAULT 0,
+                practiced_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS kv (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );",
+        )
+        .expect("failed to init test schema");
+        conn
+    }
+
+    /// Vérifie que les exercices sont triés chapter → difficulty via order_by_chapters.
+    #[test]
+    fn test_piscine_order() {
+        // "pipes" = chapitre 9, "structs" = chapitre 1
+        let ex_pipes_hard = make_exercise("pipes-hard", "pipes", Difficulty::Hard);
+        let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
+        let ex_structs_medium = make_exercise("structs-medium", "structs", Difficulty::Medium);
+
+        let exercises = vec![ex_pipes_hard, ex_structs_easy, ex_structs_medium];
+        let subjects = vec![];
+
+        let blocks = chapters::order_by_chapters(&exercises, &subjects);
+        let order = chapters::flatten_chapters(&blocks);
+
+        assert_eq!(order.len(), 3);
+        // structs (chapitre 1) doit précéder pipes (chapitre 9)
+        assert_eq!(order[0].subject, "structs");
+        assert_eq!(order[1].subject, "structs");
+        assert_eq!(order[2].subject, "pipes");
+        // Au sein de structs : Easy avant Medium
+        assert_eq!(order[0].difficulty, Difficulty::Easy);
+        assert_eq!(order[1].difficulty, Difficulty::Medium);
+    }
+
+    /// Vérifie le roundtrip save/load du checkpoint piscine sur une DB in-memory.
+    #[test]
+    fn test_checkpoint_roundtrip() {
+        let conn = open_test_db();
+        progress::save_piscine_checkpoint(&conn, 3).unwrap();
+        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, Some(3));
+    }
+
+    /// Vérifie que le mécanisme de skip incrémente bien l'index d'exercice.
+    #[test]
+    fn test_skip_increments_index() {
+        let total = 5usize;
+        let mut index = 2usize;
+        index += 1;
+        assert_eq!(index, 3);
+        assert!(index < total);
+
+        index = total - 1;
+        index += 1;
+        assert_eq!(index, total);
+    }
 }

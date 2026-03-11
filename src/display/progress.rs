@@ -82,7 +82,7 @@ pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
 /// Show mastery update after successful exercise.
 pub fn show_mastery_update(subject: &Subject, success: bool) {
     let icon = if success { "▲".green() } else { "▼".red() };
-    let bar = mastery_bar(subject.mastery_score);
+    let bar = mastery_bar(subject.mastery_score.get());
     println!(
         "  {} {} {} D{} │ {}/{} exercices",
         icon,
@@ -133,7 +133,7 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
         );
 
         for sub in chapter_subjects {
-            let bar = mastery_bar(sub.mastery_score);
+            let bar = mastery_bar(sub.mastery_score.get());
             let success_rate = if sub.attempts_total > 0 {
                 format!("{}/{}", sub.attempts_success, sub.attempts_total)
             } else {
@@ -141,13 +141,17 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
             };
             println!(
                 "    {:<20} {} D{} │ {} │ SRS {}j",
-                sub.name, bar, sub.difficulty_unlocked, success_rate, sub.srs_interval_days
+                sub.name,
+                bar,
+                sub.difficulty_unlocked,
+                success_rate,
+                sub.srs_interval_days.get()
             );
         }
         println!();
     }
 
-    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score).sum();
+    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score.get()).sum();
     let count = subjects.len();
     if count > 0 {
         println!(
