@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use colored::Colorize;
 
 use crate::models::Exercise;
@@ -79,4 +81,117 @@ pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
         "Astuce:".bold().yellow()
     );
     println!();
+}
+
+/// Sélecteur interactif TUI pour choisir une session d'exam (flèches + Entrée, q pour quitter).
+/// Retourne l'ID de la session choisie, ou None si annulé.
+pub fn select_exam_session(
+    sessions: &[AnnaleSession],
+    last_session_id: Option<&str>,
+) -> Option<String> {
+    if sessions.is_empty() {
+        return None;
+    }
+
+    let initial = last_session_id
+        .and_then(|id| sessions.iter().position(|s| s.id == id))
+        .unwrap_or(0);
+    let mut cursor = initial;
+    let mut esc_buf: Vec<u8> = Vec::new();
+
+    let _raw = crate::enable_raw_mode();
+
+    loop {
+        // Clear screen and redraw
+        print!("\x1b[2J\x1b[H");
+        println!();
+        println!("  {}", "Sélectionner une session d'exam".bold().cyan());
+        println!(
+            "  {} flèches/jk : naviguer  Entrée : lancer  q : annuler\n",
+            "▸".dimmed()
+        );
+
+        for (i, s) in sessions.iter().enumerate() {
+            if i == cursor {
+                println!(
+                    "  {} {} — {} ({} pts)",
+                    "▶".bold().green(),
+                    s.id.bold(),
+                    s.title.cyan(),
+                    s.total_points
+                );
+            } else {
+                println!(
+                    "    {} — {} ({} pts)",
+                    s.id.dimmed(),
+                    s.title.dimmed(),
+                    s.total_points
+                );
+            }
+        }
+        println!();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+
+        // Read one byte
+        let mut buf = [0u8; 1];
+        if std::io::stdin().read_exact(&mut buf).is_err() {
+            return None;
+        }
+        let byte = buf[0];
+
+        // Accumulate ESC sequences
+        if byte == 0x1b {
+            esc_buf.clear();
+            esc_buf.push(byte);
+            // Try to read 2 more bytes with a short non-blocking window
+            let mut b2 = [0u8; 1];
+            if std::io::stdin().read_exact(&mut b2).is_ok() {
+                esc_buf.push(b2[0]);
+                let mut b3 = [0u8; 1];
+                if std::io::stdin().read_exact(&mut b3).is_ok() {
+                    esc_buf.push(b3[0]);
+                }
+            }
+            // Arrow up: ESC [ A
+            if esc_buf == [0x1b, b'[', b'A'] {
+                cursor = cursor.saturating_sub(1);
+            }
+            // Arrow down: ESC [ B
+            if esc_buf == [0x1b, b'[', b'B'] && cursor + 1 < sessions.len() {
+                cursor += 1;
+            }
+            esc_buf.clear();
+            continue;
+        }
+
+        match byte {
+            b'k' | b'K' => cursor = cursor.saturating_sub(1),
+            b'j' | b'J' => {
+                if cursor + 1 < sessions.len() {
+                    cursor += 1;
+                }
+            }
+            b'\r' | b'\n' => {
+                print!("\x1b[2J\x1b[H");
+                return Some(sessions[cursor].id.clone());
+            }
+            b'q' | b'Q' => {
+                print!("\x1b[2J\x1b[H");
+                return None;
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_select_exam_session_returns_none_on_empty_list() {
+        // Empty list should return None without blocking
+        let result = select_exam_session(&[], None);
+        assert!(result.is_none());
+    }
 }

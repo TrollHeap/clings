@@ -163,6 +163,33 @@ pub(super) fn show_banner() {
     println!();
 }
 
+/// Report authoring validation results.
+pub fn show_authoring_result(path: &std::path::Path, errors: &[crate::authoring::ValidationError]) {
+    println!();
+    if errors.is_empty() {
+        println!(
+            "  {} {}",
+            "✓".bold().green(),
+            path.display().to_string().bold()
+        );
+        println!(
+            "  {}",
+            "Validation réussie — aucune erreur détectée.".green()
+        );
+    } else {
+        println!(
+            "  {} {} ({} erreur(s))",
+            "✗".bold().red(),
+            path.display().to_string().bold(),
+            errors.len()
+        );
+        for e in errors {
+            println!("    {} {}", "•".red(), e);
+        }
+    }
+    println!();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

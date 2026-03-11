@@ -1,8 +1,10 @@
 use colored::Colorize;
 
+use crate::display;
 use crate::error::{KfError, Result};
 use crate::exercises;
 use crate::models::{AnnaleQuestion, AnnaleSession};
+use crate::progress;
 
 /// Durée par défaut selon le type de session (minutes)
 fn default_duration(session_id: &str) -> u64 {
@@ -35,8 +37,8 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     let sessions: Vec<AnnaleSession> = serde_json::from_str(&raw)
         .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
 
-    // 2. Si list ou pas de session : lister les sessions
-    if list_sessions || session_id.is_none() {
+    // 2. Si --list : afficher les sessions textuellement
+    if list_sessions {
         println!(
             "\n  {} Sessions disponibles :\n",
             "Exam simulé —".bold().cyan()
@@ -55,9 +57,25 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
         return Ok(());
     }
 
-    // 3. Trouver la session
-    let Some(sid) = session_id else {
-        return Ok(());
+    // 3. Si pas de session : ouvrir le sélecteur TUI interactif
+    let session_id_owned: String;
+    let sid: &str = if let Some(id) = session_id {
+        id
+    } else {
+        let conn = progress::open_db()?;
+        let last = progress::load_last_exam_session(&conn)?;
+        let chosen = display::select_exam_session(&sessions, last.as_deref());
+        match chosen {
+            Some(id) => {
+                progress::save_last_exam_session(&conn, &id)?;
+                session_id_owned = id;
+                &session_id_owned
+            }
+            None => {
+                println!("  {}", "Annulé.".dimmed());
+                return Ok(());
+            }
+        }
     };
     let session = sessions
         .iter()

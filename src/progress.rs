@@ -4,11 +4,23 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 
 use crate::constants::{
-    CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, EXAM_CHECKPOINT_KEY, PISCINE_CHECKPOINT_KEY,
+    CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, DB_USER_VERSION_CURRENT, EXAM_CHECKPOINT_KEY,
+    LAST_EXAM_SESSION_KEY, PISCINE_CHECKPOINT_KEY,
 };
 use crate::error::Result;
 use crate::mastery;
 use crate::models::{MasteryScore, SrsIntervalDays, Subject};
+
+const SCHEMA_V1: &str = "
+CREATE TABLE IF NOT EXISTS exercise_scores (
+    exercise_id     TEXT PRIMARY KEY,
+    subject         TEXT NOT NULL,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    successes       INTEGER NOT NULL DEFAULT 0,
+    last_tried_at   INTEGER,
+    last_success_at INTEGER
+);
+";
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS subjects (
@@ -53,8 +65,19 @@ pub fn open_db() -> Result<Connection> {
         "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout={DB_BUSY_TIMEOUT_MS};"
     ))?;
     conn.execute_batch(SCHEMA)?;
+    migrate_v1(&conn)?;
 
     Ok(conn)
+}
+
+/// Additive migration: add `exercise_scores` table (user_version 0 → 1).
+fn migrate_v1(conn: &Connection) -> Result<()> {
+    let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if version < DB_USER_VERSION_CURRENT {
+        conn.execute_batch(SCHEMA_V1)?;
+        conn.execute_batch(&format!("PRAGMA user_version = {DB_USER_VERSION_CURRENT};"))?;
+    }
+    Ok(())
 }
 
 /// Ensure a subject row exists in the DB (used in tests as setup helper).
@@ -178,6 +201,24 @@ pub fn record_attempt(
         ],
     )?;
 
+    // Upsert into exercise_scores (same transaction)
+    tx.execute(
+        "INSERT INTO exercise_scores (exercise_id, subject, attempts, successes, last_tried_at, last_success_at)
+         VALUES (?1, ?2, 1, ?3, ?4, ?5)
+         ON CONFLICT(exercise_id) DO UPDATE SET
+             attempts        = attempts + 1,
+             successes       = successes + excluded.successes,
+             last_tried_at   = excluded.last_tried_at,
+             last_success_at = CASE WHEN excluded.successes > 0 THEN excluded.last_tried_at ELSE last_success_at END",
+        params![
+            exercise_id,
+            subject,
+            success as i32,
+            now,
+            if success { Some(now) } else { None::<i64> },
+        ],
+    )?;
+
     tx.commit()?;
     Ok(sub)
 }
@@ -272,6 +313,7 @@ pub fn reset_progress(conn: &Connection) -> Result<()> {
 fn open_test_db() -> Result<Connection> {
     let conn = Connection::open_in_memory()?;
     conn.execute_batch(SCHEMA)?;
+    conn.execute_batch(SCHEMA_V1)?;
     Ok(conn)
 }
 
@@ -332,6 +374,28 @@ pub fn clear_exam_checkpoint(conn: &Connection) -> Result<()> {
     kv_del(conn, EXAM_CHECKPOINT_KEY)
 }
 
+/// Save the ID of the last selected exam session (for TUI sélecteur).
+pub fn save_last_exam_session(conn: &Connection, session_id: &str) -> Result<()> {
+    kv_set(conn, LAST_EXAM_SESSION_KEY, session_id)
+}
+
+/// Load the ID of the last selected exam session. Returns None if never set.
+pub fn load_last_exam_session(conn: &Connection) -> Result<Option<String>> {
+    kv_get(conn, LAST_EXAM_SESSION_KEY)
+}
+
+/// Get the number of days until the next SRS review for a subject.
+/// Returns Ok(None) if no review is scheduled. Returns Ok(Some(days)) where
+/// days may be negative if the review is already overdue.
+pub fn get_next_review_days(conn: &Connection, subject_name: &str) -> Result<Option<i64>> {
+    let mut stmt = conn.prepare_cached("SELECT next_review_at FROM subjects WHERE name = ?1")?;
+    let next_review_at: Option<i64> = stmt
+        .query_row(params![subject_name], |row| row.get(0))
+        .optional()?
+        .flatten();
+    Ok(next_review_at.map(|ts| (ts - Utc::now().timestamp()) / 86_400))
+}
+
 /// Get subjects whose SRS review is due (next_review_at <= now).
 pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
     let mut stmt = conn.prepare_cached(
@@ -348,17 +412,80 @@ pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
 /// Retourne l'exercise_id raté le plus récemment pour un sujet donné.
 /// Utilisé par `clings review` pour cibler les exercices échoués.
 /// Retourne None si aucun échec n'est enregistré pour ce sujet.
-pub fn get_failed_exercise(conn: &Connection, subject: &str) -> Result<Option<String>> {
+/// Retourne les exercices les plus faibles pour un sujet, triés par taux de succès croissant.
+pub fn get_weakest_exercises(
+    conn: &Connection,
+    subject: &str,
+    limit: usize,
+) -> Result<Vec<String>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT exercise_id FROM practice_log
-         WHERE subject = ?1 AND success = 0
-         ORDER BY practiced_at DESC
-         LIMIT 1",
+        "SELECT exercise_id
+         FROM exercise_scores
+         WHERE subject = ?1
+         ORDER BY CAST(successes AS REAL) / MAX(attempts, 1) ASC,
+                  attempts DESC
+         LIMIT ?2",
     )?;
-    let result = stmt
-        .query_row([subject], |row| row.get::<_, String>(0))
-        .optional()?;
-    Ok(result)
+    let rows = stmt.query_map(params![subject, limit as i64], |row| row.get(0))?;
+    rows.collect::<rusqlite::Result<Vec<String>>>()
+        .map_err(crate::error::KfError::from)
+}
+
+/// Retourne (exercise_id, successes, attempts) pour un sujet donné.
+pub fn get_exercise_scores(conn: &Connection, subject: &str) -> Result<Vec<(String, u32, u32)>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT exercise_id, successes, attempts
+         FROM exercise_scores
+         WHERE subject = ?1
+         ORDER BY exercise_id",
+    )?;
+    let rows = stmt.query_map(params![subject], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, u32>(1)?,
+            row.get::<_, u32>(2)?,
+        ))
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(crate::error::KfError::from)
+}
+
+/// Retourne (subject, attempts_success, attempts_total) pour tous les sujets pratiqués.
+pub fn get_subject_attempts(conn: &Connection) -> Result<Vec<(String, u32, u32)>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT subject,
+                COUNT(CASE WHEN success = 1 THEN 1 END),
+                COUNT(*)
+         FROM practice_log
+         GROUP BY subject
+         ORDER BY subject",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, u32>(1)?,
+            row.get::<_, u32>(2)?,
+        ))
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(crate::error::KfError::from)
+}
+
+/// Retourne (date_iso, count) pour les `days` derniers jours d'activité.
+pub fn get_daily_activity(conn: &Connection, days: u32) -> Result<Vec<(String, u32)>> {
+    let cutoff = chrono::Utc::now().timestamp() - (days as i64 * 86400);
+    let mut stmt = conn.prepare_cached(
+        "SELECT date(practiced_at, 'unixepoch') AS day, COUNT(*)
+         FROM practice_log
+         WHERE practiced_at >= ?1
+         GROUP BY day
+         ORDER BY day",
+    )?;
+    let rows = stmt.query_map([cutoff], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(crate::error::KfError::from)
 }
 
 /// Apply decay to all subjects (batched in single transaction).
@@ -945,5 +1072,78 @@ mod tests {
             sub.attempts_success, 0,
             "attempts_success clamped to attempts_total"
         );
+    }
+
+    // ── G2 : last_exam_session KV ─────────────────────────────────────────
+
+    #[test]
+    fn test_save_load_last_exam_session_roundtrip() {
+        let conn = open_test_db().unwrap();
+        save_last_exam_session(&conn, "nsy103-s1-2024").unwrap();
+        let loaded = load_last_exam_session(&conn).unwrap();
+        assert_eq!(loaded, Some("nsy103-s1-2024".to_string()));
+    }
+
+    #[test]
+    fn test_load_last_exam_session_missing_returns_none() {
+        let conn = open_test_db().unwrap();
+        let loaded = load_last_exam_session(&conn).unwrap();
+        assert_eq!(loaded, None);
+    }
+
+    // ── G4 : exercise_scores ─────────────────────────────────────────────
+
+    #[test]
+    fn test_exercise_scores_upsert() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
+        record_attempt(&conn, "pointers", "ptr-deref-01", false).unwrap();
+        let scores = get_exercise_scores(&conn, "pointers").unwrap();
+        assert_eq!(scores.len(), 1);
+        let (id, successes, attempts) = &scores[0];
+        assert_eq!(id, "ptr-deref-01");
+        assert_eq!(*attempts, 2);
+        assert_eq!(*successes, 1);
+    }
+
+    #[test]
+    fn test_get_weakest_exercises_order() {
+        let conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+        // ptr-a : 0/2 successes (worst)
+        record_attempt(&conn, "pointers", "ptr-a", false).unwrap();
+        record_attempt(&conn, "pointers", "ptr-a", false).unwrap();
+        // ptr-b : 1/2 successes (middle)
+        record_attempt(&conn, "pointers", "ptr-b", true).unwrap();
+        record_attempt(&conn, "pointers", "ptr-b", false).unwrap();
+        // ptr-c : 2/2 successes (best)
+        record_attempt(&conn, "pointers", "ptr-c", true).unwrap();
+        record_attempt(&conn, "pointers", "ptr-c", true).unwrap();
+
+        let weakest = get_weakest_exercises(&conn, "pointers", 3).unwrap();
+        assert_eq!(weakest[0], "ptr-a");
+        assert_eq!(weakest[1], "ptr-b");
+        assert_eq!(weakest[2], "ptr-c");
+    }
+
+    #[test]
+    fn test_migrate_v1_idempotent() {
+        let conn = open_test_db().unwrap();
+        // open_test_db already runs migrate_v1 via SCHEMA_V1; call again
+        migrate_v1(&conn).unwrap();
+        migrate_v1(&conn).unwrap();
+        // Table still exists and is queryable
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM exercise_scores", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_exercise_scores_empty_for_unknown_subject() {
+        let conn = open_test_db().unwrap();
+        let scores = get_exercise_scores(&conn, "unknown_subject_xyz").unwrap();
+        assert!(scores.is_empty());
     }
 }

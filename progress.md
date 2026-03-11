@@ -1,6 +1,6 @@
 # progress.md — État d'avancement clings
 
-Date: 2026-03-10 (dernière mise à jour)
+Date: 2026-03-11 (dernière mise à jour)
 
 ## État général
 
@@ -14,9 +14,35 @@ Date: 2026-03-10 (dernière mise à jour)
 | Tests unitaires | 134 (mastery.rs, models.rs, chapters.rs, error.rs, tmux.rs, display.rs) |
 | Build | OK (`cargo build`) |
 | Lint | OK (`cargo clippy -- -D warnings`) |
-| Commits en avance | 4 commits ahead of origin/main |
+| Commits en avance | 10 commits ahead of origin/main |
+| Version | v1.0.0 (tag annoté 2026-03-11) |
 
 ## Sessions de travail
+
+### Session 2026-03-11 — Phase 4 qualité post-audit
+
+- [x] R1 — `ValidationConfig`: `pub` + `#[allow(dead_code)]` → `pub(crate) _mode`/`_test_code` + `#[serde(rename)]` + `#[derive(Default)]` ; tests mis à jour avec `..Default::default()`
+- [x] R2 — `fn format_elapsed(d: Duration) -> (u64, u64, u64)` extraite dans `piscine.rs`, 2 usages inline remplacés
+- [x] R3 — Commentaires `// SAFETY:` et `// .ok():` déjà en place (main.rs:443, main.rs:646, runner.rs:162-165)
+- [x] R4/R5/R7 — Skippés : valeur insuffisante vs complexité (handle_esc_sequence déjà isolé, dispatch clavier ~15 params, show_exercise_watch déjà factorisé)
+- [x] R6 — Déjà accompli : compute_next_review + update_mastery vivent dans mastery.rs
+- [x] 144 tests passent, cargo clippy -- -D warnings clean
+
+### Session 2026-03-11 — Release v1.0.0
+
+- [x] `/rust-audit [A]` — 5 fixes appliqués :
+  - `models.rs` : `InvalidDifficultyError` (thiserror) remplace `String` dans `TryFrom<u8>`
+  - `runner.rs` : stdout/stderr `take()` propagé via `?` (plus de `.expect()` évitable)
+  - `main.rs` : commentaires dégradation gracieuse sur `eprintln!` + `.ok().flatten()`
+  - `chapters.rs` : messages `.expect()` explicites (référence assert compile-time)
+  - `cargo clippy -- -D warnings` clean, 144+ tests passent
+- [x] `/finalize` — audit 4 sous-agents (sécurité, perf, qualité, conventions)
+  - 1 blocker identifié et corrigé : CHANGELOG `[Unreleased]` → `[1.0.0] — 2026-03-11`
+  - `[0.1.0] — [PROPOSED]` → `[0.1.0] — 2025-11-01`
+- [x] Commit `14e94d8` : release: v1.0.0
+- [x] Tag annoté `v1.0.0` créé
+
+
 
 ### Session 2026-03-10
 
@@ -54,7 +80,7 @@ Date: 2026-03-10 (dernière mise à jour)
 
 ## Tâches en cours
 
-Toutes les tâches T1-T8, F1-F4, Q1-Q3 sont TERMINÉES.
+Toutes les tâches T1-T8, F1-F4, Q1-Q3, R1-R7 sont TERMINÉES.
 Aucune tâche bloquante. Prêt pour usage pédagogique.
 
 ## Fichiers clés

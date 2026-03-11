@@ -2,6 +2,7 @@ use colored::Colorize;
 
 use crate::chapters::{ChapterContext, CHAPTERS};
 use crate::constants::{MINIMAP_MAX_ITEMS, PROGRESS_BAR_WIDTH};
+use crate::mastery::next_interval_days;
 use crate::models::Subject;
 
 use super::mastery_bar;
@@ -83,14 +84,16 @@ pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
 pub fn show_mastery_update(subject: &Subject, success: bool) {
     let icon = if success { "▲".green() } else { "▼".red() };
     let bar = mastery_bar(subject.mastery_score.get());
+    let next_days = next_interval_days(subject.mastery_score.get() as f32);
     println!(
-        "  {} {} {} D{} │ {}/{} exercices",
+        "  {} {} {} D{} │ {}/{} exercices │ SRS +{}j",
         icon,
         subject.name.bold(),
         bar,
         subject.difficulty_unlocked,
         subject.attempts_success,
-        subject.attempts_total
+        subject.attempts_total,
+        next_days
     );
     println!();
 }
@@ -158,6 +161,59 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
             "  {} {:.1}/5.0 moyenne globale",
             "Global".bold(),
             total_mastery / count as f64
+        );
+    }
+    println!();
+}
+
+/// Show per-exercise score breakdown for a given subject.
+pub fn show_exercise_scores(subject: &str, scores: &[(String, u32, u32)]) {
+    println!();
+    super::show_banner();
+    println!(
+        "  {} {}  — détail exercices\n",
+        "Progression".bold().cyan(),
+        subject.bold()
+    );
+
+    if scores.is_empty() {
+        println!(
+            "  {}",
+            "Aucune tentative enregistrée pour ce sujet.".dimmed()
+        );
+        println!();
+        return;
+    }
+
+    println!(
+        "  {:<32} {:>8}  {:>8}  {:>6}",
+        "Exercice".bold(),
+        "Succès".bold(),
+        "Essais".bold(),
+        "%".bold()
+    );
+    println!("  {}", "─".repeat(58).dimmed());
+
+    for (id, successes, attempts) in scores {
+        let pct = if *attempts > 0 {
+            successes * 100 / attempts
+        } else {
+            0
+        };
+        let pct_str = format!("{}%", pct);
+        let colored_pct = if pct >= 75 {
+            pct_str.green()
+        } else if pct >= 25 {
+            pct_str.yellow()
+        } else {
+            pct_str.red()
+        };
+        println!(
+            "  {:<32} {:>8}  {:>8}  {}",
+            id.dimmed(),
+            successes,
+            attempts,
+            colored_pct
         );
     }
     println!();

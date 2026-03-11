@@ -25,4 +25,5 @@ libc = "0.2"
 ctrlc = "3"
 thiserror = "2"
 regex = "1"
+toml = "0.8"
 

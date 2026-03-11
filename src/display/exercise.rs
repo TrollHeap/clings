@@ -1,8 +1,15 @@
 use colored::Colorize;
 
 use crate::constants::TEXT_WRAP_WIDTH;
-use crate::models::Exercise;
+use crate::models::{Exercise, ValidationMode};
 use crate::runner::RunResult;
+
+/// Per-exercise SRS and scaffolding hints for the watch mode header.
+pub struct WatchMeta {
+    pub stage: Option<u8>,
+    pub next_review_days: Option<i64>,
+    pub unmet_prereqs: Vec<String>,
+}
 
 use super::{difficulty_stars, gcc_re, hr, show_banner, wrap_text};
 
@@ -26,6 +33,14 @@ fn render_exercise_body(exercise: &Exercise) {
     if let Some(cm) = &exercise.common_mistake {
         println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
     }
+    if !exercise.files.is_empty() {
+        let names: Vec<&str> = exercise.files.iter().map(|f| f.name.as_str()).collect();
+        println!(
+            "  {} {}",
+            "📎 Fichiers fournis :".bold().cyan(),
+            names.join(", ").dimmed()
+        );
+    }
 
     println!();
 }
@@ -37,7 +52,7 @@ pub fn show_exercise_watch(
     total: usize,
     completed: &[bool],
     chapter_ctx: Option<&crate::chapters::ChapterContext>,
-    stage: Option<u8>,
+    meta: &WatchMeta,
 ) {
     super::clear_screen();
     show_banner();
@@ -56,29 +71,57 @@ pub fn show_exercise_watch(
         exercise.title.bold(),
     );
 
-    let stage_label = match stage {
-        Some(0) => "S0 Exemple",
-        Some(1) => "S1 Guide",
-        Some(2) => "S2 Blancs",
-        Some(3) => "S3 Squelette",
-        Some(4) => "S4 Autonome",
-        _ => "S2 Blancs",
+    let review_info = match meta.next_review_days {
+        Some(d) if d <= 0 => format!("  {}  {}", "│".dimmed(), "dû".yellow()),
+        Some(d) => format!("  {}  {}", "│".dimmed(), format!("dans {} j", d).dimmed()),
+        None => String::new(),
     };
-    println!(
-        "  {}  {}   {}  {}   {}  {}   {}  {}",
-        "│".dimmed(),
-        difficulty_stars(exercise.difficulty),
-        "│".dimmed(),
-        exercise.exercise_type.to_string().dimmed(),
-        "│".dimmed(),
-        exercise.subject.dimmed(),
-        "│".dimmed(),
-        stage_label.dimmed(),
-    );
+    if exercise.starter_code_stages.is_empty() {
+        println!(
+            "  {}  {}   {}  {}   {}  {}{}",
+            "│".dimmed(),
+            difficulty_stars(exercise.difficulty),
+            "│".dimmed(),
+            exercise.exercise_type.to_string().dimmed(),
+            "│".dimmed(),
+            exercise.subject.dimmed(),
+            review_info,
+        );
+    } else {
+        let stage_label = match meta.stage {
+            Some(0) => "S0 Exemple",
+            Some(1) => "S1 Guide",
+            Some(2) => "S2 Blancs",
+            Some(3) => "S3 Squelette",
+            Some(4) => "S4 Autonome",
+            _ => "S2 Blancs",
+        };
+        println!(
+            "  {}  {}   {}  {}   {}  {}   {}  {}{}",
+            "│".dimmed(),
+            difficulty_stars(exercise.difficulty),
+            "│".dimmed(),
+            exercise.exercise_type.to_string().dimmed(),
+            "│".dimmed(),
+            exercise.subject.dimmed(),
+            "│".dimmed(),
+            stage_label.dimmed(),
+            review_info,
+        );
+    }
 
     println!("  {}", hr().dimmed());
-    println!();
 
+    if !meta.unmet_prereqs.is_empty() {
+        println!();
+        println!(
+            "  {} {}",
+            "⚠ Prérequis non satisfaits :".bold().red(),
+            meta.unmet_prereqs.join(", ").red()
+        );
+    }
+
+    println!();
     render_exercise_body(exercise);
 }
 
@@ -201,29 +244,50 @@ pub fn show_result(result: &RunResult, exercise: &Exercise) {
         }
         println!("  {}", "╚══".green());
     } else {
-        println!("  {} {}", "╔══".red(), "SORTIE INCORRECTE".bold().red());
+        let is_test_mode = matches!(
+            exercise.validation.mode,
+            ValidationMode::Test | ValidationMode::Both
+        );
 
-        if let Some(expected) = &exercise.validation.expected_output {
-            println!("  {} {}", "║".red(), "Diff (- attendu  + obtenu):".bold());
-            let exp_lines: Vec<&str> = expected.trim().lines().collect();
-            let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
-            let max_len = exp_lines.len().max(got_lines.len());
-            for i in 0..max_len {
-                match (exp_lines.get(i), got_lines.get(i)) {
-                    (Some(e), Some(g)) if *e == *g => {
-                        println!("  {}   {}", "║".red(), format!("  {e}").green());
+        if is_test_mode {
+            println!("  {} {}", "╔══".red(), "TESTS ÉCHOUÉS".bold().red());
+            if !result.stdout.is_empty() {
+                for line in result.stdout.lines() {
+                    let colored_line = if line.trim_start().starts_with("OK") {
+                        format!("  {}   {}", "║".red(), line.green())
+                    } else if line.trim_start().starts_with("FAIL") {
+                        format!("  {}   {}", "║".red(), line.red())
+                    } else {
+                        format!("  {}   {}", "║".red(), line.dimmed())
+                    };
+                    println!("{colored_line}");
+                }
+            }
+        } else {
+            println!("  {} {}", "╔══".red(), "SORTIE INCORRECTE".bold().red());
+
+            if let Some(expected) = &exercise.validation.expected_output {
+                println!("  {} {}", "║".red(), "Diff (- attendu  + obtenu):".bold());
+                let exp_lines: Vec<&str> = expected.trim().lines().collect();
+                let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
+                let max_len = exp_lines.len().max(got_lines.len());
+                for i in 0..max_len {
+                    match (exp_lines.get(i), got_lines.get(i)) {
+                        (Some(e), Some(g)) if *e == *g => {
+                            println!("  {}   {}", "║".red(), format!("  {e}").green());
+                        }
+                        (Some(e), Some(g)) => {
+                            println!("  {}   {}", "║".red(), format!("- {e}").red());
+                            println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
+                        }
+                        (Some(e), None) => {
+                            println!("  {}   {}", "║".red(), format!("- {e}").red());
+                        }
+                        (None, Some(g)) => {
+                            println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
+                        }
+                        (None, None) => {}
                     }
-                    (Some(e), Some(g)) => {
-                        println!("  {}   {}", "║".red(), format!("- {e}").red());
-                        println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
-                    }
-                    (Some(e), None) => {
-                        println!("  {}   {}", "║".red(), format!("- {e}").red());
-                    }
-                    (None, Some(g)) => {
-                        println!("  {}   {}", "║".red(), format!("+ {g}").yellow());
-                    }
-                    (None, None) => {}
                 }
             }
         }

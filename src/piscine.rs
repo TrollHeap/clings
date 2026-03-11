@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::time::Instant;
 
 use colored::Colorize;
@@ -7,17 +8,10 @@ use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
 
 const CTRL_C: u8 = 0x03;
 const CTRL_Z: u8 = 0x1a;
-use crate::display::handle_esc_sequence;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
-
-/// Décompose une durée en (heures, minutes, secondes) pour affichage `{}h{:02}m{:02}s`.
-fn format_elapsed(elapsed: std::time::Duration) -> (u64, u64, u64) {
-    let s = elapsed.as_secs();
-    (s / 3600, (s % 3600) / 60, s % 60)
-}
 
 fn log_checkpoint_err(label: &str, result: Result<()>) {
     if let Err(e) = result {
@@ -33,6 +27,56 @@ fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, i
     if let Some(sid) = session_id {
         log_checkpoint_err("exam ", progress::save_exam_checkpoint(conn, sid, index));
     }
+}
+
+/// Handles accumulating ESC sequences and navigating visualizer steps.
+///
+/// Returns `Some(())` if the key was consumed (caller should `return None`),
+/// `None` if the key was not an ESC sequence and should be processed normally.
+fn handle_esc_sequence(
+    key: u8,
+    escape_buf: &mut Vec<u8>,
+    vis_active: bool,
+    vis_step: &mut usize,
+    vis_lines: &mut usize,
+    visualizer_steps_len: usize,
+    show_vis: &mut impl FnMut(usize) -> usize,
+) -> Option<()> {
+    if !escape_buf.is_empty() {
+        escape_buf.push(key);
+        // Invalid sequence: ESC followed by something other than '[' → clear and process normally
+        if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+            escape_buf.clear();
+        } else {
+            if escape_buf.len() == 3 {
+                let seq = std::mem::take(escape_buf);
+                if vis_active {
+                    let n = visualizer_steps_len;
+                    match seq.as_slice() {
+                        [0x1b, b'[', b'C'] => {
+                            *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        [0x1b, b'[', b'D'] => {
+                            *vis_step = vis_step.saturating_sub(1);
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return Some(());
+        }
+    }
+    if key == 0x1b {
+        escape_buf.push(key);
+        return Some(());
+    }
+    None
 }
 
 /// Re-renders the full exercise screen after closing the visualizer.
@@ -89,7 +133,7 @@ fn redisplay_piscine_exercise(
         println!();
     }
     display::show_watching(source_path);
-    display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
+    display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
 }
 
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
@@ -196,7 +240,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
+                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
                 WatchAction::Continue
             },
             |key| {
@@ -249,6 +293,16 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         }
                         None
                     }
+                    b'l' | b'L' => {
+                        match progress::get_all_subjects(&conn) {
+                            Ok(subjects) => {
+                                display::show_exercise_list(&all_exercises, &subjects, None, None)
+                            }
+                            Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
+                        }
+                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
+                        None
+                    }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
                     b'k' | b'K' => Some(WatchAction::Prev),
                     b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
@@ -287,6 +341,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         }
                         display::show_keybinds_with_vis(
                             !exercise.visualizer.steps.is_empty(),
+                            true,
                             true,
                         );
                         None
@@ -332,7 +387,10 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     }
 
     let done = completed.iter().filter(|&&c| c).count();
-    let (hours, mins, secs) = format_elapsed(start_time.elapsed());
+    let elapsed = start_time.elapsed();
+    let hours = elapsed.as_secs() / 3600;
+    let mins = (elapsed.as_secs() % 3600) / 60;
+    let secs = elapsed.as_secs() % 60;
 
     if done == total {
         log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
@@ -455,7 +513,7 @@ pub fn run_exam_piscine(
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
+                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
                 WatchAction::Continue
             },
             |key| {
@@ -504,6 +562,16 @@ pub fn run_exam_piscine(
                         }
                         None
                     }
+                    b'l' | b'L' => {
+                        match progress::get_all_subjects(&conn) {
+                            Ok(subjects) => {
+                                display::show_exercise_list(&exercises, &subjects, None, None)
+                            }
+                            Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
+                        }
+                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
+                        None
+                    }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
                     b'k' | b'K' => Some(WatchAction::Prev),
                     b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
@@ -542,6 +610,7 @@ pub fn run_exam_piscine(
                         }
                         display::show_keybinds_with_vis(
                             !exercise.visualizer.steps.is_empty(),
+                            true,
                             true,
                         );
                         None
@@ -589,7 +658,10 @@ pub fn run_exam_piscine(
         log_checkpoint_err("exam ", progress::clear_exam_checkpoint(&conn));
     }
 
-    let (hours, mins, secs) = format_elapsed(start_time.elapsed());
+    let elapsed = start_time.elapsed();
+    let hours = elapsed.as_secs() / 3600;
+    let mins = (elapsed.as_secs() % 3600) / 60;
+    let secs = elapsed.as_secs() % 60;
 
     println!();
     if timed_minutes.is_some() {
@@ -702,7 +774,9 @@ mod tests {
     use rusqlite::Connection;
 
     use crate::chapters;
-    use crate::models::{Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, Visualizer};
+    use crate::models::{
+        Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode, Visualizer,
+    };
     use crate::progress;
 
     fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
@@ -718,7 +792,10 @@ mod tests {
             hints: vec![],
             validation: ValidationConfig {
                 expected_output: Some("ok".to_string()),
-                ..Default::default()
+                max_duration_ms: None,
+                mode: ValidationMode::Output,
+                expected_tests_pass: None,
+                test_code: None,
             },
             prerequisites: vec![],
             files: vec![],
@@ -805,5 +882,82 @@ mod tests {
         index = total - 1;
         index += 1;
         assert_eq!(index, total);
+    }
+
+    /// Vérifie que clear_piscine_checkpoint efface bien le checkpoint.
+    #[test]
+    fn test_clear_checkpoint() {
+        let conn = open_test_db();
+        progress::save_piscine_checkpoint(&conn, 5).unwrap();
+        progress::clear_piscine_checkpoint(&conn).unwrap();
+        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, None);
+    }
+
+    /// Vérifie que le checkpoint est mis à jour à chaque avancement.
+    #[test]
+    fn test_checkpoint_advances_with_index() {
+        let conn = open_test_db();
+        for expected_index in [0usize, 1, 2, 5, 10] {
+            progress::save_piscine_checkpoint(&conn, expected_index).unwrap();
+            let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+            assert_eq!(loaded, Some(expected_index));
+        }
+    }
+
+    /// Vérifie que le checkpoint est écrasé (pas accumulé) lors de mises à jour successives.
+    #[test]
+    fn test_checkpoint_overwrite() {
+        let conn = open_test_db();
+        progress::save_piscine_checkpoint(&conn, 3).unwrap();
+        progress::save_piscine_checkpoint(&conn, 7).unwrap();
+        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, Some(7));
+    }
+
+    /// Vérifie que load renvoie None si aucun checkpoint n'a été sauvegardé.
+    #[test]
+    fn test_load_checkpoint_missing_returns_none() {
+        let conn = open_test_db();
+        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        assert_eq!(loaded, None);
+    }
+
+    /// Vérifie l'ordre chapter→difficulty sur une liste mixte d'exercices.
+    /// "structs" est dans ch.1 "Fondamentaux C", "pipes" est dans ch.9 "Pipes".
+    #[test]
+    fn test_piscine_order_multi_chapter() {
+        let ex_pipes_easy = make_exercise("pipes-easy", "pipes", Difficulty::Easy);
+        let ex_structs_hard = make_exercise("structs-hard", "structs", Difficulty::Hard);
+        let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
+
+        let exercises = vec![ex_pipes_easy, ex_structs_hard, ex_structs_easy];
+        let subjects = vec![];
+
+        let blocks = chapters::order_by_chapters(&exercises, &subjects);
+        let order = chapters::flatten_chapters(&blocks);
+
+        assert_eq!(order.len(), 3);
+        // structs (ch.1) must come before pipes (ch.9)
+        let structs_positions: Vec<usize> = order
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.subject == "structs")
+            .map(|(i, _)| i)
+            .collect();
+        let pipes_positions: Vec<usize> = order
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.subject == "pipes")
+            .map(|(i, _)| i)
+            .collect();
+
+        assert!(structs_positions
+            .iter()
+            .all(|&p| pipes_positions.iter().all(|&q| p < q)));
+        // within structs: easy before hard
+        assert_eq!(structs_positions.len(), 2);
+        assert_eq!(order[structs_positions[0]].difficulty, Difficulty::Easy);
+        assert_eq!(order[structs_positions[1]].difficulty, Difficulty::Hard);
     }
 }

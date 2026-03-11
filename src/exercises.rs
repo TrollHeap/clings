@@ -241,8 +241,13 @@ mod tests {
 
     #[test]
     fn test_output_validation_has_expected() {
+        use crate::models::ValidationMode;
         let (exercises, _) = load_all_exercises().unwrap();
         for ex in &exercises {
+            // Test-mode exercises validate via test_code, not expected_output
+            if matches!(ex.validation.mode, ValidationMode::Test) {
+                continue;
+            }
             assert!(
                 ex.validation.expected_output.is_some(),
                 "Exercise {} has no expected_output",

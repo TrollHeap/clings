@@ -1,4 +1,6 @@
+mod authoring;
 mod chapters;
+pub mod config;
 pub mod constants;
 mod display;
 mod error;
@@ -47,6 +49,9 @@ enum Commands {
     List {
         #[arg(long)]
         subject: Option<String>,
+        /// Afficher uniquement les exercices dont la révision SRS est due
+        #[arg(long)]
+        due: bool,
     },
     /// Lancer un exercice par identifiant
     Run {
@@ -54,7 +59,11 @@ enum Commands {
         exercise_id: String,
     },
     /// Afficher un résumé de la progression
-    Progress,
+    Progress {
+        /// Détail par exercice pour un sujet donné (ex: pointers)
+        #[arg(long, short = 's')]
+        subject: Option<String>,
+    },
     /// Afficher les indices d'un exercice
     Hint {
         /// Exercise ID
@@ -83,7 +92,11 @@ enum Commands {
     /// Réviser les sujets dus selon le calendrier SRS
     Review,
     /// Afficher les statistiques globales
-    Stats,
+    Stats {
+        /// Affichage détaillé : sparkline d'activité + breakdown par sujet
+        #[arg(long, short = 'd')]
+        detailed: bool,
+    },
     /// Afficher les annales NSY103 et leur correspondance avec les exercices
     Annales,
     /// Mode exam simulé : reproduit une annale NSY103/UTC502 avec timer
@@ -109,26 +122,67 @@ enum Commands {
         #[arg(long)]
         overwrite: bool,
     },
+    /// Modifier la configuration utilisateur (~/.clings/clings.toml)
+    Config {
+        /// Clé au format section.champ (ex: srs.decay_days)
+        key: String,
+        /// Nouvelle valeur
+        value: String,
+    },
+    /// Générer un squelette d'exercice ou valider un fichier JSON existant
+    New {
+        /// Sujet de l'exercice (ex: pointers, signals)
+        #[arg(long, short = 's')]
+        subject: Option<String>,
+        /// Niveau de difficulté 1–5
+        #[arg(long, short = 'd', default_value = "1")]
+        difficulty: u8,
+        /// Mode de validation : output, test, both
+        #[arg(long, short = 'm', default_value = "output")]
+        mode: String,
+        /// Fichier de sortie (défaut : ./exercises/<subject>/<id>.json)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+        /// Valider uniquement un fichier JSON existant sans en créer un nouveau
+        #[arg(long, short = 'v')]
+        validate_only: Option<PathBuf>,
+    },
 }
 
 fn main() {
+    config::init(config::load());
+
     let cli = Cli::parse();
 
     let result = match cli.command {
         Some(Commands::Watch { chapter }) => cmd_watch(chapter),
-        Some(Commands::List { subject }) => cmd_list(subject.as_deref()),
+        Some(Commands::List { subject, due }) => cmd_list(subject.as_deref(), due),
         Some(Commands::Run { exercise_id }) => cmd_run(&exercise_id),
-        Some(Commands::Progress) => cmd_progress(),
+        Some(Commands::Progress { subject }) => cmd_progress(subject.as_deref()),
         Some(Commands::Hint { exercise_id }) => cmd_hint(&exercise_id),
         Some(Commands::Solution { exercise_id }) => cmd_solution(&exercise_id),
         Some(Commands::Reset { subject }) => cmd_reset(subject.as_deref()),
         Some(Commands::Piscine { chapter, timed }) => piscine::cmd_piscine(chapter, timed),
         Some(Commands::Review) => cmd_review(),
-        Some(Commands::Stats) => cmd_stats(),
+        Some(Commands::Stats { detailed }) => cmd_stats(detailed),
         Some(Commands::Annales) => cmd_annales(),
         Some(Commands::Exam { session, list }) => exam::cmd_exam(session.as_deref(), list),
         Some(Commands::Export { output }) => cmd_export(output.as_deref()),
         Some(Commands::Import { input, overwrite }) => cmd_import(&input, overwrite),
+        Some(Commands::Config { key, value }) => cmd_config(&key, &value),
+        Some(Commands::New {
+            subject,
+            difficulty,
+            mode,
+            output,
+            validate_only,
+        }) => cmd_new(
+            subject.as_deref(),
+            difficulty,
+            &mode,
+            output.as_deref(),
+            validate_only.as_deref(),
+        ),
         None => cmd_watch(None),
     };
 
@@ -156,11 +210,12 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         .map(|s| (s.name.as_str(), s.difficulty_unlocked))
         .collect();
     let gated_exercises: Vec<crate::models::Exercise> = all_exercises
-        .into_iter()
+        .iter()
         .filter(|ex| {
             let unlocked = subject_map.get(ex.subject.as_str()).copied().unwrap_or(1);
             (ex.difficulty as i32) <= unlocked
         })
+        .cloned()
         .collect();
 
     let mut chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
@@ -195,16 +250,38 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 
         // Display exercise
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
+        let next_review = progress::get_next_review_days(&conn, &exercise.subject).unwrap_or(None);
+        let unmet_prereqs: Vec<String> = exercise
+            .prerequisites
+            .iter()
+            .filter_map(|pid| {
+                let subj = all_exercises
+                    .iter()
+                    .find(|e| &e.id == pid)?
+                    .subject
+                    .as_str();
+                let mastery = progress::get_subject(&conn, subj)
+                    .ok()??
+                    .mastery_score
+                    .get();
+                (mastery < 2.0).then(|| pid.clone())
+            })
+            .collect();
+        let watch_meta = display::WatchMeta {
+            stage: current_stage,
+            next_review_days: next_review,
+            unmet_prereqs: unmet_prereqs.clone(),
+        };
         display::show_exercise_watch(
             exercise,
             index,
             total,
             &completed,
             Some(&ch_ctx),
-            current_stage,
+            &watch_meta,
         );
         display::show_watching(&source_path);
-        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false);
+        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false, true);
 
         // Open/update neovim pane in tmux
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
@@ -224,7 +301,11 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
             // On file change: notify only, no auto-compile
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), false);
+                display::show_keybinds_with_vis(
+                    !exercise_clone.visualizer.steps.is_empty(),
+                    false,
+                    true,
+                );
                 WatchAction::Continue
             },
             // On keyboard input
@@ -253,11 +334,12 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         total,
                         &completed,
                         None,
-                        current_stage,
+                        &watch_meta,
                     );
                     display::show_keybinds_with_vis(
                         !exercise_clone.visualizer.steps.is_empty(),
                         false,
+                        true,
                     );
                     return None;
                 }
@@ -287,7 +369,9 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         // Quick exercise list
                         match exercises::load_all_exercises() {
                             Ok((all, _)) => match progress::get_all_subjects(&conn) {
-                                Ok(subjects) => display::show_exercise_list(&all, &subjects, None),
+                                Ok(subjects) => {
+                                    display::show_exercise_list(&all, &subjects, None, None)
+                                }
                                 // Dégradation gracieuse : l'affichage de la liste est optionnel ;
                                 // une erreur DB ne doit pas interrompre la session watch.
                                 Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
@@ -335,6 +419,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         display::show_keybinds_with_vis(
                             !exercise_clone.visualizer.steps.is_empty(),
                             false,
+                            true,
                         );
                         None
                     }
@@ -488,12 +573,23 @@ pub(crate) fn record_and_show(
     }
 }
 
-fn cmd_list(filter_subject: Option<&str>) -> Result<()> {
+fn cmd_list(filter_subject: Option<&str>, filter_due: bool) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let conn = progress::open_db()?;
     let subjects = progress::get_all_subjects(&conn)?;
 
-    display::show_exercise_list(&all_exercises, &subjects, filter_subject);
+    let due_subjects: Option<Vec<String>> = if filter_due {
+        Some(progress::get_due_subjects(&conn)?)
+    } else {
+        None
+    };
+
+    display::show_exercise_list(
+        &all_exercises,
+        &subjects,
+        filter_subject,
+        due_subjects.as_deref(),
+    );
     Ok(())
 }
 
@@ -510,8 +606,14 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
     let source_path = runner::write_starter_code(exercise, subject_mastery)?;
 
     display::show_edit_instructions(&source_path);
+    display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false, false);
     let exercise_clone = exercise.clone();
     let source_for_change = source_path.clone();
+
+    let mut vis_active = false;
+    let mut vis_step: usize = 0;
+    let mut vis_lines: usize = 0;
+    let mut escape_buf: Vec<u8> = Vec::new();
 
     let action = watcher::watch_file_interactive(
         &source_path,
@@ -533,10 +635,40 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
             WatchAction::Continue
         },
         |key| {
-            if matches!(key, b'q' | b'Q' | 0x03 | 0x1a) {
-                Some(WatchAction::Quit)
-            } else {
-                None
+            if display::handle_esc_sequence(
+                key,
+                &mut escape_buf,
+                vis_active,
+                &mut vis_step,
+                &mut vis_lines,
+                exercise_clone.visualizer.steps.len(),
+                &mut |step| display::show_visualizer(&exercise_clone, step),
+            )
+            .is_some()
+            {
+                return None;
+            }
+
+            if vis_active {
+                vis_active = false;
+                display::show_exercise(&exercise_clone, 0, 1);
+                display::show_keybinds_with_vis(
+                    !exercise_clone.visualizer.steps.is_empty(),
+                    false,
+                    false,
+                );
+                return None;
+            }
+
+            match key {
+                b'v' | b'V' if !exercise_clone.visualizer.steps.is_empty() => {
+                    vis_step = 0;
+                    vis_active = true;
+                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                    None
+                }
+                b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                _ => None,
             }
         },
     )?;
@@ -548,12 +680,17 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_progress() -> Result<()> {
+fn cmd_progress(subject: Option<&str>) -> Result<()> {
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;
-    let subjects = progress::get_all_subjects(&conn)?;
-    let streak = progress::get_streak(&conn)?;
-    display::show_progress(&subjects, streak);
+    if let Some(s) = subject {
+        let scores = progress::get_exercise_scores(&conn, s)?;
+        display::show_exercise_scores(s, &scores);
+    } else {
+        let subjects = progress::get_all_subjects(&conn)?;
+        let streak = progress::get_streak(&conn)?;
+        display::show_progress(&subjects, streak);
+    }
     Ok(())
 }
 
@@ -608,16 +745,15 @@ fn cmd_review() -> Result<()> {
     let subject_map: std::collections::HashMap<&str, &crate::models::Subject> =
         subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
-    // For each due subject, prefer the most-recently-failed exercise; fallback to first
+    // For each due subject, prefer the weakest exercise (by exercise_scores); fallback to first
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
         .filter_map(|subject_name| {
-            // Try to find the last failed exercise for this subject.
-            // .ok(): DB error (ex. sujet absent) → None, on tombe dans le fallback ci-dessous.
-            let failed_id = progress::get_failed_exercise(&conn, subject_name)
+            // Prioritise the exercise with the lowest success rate for this subject.
+            let weakest_id = progress::get_weakest_exercises(&conn, subject_name, 1)
                 .ok()
-                .flatten();
-            if let Some(ref id) = failed_id {
+                .and_then(|v| v.into_iter().next());
+            if let Some(ref id) = weakest_id {
                 if let Some(ex) = all_exercises.iter().find(|e| &e.id == id) {
                     return Some(ex);
                 }
@@ -678,12 +814,18 @@ fn cmd_review() -> Result<()> {
     Ok(())
 }
 
-fn cmd_stats() -> Result<()> {
+fn cmd_stats(detailed: bool) -> Result<()> {
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;
     let subjects = progress::get_all_subjects(&conn)?;
     let streak = progress::get_streak(&conn)?;
-    display::show_stats(&subjects, streak as u32);
+    if detailed {
+        let attempts = progress::get_subject_attempts(&conn)?;
+        let daily = progress::get_daily_activity(&conn, 30)?;
+        display::show_stats_detailed(&subjects, streak as u32, &attempts, &daily);
+    } else {
+        display::show_stats(&subjects, streak as u32);
+    }
     Ok(())
 }
 
@@ -757,5 +899,89 @@ fn cmd_reset(subject: Option<&str>) -> Result<()> {
             println!("  {}", "Annulé.".dimmed());
         }
     }
+    Ok(())
+}
+
+fn cmd_config(key: &str, value: &str) -> Result<()> {
+    let (section, field) = key.split_once('.').ok_or_else(|| {
+        KfError::Config(format!(
+            "Format de clé invalide : '{key}' — attendu 'section.champ' (ex: srs.decay_days)"
+        ))
+    })?;
+    config::set_value(section, field, value).map_err(KfError::Config)?;
+    println!(
+        "  {} {key} = {value}",
+        "Config mise à jour :".bold().green()
+    );
+    Ok(())
+}
+
+fn cmd_new(
+    subject: Option<&str>,
+    difficulty: u8,
+    mode: &str,
+    output: Option<&std::path::Path>,
+    validate_only: Option<&std::path::Path>,
+) -> Result<()> {
+    // ── Mode --validate-only ──────────────────────────────────────────────
+    if let Some(path) = validate_only {
+        let errors = authoring::validate_exercise(path);
+        display::show_authoring_result(path, &errors);
+        if !errors.is_empty() {
+            return Err(KfError::Config("validation échouée".to_string()));
+        }
+        return Ok(());
+    }
+
+    // ── Mode génération ───────────────────────────────────────────────────
+    let subject = subject.ok_or_else(|| {
+        KfError::Config(
+            "--subject requis pour générer un squelette (ex: --subject pointers)".to_string(),
+        )
+    })?;
+
+    let exercise = authoring::generate_skeleton(subject, difficulty, mode)?;
+
+    // Determine output path
+    let target = if let Some(p) = output {
+        p.to_path_buf()
+    } else {
+        let exercises_dir = exercises::resolve_exercises_dir()?;
+        let dir = exercises_dir.join(subject);
+        std::fs::create_dir_all(&dir)?;
+        dir.join(format!("{}.json", exercise.id))
+    };
+
+    let json = serde_json::to_string_pretty(&exercise)
+        .map_err(|e| KfError::Config(format!("sérialisation JSON : {e}")))?;
+    std::fs::write(&target, &json)?;
+
+    println!();
+    println!(
+        "  {} {}",
+        "Squelette généré :".bold().green(),
+        target.display()
+    );
+    println!();
+    println!("  Champs à remplir :");
+    for placeholder in &[
+        "__TITLE__",
+        "__DESCRIPTION__",
+        "__STARTER_CODE__",
+        "__SOLUTION_CODE__",
+    ] {
+        if json.contains(placeholder) {
+            println!("    {} {}", "•".dimmed(), placeholder.yellow());
+        }
+    }
+    if json.contains("__EXPECTED_OUTPUT__") {
+        println!("    {} {}", "•".dimmed(), "__EXPECTED_OUTPUT__".yellow());
+    }
+    println!();
+    println!(
+        "  Valider ensuite avec : {}",
+        format!("clings new --validate-only {}", target.display()).bold()
+    );
+    println!();
     Ok(())
 }

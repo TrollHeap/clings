@@ -10,11 +10,22 @@ pub fn show_exercise_list(
     exercises: &[Exercise],
     subjects: &[Subject],
     filter_subject: Option<&str>,
+    filter_due: Option<&[String]>,
 ) {
     let filtered: Vec<&Exercise> = if let Some(filter) = filter_subject {
         exercises.iter().filter(|e| e.subject == filter).collect()
     } else {
         exercises.iter().collect()
+    };
+
+    // Filtre --due : garder uniquement les exercices des sujets dus
+    let filtered: Vec<&Exercise> = if let Some(due) = filter_due {
+        filtered
+            .into_iter()
+            .filter(|e| due.iter().any(|d| d == &e.subject))
+            .collect()
+    } else {
+        filtered
     };
 
     if filtered.is_empty() {
@@ -27,6 +38,11 @@ pub fn show_exercise_list(
 
     println!();
     show_banner();
+
+    if filter_due.is_some() {
+        println!("  {} exercices dus en révision SRS", "★".bold().yellow());
+        println!();
+    }
 
     // Group by chapter
     for chapter in CHAPTERS {
