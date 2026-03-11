@@ -520,9 +520,7 @@ mod tests {
             hints: vec![],
             validation: ValidationConfig {
                 expected_output: expected,
-                max_duration_ms: None,
-                mode: None,
-                test_code: None,
+                ..Default::default()
             },
             prerequisites: vec![],
             files: vec![],

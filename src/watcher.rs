@@ -52,7 +52,7 @@ where
         let stdin = std::io::stdin();
         let mut buf = [0u8; 1];
         loop {
-            if stop_clone.load(Ordering::Relaxed) {
+            if stop_clone.load(Ordering::Acquire) {
                 break;
             }
             if stdin.lock().read_exact(&mut buf).is_err() {
@@ -99,7 +99,7 @@ where
         }
     };
 
-    stop.store(true, Ordering::Relaxed);
+    stop.store(true, Ordering::Release);
     // The stdin thread is blocked on read_exact; detach it instead of joining.
     // It will exit on the next keypress (stop == true) or when key_rx is dropped
     // (causing key_tx.send to fail).

@@ -266,9 +266,7 @@ mod tests {
             hints: vec![],
             validation: crate::models::ValidationConfig {
                 expected_output: Some("test".to_string()),
-                max_duration_ms: None,
-                mode: None,
-                test_code: None,
+                ..Default::default()
             },
             prerequisites: vec![],
             files: vec![],
@@ -311,9 +309,7 @@ mod tests {
             hints: vec![],
             validation: crate::models::ValidationConfig {
                 expected_output: Some("test".to_string()),
-                max_duration_ms: None,
-                mode: None,
-                test_code: None,
+                ..Default::default()
             },
             prerequisites: vec![],
             files: vec![],

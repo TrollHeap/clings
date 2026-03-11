@@ -1,6 +1,6 @@
 [package]
 name = "clings"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "NSY103 C systems programming trainer — rustlings-style TUI"
 license = "MIT"

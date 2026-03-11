@@ -1,9 +1,61 @@
+use std::io::Write;
+
 use colored::Colorize;
 
 use crate::constants::HEADER_WIDTH;
 use crate::models::{Exercise, VisVar};
 
 use super::{footer_box, header_box, wrap_text, INNER_W};
+
+/// Handles accumulating ESC sequences and navigating visualizer steps.
+///
+/// Returns `Some(())` if the key was consumed (caller should `return None`),
+/// `None` if the key was not an ESC sequence and should be processed normally.
+pub(crate) fn handle_esc_sequence(
+    key: u8,
+    escape_buf: &mut Vec<u8>,
+    vis_active: bool,
+    vis_step: &mut usize,
+    vis_lines: &mut usize,
+    visualizer_steps_len: usize,
+    show_vis: &mut impl FnMut(usize) -> usize,
+) -> Option<()> {
+    if !escape_buf.is_empty() {
+        escape_buf.push(key);
+        // Invalid sequence: ESC followed by something other than '[' → clear and process normally
+        if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+            escape_buf.clear();
+        } else {
+            if escape_buf.len() == 3 {
+                let seq = std::mem::take(escape_buf);
+                if vis_active {
+                    let n = visualizer_steps_len;
+                    match seq.as_slice() {
+                        [0x1b, b'[', b'C'] => {
+                            *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        [0x1b, b'[', b'D'] => {
+                            *vis_step = vis_step.saturating_sub(1);
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return Some(());
+        }
+    }
+    if key == 0x1b {
+        escape_buf.push(key);
+        return Some(());
+    }
+    None
+}
 
 /// Width of each column in the two-column memory visualizer layout.
 const COL_W: usize = 26;

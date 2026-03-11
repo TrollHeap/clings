@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::time::Instant;
 
 use colored::Colorize;
@@ -8,10 +7,17 @@ use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
 
 const CTRL_C: u8 = 0x03;
 const CTRL_Z: u8 = 0x1a;
+use crate::display::handle_esc_sequence;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
+
+/// Décompose une durée en (heures, minutes, secondes) pour affichage `{}h{:02}m{:02}s`.
+fn format_elapsed(elapsed: std::time::Duration) -> (u64, u64, u64) {
+    let s = elapsed.as_secs();
+    (s / 3600, (s % 3600) / 60, s % 60)
+}
 
 fn log_checkpoint_err(label: &str, result: Result<()>) {
     if let Err(e) = result {
@@ -27,56 +33,6 @@ fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, i
     if let Some(sid) = session_id {
         log_checkpoint_err("exam ", progress::save_exam_checkpoint(conn, sid, index));
     }
-}
-
-/// Handles accumulating ESC sequences and navigating visualizer steps.
-///
-/// Returns `Some(())` if the key was consumed (caller should `return None`),
-/// `None` if the key was not an ESC sequence and should be processed normally.
-fn handle_esc_sequence(
-    key: u8,
-    escape_buf: &mut Vec<u8>,
-    vis_active: bool,
-    vis_step: &mut usize,
-    vis_lines: &mut usize,
-    visualizer_steps_len: usize,
-    show_vis: &mut impl FnMut(usize) -> usize,
-) -> Option<()> {
-    if !escape_buf.is_empty() {
-        escape_buf.push(key);
-        // Invalid sequence: ESC followed by something other than '[' → clear and process normally
-        if escape_buf.len() == 2 && escape_buf[1] != b'[' {
-            escape_buf.clear();
-        } else {
-            if escape_buf.len() == 3 {
-                let seq = std::mem::take(escape_buf);
-                if vis_active {
-                    let n = visualizer_steps_len;
-                    match seq.as_slice() {
-                        [0x1b, b'[', b'C'] => {
-                            *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
-                            print!("\x1b[{}A\x1b[J", *vis_lines);
-                            let _ = std::io::stdout().flush();
-                            *vis_lines = show_vis(*vis_step);
-                        }
-                        [0x1b, b'[', b'D'] => {
-                            *vis_step = vis_step.saturating_sub(1);
-                            print!("\x1b[{}A\x1b[J", *vis_lines);
-                            let _ = std::io::stdout().flush();
-                            *vis_lines = show_vis(*vis_step);
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            return Some(());
-        }
-    }
-    if key == 0x1b {
-        escape_buf.push(key);
-        return Some(());
-    }
-    None
 }
 
 /// Re-renders the full exercise screen after closing the visualizer.
@@ -376,10 +332,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     }
 
     let done = completed.iter().filter(|&&c| c).count();
-    let elapsed = start_time.elapsed();
-    let hours = elapsed.as_secs() / 3600;
-    let mins = (elapsed.as_secs() % 3600) / 60;
-    let secs = elapsed.as_secs() % 60;
+    let (hours, mins, secs) = format_elapsed(start_time.elapsed());
 
     if done == total {
         log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
@@ -636,10 +589,7 @@ pub fn run_exam_piscine(
         log_checkpoint_err("exam ", progress::clear_exam_checkpoint(&conn));
     }
 
-    let elapsed = start_time.elapsed();
-    let hours = elapsed.as_secs() / 3600;
-    let mins = (elapsed.as_secs() % 3600) / 60;
-    let secs = elapsed.as_secs() % 60;
+    let (hours, mins, secs) = format_elapsed(start_time.elapsed());
 
     println!();
     if timed_minutes.is_some() {
@@ -768,9 +718,7 @@ mod tests {
             hints: vec![],
             validation: ValidationConfig {
                 expected_output: Some("ok".to_string()),
-                max_duration_ms: None,
-                mode: None,
-                test_code: None,
+                ..Default::default()
             },
             prerequisites: vec![],
             files: vec![],
