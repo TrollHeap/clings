@@ -230,47 +230,17 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
             // On keyboard input
             |key| {
                 // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
-                if !escape_buf.is_empty() {
-                    escape_buf.push(key);
-                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter normalement
-                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
-                        escape_buf.clear();
-                        // fall through — key is treated as a normal keypress below
-                    } else if escape_buf.len() == 3 {
-                        let seq = std::mem::take(&mut escape_buf);
-                        if vis_active {
-                            let n = exercise_clone.visualizer.steps.len();
-                            match seq.as_slice() {
-                                [0x1b, b'[', b'C'] => {
-                                    // Arrow right → next step
-                                    vis_step = (vis_step + 1).min(n.saturating_sub(1));
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = io::stdout().flush();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
-                                    return None;
-                                }
-                                [0x1b, b'[', b'D'] => {
-                                    // Arrow left → previous step
-                                    vis_step = vis_step.saturating_sub(1);
-                                    print!("\x1b[{}A\x1b[J", vis_lines);
-                                    let _ = io::stdout().flush();
-                                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
-                                    return None;
-                                }
-                                // Séquence inconnue en mode visualizer → traiter `key` normalement
-                                _ => {}
-                            }
-                        } else {
-                            // Séquence inconnue hors visualizer → ignorer
-                            return None;
-                        }
-                    } else {
-                        // Séquence incomplète (len == 2, byte = '[')
-                        return None;
-                    }
-                }
-                if key == 0x1b {
-                    escape_buf.push(key);
+                if display::handle_esc_sequence(
+                    key,
+                    &mut escape_buf,
+                    vis_active,
+                    &mut vis_step,
+                    &mut vis_lines,
+                    exercise_clone.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                )
+                .is_some()
+                {
                     return None;
                 }
 

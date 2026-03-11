@@ -12,6 +12,7 @@ pub use keybinds::*;
 pub use list::*;
 pub use progress::*;
 pub use stats::*;
+pub(crate) use visualizer::handle_esc_sequence;
 pub use visualizer::*;
 
 use std::sync::OnceLock;

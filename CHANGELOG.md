@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1] — 2026-03-11
+
+### Refactoring
+- `handle_esc_sequence` extrait dans `display/visualizer.rs` (était inline dans `runner.rs`)
+- `ValidationConfig` nettoyée : `deny_unknown_fields` retiré, champs legacy supprimés
+
+### Corrections
+- `AtomicBool::store` utilise désormais `Ordering::Release` (cohérence avec `Acquire` sur load)
+
 ## [1.0.0] — 2026-03-11
 
 ### Sécurité

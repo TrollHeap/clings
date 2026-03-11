@@ -77,21 +77,13 @@ impl std::fmt::Display for Lang {
 }
 
 /// Configuration de validation d'un exercice.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ValidationConfig {
     /// Sortie attendue (comparaison stdout normalisée) ; supporte le préfixe `REGEX:`
     pub expected_output: Option<String>,
     /// Durée maximale d'exécution en millisecondes (remplace la limite globale de 10s)
     #[serde(default)]
     pub max_duration_ms: Option<u64>,
-    /// Champs legacy acceptés mais ignorés (supprimés du modèle, seule la validation Output est active)
-    #[allow(dead_code)]
-    #[serde(default, skip_serializing)]
-    pub mode: Option<String>,
-    #[allow(dead_code)]
-    #[serde(default, skip_serializing)]
-    pub test_code: Option<String>,
 }
 
 /// Nature pédagogique d'un exercice.
