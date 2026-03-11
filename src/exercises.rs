@@ -5,8 +5,8 @@ use crate::constants::EXERCISES_ENV_VAR;
 use crate::error::{KfError, Result};
 use crate::models::Exercise;
 
-/// Ensemble d'exercices : liste complète + index par sujet.
-pub type ExerciseSet = (Vec<Exercise>, HashMap<String, Vec<Exercise>>);
+/// Ensemble d'exercices : liste complète + index par sujet (indices dans le Vec).
+pub type ExerciseSet = (Vec<Exercise>, HashMap<String, Vec<usize>>);
 
 /// Recursively load all exercise JSON files from a directory.
 fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
@@ -93,12 +93,9 @@ pub fn load_all_exercises() -> Result<ExerciseSet> {
         )));
     }
 
-    let mut by_subject: HashMap<String, Vec<Exercise>> = HashMap::new();
-    for ex in &exercises {
-        by_subject
-            .entry(ex.subject.clone())
-            .or_default()
-            .push(ex.clone());
+    let mut by_subject: HashMap<String, Vec<usize>> = HashMap::new();
+    for (i, ex) in exercises.iter().enumerate() {
+        by_subject.entry(ex.subject.clone()).or_default().push(i);
     }
 
     Ok((exercises, by_subject))
@@ -120,6 +117,12 @@ mod tests {
         let (exercises, by_subject) = result.unwrap();
         assert!(!exercises.is_empty(), "Should load at least one exercise");
         assert!(!by_subject.is_empty(), "Should group by subject");
+        // Verify indices are in bounds
+        for indices in by_subject.values() {
+            for &i in indices {
+                assert!(i < exercises.len());
+            }
+        }
     }
 
     #[test]
@@ -156,6 +159,12 @@ mod tests {
         let (exercises, by_subject) = load_all_exercises().unwrap();
         let total_in_map: usize = by_subject.values().map(|v| v.len()).sum();
         assert_eq!(exercises.len(), total_in_map);
+        // Verify subjects in map match the exercises they index
+        for (subject, indices) in &by_subject {
+            for &i in indices {
+                assert_eq!(&exercises[i].subject, subject);
+            }
+        }
     }
 
     #[test]

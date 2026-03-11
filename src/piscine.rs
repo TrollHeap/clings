@@ -823,7 +823,27 @@ mod tests {
     fn open_test_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+            "CREATE TABLE IF NOT EXISTS subjects (
+                name TEXT PRIMARY KEY,
+                mastery_score REAL NOT NULL DEFAULT 0.0,
+                last_practiced_at INTEGER,
+                attempts_total INTEGER NOT NULL DEFAULT 0,
+                attempts_success INTEGER NOT NULL DEFAULT 0,
+                difficulty_unlocked INTEGER NOT NULL DEFAULT 1,
+                next_review_at INTEGER,
+                srs_interval_days INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS practice_log (
+                id TEXT PRIMARY KEY,
+                subject TEXT NOT NULL,
+                exercise_id TEXT NOT NULL,
+                success INTEGER NOT NULL DEFAULT 0,
+                practiced_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS kv (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );",
         )
         .unwrap();
         conn

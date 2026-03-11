@@ -4,7 +4,7 @@ use crate::error::{KfError, Result};
 use crate::exercises;
 
 #[derive(Debug, serde::Deserialize)]
-struct AnnaleQuestion {
+struct SessionQuestion {
     pub exercises: Vec<String>,
     #[serde(default)]
     pub points: f32,
@@ -12,12 +12,12 @@ struct AnnaleQuestion {
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct AnnaleSession {
+struct ExamSession {
     pub id: String,
     pub title: String,
     #[serde(default)]
     pub total_points: f32,
-    pub questions: Vec<AnnaleQuestion>,
+    pub questions: Vec<SessionQuestion>,
 }
 
 /// Durée par défaut selon le type de session (minutes)
@@ -29,12 +29,26 @@ fn default_duration(session_id: &str) -> u64 {
     }
 }
 
+/// Collect deduplicated exercise IDs from session questions, preserving order.
+fn collect_unique_ids(questions: &[SessionQuestion]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut ids = Vec::new();
+    for q in questions {
+        for eid in &q.exercises {
+            if seen.insert(eid.as_str()) {
+                ids.push(eid.clone());
+            }
+        }
+    }
+    ids
+}
+
 pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     // 1. Charger annales_map.json
     let exercises_dir = exercises::resolve_exercises_dir()?;
     let map_path = exercises_dir.join("annales_map.json");
     let raw = std::fs::read_to_string(&map_path)?;
-    let sessions: Vec<AnnaleSession> = serde_json::from_str(&raw)
+    let sessions: Vec<ExamSession> = serde_json::from_str(&raw)
         .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
 
     // 2. Si list ou pas de session : lister les sessions
@@ -67,15 +81,7 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
         .ok_or_else(|| KfError::Config(format!("Session introuvable : '{sid}'")))?;
 
     // 4. Collecter les exercise IDs (dédupliqués, dans l'ordre)
-    let mut seen = std::collections::HashSet::new();
-    let mut exercise_ids: Vec<&str> = Vec::new();
-    for q in &session.questions {
-        for eid in &q.exercises {
-            if seen.insert(eid.as_str()) {
-                exercise_ids.push(eid.as_str());
-            }
-        }
-    }
+    let exercise_ids = collect_unique_ids(&session.questions);
 
     let total_ex = exercise_ids.len();
     let duration = default_duration(&session.id);
@@ -161,4 +167,48 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
 
     // Lancer une session piscine avec ces exercices uniquement
     crate::piscine::run_exam_piscine(exam_exercises, Some(duration), Some(sid))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn q(exercises: &[&str]) -> SessionQuestion {
+        SessionQuestion {
+            exercises: exercises.iter().map(|s| s.to_string()).collect(),
+            points: 1.0,
+            title: "Q".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_collect_unique_ids_deduplicates() {
+        // "ptr-1" appears in both questions — should appear only once, first occurrence wins
+        let questions = vec![q(&["ptr-1", "ptr-2"]), q(&["ptr-2", "ptr-3", "ptr-1"])];
+        let ids = collect_unique_ids(&questions);
+        assert_eq!(ids, vec!["ptr-1", "ptr-2", "ptr-3"]);
+    }
+
+    #[test]
+    fn test_collect_unique_ids_preserves_order() {
+        let questions = vec![q(&["c", "a"]), q(&["b"])];
+        let ids = collect_unique_ids(&questions);
+        assert_eq!(ids, vec!["c", "a", "b"]);
+    }
+
+    #[test]
+    fn test_collect_unique_ids_empty() {
+        assert!(collect_unique_ids(&[]).is_empty());
+        assert!(collect_unique_ids(&[q(&[])]).is_empty());
+    }
+
+    #[test]
+    fn test_default_duration_nsy103() {
+        assert_eq!(default_duration("nsy103-s1-2024"), 150);
+    }
+
+    #[test]
+    fn test_default_duration_utc502() {
+        assert_eq!(default_duration("utc502-s2-2024"), 180);
+    }
 }
