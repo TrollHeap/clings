@@ -12,17 +12,19 @@ use crate::models::ValidationMode;
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
 
-fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
-    if let Err(e) = progress::save_piscine_checkpoint(conn, index) {
-        eprintln!("  Warning: checkpoint not saved: {e}");
+fn log_checkpoint_err(label: &str, result: Result<()>) {
+    if let Err(e) = result {
+        eprintln!("  Warning: {label}checkpoint not saved: {e}");
     }
+}
+
+fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
+    log_checkpoint_err("", progress::save_piscine_checkpoint(conn, index));
 }
 
 fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, index: usize) {
     if let Some(sid) = session_id {
-        if let Err(e) = progress::save_exam_checkpoint(conn, sid, index) {
-            eprintln!("  Warning: exam checkpoint not saved: {e}");
-        }
+        log_checkpoint_err("exam ", progress::save_exam_checkpoint(conn, sid, index));
     }
 }
 
