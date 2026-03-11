@@ -23,6 +23,52 @@
   "common_mistake": "Oublier que les entrées par bloc dépendent de la taille du pointeur (block_size / ptr_size, pas block_size seul)",
   "kc_ids": ["KC-C5"],
   "files": [],
+  "visualizer": {
+    "type": "stack_heap",
+    "steps": [
+      {
+        "label": "Étape 1 — Structure d'un inode Unix",
+        "stack": [
+          { "name": "blocs directs (D0–D11)", "value": "12 pointeurs → 12 Ko max" },
+          { "name": "indirect simple (I1)", "value": "1 pointeur → bloc d'adresses" },
+          { "name": "indirect double (I2)", "value": "1 pointeur → bloc → blocs d'adresses" },
+          { "name": "indirect triple (I3)", "value": "1 pointeur → ..." }
+        ],
+        "explanation": "Un inode contient 12 blocs directs + 3 niveaux d'indirection",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "Étape 2 — Calcul : nombre de blocs de données",
+        "stack": [
+          { "name": "FILE_SIZE", "value": "32 × 1024 = 32768 octets" },
+          { "name": "BLOCK_SIZE", "value": "1024 octets" },
+          { "name": "data_blocks", "value": "32768 / 1024 = 32 blocs" }
+        ],
+        "explanation": "32 blocs nécessaires pour un fichier de 32 Ko avec des blocs de 1 Ko",
+        "step_label": "Étape 2"
+      },
+      {
+        "label": "Étape 3 — Calcul : entrées par bloc indirect",
+        "stack": [
+          { "name": "BLOCK_SIZE", "value": "1024 octets" },
+          { "name": "PTR_SIZE", "value": "2 octets (numéro de bloc)" },
+          { "name": "entries_per_block", "value": "1024 / 2 = 512 entrées" }
+        ],
+        "explanation": "Un bloc d'indirection peut contenir 512 pointeurs de 2 octets chacun",
+        "step_label": "Étape 3"
+      },
+      {
+        "label": "Étape 4 — Conclusion : les blocs directs ne suffisent pas",
+        "stack": [
+          { "name": "data_blocks", "value": "32 blocs requis" },
+          { "name": "DIRECT_BLOCKS", "value": "12 blocs directs disponibles" },
+          { "name": "direct_ok", "value": "32 <= 12 ? → NON" }
+        ],
+        "explanation": "32 blocs > 12 directs : il faudra utiliser l'indirection simple I1",
+        "step_label": "Étape 4"
+      }
+    ]
+  },
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == RAPPEL =================================================\n * Structure d'un inode Unix :\n *   - 12 blocs directs (D0..D11)\n *   - 1 bloc indirect simple  (I1)\n *   - 1 bloc indirect double  (I2)\n *   - 1 bloc indirect triple  (I3)\n *\n * Exemple avec BLOCK_SIZE=512, PTR_SIZE=2, fichier 1 Ko :\n *   data_blocks       = 1024 / 512  = 2\n *   entries_per_block = 512  / 2    = 256\n *   direct_ok         = (2 <= 12)   = oui\n * =========================================================== */\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    int data_blocks       = FILE_SIZE / BLOCK_SIZE;\n    int entries_per_block = BLOCK_SIZE / PTR_SIZE;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",
     "#include <stdio.h>\n\n#define BLOCK_SIZE   1024\n#define PTR_SIZE     2\n#define FILE_SIZE    (32 * 1024)\n#define DIRECT_BLOCKS 12\n\nint main(void) {\n    /* data_blocks = taille_fichier / taille_bloc */\n    int data_blocks       = FILE_SIZE / ____;\n    int entries_per_block = ____ / PTR_SIZE;\n    int direct_ok         = (data_blocks <= DIRECT_BLOCKS) ? 1 : 0;\n\n    printf(\"Blocs de données: %d\\n\", data_blocks);\n    printf(\"Entrées par bloc indirect: %d\\n\", entries_per_block);\n    printf(\"Blocs directs suffisants: %s\\n\", direct_ok ? \"oui\" : \"non\");\n    return 0;\n}",

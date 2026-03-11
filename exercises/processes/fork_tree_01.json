@@ -19,7 +19,50 @@
   },
   "visualizer": {
     "type": "dataflow",
-    "steps": []
+    "steps": [
+      {
+        "label": "Étape 1 — Avant fork() : un seul processus parent",
+        "stack": [
+          { "name": "pid_t pid", "value": "non initialisé" },
+          { "name": "int i", "value": "0 (début de boucle)" }
+        ],
+        "explanation": "Le processus parent (ex. PID 1000) entre dans la boucle for i=0..2",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "Étape 2 — fork() i=0 : naissance de l'enfant 0",
+        "stack": [
+          { "name": "parent : pid", "value": "1001 (retour fork)" },
+          { "name": "parent : i", "value": "0" },
+          { "name": "enfant0 : pid", "value": "0 (retour fork dans fils)" },
+          { "name": "enfant0 : ppid", "value": "1000 (PID du parent)" }
+        ],
+        "explanation": "fork() duplique le processus — retourne le PID du fils dans le parent, 0 dans le fils",
+        "step_label": "Étape 2"
+      },
+      {
+        "label": "Étape 3 — Bug : sans _exit(), l'enfant continue la boucle",
+        "stack": [
+          { "name": "enfant0 : i", "value": "0 → continue → i=1, i=2" },
+          { "name": "enfant0 fork i=1", "value": "crée enfant01 (PID 1002)" },
+          { "name": "enfant0 fork i=2", "value": "crée enfant02 (PID 1003)" },
+          { "name": "processus total", "value": "1 + 2 + 4 = 7 au lieu de 3 !" }
+        ],
+        "explanation": "Sans _exit(), l'enfant hérite de i et continue à forker — explosion exponentielle",
+        "step_label": "Étape 3"
+      },
+      {
+        "label": "Étape 4 — Correction : _exit(0) immédiat dans le fils",
+        "stack": [
+          { "name": "enfant0 : printf", "value": "\"child 0: pid=1001 ppid=1000\"" },
+          { "name": "enfant0 : _exit(0)", "value": "terminaison immédiate" },
+          { "name": "parent : wait(NULL)", "value": "× 3 pour récolter chaque fils" },
+          { "name": "parent : printf", "value": "\"parent done\"" }
+        ],
+        "explanation": "_exit() évite flush des buffers et coupe la boucle ; wait() évite les processus zombies",
+        "step_label": "Étape 4"
+      }
+    ]
   },
   "prerequisites": ["fork-multi-01"],
   "exercise_type": "fix_bug",

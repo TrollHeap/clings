@@ -14,8 +14,6 @@ mod watcher;
 
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -30,7 +28,8 @@ use crate::watcher::WatchAction;
     name = "clings",
     version,
     propagate_version = true,
-    about = "clings — C Systems Programming Trainer"
+    about = "clings — C Systems Programming Trainer",
+    long_about = "clings — Entraîneur de programmation système C (NSY103/UTC502)\n\nSans sous-commande, démarre le mode watch (progression SRS par défaut).\n\nVariables d'environnement :\n  CLINGS_EXERCISES  chemin vers le répertoire des exercices"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -39,35 +38,35 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start watch mode: SRS-prioritized exercises with auto-advance
+    /// Mode watch : progression SRS par chapitre
     Watch {
         /// Restreindre à un seul chapitre (1-16)
         #[arg(long, short = 'c')]
         chapter: Option<u8>,
     },
-    /// List all exercises (optionally filtered by subject)
+    /// Lister tous les exercices (filtrable par sujet)
     List {
         #[arg(long)]
         subject: Option<String>,
     },
-    /// Run a specific exercise by ID
+    /// Lancer un exercice par identifiant
     Run {
         /// Exercise ID (e.g. "ptr-deref-01")
         exercise_id: String,
     },
-    /// Show progress overview
+    /// Afficher un résumé de la progression
     Progress,
-    /// Show hints for an exercise
+    /// Afficher les indices d'un exercice
     Hint {
         /// Exercise ID
         exercise_id: String,
     },
-    /// Show solution for an exercise (requires >= 1 attempt)
+    /// Afficher la solution d'un exercice (nécessite au moins 1 tentative)
     Solution {
         /// Exercise ID
         exercise_id: String,
     },
-    /// Reset all progress (with confirmation)
+    /// Réinitialiser la progression (tout ou un seul sujet)
     Reset {
         /// Réinitialiser uniquement ce sujet (ex: pointers)
         #[arg(long, short = 's')]
@@ -82,9 +81,9 @@ enum Commands {
         #[arg(long, short = 't')]
         timed: Option<u64>,
     },
-    /// Reinforce due subjects via SRS scheduling
+    /// Réviser les sujets dus selon le calendrier SRS
     Review,
-    /// Show global statistics
+    /// Afficher les statistiques globales
     Stats,
     /// Afficher les annales NSY103 et leur correspondance avec les exercices
     Annales,
@@ -230,7 +229,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
         let mut escape_buf: Vec<u8> = Vec::new();
-        let already_recorded = Arc::new(AtomicBool::new(false));
+        let mut already_recorded = false;
         let mut consecutive_failures: u32 = 0;
 
         let action = watcher::watch_file_interactive(
@@ -329,15 +328,12 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                     b'l' | b'L' => {
                         // Quick exercise list
-                        let list_result = (|| -> crate::error::Result<()> {
-                            let c = progress::open_db()?;
-                            let subjects = progress::get_all_subjects(&c)?;
-                            let (all, _) = exercises::load_all_exercises()?;
-                            display::show_exercise_list(&all, &subjects, None);
-                            Ok(())
-                        })();
-                        if let Err(e) = list_result {
-                            eprintln!("  {} {e}", "Erreur:".red());
+                        match exercises::load_all_exercises() {
+                            Ok((all, _)) => match progress::get_all_subjects(&conn) {
+                                Ok(subjects) => display::show_exercise_list(&all, &subjects, None),
+                                Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
+                            },
+                            Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
                         }
                         println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
                         None
@@ -348,7 +344,8 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         display::show_result(&result, &exercise_clone);
                         if result.success {
                             consecutive_failures = 0;
-                            if !already_recorded.swap(true, Ordering::SeqCst) {
+                            if !already_recorded {
+                                already_recorded = true;
                                 record_and_show(
                                     &conn,
                                     &exercise_clone.subject,

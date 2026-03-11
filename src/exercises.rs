@@ -19,7 +19,7 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
         let entry = match entry {
             Ok(e) => e,
             Err(err) => {
-                eprintln!("Warning: skipping directory entry: {err}");
+                eprintln!("Avertissement : entrée de répertoire ignorée : {err}");
                 continue;
             }
         };
@@ -33,7 +33,11 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 match serde_json::from_str::<Exercise>(&content) {
                     Ok(exercise) => exercises.push(exercise),
-                    Err(e) => eprintln!("Warning: failed to parse {}: {}", path.display(), e),
+                    Err(e) => eprintln!(
+                        "Avertissement : échec d'analyse de {} : {}",
+                        path.display(),
+                        e
+                    ),
                 }
             }
         }

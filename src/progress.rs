@@ -253,11 +253,11 @@ pub fn reset_subject(conn: &Connection, subject_name: &str) -> Result<()> {
 /// atomically via `execute_batch`. Used by `clings reset` (full reset only;
 /// for subject-scoped reset see [`reset_subject`]).
 pub fn reset_progress(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "DELETE FROM kv;
-         DELETE FROM practice_log;
-         DELETE FROM subjects;",
-    )?;
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM kv", [])?;
+    tx.execute("DELETE FROM practice_log", [])?;
+    tx.execute("DELETE FROM subjects", [])?;
+    tx.commit()?;
     Ok(())
 }
 

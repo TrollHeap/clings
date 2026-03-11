@@ -224,54 +224,17 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 
         let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
-        // Piscine display
-        display::clear_screen();
-        show_piscine_header(index, total, &start_time, deadline);
-
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
-        display::show_chapter(&ch_ctx);
-        println!();
-
-        println!(
-            "  {} [{}/{}]  {}",
-            "Exercice".bold().green(),
-            (index + 1).to_string().bold(),
+        redisplay_piscine_exercise(
+            index,
             total,
-            exercise.title.bold(),
+            &start_time,
+            deadline,
+            Some(&ch_ctx),
+            exercise,
+            current_stage,
+            &source_path,
         );
-        println!(
-            "  {}  {}   {}  {}   {}  {}",
-            "│".dimmed(),
-            display::difficulty_stars(exercise.difficulty),
-            "│".dimmed(),
-            exercise.subject.dimmed(),
-            "│".dimmed(),
-            match current_stage {
-                Some(s) => format!("S{s}"),
-                None => "S2".to_string(),
-            }
-            .dimmed(),
-        );
-        println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
-        println!();
-
-        for line in exercise.description.lines() {
-            println!("  {line}");
-        }
-        println!();
-
-        if let Some(kc) = &exercise.key_concept {
-            println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
-        }
-        if let Some(cm) = &exercise.common_mistake {
-            println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-        }
-        if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
-            println!();
-        }
-
-        display::show_watching(&source_path);
-        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
@@ -531,49 +494,16 @@ pub fn run_exam_piscine(
         let ex_start = Instant::now();
         let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
 
-        display::clear_screen();
-        show_piscine_header(index, total, &start_time, deadline);
-
-        println!(
-            "  {} [{}/{}]  {}",
-            "Exercice".bold().green(),
-            (index + 1).to_string().bold(),
+        redisplay_piscine_exercise(
+            index,
             total,
-            exercise.title.bold(),
+            &start_time,
+            deadline,
+            None,
+            exercise,
+            current_stage,
+            &source_path,
         );
-        println!(
-            "  {}  {}   {}  {}   {}  {}",
-            "│".dimmed(),
-            display::difficulty_stars(exercise.difficulty),
-            "│".dimmed(),
-            exercise.subject.dimmed(),
-            "│".dimmed(),
-            match current_stage {
-                Some(s) => format!("S{s}"),
-                None => "S2".to_string(),
-            }
-            .dimmed(),
-        );
-        println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
-        println!();
-
-        for line in exercise.description.lines() {
-            println!("  {line}");
-        }
-        println!();
-
-        if let Some(kc) = &exercise.key_concept {
-            println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
-        }
-        if let Some(cm) = &exercise.common_mistake {
-            println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-        }
-        if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
-            println!();
-        }
-
-        display::show_watching(&source_path);
-        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 

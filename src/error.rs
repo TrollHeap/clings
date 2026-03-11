@@ -16,8 +16,12 @@ pub enum KfError {
     Watch(#[from] notify::Error),
 
     /// L'identifiant d'exercice demandé est introuvable
-    #[error("exercise not found: {0}")]
+    #[error("exercice introuvable : {0}")]
     ExerciseNotFound(String),
+
+    /// Erreur de désérialisation JSON
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
 
     /// Erreur de configuration ou de chemin (message libre)
     #[error("{0}")]
@@ -34,7 +38,7 @@ mod tests {
     #[test]
     fn test_exercise_not_found_display() {
         let e = KfError::ExerciseNotFound("ptr-deref-42".to_string());
-        assert_eq!(e.to_string(), "exercise not found: ptr-deref-42");
+        assert_eq!(e.to_string(), "exercice introuvable : ptr-deref-42");
     }
 
     #[test]
