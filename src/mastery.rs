@@ -56,6 +56,10 @@ pub fn apply_decay(subject: &mut Subject) {
         let intervals = days_since / MASTERY_DECAY_DAYS;
         let decay = intervals as f64 * DECAY_AMOUNT;
         subject.mastery_score = (subject.mastery_score - decay).max(MASTERY_MIN);
+        // Advance last_practiced_at to "consume" the decayed intervals,
+        // preventing the same intervals from being re-applied on the next call.
+        subject.last_practiced_at =
+            Some(last_epoch + intervals * MASTERY_DECAY_DAYS * SECS_PER_DAY);
     }
 }
 
@@ -214,6 +218,26 @@ mod tests {
         s.last_practiced_at = Some(Utc::now().timestamp() - 29 * SECS_PER_DAY);
         apply_decay(&mut s);
         assert_eq!(s.mastery_score, 2.0);
+    }
+
+    #[test]
+    fn test_apply_decay_idempotent() {
+        // Applying decay twice with the same starting timestamp must give the same result
+        let ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
+        let mut s1 = make_subject("test", 2.0);
+        s1.last_practiced_at = Some(ts);
+        apply_decay(&mut s1);
+        let score_after_first = s1.mastery_score;
+        let lpa_after_first = s1.last_practiced_at;
+
+        // Apply decay again (simulating a second startup)
+        apply_decay(&mut s1);
+        // Score must NOT change again
+        assert_eq!(
+            s1.mastery_score, score_after_first,
+            "decay must be idempotent"
+        );
+        assert_eq!(s1.last_practiced_at, lpa_after_first);
     }
 
     #[test]

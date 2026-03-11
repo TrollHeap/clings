@@ -8,13 +8,21 @@ pub fn is_tmux() -> bool {
     std::env::var("TMUX").is_ok()
 }
 
-/// Open a tmux pane on the right (50% width) with neovim editing the given file.
+/// Resolve the editor binary: $VISUAL → $EDITOR → TMUX_EDITOR fallback.
+fn resolve_editor() -> String {
+    std::env::var("VISUAL")
+        .or_else(|_| std::env::var("EDITOR"))
+        .unwrap_or_else(|_| TMUX_EDITOR.to_owned())
+}
+
+/// Open a tmux pane on the right (50% width) with the configured editor editing the given file.
 /// Returns the pane ID for later cleanup.
 pub fn open_editor_pane(file: &Path) -> Option<String> {
     if !is_tmux() {
         return None;
     }
 
+    let editor = resolve_editor();
     let output = Command::new("tmux")
         .args([
             "split-window",
@@ -24,7 +32,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
             "-P",
             "-F",
             "#{pane_id}",
-            TMUX_EDITOR,
+            &editor,
             "--",
         ])
         .arg(file)

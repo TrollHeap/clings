@@ -2,23 +2,7 @@ use colored::Colorize;
 
 use crate::error::{KfError, Result};
 use crate::exercises;
-
-#[derive(Debug, serde::Deserialize)]
-struct SessionQuestion {
-    pub exercises: Vec<String>,
-    #[serde(default)]
-    pub points: f32,
-    pub title: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct ExamSession {
-    pub id: String,
-    pub title: String,
-    #[serde(default)]
-    pub total_points: f32,
-    pub questions: Vec<SessionQuestion>,
-}
+use crate::models::{AnnaleQuestion, AnnaleSession};
 
 /// Durée par défaut selon le type de session (minutes)
 fn default_duration(session_id: &str) -> u64 {
@@ -30,7 +14,7 @@ fn default_duration(session_id: &str) -> u64 {
 }
 
 /// Collect deduplicated exercise IDs from session questions, preserving order.
-fn collect_unique_ids(questions: &[SessionQuestion]) -> Vec<String> {
+fn collect_unique_ids(questions: &[AnnaleQuestion]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     let mut ids = Vec::new();
     for q in questions {
@@ -48,7 +32,7 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     let exercises_dir = exercises::resolve_exercises_dir()?;
     let map_path = exercises_dir.join("annales_map.json");
     let raw = std::fs::read_to_string(&map_path)?;
-    let sessions: Vec<ExamSession> = serde_json::from_str(&raw)
+    let sessions: Vec<AnnaleSession> = serde_json::from_str(&raw)
         .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
 
     // 2. Si list ou pas de session : lister les sessions
@@ -173,11 +157,14 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn q(exercises: &[&str]) -> SessionQuestion {
-        SessionQuestion {
+    fn q(exercises: &[&str]) -> AnnaleQuestion {
+        AnnaleQuestion {
             exercises: exercises.iter().map(|s| s.to_string()).collect(),
             points: 1.0,
             title: "Q".to_string(),
+            number: 0,
+            summary: String::new(),
+            subjects: vec![],
         }
     }
 

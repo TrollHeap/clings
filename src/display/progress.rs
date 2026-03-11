@@ -55,7 +55,7 @@ pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
 
     println!(
         "  {} {} {}/{}  ({}%)",
-        "Progress".bold(),
+        "Progression".bold(),
         colored_bar,
         done.to_string().bold(),
         total,
@@ -152,7 +152,7 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
     if count > 0 {
         println!(
             "  {} {:.1}/5.0 moyenne globale",
-            "Overall".bold(),
+            "Global".bold(),
             total_mastery / count as f64
         );
     }

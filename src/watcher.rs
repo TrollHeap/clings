@@ -100,7 +100,10 @@ where
     };
 
     stop.store(true, Ordering::Relaxed);
-    stdin_thread.join().ok();
+    // The stdin thread is blocked on read_exact; detach it instead of joining.
+    // It will exit on the next keypress (stop == true) or when key_rx is dropped
+    // (causing key_tx.send to fail).
+    drop(stdin_thread);
 
     result
 }

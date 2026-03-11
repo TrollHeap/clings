@@ -362,8 +362,8 @@ pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
         mastery::apply_decay(sub);
         if sub.mastery_score != old_score {
             tx.execute(
-                "UPDATE subjects SET mastery_score = ?2 WHERE name = ?1",
-                params![sub.name, sub.mastery_score],
+                "UPDATE subjects SET mastery_score = ?2, last_practiced_at = ?3 WHERE name = ?1",
+                params![sub.name, sub.mastery_score, sub.last_practiced_at],
             )?;
         }
     }
@@ -409,6 +409,16 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
     let mut count = 0usize;
 
     for sub in &data.subjects {
+        let clamped_score = sub
+            .mastery_score
+            .clamp(crate::constants::MASTERY_MIN, crate::constants::MASTERY_MAX);
+        let clamped_difficulty = sub.difficulty_unlocked.clamp(1, 5);
+        let clamped_interval = sub.srs_interval_days.clamp(
+            crate::constants::SRS_BASE_INTERVAL_DAYS,
+            crate::constants::SRS_MAX_INTERVAL_DAYS,
+        );
+        let clamped_total = sub.attempts_total.max(0);
+        let clamped_success = sub.attempts_success.max(0).min(clamped_total);
         if overwrite {
             tx.execute(
                 "INSERT OR REPLACE INTO subjects
@@ -417,13 +427,13 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     sub.name,
-                    sub.mastery_score,
+                    clamped_score,
                     sub.last_practiced_at,
-                    sub.attempts_total,
-                    sub.attempts_success,
-                    sub.difficulty_unlocked,
+                    clamped_total,
+                    clamped_success,
+                    clamped_difficulty,
                     sub.next_review_at,
-                    sub.srs_interval_days,
+                    clamped_interval,
                 ],
             )?;
         } else {
@@ -437,13 +447,13 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
                    difficulty_unlocked = MAX(difficulty_unlocked, excluded.difficulty_unlocked)",
                 params![
                     sub.name,
-                    sub.mastery_score,
+                    clamped_score,
                     sub.last_practiced_at,
-                    sub.attempts_total,
-                    sub.attempts_success,
-                    sub.difficulty_unlocked,
+                    clamped_total,
+                    clamped_success,
+                    clamped_difficulty,
                     sub.next_review_at,
-                    sub.srs_interval_days,
+                    clamped_interval,
                 ],
             )?;
         }
@@ -739,6 +749,46 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_all_decay_updates_last_practiced_at() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        conn.execute(
+            "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
+            params![old_ts],
+        )
+        .unwrap();
+        apply_all_decay(&mut conn).unwrap();
+        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, 1.5, "score must decay by 0.5");
+        // last_practiced_at must have advanced (not remain at old_ts)
+        assert!(
+            sub.last_practiced_at.unwrap() > old_ts,
+            "last_practiced_at must advance after decay"
+        );
+    }
+
+    #[test]
+    fn test_apply_all_decay_idempotent_in_db() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pipes").unwrap();
+        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        conn.execute(
+            "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'pipes'",
+            params![old_ts],
+        )
+        .unwrap();
+        apply_all_decay(&mut conn).unwrap();
+        let sub1 = get_subject(&conn, "pipes").unwrap().unwrap();
+        apply_all_decay(&mut conn).unwrap();
+        let sub2 = get_subject(&conn, "pipes").unwrap().unwrap();
+        assert_eq!(
+            sub1.mastery_score, sub2.mastery_score,
+            "decay must not compound on second call"
+        );
+    }
+
+    #[test]
     fn test_record_attempt_persists_srs_fields() {
         let conn = open_test_db().unwrap();
         ensure_subject(&conn, "pipes").unwrap();
@@ -750,5 +800,143 @@ mod tests {
         let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();
         assert_eq!(reloaded.srs_interval_days, sub.srs_interval_days);
         assert_eq!(reloaded.next_review_at, sub.next_review_at);
+    }
+
+    #[test]
+    fn test_import_progress_clamps_mastery_score() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "structs").unwrap();
+
+        // Create JSON with mastery_score = 10.0 (exceeds MASTERY_MAX = 5.0)
+        let json = r#"
+        {
+            "subjects": [
+                {
+                    "name": "structs",
+                    "mastery_score": 10.0,
+                    "last_practiced_at": null,
+                    "attempts_total": 0,
+                    "attempts_success": 0,
+                    "difficulty_unlocked": 1,
+                    "next_review_at": null,
+                    "srs_interval_days": 1
+                }
+            ]
+        }
+        "#;
+
+        let count = import_progress(&mut conn, json, true).unwrap();
+        assert_eq!(count, 1);
+
+        // Verify the score was clamped to MASTERY_MAX (5.0)
+        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, crate::constants::MASTERY_MAX);
+    }
+
+    #[test]
+    fn test_import_progress_clamps_negative_score() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "pointers").unwrap();
+
+        // Create JSON with mastery_score = -2.0 (below MASTERY_MIN = 0.0)
+        let json = r#"
+        {
+            "subjects": [
+                {
+                    "name": "pointers",
+                    "mastery_score": -2.0,
+                    "last_practiced_at": null,
+                    "attempts_total": 0,
+                    "attempts_success": 0,
+                    "difficulty_unlocked": 1,
+                    "next_review_at": null,
+                    "srs_interval_days": 1
+                }
+            ]
+        }
+        "#;
+
+        let count = import_progress(&mut conn, json, true).unwrap();
+        assert_eq!(count, 1);
+
+        // Verify the score was clamped to MASTERY_MIN (0.0)
+        let sub = get_subject(&conn, "pointers").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, crate::constants::MASTERY_MIN);
+    }
+
+    #[test]
+    fn test_import_progress_preserves_valid_scores() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "memory_allocation").unwrap();
+
+        // Create JSON with a valid mastery_score = 2.5
+        let json = r#"
+        {
+            "subjects": [
+                {
+                    "name": "memory_allocation",
+                    "mastery_score": 2.5,
+                    "last_practiced_at": null,
+                    "attempts_total": 5,
+                    "attempts_success": 3,
+                    "difficulty_unlocked": 2,
+                    "next_review_at": null,
+                    "srs_interval_days": 1
+                }
+            ]
+        }
+        "#;
+
+        let count = import_progress(&mut conn, json, true).unwrap();
+        assert_eq!(count, 1);
+
+        // Verify the score was preserved
+        let sub = get_subject(&conn, "memory_allocation").unwrap().unwrap();
+        assert_eq!(sub.mastery_score, 2.5);
+        assert_eq!(sub.attempts_total, 5);
+    }
+
+    #[test]
+    fn test_import_progress_clamps_all_fields() {
+        let mut conn = open_test_db().unwrap();
+        ensure_subject(&conn, "signals").unwrap();
+
+        // difficulty_unlocked = 99 (>5), srs_interval_days = 9999 (>60),
+        // attempts_total = -3 (<0), attempts_success = 100 (> attempts_total after clamp)
+        let json = r#"
+        {
+            "subjects": [
+                {
+                    "name": "signals",
+                    "mastery_score": 3.0,
+                    "last_practiced_at": null,
+                    "attempts_total": -3,
+                    "attempts_success": 100,
+                    "difficulty_unlocked": 99,
+                    "next_review_at": null,
+                    "srs_interval_days": 9999
+                }
+            ]
+        }
+        "#;
+
+        let count = import_progress(&mut conn, json, true).unwrap();
+        assert_eq!(count, 1);
+
+        let sub = get_subject(&conn, "signals").unwrap().unwrap();
+        assert_eq!(sub.difficulty_unlocked, 5, "difficulty clamped to 5");
+        assert_eq!(
+            sub.srs_interval_days,
+            crate::constants::SRS_MAX_INTERVAL_DAYS,
+            "srs_interval clamped to SRS_MAX_INTERVAL_DAYS"
+        );
+        assert_eq!(
+            sub.attempts_total, 0,
+            "negative attempts_total clamped to 0"
+        );
+        assert_eq!(
+            sub.attempts_success, 0,
+            "attempts_success clamped to attempts_total"
+        );
     }
 }
