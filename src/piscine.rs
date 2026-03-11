@@ -699,22 +699,20 @@ pub fn run_exam_piscine(
                     ex_secs % 60,
                 );
                 index += 1;
-                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Skip | WatchAction::Next => {
                 index += 1;
-                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Prev => {
                 index = index.saturating_sub(1);
-                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Quit => {
                 save_exam_checkpoint(&conn, session_id, index);
                 break;
             }
-            WatchAction::Continue => {}
+            WatchAction::Continue => continue,
         }
+        save_exam_checkpoint(&conn, session_id, index);
     }
 
     drop(_raw_guard);
