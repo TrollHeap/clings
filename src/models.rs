@@ -17,16 +17,21 @@ pub enum Difficulty {
     Expert = 5,
 }
 
+/// Erreur retournée par `Difficulty::try_from(u8)` pour une valeur hors [1, 5].
+#[derive(Debug, thiserror::Error)]
+#[error("difficulty invalide : {0} (attendu 1–5)")]
+pub struct InvalidDifficultyError(pub u8);
+
 impl TryFrom<u8> for Difficulty {
-    type Error = String;
-    fn try_from(v: u8) -> Result<Self, String> {
+    type Error = InvalidDifficultyError;
+    fn try_from(v: u8) -> Result<Self, InvalidDifficultyError> {
         match v {
             1 => Ok(Difficulty::Easy),
             2 => Ok(Difficulty::Medium),
             3 => Ok(Difficulty::Hard),
             4 => Ok(Difficulty::Advanced),
             5 => Ok(Difficulty::Expert),
-            _ => Err(format!("invalid difficulty: {v}")),
+            _ => Err(InvalidDifficultyError(v)),
         }
     }
 }
@@ -71,30 +76,22 @@ impl std::fmt::Display for Lang {
     }
 }
 
-/// Mode de validation d'un exercice.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ValidationMode {
-    /// Comparaison de la sortie stdout avec `expected_output`
-    Output,
-    /// Exécution de tests unitaires (non supporté en CLI MVP)
-    Test,
-    /// Combinaison sortie + tests
-    Both,
-}
-
 /// Configuration de validation d'un exercice.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
-    /// Mode de validation appliqué
-    pub mode: ValidationMode,
-    /// Sortie attendue en mode `Output` ; supporte le préfixe `REGEX:`
+    /// Sortie attendue (comparaison stdout normalisée) ; supporte le préfixe `REGEX:`
     pub expected_output: Option<String>,
-    /// Code de test utilisé en mode `Test` (non implémenté en CLI)
-    pub test_code: Option<String>,
     /// Durée maximale d'exécution en millisecondes (remplace la limite globale de 10s)
     #[serde(default)]
     pub max_duration_ms: Option<u64>,
+    /// Champs legacy acceptés mais ignorés (supprimés du modèle, seule la validation Output est active)
+    #[allow(dead_code)]
+    #[serde(default, skip_serializing)]
+    pub mode: Option<String>,
+    #[allow(dead_code)]
+    #[serde(default, skip_serializing)]
+    pub test_code: Option<String>,
 }
 
 /// Nature pédagogique d'un exercice.
@@ -125,6 +122,7 @@ impl std::fmt::Display for ExerciseType {
 
 /// Fichier auxiliaire fourni avec un exercice (en-tête, données…).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExerciseFile {
     /// Nom du fichier tel qu'il sera écrit dans `~/.clings/`
     pub name: String,
@@ -137,6 +135,7 @@ pub struct ExerciseFile {
 
 /// Définition complète d'un exercice chargé depuis un fichier JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Exercise {
     /// Identifiant unique de l'exercice (ex. `ptr-deref-01`)
     pub id: String,
@@ -187,6 +186,7 @@ pub struct Exercise {
 
 /// Visualiseur d'exercice — séquence d'étapes annotées.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Visualizer {
     #[serde(rename = "type", default)]
     pub vis_type: String,
@@ -196,6 +196,7 @@ pub struct Visualizer {
 
 /// Une étape du visualiseur avec snapshot mémoire.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VisStep {
     pub label: String,
     #[serde(default)]
@@ -269,6 +270,8 @@ impl<'de> serde::Deserialize<'de> for VisVar {
                     }
                 }
 
+                // unwrap_or_default: visualizer data is internal/best-effort —
+                // missing name/value in JSON produces empty strings rather than a parse error.
                 Ok(VisVar {
                     name: name.unwrap_or_default(),
                     value: value.unwrap_or_default(),
@@ -280,13 +283,83 @@ impl<'de> serde::Deserialize<'de> for VisVar {
     }
 }
 
+/// Score de maîtrise SRS, toujours dans [0.0, 5.0].
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct MasteryScore(f64);
+
+impl MasteryScore {
+    pub const FLOOR: f64 = 0.0;
+    pub const CAP: f64 = 5.0;
+
+    /// Construit en clampant `v` dans [0.0, 5.0].
+    pub fn clamped(v: f64) -> Self {
+        Self(v.clamp(Self::FLOOR, Self::CAP))
+    }
+
+    /// Accès à la valeur brute.
+    pub fn get(self) -> f64 {
+        self.0
+    }
+}
+
+impl Default for MasteryScore {
+    fn default() -> Self {
+        Self(0.0)
+    }
+}
+
+impl std::fmt::Display for MasteryScore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.1}", self.0)
+    }
+}
+
+/// Intervalle SRS en jours, toujours ≥ 1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SrsIntervalDays(i64);
+
+impl SrsIntervalDays {
+    pub const MIN: i64 = 1;
+
+    /// Construit en clampant `v` à ≥ 1.
+    pub fn clamped(v: i64) -> Self {
+        Self(v.max(Self::MIN))
+    }
+
+    /// Accès à la valeur brute.
+    pub fn get(self) -> i64 {
+        self.0
+    }
+}
+
+impl Default for SrsIntervalDays {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+fn deserialize_mastery_score<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<MasteryScore, D::Error> {
+    let v = f64::deserialize(d)?;
+    Ok(MasteryScore::clamped(v))
+}
+
+fn deserialize_srs_interval<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<SrsIntervalDays, D::Error> {
+    let v = i64::deserialize(d)?;
+    Ok(SrsIntervalDays::clamped(v))
+}
+
 /// État de maîtrise d'un sujet, persisté en base SQLite.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Subject {
     /// Nom du sujet correspondant au champ `subject` des exercices
     pub name: String,
     /// Score SRS courant entre 0.0 et 5.0
-    pub mastery_score: f64,
+    #[serde(deserialize_with = "deserialize_mastery_score")]
+    pub mastery_score: MasteryScore,
     /// Horodatage Unix de la dernière pratique
     pub last_practiced_at: Option<i64>,
     /// Nombre total de tentatives enregistrées
@@ -298,7 +371,8 @@ pub struct Subject {
     /// Horodatage Unix de la prochaine révision planifiée par le SRS
     pub next_review_at: Option<i64>,
     /// Intervalle SRS courant en jours
-    pub srs_interval_days: i64,
+    #[serde(deserialize_with = "deserialize_srs_interval")]
+    pub srs_interval_days: SrsIntervalDays,
 }
 
 impl Subject {
@@ -306,13 +380,13 @@ impl Subject {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            mastery_score: 0.0,
+            mastery_score: MasteryScore::default(),
             last_practiced_at: None,
             attempts_total: 0,
             attempts_success: 0,
             difficulty_unlocked: 1,
             next_review_at: None,
-            srs_interval_days: 1,
+            srs_interval_days: SrsIntervalDays::default(),
         }
     }
 }
@@ -425,7 +499,6 @@ mod tests {
             "solution_code": "int main() { printf(\"done\"); return 0; }",
             "hints": ["Hint 1", "Hint 2"],
             "validation": {
-                "mode": "output",
                 "expected_output": "done"
             }
         }"#;
@@ -441,14 +514,14 @@ mod tests {
 
     #[test]
     fn test_subject_new_defaults() {
-        let subject = Subject::new("test_subject".to_string());
+        let subject = Subject::new("test_subject".to_owned());
         assert_eq!(subject.name, "test_subject");
-        assert_eq!(subject.mastery_score, 0.0);
+        assert_eq!(subject.mastery_score.get(), 0.0);
         assert_eq!(subject.last_practiced_at, None);
         assert_eq!(subject.attempts_total, 0);
         assert_eq!(subject.attempts_success, 0);
         assert_eq!(subject.difficulty_unlocked, 1);
         assert_eq!(subject.next_review_at, None);
-        assert_eq!(subject.srs_interval_days, 1);
+        assert_eq!(subject.srs_interval_days.get(), 1);
     }
 }

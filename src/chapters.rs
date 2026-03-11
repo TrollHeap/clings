@@ -11,6 +11,9 @@ pub struct Chapter {
     pub subjects: &'static [&'static str],
 }
 
+// Compile-time guarantee that CHAPTERS.len() fits in u8 (used throughout for chapter_number).
+const _: () = assert!(CHAPTERS.len() <= 255, "chapter count must fit in u8");
+
 const UNCATEGORIZED_CHAPTER: Chapter = Chapter {
     number: 0,
     title: "Divers",
@@ -109,7 +112,7 @@ pub fn order_by_chapters<'a>(
 ) -> Vec<ChapterBlock<'a>> {
     let subject_mastery: std::collections::HashMap<&str, f64> = subjects
         .iter()
-        .map(|s| (s.name.as_str(), s.mastery_score))
+        .map(|s| (s.name.as_str(), s.mastery_score.get()))
         .collect();
 
     // Build subject→chapter_index map once (O(chapters) instead of O(chapters×exercises))
@@ -132,10 +135,11 @@ pub fn order_by_chapters<'a>(
     }
 
     let mut blocks = Vec::new();
-    for (i, mut bucket) in buckets.into_iter().enumerate() {
-        if bucket.is_empty() {
-            continue;
-        }
+    for (i, mut bucket) in buckets
+        .into_iter()
+        .enumerate()
+        .filter(|(_, b)| !b.is_empty())
+    {
         bucket.sort_by(|a, b| {
             a.difficulty.cmp(&b.difficulty).then_with(|| {
                 let ma = subject_mastery.get(a.subject.as_str()).unwrap_or(&0.0);
@@ -182,7 +186,7 @@ pub struct ChapterContext {
     /// Numéro du chapitre courant
     pub chapter_number: u8,
     /// Intitulé du chapitre courant
-    pub chapter_title: String,
+    pub chapter_title: &'static str,
     /// Nombre total de chapitres dans la progression
     pub total_chapters: u8,
     /// Position de l'exercice dans son chapitre (1-based)
@@ -198,8 +202,9 @@ pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> Chapter
         if flat_index < offset + block.exercises.len() {
             return ChapterContext {
                 chapter_number: block.chapter.number,
-                chapter_title: block.chapter.title.to_string(),
-                total_chapters: u8::try_from(CHAPTERS.len()).expect("chapter count fits u8"),
+                chapter_title: block.chapter.title,
+                total_chapters: u8::try_from(CHAPTERS.len())
+                    .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255"),
                 exercise_in_chapter: flat_index - offset + 1,
                 chapter_size: block.exercises.len(),
             };
@@ -209,8 +214,9 @@ pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> Chapter
     // Fallback
     ChapterContext {
         chapter_number: 0,
-        chapter_title: "???".to_string(),
-        total_chapters: u8::try_from(CHAPTERS.len()).expect("chapter count fits u8"),
+        chapter_title: "???",
+        total_chapters: u8::try_from(CHAPTERS.len())
+            .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255"),
         exercise_in_chapter: 0,
         chapter_size: 0,
     }
@@ -259,10 +265,10 @@ mod tests {
             solution_code: "".to_string(),
             hints: vec![],
             validation: crate::models::ValidationConfig {
-                mode: crate::models::ValidationMode::Output,
                 expected_output: Some("test".to_string()),
-                test_code: None,
                 max_duration_ms: None,
+                mode: None,
+                test_code: None,
             },
             prerequisites: vec![],
             files: vec![],
@@ -304,10 +310,10 @@ mod tests {
             solution_code: "".to_string(),
             hints: vec![],
             validation: crate::models::ValidationConfig {
-                mode: crate::models::ValidationMode::Output,
                 expected_output: Some("test".to_string()),
-                test_code: None,
                 max_duration_ms: None,
+                mode: None,
+                test_code: None,
             },
             prerequisites: vec![],
             files: vec![],
@@ -336,7 +342,8 @@ mod tests {
         assert_eq!(ctx.chapter_size, 2);
         assert_eq!(
             ctx.total_chapters,
-            u8::try_from(CHAPTERS.len()).expect("chapter count fits u8")
+            u8::try_from(CHAPTERS.len())
+                .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255")
         );
 
         let ctx = chapter_context_at(&blocks, 1);

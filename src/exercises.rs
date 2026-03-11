@@ -13,7 +13,13 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
     let mut exercises = Vec::new();
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
-        Err(_) => return exercises,
+        Err(e) => {
+            eprintln!(
+                "Avertissement : impossible de lire le répertoire {} : {e}",
+                dir.display()
+            );
+            return exercises;
+        }
     };
     for entry in entries {
         let entry = match entry {
@@ -235,22 +241,19 @@ mod tests {
 
     #[test]
     fn test_output_validation_has_expected() {
-        use crate::models::ValidationMode;
         let (exercises, _) = load_all_exercises().unwrap();
         for ex in &exercises {
-            if matches!(ex.validation.mode, ValidationMode::Output) {
-                assert!(
-                    ex.validation.expected_output.is_some(),
-                    "Exercise {} uses Output mode but has no expected_output",
-                    ex.id
-                );
-                let expected = ex.validation.expected_output.as_ref().unwrap();
-                assert!(
-                    !expected.is_empty(),
-                    "Exercise {} has empty expected_output",
-                    ex.id
-                );
-            }
+            assert!(
+                ex.validation.expected_output.is_some(),
+                "Exercise {} has no expected_output",
+                ex.id
+            );
+            let expected = ex.validation.expected_output.as_ref().unwrap();
+            assert!(
+                !expected.is_empty(),
+                "Exercise {} has empty expected_output",
+                ex.id
+            );
         }
     }
 

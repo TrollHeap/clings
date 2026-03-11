@@ -51,7 +51,7 @@ pub fn show_exercise_list(
             let diff = difficulty_stars(ex.difficulty);
             let mastery_info = subject_map
                 .get(ex.subject.as_str())
-                .map(|s| format!(" [{:.1}]", s.mastery_score))
+                .map(|s| format!(" [{:.1}]", s.mastery_score.get()))
                 .unwrap_or_default();
             let kc_info = if !ex.kc_ids.is_empty() {
                 format!(" [{}]", ex.kc_ids.join(", "))

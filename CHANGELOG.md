@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — [PROPOSED]
+## [1.0.0] — 2026-03-11
 
 ### Sécurité
 - Path traversal : validation par canonicalize() après création de fichier (`runner.rs`)
@@ -22,7 +22,7 @@
 - README : distinction `j` (next) vs `n` (skip) dans les raccourcis clavier
 - SRS : multiplicateur de décroissance ajusté à 1.8 (cohérent avec intervalles 14 jours)
 
-## [0.1.0] — [PROPOSED]
+## [0.1.0] — 2025-11-01
 - Version initiale avec 283+ exercices C couvrant 21 sujets
 - Mode watch avec compilation gcc, validation de sortie, progression SRS
 - Système de maîtrise SRS (répétition espacée, décroissance 14 jours)

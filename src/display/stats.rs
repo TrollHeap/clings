@@ -28,7 +28,7 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
         return;
     }
 
-    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score).sum();
+    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score.get()).sum();
     let avg = total_mastery / subjects.len() as f64;
     println!(
         "  {} {}",
@@ -41,7 +41,8 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     let mut sorted: Vec<&Subject> = subjects.iter().collect();
     sorted.sort_by(|a, b| {
         b.mastery_score
-            .partial_cmp(&a.mastery_score)
+            .get()
+            .partial_cmp(&a.mastery_score.get())
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -64,8 +65,8 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
             println!(
                 "  {:<22} {:<6.1}  {}",
                 sub.name,
-                sub.mastery_score,
-                mastery_bar(sub.mastery_score)
+                sub.mastery_score.get(),
+                mastery_bar(sub.mastery_score.get())
             );
         }
         println!("  {}", "── À renforcer ──".dimmed());
@@ -73,8 +74,8 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
             println!(
                 "  {:<22} {:<6.1}  {}",
                 sub.name,
-                sub.mastery_score,
-                mastery_bar(sub.mastery_score)
+                sub.mastery_score.get(),
+                mastery_bar(sub.mastery_score.get())
             );
         }
     } else {
@@ -82,8 +83,8 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
             println!(
                 "  {:<22} {:<6.1}  {}",
                 sub.name,
-                sub.mastery_score,
-                mastery_bar(sub.mastery_score)
+                sub.mastery_score.get(),
+                mastery_bar(sub.mastery_score.get())
             );
         }
     }

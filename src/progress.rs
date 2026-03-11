@@ -8,7 +8,7 @@ use crate::constants::{
 };
 use crate::error::Result;
 use crate::mastery;
-use crate::models::Subject;
+use crate::models::{MasteryScore, SrsIntervalDays, Subject};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS subjects (
@@ -91,13 +91,19 @@ pub fn ensure_subjects_batch(
 fn row_to_subject(row: &rusqlite::Row) -> rusqlite::Result<Subject> {
     Ok(Subject {
         name: row.get(0)?,
-        mastery_score: row.get(1)?,
+        mastery_score: {
+            let v: f64 = row.get(1)?;
+            MasteryScore::clamped(v)
+        },
         last_practiced_at: row.get(2)?,
         attempts_total: row.get(3)?,
         attempts_success: row.get(4)?,
         difficulty_unlocked: row.get(5)?,
         next_review_at: row.get(6)?,
-        srs_interval_days: row.get::<_, i64>(7)?,
+        srs_interval_days: {
+            let v: i64 = row.get::<_, i64>(7)?;
+            SrsIntervalDays::clamped(v)
+        },
     })
 }
 
@@ -146,9 +152,9 @@ pub fn record_attempt(
     mastery::update_mastery(&mut sub, success);
 
     let (next_review, new_interval) =
-        mastery::compute_next_review(sub.srs_interval_days, success, now);
+        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
     sub.next_review_at = Some(next_review);
-    sub.srs_interval_days = new_interval;
+    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
 
     tx.execute(
         "UPDATE subjects SET
@@ -162,13 +168,13 @@ pub fn record_attempt(
          WHERE name = ?1",
         params![
             sub.name,
-            sub.mastery_score,
+            sub.mastery_score.get(),
             sub.last_practiced_at,
             sub.attempts_total,
             sub.attempts_success,
             sub.difficulty_unlocked,
             sub.next_review_at,
-            sub.srs_interval_days,
+            sub.srs_interval_days.get(),
         ],
     )?;
 
@@ -296,6 +302,7 @@ pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
 
 /// Load piscine checkpoint, returns None if no checkpoint saved.
 pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
+    // .parse().ok(): parse error means invalid/missing checkpoint — return None
     Ok(kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| s.parse().ok()))
 }
 
@@ -312,6 +319,7 @@ pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -
 /// Load exam checkpoint for the given session_id. Returns None if no checkpoint exists or if the
 /// stored session differs (i.e. the user switched to a different exam session).
 pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Option<usize>> {
+    // .parse().ok(): parse error means invalid/missing checkpoint — return None
     Ok(kv_get(conn, EXAM_CHECKPOINT_KEY)?.and_then(|s| {
         s.rsplit_once(':')
             .filter(|(sid, _)| *sid == session_id)
@@ -363,7 +371,7 @@ pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
         if sub.mastery_score != old_score {
             tx.execute(
                 "UPDATE subjects SET mastery_score = ?2, last_practiced_at = ?3 WHERE name = ?1",
-                params![sub.name, sub.mastery_score, sub.last_practiced_at],
+                params![sub.name, sub.mastery_score.get(), sub.last_practiced_at],
             )?;
         }
     }
@@ -409,11 +417,9 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
     let mut count = 0usize;
 
     for sub in &data.subjects {
-        let clamped_score = sub
-            .mastery_score
-            .clamp(crate::constants::MASTERY_MIN, crate::constants::MASTERY_MAX);
+        let clamped_score = sub.mastery_score.get();
         let clamped_difficulty = sub.difficulty_unlocked.clamp(1, 5);
-        let clamped_interval = sub.srs_interval_days.clamp(
+        let clamped_interval = sub.srs_interval_days.get().clamp(
             crate::constants::SRS_BASE_INTERVAL_DAYS,
             crate::constants::SRS_MAX_INTERVAL_DAYS,
         );
@@ -476,7 +482,7 @@ mod tests {
         assert!(sub.is_some());
         let sub = sub.unwrap();
         assert_eq!(sub.name, "pointers");
-        assert_eq!(sub.mastery_score, 0.0);
+        assert_eq!(sub.mastery_score.get(), 0.0);
         assert_eq!(sub.difficulty_unlocked, 1);
     }
 
@@ -494,7 +500,7 @@ mod tests {
         let conn = open_test_db().unwrap();
         ensure_subject(&conn, "structs").unwrap();
         let sub = record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
-        assert_eq!(sub.mastery_score, 1.0);
+        assert_eq!(sub.mastery_score.get(), 1.0);
         assert_eq!(sub.attempts_total, 1);
         assert_eq!(sub.attempts_success, 1);
     }
@@ -507,7 +513,7 @@ mod tests {
         // First succeed to have score > 0
         record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
         let sub = record_attempt(&conn, "structs", "struct-point-01", false).unwrap();
-        assert_eq!(sub.mastery_score, 0.5);
+        assert_eq!(sub.mastery_score.get(), 0.5);
         assert_eq!(sub.attempts_total, 2);
         assert_eq!(sub.attempts_success, 1);
     }
@@ -543,7 +549,7 @@ mod tests {
         assert!(get_subject(&conn, "pointers").unwrap().is_none());
         // structs intact
         let s = get_subject(&conn, "structs").unwrap().unwrap();
-        assert_eq!(s.mastery_score, 1.0);
+        assert_eq!(s.mastery_score.get(), 1.0);
         // log pointers supprimé, log structs intact
         let count: i64 = conn
             .query_row(
@@ -730,7 +736,7 @@ mod tests {
         ).unwrap();
         apply_all_decay(&mut conn).unwrap();
         let sub = get_subject(&conn, "structs").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, 1.5);
+        assert_eq!(sub.mastery_score.get(), 1.5);
     }
 
     #[test]
@@ -745,7 +751,7 @@ mod tests {
         .unwrap();
         apply_all_decay(&mut conn).unwrap();
         let sub = get_subject(&conn, "pipes").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, 3.0);
+        assert_eq!(sub.mastery_score.get(), 3.0);
     }
 
     #[test]
@@ -760,7 +766,7 @@ mod tests {
         .unwrap();
         apply_all_decay(&mut conn).unwrap();
         let sub = get_subject(&conn, "structs").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, 1.5, "score must decay by 0.5");
+        assert_eq!(sub.mastery_score.get(), 1.5, "score must decay by 0.5");
         // last_practiced_at must have advanced (not remain at old_ts)
         assert!(
             sub.last_practiced_at.unwrap() > old_ts,
@@ -783,7 +789,8 @@ mod tests {
         apply_all_decay(&mut conn).unwrap();
         let sub2 = get_subject(&conn, "pipes").unwrap().unwrap();
         assert_eq!(
-            sub1.mastery_score, sub2.mastery_score,
+            sub1.mastery_score.get(),
+            sub2.mastery_score.get(),
             "decay must not compound on second call"
         );
     }
@@ -794,7 +801,7 @@ mod tests {
         ensure_subject(&conn, "pipes").unwrap();
         let sub = record_attempt(&conn, "pipes", "pipe-01", true).unwrap();
         // Après un succès, intervalle SRS = round(1 * 2.5) = 3
-        assert_eq!(sub.srs_interval_days, 3);
+        assert_eq!(sub.srs_interval_days.get(), 3);
         assert!(sub.next_review_at.is_some());
         // Vérifier la persistance en DB
         let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();
@@ -830,7 +837,7 @@ mod tests {
 
         // Verify the score was clamped to MASTERY_MAX (5.0)
         let sub = get_subject(&conn, "structs").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, crate::constants::MASTERY_MAX);
+        assert_eq!(sub.mastery_score.get(), crate::constants::MASTERY_MAX);
     }
 
     #[test]
@@ -861,7 +868,7 @@ mod tests {
 
         // Verify the score was clamped to MASTERY_MIN (0.0)
         let sub = get_subject(&conn, "pointers").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, crate::constants::MASTERY_MIN);
+        assert_eq!(sub.mastery_score.get(), crate::constants::MASTERY_MIN);
     }
 
     #[test]
@@ -892,7 +899,7 @@ mod tests {
 
         // Verify the score was preserved
         let sub = get_subject(&conn, "memory_allocation").unwrap().unwrap();
-        assert_eq!(sub.mastery_score, 2.5);
+        assert_eq!(sub.mastery_score.get(), 2.5);
         assert_eq!(sub.attempts_total, 5);
     }
 
@@ -926,7 +933,7 @@ mod tests {
         let sub = get_subject(&conn, "signals").unwrap().unwrap();
         assert_eq!(sub.difficulty_unlocked, 5, "difficulty clamped to 5");
         assert_eq!(
-            sub.srs_interval_days,
+            sub.srs_interval_days.get(),
             crate::constants::SRS_MAX_INTERVAL_DAYS,
             "srs_interval clamped to SRS_MAX_INTERVAL_DAYS"
         );
