@@ -29,6 +29,7 @@ use crate::watcher::WatchAction;
 #[command(
     name = "clings",
     version,
+    propagate_version = true,
     about = "clings — C Systems Programming Trainer"
 )]
 struct Cli {
@@ -438,9 +439,10 @@ pub(crate) fn enable_raw_mode() -> Option<RawModeGuard> {
             let mut termios: libc::termios = std::mem::zeroed();
             if libc::tcgetattr(fd, &mut termios) == 0 {
                 let original = termios;
-                if let Ok(mut guard) = ORIGINAL_TERMIOS.lock() {
-                    guard.replace(original);
-                }
+                ORIGINAL_TERMIOS
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .replace(original);
                 termios.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
                 termios.c_cc[libc::VMIN] = 1;
                 termios.c_cc[libc::VTIME] = 0;
@@ -464,7 +466,11 @@ fn disable_raw_mode() {
         let fd = std::io::stdin().as_raw_fd();
         // SAFETY: original est une valeur tcgetattr valide conservée depuis enable_raw_mode.
         // fd est le même stdin que lors de l'appel à tcgetattr.
-        if let Some(original) = ORIGINAL_TERMIOS.lock().ok().and_then(|mut g| g.take()) {
+        if let Some(original) = ORIGINAL_TERMIOS
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+        {
             unsafe {
                 libc::tcsetattr(fd, libc::TCSANOW, &original);
             }
@@ -587,7 +593,12 @@ fn cmd_solution(exercise_id: &str) -> Result<()> {
 
     let conn = progress::open_db()?;
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM practice_log WHERE exercise_id = ?1")?;
-    let count: i64 = stmt.query_row([exercise_id], |row| row.get(0)).unwrap_or(0);
+    let count: i64 = stmt
+        .query_row([exercise_id], |row| row.get(0))
+        .unwrap_or_else(|e| {
+            eprintln!("DB error checking attempts: {e}");
+            0
+        });
 
     if count == 0 {
         println!(

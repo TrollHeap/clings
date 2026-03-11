@@ -14,7 +14,6 @@ pub const MASTERY_MIN: f64 = 0.0;
 pub const MASTERY_SUCCESS_DELTA: f64 = 1.0;
 pub const MASTERY_FAILURE_DELTA: f64 = 0.5;
 pub const MASTERY_DECAY_DAYS: i64 = 14;
-pub const MASTERY_DECAY_RATE: f64 = 0.1;
 pub const SRS_INTERVAL_MULTIPLIER: f64 = 2.5;
 pub const SRS_BASE_INTERVAL_DAYS: i64 = 1;
 pub const SRS_MAX_INTERVAL_DAYS: i64 = 60;

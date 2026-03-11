@@ -1,5 +1,7 @@
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -43,11 +45,16 @@ where
 
     // Set up non-blocking stdin
     let (key_tx, key_rx) = mpsc::channel();
-    let _stdin_thread = std::thread::spawn(move || {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_clone = Arc::clone(&stop);
+    let stdin_thread = std::thread::spawn(move || {
         use std::io::Read;
         let stdin = std::io::stdin();
         let mut buf = [0u8; 1];
         loop {
+            if stop_clone.load(Ordering::Relaxed) {
+                break;
+            }
             if stdin.lock().read_exact(&mut buf).is_err() {
                 break;
             }
@@ -60,7 +67,7 @@ where
     let mut last_event = Instant::now();
     let debounce = Duration::from_millis(DEBOUNCE_INTERVAL_MS);
 
-    loop {
+    let result = loop {
         // Check for file changes
         match rx.recv_timeout(Duration::from_millis(KEY_CHECK_TIMEOUT_MS)) {
             Ok(Ok(event)) => match event.kind {
@@ -69,7 +76,7 @@ where
                         last_event = Instant::now();
                         match on_change() {
                             WatchAction::Continue => {}
-                            action => return Ok(action),
+                            action => break Ok(action),
                         }
                     }
                 }
@@ -80,15 +87,20 @@ where
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err(KfError::Config("File watcher disconnected".to_string()));
+                break Err(KfError::Config("File watcher disconnected".to_string()));
             }
         }
 
         // Check for keyboard input
         if let Ok(key) = key_rx.try_recv() {
             if let Some(action) = on_key(key) {
-                return Ok(action);
+                break Ok(action);
             }
         }
-    }
+    };
+
+    stop.store(true, Ordering::Relaxed);
+    stdin_thread.join().ok();
+
+    result
 }

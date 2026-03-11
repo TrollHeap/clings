@@ -199,7 +199,7 @@ pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> Chapter
             return ChapterContext {
                 chapter_number: block.chapter.number,
                 chapter_title: block.chapter.title.to_string(),
-                total_chapters: CHAPTERS.len() as u8,
+                total_chapters: u8::try_from(CHAPTERS.len()).expect("chapter count fits u8"),
                 exercise_in_chapter: flat_index - offset + 1,
                 chapter_size: block.exercises.len(),
             };
@@ -210,7 +210,7 @@ pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> Chapter
     ChapterContext {
         chapter_number: 0,
         chapter_title: "???".to_string(),
-        total_chapters: CHAPTERS.len() as u8,
+        total_chapters: u8::try_from(CHAPTERS.len()).expect("chapter count fits u8"),
         exercise_in_chapter: 0,
         chapter_size: 0,
     }
@@ -334,7 +334,10 @@ mod tests {
         assert_eq!(ctx.chapter_title, "Fondamentaux C");
         assert_eq!(ctx.exercise_in_chapter, 1);
         assert_eq!(ctx.chapter_size, 2);
-        assert_eq!(ctx.total_chapters, CHAPTERS.len() as u8);
+        assert_eq!(
+            ctx.total_chapters,
+            u8::try_from(CHAPTERS.len()).expect("chapter count fits u8")
+        );
 
         let ctx = chapter_context_at(&blocks, 1);
         assert_eq!(ctx.chapter_number, 1);

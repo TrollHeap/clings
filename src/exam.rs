@@ -58,7 +58,9 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     }
 
     // 3. Trouver la session
-    let sid = session_id.expect("session_id is Some: guarded by is_none() check above");
+    let Some(sid) = session_id else {
+        return Ok(());
+    };
     let session = sessions
         .iter()
         .find(|s| s.id == sid)

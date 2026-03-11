@@ -88,7 +88,7 @@ pub fn show_export_done(path: Option<&std::path::Path>, count: usize) {
             count,
             p.display().to_string().bold()
         ),
-        None => println!(
+        None => eprintln!(
             "  {} {} sujets exportés (stdout)",
             "✓".bold().green(),
             count
@@ -143,7 +143,7 @@ pub(super) fn wrap_text(text: &str, width: usize) -> Vec<String> {
     for word in text.split_whitespace() {
         if current.is_empty() {
             current = word.to_string();
-        } else if current.len() + 1 + word.len() <= width {
+        } else if current.chars().count() + 1 + word.chars().count() <= width {
             current.push(' ');
             current.push_str(word);
         } else {

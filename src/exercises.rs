@@ -46,7 +46,7 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
 pub fn resolve_exercises_dir() -> Result<PathBuf> {
     if let Ok(env_path) = std::env::var(EXERCISES_ENV_VAR) {
         let p = PathBuf::from(env_path);
-        if p.exists() {
+        if p.is_dir() {
             return Ok(p);
         }
         return Err(KfError::Config(format!(
