@@ -88,41 +88,6 @@
     ]
   },
   {
-    "id": "nsy103-s1-2023-2024",
-    "title": "NSY103 — Première session 2023–2024",
-    "date": "2024",
-    "total_points": 15,
-    "questions": [
-      {
-        "number": 1,
-        "points": 8,
-        "title": "fork/pthread — graphe de processus et IPC",
-        "summary": "Tracer le graphe de processus créés dans une boucle fork (while i<3). Enchaîner fork+exec+pipe. Analyser le comportement de threads accédant à des variables globales.",
-        "subjects": ["processes", "pthreads", "pipes"],
-        "kc_ids": ["KC-C01", "KC-C02", "KC-C04"],
-        "exercises": ["fork-basic-01", "fork-multi-01", "fork-tree-01", "pthread-01", "pipe-01"]
-      },
-      {
-        "number": 2,
-        "points": 3,
-        "title": "Système de fichiers — tailles et blocs",
-        "summary": "Calculer taille minimale et maximale d'un fichier avec 512 octets/bloc et 128 pointeurs/bloc d'index. Déterminer les blocs pour un fichier de 256 Ko.",
-        "subjects": ["filesystem"],
-        "kc_ids": [],
-        "exercises": ["fs-inode-01", "fs-inode-calc-01", "fs-inode-calc-02"]
-      },
-      {
-        "number": 3,
-        "points": 4,
-        "title": "Files de messages POSIX — client/serveur addition",
-        "summary": "Implémenter un serveur de calcul avec msgget/msgsnd/msgrcv. Définir les structures requete/reponse. Le client envoie deux entiers, le serveur répond avec la somme.",
-        "subjects": ["message_queues"],
-        "kc_ids": ["KC-C09"],
-        "exercises": ["mq-create-01", "mq-sendrecv-01", "mq-02", "mq-03"]
-      }
-    ]
-  },
-  {
     "id": "utc502-s1-2021-2022",
     "title": "UTC502 — Première session 2021–2022",
     "date": "2022",
