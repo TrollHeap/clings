@@ -30,8 +30,9 @@ pub fn show_exercise_list(
 
     // Group by chapter
     for chapter in CHAPTERS {
-        let chapter_exercises: Vec<&&Exercise> = filtered
+        let chapter_exercises: Vec<&Exercise> = filtered
             .iter()
+            .copied()
             .filter(|e| chapter.subjects.iter().any(|&s| s == e.subject))
             .collect();
 
@@ -76,8 +77,9 @@ pub fn show_exercise_list(
         .flat_map(|ch| ch.subjects.iter().copied())
         .collect();
 
-    let uncategorized: Vec<&&Exercise> = filtered
+    let uncategorized: Vec<&Exercise> = filtered
         .iter()
+        .copied()
         .filter(|e| !known_subjects.contains(e.subject.as_str()))
         .collect();
 

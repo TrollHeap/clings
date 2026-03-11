@@ -218,7 +218,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
             current_stage,
         );
         display::show_watching(&source_path);
-        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty());
+        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false);
 
         // Open/update neovim pane in tmux
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
@@ -239,7 +239,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
             // On file change: notify only, no auto-compile
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty());
+                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), false);
                 WatchAction::Continue
             },
             // On keyboard input
@@ -247,7 +247,11 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                 // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
                 if !escape_buf.is_empty() {
                     escape_buf.push(key);
-                    if escape_buf.len() == 3 {
+                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter normalement
+                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+                        escape_buf.clear();
+                        // fall through — key is treated as a normal keypress below
+                    } else if escape_buf.len() == 3 {
                         let seq = std::mem::take(&mut escape_buf);
                         if vis_active {
                             let n = exercise_clone.visualizer.steps.len();
@@ -269,8 +273,10 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                 _ => {}
                             }
                         }
+                        return None;
+                    } else {
+                        return None;
                     }
-                    return None;
                 }
                 if key == 0x1b {
                     escape_buf.push(key);
@@ -288,7 +294,10 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         None,
                         current_stage,
                     );
-                    display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty());
+                    display::show_keybinds_with_vis(
+                        !exercise_clone.visualizer.steps.is_empty(),
+                        false,
+                    );
                     return None;
                 }
 
@@ -315,19 +324,17 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                     b'l' | b'L' => {
                         // Quick exercise list
-                        match progress::open_db() {
-                            Err(e) => eprintln!("  {} {e}", "DB Error:".red()),
-                            Ok(c) => match progress::get_all_subjects(&c) {
-                                Err(e) => eprintln!("  {} {e}", "DB Error:".red()),
-                                Ok(subjects) => match exercises::load_all_exercises() {
-                                    Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
-                                    Ok((all, _)) => {
-                                        display::show_exercise_list(&all, &subjects, None);
-                                    }
-                                },
-                            },
+                        let list_result = (|| -> crate::error::Result<()> {
+                            let c = progress::open_db()?;
+                            let subjects = progress::get_all_subjects(&c)?;
+                            let (all, _) = exercises::load_all_exercises()?;
+                            display::show_exercise_list(&all, &subjects, None);
+                            Ok(())
+                        })();
+                        if let Err(e) = list_result {
+                            eprintln!("  {} {e}", "Erreur:".red());
                         }
-                        println!("  {}", "Press any key to return...".dimmed());
+                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
                         None
                     }
                     b'r' | b'R' => {
@@ -364,6 +371,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         }
                         display::show_keybinds_with_vis(
                             !exercise_clone.visualizer.steps.is_empty(),
+                            false,
                         );
                         None
                     }
@@ -542,7 +550,7 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
 
             if result.success {
                 record_and_show(&conn, &exercise_clone.subject, &exercise_clone.id, true);
-                println!("  {}", "Exercise completed!".bold().green());
+                println!("  {}", "Exercice résolu !".bold().green());
                 return WatchAction::Advance;
             }
 
@@ -550,7 +558,7 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
                 record_and_show(&conn, &exercise_clone.subject, &exercise_clone.id, false);
             }
 
-            println!("  {}", "Waiting for next save...".dimmed());
+            println!("  {}", "En attente de la prochaine sauvegarde...".dimmed());
             WatchAction::Continue
         },
         |key| {
@@ -592,7 +600,8 @@ fn cmd_solution(exercise_id: &str) -> Result<()> {
         .ok_or_else(|| KfError::ExerciseNotFound(exercise_id.to_string()))?;
 
     let conn = progress::open_db()?;
-    let mut stmt = conn.prepare("SELECT COUNT(*) FROM practice_log WHERE exercise_id = ?1")?;
+    let mut stmt =
+        conn.prepare_cached("SELECT COUNT(*) FROM practice_log WHERE exercise_id = ?1")?;
     let count: i64 = stmt
         .query_row([exercise_id], |row| row.get(0))
         .unwrap_or_else(|e| {
