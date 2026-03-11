@@ -43,6 +43,8 @@ pub const CURRENT_C_FILENAME: &str = "current.c";
 pub const EXERCISES_ENV_VAR: &str = "CLINGS_EXERCISES";
 pub const PISCINE_CHECKPOINT_KEY: &str = "piscine_checkpoint";
 pub const EXAM_CHECKPOINT_KEY: &str = "exam_checkpoint";
+pub const LAST_EXAM_SESSION_KEY: &str = "last_exam_session";
+pub const DB_USER_VERSION_CURRENT: i32 = 1;
 
 // === tmux ===
 pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";

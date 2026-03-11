@@ -76,14 +76,36 @@ impl std::fmt::Display for Lang {
     }
 }
 
+/// Mode de validation d'un exercice.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ValidationMode {
+    /// Comparer stdout avec `expected_output` (défaut)
+    #[default]
+    Output,
+    /// Exécuter le harnais de tests C et vérifier que tous les tests passent
+    Test,
+    /// Les deux : output ET tests doivent passer
+    Both,
+}
+
 /// Configuration de validation d'un exercice.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ValidationConfig {
+    /// Mode de validation (output, test, both)
+    #[serde(default)]
+    pub mode: ValidationMode,
     /// Sortie attendue (comparaison stdout normalisée) ; supporte le préfixe `REGEX:`
     pub expected_output: Option<String>,
     /// Durée maximale d'exécution en millisecondes (remplace la limite globale de 10s)
     #[serde(default)]
     pub max_duration_ms: Option<u64>,
+    /// Code C du harnais de tests (inclus après `current.c` en mode Test/Both)
+    #[serde(default)]
+    pub test_code: Option<String>,
+    /// Nombre de tests attendus (si None : tous les tests déclarés doivent passer)
+    #[serde(default)]
+    pub expected_tests_pass: Option<usize>,
 }
 
 /// Nature pédagogique d'un exercice.
@@ -127,7 +149,6 @@ pub struct ExerciseFile {
 
 /// Définition complète d'un exercice chargé depuis un fichier JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Exercise {
     /// Identifiant unique de l'exercice (ex. `ptr-deref-01`)
     pub id: String,
@@ -178,7 +199,6 @@ pub struct Exercise {
 
 /// Visualiseur d'exercice — séquence d'étapes annotées.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct Visualizer {
     #[serde(rename = "type", default)]
     pub vis_type: String,
@@ -188,7 +208,6 @@ pub struct Visualizer {
 
 /// Une étape du visualiseur avec snapshot mémoire.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct VisStep {
     pub label: String,
     #[serde(default)]

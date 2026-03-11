@@ -13,9 +13,10 @@
     "Consommateur: sem_wait(full) puis sem_wait(mutex), lire, sem_post(mutex) puis sem_post(empty) — l'inverse du producteur"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "REGEX:(?s)(\\[(prod|cons)\\] buffer\\[\\d+\\] = \\d+\\n){12}\\[main\\] termine, in=2 out=2",
-    "test_code": null
+    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n\n#define BUF_SIZE 4\n\ntypedef struct {\n    int buffer[BUF_SIZE];\n    int in;\n    int out;\n} SharedBuffer;\n\nvoid test_circular_buffer_in_wraps(void) {\n    SharedBuffer sb = {{0,0,0,0}, 0, 0};\n    sb.in = (sb.in + 1) % BUF_SIZE;\n    sb.in = (sb.in + 1) % BUF_SIZE;\n    sb.in = (sb.in + 1) % BUF_SIZE;\n    sb.in = (sb.in + 1) % BUF_SIZE;\n    TEST_ASSERT(sb.in == 0, \"buffer circulaire: in revient a 0 apres 4 increments\");\n}\n\nvoid test_circular_buffer_out_wraps(void) {\n    SharedBuffer sb = {{10,20,30,40}, 0, 3};\n    int val = sb.buffer[sb.out];\n    sb.out = (sb.out + 1) % BUF_SIZE;\n    TEST_ASSERT(val == 40, \"buffer circulaire: lecture position 3\");\n    TEST_ASSERT(sb.out == 0, \"buffer circulaire: out revient a 0\");\n}\n\nvoid test_buffer_size_constant(void) {\n    TEST_ASSERT(BUF_SIZE == 4, \"BUF_SIZE vaut 4\");\n}\n\nvoid run_tests(void) {\n    test_circular_buffer_in_wraps();\n    test_circular_buffer_out_wraps();\n    test_buffer_size_constant();\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

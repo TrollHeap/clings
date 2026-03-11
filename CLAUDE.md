@@ -48,6 +48,41 @@ Exercises are JSON files in `exercises/<subject>/` directories. Required fields:
 
 `exercises/annales_map.json` maps past NSY103 exam questions to exercise IDs (used by `clings annales`).
 
+### mode: "both" — Validation combinée Output + Tests unitaires
+
+Le mode `"both"` valide à la fois la sortie stdout **et** des tests unitaires C.
+
+**Champs requis** :
+- `validation.mode`: `"both"`
+- `validation.expected_output`: sortie stdout attendue du `main()` (identique au mode `output`)
+- `validation.test_code`: code C des tests unitaires — **minimum 3 `TEST_ASSERT`**
+- `validation.expected_tests_pass`: nombre de tests qui doivent passer
+
+**Format du `test_code`** :
+
+```c
+void test_my_function(void) {
+    // setup
+    int result = my_function(42);
+    TEST_ASSERT(result == 42, "my_function retourne la valeur correcte");
+}
+
+// Fonction run_tests() OBLIGATOIRE — appelée par le runner
+void run_tests(void) {
+    test_my_function();
+    // ... autres tests
+}
+```
+
+**Règles** :
+- La fonction `run_tests()` est obligatoire : le runner l'appelle via `#include "current.c"`
+- `TEST_ASSERT(cond, msg)` : passe si `cond` est non-nul, échoue sinon
+- Ne pas appeler `main()` depuis `run_tests()` — le runner gère l'ordre
+- Les tests doivent être indépendants du `main()` (pas de dépendances d'état global)
+- Ligne de résultat attendue : `"N Tests M Failures 0 Ignored"` (géré automatiquement par `test.h`)
+
+**Exemple complet** : voir `exercises/capstones/capstone_allocator_01.json`
+
 ### Key conventions
 
 - Error handling uses `thiserror` with `KfError` enum in `src/error.rs` and crate-local `Result<T>` alias

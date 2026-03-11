@@ -13,9 +13,10 @@
     "Le coalescing fusionne les blocs libres adjacents : curr->size += BLOCK_SIZE + next->size, puis saute next"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "=== init ===\n  [0] FREE size=232\n=== malloc 32, 64, 16 ===\n  [0] USED size=32\n  [1] USED size=64\n  [2] USED size=16\n  [3] FREE size=48\n=== free b (64) ===\n  [0] USED size=32\n  [1] FREE size=64\n  [2] USED size=16\n  [3] FREE size=48\n=== malloc 24 (dans trou de b) ===\n  [0] USED size=32\n  [1] USED size=24\n  [2] FREE size=16\n  [3] USED size=16\n  [4] FREE size=48\n=== free a, free d, free c ===\n  [0] FREE size=232\n=== coalesce final ===\n  [0] FREE size=232\n",
-    "test_code": null
+    "test_code": "#include <stdio.h>\n#include <string.h>\n#include <stdint.h>\n\n#define HEAP_SIZE 256\ntypedef struct Block { size_t size; int free; struct Block *next; } Block;\n#define BLOCK_SIZE sizeof(Block)\nstatic char heap[HEAP_SIZE];\nstatic Block *free_list = NULL;\n\nvoid heap_init(void);\nvoid *my_malloc(size_t size);\nvoid my_free(void *ptr);\n\nvoid test_heap_init(void) {\n    heap_init();\n    TEST_ASSERT(free_list != NULL, \"heap_init: free_list non NULL\");\n    TEST_ASSERT(free_list->free == 1, \"heap_init: bloc libre\");\n    TEST_ASSERT(free_list->size == HEAP_SIZE - BLOCK_SIZE, \"heap_init: taille correcte\");\n}\n\nvoid test_malloc_returns_non_null(void) {\n    heap_init();\n    void *p = my_malloc(32);\n    TEST_ASSERT(p != NULL, \"my_malloc: retourne non-NULL\");\n}\n\nvoid test_free_marks_block_free(void) {\n    heap_init();\n    void *p = my_malloc(16);\n    my_free(p);\n    Block *b = (Block *)((char *)p - BLOCK_SIZE);\n    TEST_ASSERT(b->free == 1, \"my_free: bloc marqué libre\");\n}\n\nvoid run_tests(void) {\n    test_heap_init();\n    test_malloc_returns_non_null();\n    test_free_marks_block_free();\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

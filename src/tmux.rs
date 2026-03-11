@@ -1,21 +1,28 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use crate::constants::{TMUX_EDITOR, TMUX_PANE_WIDTH_PERCENT};
+use crate::constants::TMUX_EDITOR;
 
 /// Check if we're running inside a tmux session.
 pub fn is_tmux() -> bool {
     std::env::var("TMUX").is_ok()
 }
 
-/// Resolve the editor binary: $VISUAL → $EDITOR → TMUX_EDITOR fallback.
+/// Resolve the editor binary: $VISUAL → $EDITOR → config/TMUX_EDITOR fallback.
 fn resolve_editor() -> String {
     std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))
-        .unwrap_or_else(|_| TMUX_EDITOR.to_owned())
+        .unwrap_or_else(|_| {
+            let cfg_editor = &crate::config::get().ui.editor;
+            if cfg_editor.is_empty() {
+                TMUX_EDITOR.to_owned()
+            } else {
+                cfg_editor.clone()
+            }
+        })
 }
 
-/// Open a tmux pane on the right (50% width) with the configured editor editing the given file.
+/// Open a tmux pane on the right with the configured editor editing the given file.
 /// Returns the pane ID for later cleanup.
 pub fn open_editor_pane(file: &Path) -> Option<String> {
     if !is_tmux() {
@@ -23,12 +30,13 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
     }
 
     let editor = resolve_editor();
+    let pane_width = crate::config::get().ui.tmux_pane_width.to_string();
     let output = Command::new("tmux")
         .args([
             "split-window",
             "-h",
             "-p",
-            TMUX_PANE_WIDTH_PERCENT,
+            &pane_width,
             "-P",
             "-F",
             "#{pane_id}",

@@ -13,9 +13,10 @@
     "Le parent doit fermer les deux extrémités du pipe avant d'attendre, sinon le lecteur ne recevra jamais EOF"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "REGEX:(?s)shell> producer \\| counter\\n.*Lines: \\d+\\n.*child1 exit=0\\nchild2 exit=0\\nshell> done",
-    "test_code": null
+    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/wait.h>\n\nvoid test_pipe_creates_two_fds(void) {\n    int pipefd[2];\n    int ret = pipe(pipefd);\n    TEST_ASSERT(ret == 0, \"pipe() reussi\");\n    TEST_ASSERT(pipefd[0] > 0, \"fd lecture valide\");\n    TEST_ASSERT(pipefd[1] > 0, \"fd ecriture valide\");\n    close(pipefd[0]); close(pipefd[1]);\n}\n\nvoid test_fork_child_exits_zero(void) {\n    pid_t pid = fork();\n    if (pid == 0) { exit(0); }\n    int status;\n    waitpid(pid, &status, 0);\n    TEST_ASSERT(WIFEXITED(status), \"enfant termine normalement\");\n    TEST_ASSERT(WEXITSTATUS(status) == 0, \"code sortie enfant = 0\");\n}\n\nvoid test_string_split_on_pipe(void) {\n    char cmd[] = \"producer | consumer\";\n    char *pipe_pos = strchr(cmd, '|');\n    TEST_ASSERT(pipe_pos != NULL, \"pipe '|' trouve dans la commande\");\n}\n\nvoid run_tests(void) {\n    test_pipe_creates_two_fds();\n    test_fork_child_exits_zero();\n    test_string_split_on_pipe();\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

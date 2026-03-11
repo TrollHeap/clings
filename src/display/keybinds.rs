@@ -18,16 +18,17 @@ fn show_keybinds_list(binds: &[(char, &str)]) {
 /// Show keybind hints.
 ///
 /// - `has_visualizer`: include `[v]` visualiser key.
-/// - `has_nav`: include `[j]`/`[k]` nav keys and omit `[l]` list key (piscine mode).
-pub fn show_keybinds_with_vis(has_visualizer: bool, has_nav: bool) {
-    let mut binds: Vec<(char, &str)> = Vec::with_capacity(8);
+/// - `has_nav`: include `[j]`/`[k]` nav keys.
+/// - `has_list`: include `[l]` list key.
+pub fn show_keybinds_with_vis(has_visualizer: bool, has_nav: bool, has_list: bool) {
+    let mut binds: Vec<(char, &str)> = Vec::with_capacity(9);
     binds.push(('h', "hint"));
     if has_nav {
         binds.push(('j', "suivant"));
         binds.push(('k', "précédent"));
     }
     binds.push(('n', "skip"));
-    if !has_nav {
+    if has_list {
         binds.push(('l', "list"));
     }
     binds.push(('r', "run"));

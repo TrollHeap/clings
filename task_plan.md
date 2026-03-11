@@ -188,6 +188,95 @@ Audit `/quality-audit` [A] exécuté — docs + tests — après les 3 commits a
 
 ---
 
+---
+
+## Phase 4 — Qualité du code (rust-audit + full-audit 2026-03-11)
+
+Audits `/rust-audit [A]` + `/full-audit [A]` exécutés. 40 findings, 0 critique, 9 high.
+Plan en 3 tiers par risque. Périmètre : **code Rust uniquement** — pas d'exercices JSON.
+
+### Tier 1 — Quick wins (safe, isolated)
+
+#### R1: Supprimer les champs morts `ValidationConfig.mode` + `.test_code`
+- **Fichier à modifier** : `src/models.rs` (lignes 89–94)
+- **Pattern** : Supprimer les deux champs `#[allow(dead_code)]` + leurs attributs serde
+- **Vérification** : `grep -r "\.mode" src/` et `grep -r "test_code" src/` pour confirmer zéro usage
+- **Contrainte** : Les exercices JSON peuvent avoir ces champs — serde les ignorera silencieusement (comportement par défaut)
+- **Statut** : [x] DONE — `deny_unknown_fields` retiré de `ValidationConfig`, champs legacy supprimés
+
+#### R2: Extraire `format_elapsed` (3 occurrences dupliquées)
+- **Fichier à modifier** : `src/piscine.rs`
+- **Fonctions concernées** : lignes 380–382 (cmd_piscine), ~550 (run_exam_piscine), show_piscine_header
+- **Signature cible** : `fn format_elapsed(elapsed: std::time::Duration) -> (u64, u64, u64)` dans piscine.rs (privée)
+- **Statut** : [x] DONE — déjà implémenté (piscine.rs:17), constaté lors de la vérification
+
+#### R3: Documenter les erreurs silencieuses (`// intentional:` + `// SAFETY:`)
+- **Fichiers à modifier** : `src/runner.rs` (l.162, l.164), `src/main.rs` (l.445, l.648)
+- **Statut** : [x] DONE — commentaires `// intentional:` et `// SAFETY:` déjà présents dans le code
+
+---
+
+### Tier 2 — DRY extraction (medium complexity)
+
+#### R4: Déplacer `handle_esc_sequence` vers `src/display/visualizer.rs`
+- **Fichiers modifiés** : `src/display/visualizer.rs`, `src/display/mod.rs`, `src/piscine.rs`, `src/main.rs`
+- **Statut** : [x] DONE — fonction déplacée, re-export `pub(crate)` ajouté, code inline main.rs remplacé
+
+#### R5: Extraire le dispatch clavier piscine (cmd_piscine vs run_exam_piscine)
+- **Contexte** : Touches h/H/v/V/n/N/j/J/k/K/q/Q/r/R identiques dans cmd_piscine et run_exam_piscine. Seule différence : `ch_ctx: Option<&ChapterContext>` pour `redisplay_piscine_exercise`
+- **Statut** : [x] SKIP (justifié) — extraction exigerait ~16 paramètres ou struct avec lifetimes mixtes, plus illisible que la duplication actuelle (~50 lignes identiques)
+
+---
+
+### Tier 3 — Extraction de fonctions longues (faible priorité)
+
+#### R6: Extraire le calcul mastery de `record_attempt`
+- **Fichier** : `src/progress.rs` (l.129–181)
+- **Statut** : [x] N/A — `mastery::update_mastery` et `mastery::compute_next_review` sont déjà délégués à mastery.rs. La séparation SQL/logique est déjà en place.
+
+#### R7: Décomposer `show_exercise_watch`
+- **Fichier** : `src/display/exercise.rs` (l.34–84)
+- **Statut** : [x] N/A — fonction de 42 lignes, `render_exercise_body` déjà extrait. Décomposition supplémentaire inutile.
+
+---
+
+### Vérification finale
+
+```bash
+cargo clippy -- -D warnings   # clean ✓
+cargo test                     # 144 passed, 0 failed ✓ (2026-03-11)
+```
+
+**Phase 4 terminée.** R1 + R4 appliqués. R2/R3/R6/R7 déjà faits ou N/A. R5 skip justifié.
+AtomicBool Ordering::Acquire fix (watcher.rs) appliqué lors de la session rust-audit.
+
+### Hors scope (décisions architecturales requises)
+
+- **Unification boucle watch/piscine/exam** : cmd_watch (~290 lignes), cmd_piscine (~280 lignes), run_exam_piscine (~270 lignes) divergent trop (gating, SRS, checkpoints) pour une extraction safe sans refonte complète. Reporter à v2.0.
+- **Tests cmd_watch / cmd_review / cmd_piscine** : nécessitent injection de terminal + DB mock. Hors scope sans infrastructure de test dédiée.
+
+---
+
+---
+
+## Phase 5 — ValidationMode::Test (2026-03-11)
+
+Implémentation de F1 du roadmap v2.0 : support des exercices validés par harnais de tests C unitaires.
+
+### F1 — ValidationMode::Test
+
+- [x] `src/models.rs` — Ajout de l'enum `ValidationMode` (`Output` par défaut, `Test`, `Both`) + champs `mode`, `test_code`, `expected_tests_pass` dans `ValidationConfig`
+- [x] `assets/test.h` — Harness C minimal (setjmp/longjmp) : macros `RUN_TEST`, `TEST_ASSERT_EQUAL_INT`, `TEST_ASSERT_TRUE`, `TEST_ASSERT_FALSE`, `TEST_ASSERT_NULL`, `TEST_ASSERT_NOT_NULL`, `TEST_ASSERT_EQUAL_STRING`, `TEST_SUMMARY`. Format de sortie : `"N Tests N Failures 0 Ignored"`
+- [x] `src/runner.rs` — `compile_and_run()` dispatch sur `ValidationMode` ; nouvelles fonctions `run_output()`, `run_tests()`, `parse_test_summary()` ; inclus `test.h` via `include_str!`
+- [x] `src/display/exercise.rs` — `show_result()` : affichage spécialisé en mode Test (lignes OK en vert, FAIL en rouge)
+- [x] `src/exercises.rs` — Test de sanité `test_output_validation_has_expected` mis à jour pour ignorer les exercices mode `Test`
+- [x] `exercises/pointers/ptr_test_01.json` — Exercice démo avec 4 tests sur `sum_array()`
+- [x] Tests unitaires `parse_test_summary` (4 cas) — 148 tests total, 0 échec
+
+**Décision technique** : `test_current.c = #include "current.c"\n#include "test.h"\n\n{test_code}` — le code source de l'étudiant est inclus en tant que TU, le harnais est séparé. Rétrocompatibilité JSON garantie : `ValidationMode` est `#[serde(default)]` → tous les exercices existants continuent de fonctionner sans modification.
+
+---
+
 ## Non-prioritaires (hors scope NSY103/UTC502)
 
 Ces sujets enrichiraient la plateforme mais ne sont pas dans les curricula:

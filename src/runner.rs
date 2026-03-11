@@ -9,10 +9,15 @@ use crate::constants::{
     POLL_INTERVAL_MS, REGEX_PREFIX,
 };
 use crate::error::KfError;
-use crate::models::Exercise;
+use crate::models::{Exercise, ValidationMode};
 
 /// Préfixe des messages de timeout — utilisé pour la création du message et les pattern matches.
 const TIMEOUT_MSG_PREFIX: &str = "Délai d'exécution dépassé";
+
+/// Nom du fichier de harnais de tests C copié dans le répertoire de travail.
+const TEST_H_FILENAME: &str = "test.h";
+/// Nom du fichier C généré qui inclut current.c + le code du harnais.
+const TEST_C_FILENAME: &str = "test_current.c";
 
 // Per-thread cache of compiled regexes: pattern string → compiled Regex (or None if invalid).
 thread_local! {
@@ -198,9 +203,24 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
         tmp_fallback2.as_path()
     });
+
+    match exercise.validation.mode {
+        ValidationMode::Test => run_tests(source_path, work_dir, exercise),
+        ValidationMode::Both => {
+            let output_result = run_output(source_path, work_dir, exercise);
+            if !output_result.success {
+                return output_result;
+            }
+            run_tests(source_path, work_dir, exercise)
+        }
+        ValidationMode::Output => run_output(source_path, work_dir, exercise),
+    }
+}
+
+/// Run output-validation mode: compile source, run, compare stdout.
+fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let output_path = work_dir.join("kf_run");
 
-    // Write additional files (headers etc.)
     if let Err(e) = write_exercise_files(exercise, work_dir) {
         return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
     }
@@ -242,8 +262,6 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
                     timeout: false,
                 };
             }
-
-            // Validate output
             let valid = validate_output(&stdout, exercise);
             RunResult {
                 success: valid,
@@ -255,6 +273,122 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
             }
         },
     )
+}
+
+/// Run test-harness mode: write test.h + test_current.c, compile, run, parse summary.
+fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
+    let test_code = match &exercise.validation.test_code {
+        Some(c) => c.clone(),
+        None => {
+            return make_compile_error(
+                "Mode Test : champ 'test_code' manquant dans l'exercice".to_string(),
+            );
+        }
+    };
+
+    // Write test.h from embedded asset
+    let test_h_content = include_str!("../assets/test.h");
+    let test_h_path = work_dir.join(TEST_H_FILENAME);
+    if let Err(e) = std::fs::write(&test_h_path, test_h_content) {
+        return make_compile_error(format!("Impossible d'écrire test.h : {e}"));
+    }
+
+    // Write test_current.c = #include "current.c" + test_code
+    let test_c_path = work_dir.join(TEST_C_FILENAME);
+    let source_filename = source_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
+    let test_c_content =
+        format!("#include \"{source_filename}\"\n#include \"test.h\"\n\n{test_code}\n");
+    if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {
+        return make_compile_error(format!("Impossible d'écrire test_current.c : {e}"));
+    }
+
+    if let Err(e) = write_exercise_files(exercise, work_dir) {
+        return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
+    }
+
+    let output_path = work_dir.join("kf_test");
+    let output_path_str = output_path.to_string_lossy().into_owned();
+    let test_c_path_str = test_c_path.to_string_lossy().into_owned();
+    let include_flag = format!("-I{}", work_dir.display());
+    let linker = linker_flags(&exercise.subject);
+
+    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &test_c_path_str, &include_flag];
+    for flag in &linker {
+        extra_args.push(flag);
+    }
+
+    let timeout = exercise
+        .validation
+        .max_duration_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
+
+    let start = Instant::now();
+    let gcc_result = spawn_gcc_and_collect(&test_c_path, &extra_args, work_dir, timeout);
+    let expected_pass = exercise.validation.expected_tests_pass;
+    dispatch_gcc_result(
+        gcc_result,
+        timeout,
+        start,
+        move |stdout, stderr, status, duration_ms| {
+            if !status.success() {
+                return RunResult {
+                    success: false,
+                    stdout,
+                    stderr: if stderr.is_empty() {
+                        format!("Process exited with {status}")
+                    } else {
+                        stderr
+                    },
+                    duration_ms,
+                    compile_error: false,
+                    timeout: false,
+                };
+            }
+            let (success, failures) = parse_test_summary(&stdout);
+            let passed = success && failures == 0;
+            let result_ok = match expected_pass {
+                Some(n) => {
+                    // Count OK lines in stdout
+                    let ok_count = stdout
+                        .lines()
+                        .filter(|l| l.trim_start().starts_with("OK"))
+                        .count();
+                    passed && ok_count >= n
+                }
+                None => passed,
+            };
+            RunResult {
+                success: result_ok,
+                stdout,
+                stderr,
+                duration_ms,
+                compile_error: false,
+                timeout: false,
+            }
+        },
+    )
+}
+
+/// Parse the test summary line: "N Tests N Failures 0 Ignored".
+/// Returns `(found_summary, failures_count)`.
+fn parse_test_summary(stdout: &str) -> (bool, usize) {
+    for line in stdout.lines().rev() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        // Format: "<N> Tests <M> Failures 0 Ignored"
+        if parts.len() == 6
+            && parts[1] == "Tests"
+            && parts[3] == "Failures"
+            && parts[5] == "Ignored"
+        {
+            let failures = parts[2].parse::<usize>().unwrap_or(1);
+            return (true, failures);
+        }
+    }
+    (false, 1) // No summary line found → treat as failure
 }
 
 /// Dispatch le résultat de `spawn_gcc_and_collect` vers un `RunResult`.
@@ -822,5 +956,36 @@ mod tests {
         assert_eq!(select_starter_code(&exercise, 1.5), "stage1");
         // mastery 4.5 → stage 4, but only 3 stages available → fall back to default
         assert_eq!(select_starter_code(&exercise, 4.5), "default");
+    }
+
+    #[test]
+    fn test_parse_test_summary_all_pass() {
+        let stdout = "  OK    test_foo\n  OK    test_bar\n\n3 Tests 0 Failures 0 Ignored\n";
+        let (found, failures) = parse_test_summary(stdout);
+        assert!(found);
+        assert_eq!(failures, 0);
+    }
+
+    #[test]
+    fn test_parse_test_summary_with_failures() {
+        let stdout = "  OK    test_foo\n  FAIL  test_bar — expected 1 but got 0\n\n2 Tests 1 Failures 0 Ignored\n";
+        let (found, failures) = parse_test_summary(stdout);
+        assert!(found);
+        assert_eq!(failures, 1);
+    }
+
+    #[test]
+    fn test_parse_test_summary_no_summary_line() {
+        let stdout = "some random output\nno summary here\n";
+        let (found, failures) = parse_test_summary(stdout);
+        assert!(!found);
+        assert_eq!(failures, 1); // treated as failure
+    }
+
+    #[test]
+    fn test_parse_test_summary_empty() {
+        let (found, failures) = parse_test_summary("");
+        assert!(!found);
+        assert_eq!(failures, 1);
     }
 }

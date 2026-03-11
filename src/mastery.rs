@@ -2,8 +2,7 @@ use chrono::Utc;
 
 use crate::constants::{
     DIFFICULTY_2_UNLOCK, DIFFICULTY_3_UNLOCK, DIFFICULTY_4_UNLOCK, DIFFICULTY_5_UNLOCK,
-    MASTERY_DECAY_DAYS, MASTERY_FAILURE_DELTA, MASTERY_SUCCESS_DELTA, SRS_BASE_INTERVAL_DAYS,
-    SRS_INTERVAL_MULTIPLIER, SRS_MAX_INTERVAL_DAYS,
+    MASTERY_FAILURE_DELTA, MASTERY_SUCCESS_DELTA,
 };
 use crate::models::{MasteryScore, Subject};
 
@@ -51,27 +50,38 @@ pub fn apply_decay(subject: &mut Subject) {
 
     let now = Utc::now().timestamp();
     let days_since = ((now - last_epoch) / SECS_PER_DAY).max(0);
+    let decay_days = crate::config::get().srs.decay_days;
 
-    if days_since >= MASTERY_DECAY_DAYS {
-        let intervals = days_since / MASTERY_DECAY_DAYS;
+    if days_since >= decay_days {
+        let intervals = days_since / decay_days;
         let decay = intervals as f64 * DECAY_AMOUNT;
         subject.mastery_score = MasteryScore::clamped(subject.mastery_score.get() - decay);
         // Advance last_practiced_at to "consume" the decayed intervals,
         // preventing the same intervals from being re-applied on the next call.
-        subject.last_practiced_at =
-            Some(last_epoch + intervals * MASTERY_DECAY_DAYS * SECS_PER_DAY);
+        subject.last_practiced_at = Some(last_epoch + intervals * decay_days * SECS_PER_DAY);
     }
 }
 
+/// Estime le nombre de jours avant le prochain review à partir du score de maîtrise.
+/// Utilisé pour l'affichage post-validation en mode review.
+/// Formule : round(mastery * interval_multiplier), borné entre base et max.
+pub(crate) fn next_interval_days(mastery: f32) -> u32 {
+    let cfg = &crate::config::get().srs;
+    let raw = (mastery as f64 * cfg.interval_multiplier).round() as i64;
+    raw.clamp(cfg.base_interval_days, cfg.max_interval_days) as u32
+}
+
 /// Calcule le prochain horodatage de révision et le nouvel intervalle SRS.
-/// En cas de succès l'intervalle est multiplié par 2.5 (max 365 jours) ; en cas d'échec il revient à 1 jour.
+/// En cas de succès l'intervalle est multiplié par `interval_multiplier` (max `max_interval_days`) ;
+/// en cas d'échec il revient à `base_interval_days`.
 /// Retourne `(next_review_at_unix, new_interval_days)`.
 pub fn compute_next_review(current_interval_days: i64, success: bool, now: i64) -> (i64, i64) {
+    let cfg = &crate::config::get().srs;
     let new_interval = if success {
-        let expanded = ((current_interval_days as f64) * SRS_INTERVAL_MULTIPLIER).round() as i64;
-        expanded.clamp(SRS_BASE_INTERVAL_DAYS, SRS_MAX_INTERVAL_DAYS)
+        let expanded = ((current_interval_days as f64) * cfg.interval_multiplier).round() as i64;
+        expanded.clamp(cfg.base_interval_days, cfg.max_interval_days)
     } else {
-        SRS_BASE_INTERVAL_DAYS
+        cfg.base_interval_days
     };
     let next_review_at = now + new_interval * SECS_PER_DAY;
     (next_review_at, new_interval)
@@ -80,6 +90,7 @@ pub fn compute_next_review(current_interval_days: i64, success: bool, now: i64) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::constants::{SRS_BASE_INTERVAL_DAYS, SRS_MAX_INTERVAL_DAYS};
 
     const SUCCESS_DELTA: f64 = crate::constants::MASTERY_SUCCESS_DELTA;
     const FAILURE_DELTA: f64 = -(crate::constants::MASTERY_FAILURE_DELTA);
@@ -249,5 +260,28 @@ mod tests {
     #[test]
     fn test_mastery_delta_failure() {
         assert_eq!(mastery_delta(false), FAILURE_DELTA);
+    }
+
+    // ── next_interval_days ──────────────────────────────────────────────
+
+    #[test]
+    fn next_interval_days_min_clamp() {
+        // mastery=0.0 → raw=round(0.0 * 2.5)=0 → clamped to base_interval_days (1)
+        let result = next_interval_days(0.0);
+        assert_eq!(result, SRS_BASE_INTERVAL_DAYS as u32);
+    }
+
+    #[test]
+    fn next_interval_days_max_clamp() {
+        // mastery=30.0 → raw=round(30.0 * 2.5)=75 → clamped to max_interval_days (60)
+        let result = next_interval_days(30.0);
+        assert_eq!(result, SRS_MAX_INTERVAL_DAYS as u32);
+    }
+
+    #[test]
+    fn next_interval_days_mid() {
+        // mastery=2.0 → raw=round(2.0 * 2.5)=5 → within [1, 60], returns 5
+        let result = next_interval_days(2.0);
+        assert_eq!(result, 5);
     }
 }
