@@ -50,7 +50,7 @@ pub fn apply_decay(subject: &mut Subject) {
     };
 
     let now = Utc::now().timestamp();
-    let days_since = (now - last_epoch) / SECS_PER_DAY;
+    let days_since = ((now - last_epoch) / SECS_PER_DAY).max(0);
 
     if days_since >= MASTERY_DECAY_DAYS {
         let intervals = days_since / MASTERY_DECAY_DAYS;

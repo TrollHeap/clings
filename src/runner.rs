@@ -8,6 +8,7 @@ use crate::constants::{
     CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
     POLL_INTERVAL_MS, REGEX_PREFIX,
 };
+use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
 
 // Per-thread cache of compiled regexes: pattern string → compiled Regex (or None if invalid).
@@ -74,6 +75,109 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
     Ok(())
 }
 
+/// Compile `source_path` with gcc `extra_args`, run the resulting binary from
+/// `work_dir`, and collect stdout + stderr within `timeout`.
+/// Returns `(stdout, stderr, exit_status)` or a `KfError`.
+fn spawn_gcc_and_collect(
+    source_path: &Path,
+    extra_args: &[&str],
+    work_dir: &Path,
+    timeout: Duration,
+) -> crate::error::Result<(String, String, std::process::ExitStatus)> {
+    // Build gcc command: fixed flags + caller-supplied args (output path, source, -I…, linker flags).
+    let mut gcc = Command::new(GCC_BINARY);
+    gcc.args(GCC_FLAGS);
+    for arg in extra_args {
+        gcc.arg(arg);
+    }
+
+    let compile_result = gcc.output().map_err(|e| {
+        KfError::Io(std::io::Error::new(
+            e.kind(),
+            format!("Failed to run gcc: {e}. Is gcc installed?"),
+        ))
+    })?;
+
+    if !compile_result.status.success() {
+        let stderr = String::from_utf8_lossy(&compile_result.stderr).to_string();
+        return Err(KfError::Config(stderr));
+    }
+
+    // Derive the output binary path: gcc writes it via "-o <output_path>" which is the
+    // first extra_arg after "-o". We locate it by scanning extra_args.
+    let output_path = {
+        let mut it = extra_args.iter();
+        loop {
+            match it.next() {
+                Some(&"-o") => {
+                    let p = it
+                        .next()
+                        .ok_or_else(|| KfError::Config("-o flag missing argument".to_string()))?;
+                    break PathBuf::from(p);
+                }
+                None => {
+                    return Err(KfError::Config(
+                        "extra_args must contain -o <output>".to_string(),
+                    ))
+                }
+                _ => {}
+            }
+        }
+    };
+
+    let _ = source_path; // consumed by gcc via extra_args; kept in signature for clarity
+
+    let start = Instant::now();
+    let mut child = Command::new(&output_path)
+        .current_dir(work_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(KfError::Io)?;
+
+    // INVARIANT: Stdio::piped() was set on Command — stdout/stderr always present.
+    let (stdout_thread, stderr_thread) = spawn_drain_threads(
+        child.stdout.take().expect("stdout piped"),
+        child.stderr.take().expect("stderr piped"),
+    );
+
+    match child.wait_timeout(timeout) {
+        Ok(Some(status)) => {
+            // drain thread cannot panic: only calls read_to_end on a pipe
+            let stdout = stdout_thread.join().unwrap_or_default();
+            // drain thread cannot panic: only calls read_to_end on a pipe
+            let stderr = stderr_thread.join().unwrap_or_default();
+            Ok((stdout, stderr, status))
+        }
+        Ok(None) => {
+            kill_process_group(&child);
+            let _ = child.wait();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
+            let elapsed = start.elapsed();
+            Err(KfError::Config(format!(
+                "Execution timed out ({:.1}s limit)",
+                elapsed.as_secs_f64()
+            )))
+        }
+        Err(e) => {
+            kill_process_group(&child);
+            let _ = child.wait();
+            if let Err(e) = stdout_thread.join() {
+                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+            }
+            if let Err(e) = stderr_thread.join() {
+                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+            }
+            Err(KfError::Io(e))
+        }
+    }
+}
+
 /// Compile and run a C source file for Test/Both modes.
 /// Reads user code from `source_path`, appends the test harness, writes to a
 /// temporary file, compiles it, and validates by exit code (and optionally stdout).
@@ -103,54 +207,15 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         return make_compile_error(format!("Failed to write exercise files: {e}"));
     }
 
-    let mut gcc = Command::new(GCC_BINARY);
-    gcc.args(GCC_FLAGS)
-        .arg("-o")
-        .arg(&output_path)
-        .arg(&test_source_path)
-        .arg(format!("-I{}", work_dir.display()));
+    let output_path_str = output_path.to_string_lossy().into_owned();
+    let test_source_str = test_source_path.to_string_lossy().into_owned();
+    let include_flag = format!("-I{}", work_dir.display());
+    let linker = linker_flags(&exercise.subject);
 
-    for flag in linker_flags(&exercise.subject) {
-        gcc.arg(flag);
+    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &test_source_str, &include_flag];
+    for flag in &linker {
+        extra_args.push(flag);
     }
-
-    let compile_result = match gcc.output() {
-        Ok(r) => r,
-        Err(e) => {
-            return make_compile_error(format!("Failed to run gcc: {e}. Is gcc installed?"));
-        }
-    };
-
-    if !compile_result.status.success() {
-        return make_compile_error(String::from_utf8_lossy(&compile_result.stderr).to_string());
-    }
-
-    let start = Instant::now();
-    let child = Command::new(&output_path)
-        .current_dir(work_dir)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
-
-    let mut child = match child {
-        Ok(c) => c,
-        Err(e) => {
-            return RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Failed to execute: {e}"),
-                duration_ms: 0,
-                compile_error: false,
-                timeout: false,
-            };
-        }
-    };
-
-    // stdout/stderr are always Some because we spawned with Stdio::piped().
-    let (stdout_thread, stderr_thread) = spawn_drain_threads(
-        child.stdout.take().expect("stdout piped"),
-        child.stderr.take().expect("stderr piped"),
-    );
 
     let timeout = exercise
         .validation
@@ -158,12 +223,10 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         .map(Duration::from_millis)
         .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
-    match child.wait_timeout(timeout) {
-        Ok(Some(status)) => {
+    let start = std::time::Instant::now();
+    match spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout) {
+        Ok((stdout, stderr, status)) => {
             let duration_ms = start.elapsed().as_millis() as u64;
-            let stdout = stdout_thread.join().unwrap_or_default();
-            let stderr = stderr_thread.join().unwrap_or_default();
-
             let exit_ok = status.success();
             let output_ok = match exercise.validation.mode {
                 ValidationMode::Both => {
@@ -202,42 +265,30 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
                 timeout: false,
             }
         }
-        Ok(None) => {
-            kill_process_group(&child);
-            let _ = child.wait();
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
-            }
-            RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Execution timed out ({:.1}s limit)", timeout.as_secs_f64()),
-                duration_ms: timeout.as_millis() as u64,
-                compile_error: false,
-                timeout: true,
-            }
+        Err(KfError::Config(msg)) if msg.starts_with("Execution timed out") => RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: msg,
+            duration_ms: timeout.as_millis() as u64,
+            compile_error: false,
+            timeout: true,
+        },
+        Err(KfError::Config(msg)) => {
+            // gcc stderr or other config error — treat as compile error if it looks like
+            // a compiler diagnostic, otherwise treat as runtime error.
+            // The only non-gcc Config errors from spawn_gcc_and_collect are internal
+            // invariant violations; treat them uniformly as compile errors.
+            make_compile_error(msg)
         }
-        Err(e) => {
-            kill_process_group(&child);
-            let _ = child.wait();
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
-            }
-            RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Wait error: {e}"),
-                duration_ms: start.elapsed().as_millis() as u64,
-                compile_error: false,
-                timeout: false,
-            }
-        }
+        Err(KfError::Io(e)) => RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Wait error: {e}"),
+            duration_ms: start.elapsed().as_millis() as u64,
+            compile_error: false,
+            timeout: false,
+        },
+        Err(e) => make_compile_error(format!("{e}")),
     }
 }
 
@@ -284,62 +335,15 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         return make_compile_error(format!("Failed to write exercise files: {e}"));
     }
 
-    // Compile
-    let mut gcc = Command::new(GCC_BINARY);
-    gcc.args(GCC_FLAGS)
-        .arg("-o")
-        .arg(&output_path)
-        .arg(source_path);
+    let output_path_str = output_path.to_string_lossy().into_owned();
+    let source_path_str = source_path.to_string_lossy().into_owned();
+    let include_flag = format!("-I{}", work_dir.display());
+    let linker = linker_flags(&exercise.subject);
 
-    // Add include path for headers
-    gcc.arg(format!("-I{}", work_dir.display()));
-
-    // Add linker flags
-    for flag in linker_flags(&exercise.subject) {
-        gcc.arg(flag);
+    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &source_path_str, &include_flag];
+    for flag in &linker {
+        extra_args.push(flag);
     }
-
-    let compile_result = match gcc.output() {
-        Ok(r) => r,
-        Err(e) => {
-            return make_compile_error(format!("Failed to run gcc: {e}. Is gcc installed?"));
-        }
-    };
-
-    if !compile_result.status.success() {
-        return make_compile_error(String::from_utf8_lossy(&compile_result.stderr).to_string());
-    }
-
-    // Execute with timeout
-    let start = Instant::now();
-    let child = Command::new(&output_path)
-        .current_dir(work_dir)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
-
-    let mut child = match child {
-        Ok(c) => c,
-        Err(e) => {
-            return RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Failed to execute: {e}"),
-                duration_ms: 0,
-                compile_error: false,
-                timeout: false,
-            };
-        }
-    };
-
-    // Drain stdout/stderr in background threads to prevent pipe buffer deadlock.
-    // If the child writes more than ~64 KB without being read, write() blocks
-    // and wait() never returns (classic pipe deadlock). Reading concurrently avoids it.
-    // stdout/stderr are always Some because we spawned with Stdio::piped().
-    let (stdout_thread, stderr_thread) = spawn_drain_threads(
-        child.stdout.take().expect("stdout piped"),
-        child.stderr.take().expect("stderr piped"),
-    );
 
     let timeout = exercise
         .validation
@@ -347,12 +351,10 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         .map(Duration::from_millis)
         .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
-    match child.wait_timeout(timeout) {
-        Ok(Some(status)) => {
+    let start = Instant::now();
+    match spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout) {
+        Ok((stdout, stderr, status)) => {
             let duration_ms = start.elapsed().as_millis() as u64;
-            let stdout = stdout_thread.join().unwrap_or_default();
-            let stderr = stderr_thread.join().unwrap_or_default();
-
             if !status.success() {
                 return RunResult {
                     success: false,
@@ -379,43 +381,27 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
                 timeout: false,
             }
         }
-        Ok(None) => {
-            // Timeout — kill the process group, then join readers (pipe close unblocks them)
-            kill_process_group(&child);
-            let _ = child.wait();
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
-            }
+        Err(KfError::Config(msg)) if msg.starts_with("Execution timed out") => {
+            // Timeout — kill already handled inside spawn_gcc_and_collect
             RunResult {
                 success: false,
                 stdout: String::new(),
-                stderr: format!("Execution timed out ({:.1}s limit)", timeout.as_secs_f64()),
+                stderr: msg,
                 duration_ms: timeout.as_millis() as u64,
                 compile_error: false,
                 timeout: true,
             }
         }
-        Err(e) => {
-            kill_process_group(&child);
-            let _ = child.wait();
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
-            }
-            RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: format!("Wait error: {e}"),
-                duration_ms: start.elapsed().as_millis() as u64,
-                compile_error: false,
-                timeout: false,
-            }
-        }
+        Err(KfError::Config(msg)) => make_compile_error(msg),
+        Err(KfError::Io(e)) => RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Wait error: {e}"),
+            duration_ms: start.elapsed().as_millis() as u64,
+            compile_error: false,
+            timeout: false,
+        },
+        Err(e) => make_compile_error(format!("{e}")),
     }
 }
 
@@ -463,12 +449,12 @@ fn normalize(s: &str) -> String {
 }
 
 /// Get the working directory for exercises.
-pub fn work_dir() -> std::io::Result<PathBuf> {
+pub fn work_dir() -> crate::error::Result<PathBuf> {
     let home = std::env::var_os("HOME").ok_or_else(|| {
-        std::io::Error::new(
+        KfError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "Variable $HOME non définie — impossible de localiser ~/.clings",
-        )
+        ))
     })?;
     let dir = PathBuf::from(home).join(CLINGS_DIR);
     #[cfg(unix)]
@@ -479,11 +465,11 @@ pub fn work_dir() -> std::io::Result<PathBuf> {
             .recursive(true)
             .mode(0o700)
             .create(&dir)
-            .ok();
+            .map_err(KfError::Io)?;
     }
     #[cfg(not(unix))]
     {
-        std::fs::create_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).map_err(KfError::Io)?;
     }
     Ok(dir)
 }
@@ -513,7 +499,10 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
 /// Write starter code to the current.c file.
 /// If mastery is provided, selects the appropriate stage.
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
-    let dir = work_dir()?;
+    let dir = work_dir().map_err(|e| match e {
+        KfError::Io(io) => io,
+        other => std::io::Error::other(other.to_string()),
+    })?;
     let source_path = dir.join(CURRENT_C_FILENAME);
     let code = match mastery {
         Some(m) => select_starter_code(exercise, m),

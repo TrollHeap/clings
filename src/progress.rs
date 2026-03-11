@@ -97,7 +97,7 @@ fn row_to_subject(row: &rusqlite::Row) -> rusqlite::Result<Subject> {
         attempts_success: row.get(4)?,
         difficulty_unlocked: row.get(5)?,
         next_review_at: row.get(6)?,
-        srs_interval_days: row.get::<_, Option<i64>>(7)?.unwrap_or(1),
+        srs_interval_days: row.get::<_, i64>(7)?,
     })
 }
 

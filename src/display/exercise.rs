@@ -6,6 +6,40 @@ use crate::runner::RunResult;
 
 use super::{difficulty_stars, hr, show_banner, wrap_text, GCC_RE};
 
+/// Render the description, key_concept, common_mistake, and validation warning
+/// for an exercise — shared between watch mode and single-run mode.
+fn render_exercise_body(exercise: &Exercise) {
+    for line in exercise.description.lines() {
+        if line.chars().count() > TEXT_WRAP_WIDTH {
+            for wrapped in wrap_text(line, TEXT_WRAP_WIDTH) {
+                println!("  {wrapped}");
+            }
+        } else {
+            println!("  {line}");
+        }
+    }
+    println!();
+
+    if let Some(kc) = &exercise.key_concept {
+        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+    }
+    if let Some(cm) = &exercise.common_mistake {
+        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+    }
+
+    match exercise.validation.mode {
+        ValidationMode::Test | ValidationMode::Both => {
+            println!(
+                "\n  {} Test-based validation (non supporté en CLI)",
+                "⚠".yellow()
+            );
+        }
+        _ => {}
+    }
+
+    println!();
+}
+
 /// Display exercise info in watch mode (rustlings-style).
 pub fn show_exercise_watch(
     exercise: &Exercise,
@@ -55,35 +89,7 @@ pub fn show_exercise_watch(
     println!("  {}", hr().dimmed());
     println!();
 
-    for line in exercise.description.lines() {
-        if line.chars().count() > TEXT_WRAP_WIDTH {
-            for wrapped in wrap_text(line, TEXT_WRAP_WIDTH) {
-                println!("  {wrapped}");
-            }
-        } else {
-            println!("  {line}");
-        }
-    }
-    println!();
-
-    if let Some(kc) = &exercise.key_concept {
-        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
-    }
-    if let Some(cm) = &exercise.common_mistake {
-        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-    }
-
-    match exercise.validation.mode {
-        ValidationMode::Test | ValidationMode::Both => {
-            println!(
-                "\n  {} Test-based validation (non supporté en CLI)",
-                "⚠".yellow()
-            );
-        }
-        _ => {}
-    }
-
-    println!();
+    render_exercise_body(exercise);
 }
 
 /// Display exercise info before editing (single run mode).
@@ -108,35 +114,7 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
     println!("  {}", hr().dimmed());
     println!();
 
-    for line in exercise.description.lines() {
-        if line.chars().count() > TEXT_WRAP_WIDTH {
-            for wrapped in wrap_text(line, TEXT_WRAP_WIDTH) {
-                println!("  {wrapped}");
-            }
-        } else {
-            println!("  {line}");
-        }
-    }
-    println!();
-
-    if let Some(kc) = &exercise.key_concept {
-        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
-    }
-    if let Some(cm) = &exercise.common_mistake {
-        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-    }
-
-    match exercise.validation.mode {
-        ValidationMode::Test | ValidationMode::Both => {
-            println!(
-                "\n  {} Test-based validation (non supporté en CLI)",
-                "⚠".yellow()
-            );
-        }
-        _ => {}
-    }
-
-    println!();
+    render_exercise_body(exercise);
 }
 
 /// Show the "waiting for changes" status.

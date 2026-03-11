@@ -163,7 +163,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         }
 
         display::show_watching(&source_path);
-        display::show_keybinds_piscine(!exercise.visualizer.steps.is_empty());
+        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
@@ -182,7 +182,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), true);
                 WatchAction::Continue
             },
             |key| {
@@ -273,7 +273,10 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                     }
 
                     display::show_watching(&source_path);
-                    display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                    display::show_keybinds_with_vis(
+                        !exercise_clone.visualizer.steps.is_empty(),
+                        true,
+                    );
                     return None;
                 }
 
@@ -329,7 +332,10 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                                 }
                             }
                         }
-                        display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                        display::show_keybinds_with_vis(
+                            !exercise_clone.visualizer.steps.is_empty(),
+                            true,
+                        );
                         None
                     }
                     _ => None,
@@ -521,7 +527,7 @@ pub fn run_exam_piscine(
         }
 
         display::show_watching(&source_path);
-        display::show_keybinds_piscine(!exercise.visualizer.steps.is_empty());
+        display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
 
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
@@ -540,7 +546,7 @@ pub fn run_exam_piscine(
             &source_path,
             || {
                 display::show_file_saved();
-                display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                display::show_keybinds_with_vis(!exercise_clone.visualizer.steps.is_empty(), true);
                 WatchAction::Continue
             },
             |key| {
@@ -626,7 +632,10 @@ pub fn run_exam_piscine(
                     }
 
                     display::show_watching(&source_for_change);
-                    display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                    display::show_keybinds_with_vis(
+                        !exercise_clone.visualizer.steps.is_empty(),
+                        true,
+                    );
                     return None;
                 }
                 match key {
@@ -681,7 +690,10 @@ pub fn run_exam_piscine(
                                 }
                             }
                         }
-                        display::show_keybinds_piscine(!exercise_clone.visualizer.steps.is_empty());
+                        display::show_keybinds_with_vis(
+                            !exercise_clone.visualizer.steps.is_empty(),
+                            true,
+                        );
                         None
                     }
                     _ => None,
