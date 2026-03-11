@@ -18,7 +18,7 @@ fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
     }
 }
 
-fn save_exam_ckpt(conn: &rusqlite::Connection, session_id: Option<&str>, index: usize) {
+fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, index: usize) {
     if let Some(sid) = session_id {
         if let Err(e) = progress::save_exam_checkpoint(conn, sid, index) {
             eprintln!("  Warning: exam checkpoint not saved: {e}");
@@ -699,18 +699,18 @@ pub fn run_exam_piscine(
                     ex_secs % 60,
                 );
                 index += 1;
-                save_exam_ckpt(&conn, session_id, index);
+                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Skip | WatchAction::Next => {
                 index += 1;
-                save_exam_ckpt(&conn, session_id, index);
+                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Prev => {
                 index = index.saturating_sub(1);
-                save_exam_ckpt(&conn, session_id, index);
+                save_exam_checkpoint(&conn, session_id, index);
             }
             WatchAction::Quit => {
-                save_exam_ckpt(&conn, session_id, index);
+                save_exam_checkpoint(&conn, session_id, index);
                 break;
             }
             WatchAction::Continue => {}
@@ -723,7 +723,7 @@ pub fn run_exam_piscine(
     }
 
     let done = completed.iter().filter(|&&c| c).count();
-    if done == total {
+    if index >= total {
         progress::clear_exam_checkpoint(&conn).ok();
     }
 

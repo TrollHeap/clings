@@ -263,70 +263,60 @@ fn open_test_db() -> Result<Connection> {
     Ok(conn)
 }
 
+// === Generic KV helpers ===
+
+fn kv_set(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    let mut stmt = conn.prepare_cached("INSERT OR REPLACE INTO kv (key, value) VALUES (?1, ?2)")?;
+    stmt.execute(params![key, value])?;
+    Ok(())
+}
+
+fn kv_get(conn: &Connection, key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare_cached("SELECT value FROM kv WHERE key = ?1")?;
+    Ok(stmt.query_row(params![key], |row| row.get(0)).optional()?)
+}
+
+fn kv_del(conn: &Connection, key: &str) -> Result<()> {
+    let mut stmt = conn.prepare_cached("DELETE FROM kv WHERE key = ?1")?;
+    stmt.execute(params![key])?;
+    Ok(())
+}
+
+// === Checkpoints ===
+
 /// Save piscine checkpoint (current exercise index).
 pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
-    conn.execute(
-        &format!("INSERT OR REPLACE INTO kv (key, value) VALUES ('{PISCINE_CHECKPOINT_KEY}', ?1)"),
-        params![index.to_string()],
-    )?;
-    Ok(())
+    kv_set(conn, PISCINE_CHECKPOINT_KEY, &index.to_string())
 }
 
 /// Load piscine checkpoint, returns None if no checkpoint saved.
 pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
-    let mut stmt = conn.prepare_cached(&format!(
-        "SELECT value FROM kv WHERE key = '{PISCINE_CHECKPOINT_KEY}'"
-    ))?;
-    let result = stmt
-        .query_row([], |row| row.get::<_, String>(0))
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok());
-    Ok(result)
+    Ok(kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| s.parse().ok()))
 }
 
 /// Clear piscine checkpoint (called when piscine is fully completed).
 pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
-    conn.execute(
-        &format!("DELETE FROM kv WHERE key = '{PISCINE_CHECKPOINT_KEY}'"),
-        [],
-    )?;
-    Ok(())
+    kv_del(conn, PISCINE_CHECKPOINT_KEY)
 }
 
 /// Save exam checkpoint: stores "{session_id}:{index}" under exam_checkpoint key.
 pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -> Result<()> {
-    let value = format!("{session_id}:{index}");
-    conn.execute(
-        &format!("INSERT OR REPLACE INTO kv (key, value) VALUES ('{EXAM_CHECKPOINT_KEY}', ?1)"),
-        params![value],
-    )?;
-    Ok(())
+    kv_set(conn, EXAM_CHECKPOINT_KEY, &format!("{session_id}:{index}"))
 }
 
 /// Load exam checkpoint for the given session_id. Returns None if no checkpoint exists or if the
 /// stored session differs (i.e. the user switched to a different exam session).
 pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Option<usize>> {
-    let mut stmt = conn.prepare_cached(&format!(
-        "SELECT value FROM kv WHERE key = '{EXAM_CHECKPOINT_KEY}'"
-    ))?;
-    let result = stmt
-        .query_row([], |row| row.get::<_, String>(0))
-        .ok()
-        .and_then(|s| {
-            let prefix = format!("{session_id}:");
-            s.strip_prefix(&prefix)
-                .and_then(|rest| rest.parse::<usize>().ok())
-        });
-    Ok(result)
+    Ok(kv_get(conn, EXAM_CHECKPOINT_KEY)?.and_then(|s| {
+        s.rsplit_once(':')
+            .filter(|(sid, _)| *sid == session_id)
+            .and_then(|(_, rest)| rest.parse().ok())
+    }))
 }
 
 /// Clear exam checkpoint (called when exam session is fully completed).
 pub fn clear_exam_checkpoint(conn: &Connection) -> Result<()> {
-    conn.execute(
-        &format!("DELETE FROM kv WHERE key = '{EXAM_CHECKPOINT_KEY}'"),
-        [],
-    )?;
-    Ok(())
+    kv_del(conn, EXAM_CHECKPOINT_KEY)
 }
 
 /// Get subjects whose SRS review is due (next_review_at <= now).
@@ -589,6 +579,42 @@ mod tests {
         save_piscine_checkpoint(&conn, 17).unwrap();
         let loaded = load_piscine_checkpoint(&conn).unwrap();
         assert_eq!(loaded, Some(17));
+    }
+
+    #[test]
+    fn test_exam_checkpoint_roundtrip() {
+        let conn = open_test_db().unwrap();
+        save_exam_checkpoint(&conn, "nsy103-2024", 5).unwrap();
+        let loaded = load_exam_checkpoint(&conn, "nsy103-2024").unwrap();
+        assert_eq!(loaded, Some(5));
+    }
+
+    #[test]
+    fn test_exam_checkpoint_session_isolation() {
+        let conn = open_test_db().unwrap();
+        save_exam_checkpoint(&conn, "nsy103-2024", 3).unwrap();
+        let other = load_exam_checkpoint(&conn, "utc502-2023").unwrap();
+        assert_eq!(other, None);
+    }
+
+    #[test]
+    fn test_exam_checkpoint_session_id_with_colon() {
+        let conn = open_test_db().unwrap();
+        save_exam_checkpoint(&conn, "utc502:2024", 7).unwrap();
+        let loaded = load_exam_checkpoint(&conn, "utc502:2024").unwrap();
+        assert_eq!(loaded, Some(7));
+        // A session_id that only matches the prefix must not match
+        let wrong = load_exam_checkpoint(&conn, "utc502").unwrap();
+        assert_eq!(wrong, None);
+    }
+
+    #[test]
+    fn test_exam_checkpoint_clear() {
+        let conn = open_test_db().unwrap();
+        save_exam_checkpoint(&conn, "nsy103-2024", 2).unwrap();
+        clear_exam_checkpoint(&conn).unwrap();
+        let loaded = load_exam_checkpoint(&conn, "nsy103-2024").unwrap();
+        assert_eq!(loaded, None);
     }
 
     #[test]
