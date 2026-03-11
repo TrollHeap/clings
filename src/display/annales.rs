@@ -2,10 +2,10 @@ use colored::Colorize;
 
 use crate::models::Exercise;
 
-use super::{hr, show_banner, AnnaleExam};
+use super::{hr, show_banner, AnnaleSession};
 
 /// Affiche les annales NSY103 avec le mapping vers les exercices clings.
-pub fn show_annales(annales: &[AnnaleExam], exercises: &[Exercise]) {
+pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
     println!();
     show_banner();
     println!(

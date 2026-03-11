@@ -8,13 +8,13 @@ use colored::Colorize;
 use crate::chapters;
 use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
 use crate::error::Result;
-use crate::models::ValidationMode;
+use crate::models::{Exercise, ValidationMode};
 use crate::watcher::WatchAction;
 use crate::{display, exercises, progress, runner, tmux};
 
 fn log_checkpoint_err(label: &str, result: Result<()>) {
     if let Err(e) = result {
-        eprintln!("  Warning: {label}checkpoint not saved: {e}");
+        eprintln!("  Avertissement : {label}checkpoint non sauvegardé : {e}");
     }
 }
 
@@ -26,6 +26,113 @@ fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, i
     if let Some(sid) = session_id {
         log_checkpoint_err("exam ", progress::save_exam_checkpoint(conn, sid, index));
     }
+}
+
+/// Handles accumulating ESC sequences and navigating visualizer steps.
+///
+/// Returns `Some(())` if the key was consumed (caller should `return None`),
+/// `None` if the key was not an ESC sequence and should be processed normally.
+fn handle_esc_sequence(
+    key: u8,
+    escape_buf: &mut Vec<u8>,
+    vis_active: bool,
+    vis_step: &mut usize,
+    vis_lines: &mut usize,
+    visualizer_steps_len: usize,
+    show_vis: &mut impl FnMut(usize) -> usize,
+) -> Option<()> {
+    if !escape_buf.is_empty() {
+        escape_buf.push(key);
+        // Invalid sequence: ESC followed by something other than '[' → clear and process normally
+        if escape_buf.len() == 2 && escape_buf[1] != b'[' {
+            escape_buf.clear();
+        } else {
+            if escape_buf.len() == 3 {
+                let seq = std::mem::take(escape_buf);
+                if vis_active {
+                    let n = visualizer_steps_len;
+                    match seq.as_slice() {
+                        [0x1b, b'[', b'C'] => {
+                            *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        [0x1b, b'[', b'D'] => {
+                            *vis_step = vis_step.saturating_sub(1);
+                            print!("\x1b[{}A\x1b[J", *vis_lines);
+                            let _ = std::io::stdout().flush();
+                            *vis_lines = show_vis(*vis_step);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return Some(());
+        }
+    }
+    if key == 0x1b {
+        escape_buf.push(key);
+        return Some(());
+    }
+    None
+}
+
+/// Re-renders the full exercise screen after closing the visualizer.
+#[allow(clippy::too_many_arguments)]
+fn redisplay_piscine_exercise(
+    index: usize,
+    total: usize,
+    start: &Instant,
+    deadline: Option<std::time::Instant>,
+    chapter_ctx: Option<&crate::chapters::ChapterContext>,
+    exercise: &Exercise,
+    current_stage: Option<u8>,
+    source_path: &std::path::Path,
+) {
+    display::clear_screen();
+    show_piscine_header(index, total, start, deadline);
+    if let Some(ctx) = chapter_ctx {
+        display::show_chapter(ctx);
+        println!();
+    }
+    println!(
+        "  {} [{}/{}]  {}",
+        "Exercice".bold().green(),
+        (index + 1).to_string().bold(),
+        total,
+        exercise.title.bold(),
+    );
+    println!(
+        "  {}  {}   {}  {}   {}  {}",
+        "│".dimmed(),
+        display::difficulty_stars(exercise.difficulty),
+        "│".dimmed(),
+        exercise.subject.dimmed(),
+        "│".dimmed(),
+        match current_stage {
+            Some(s) => format!("S{s}"),
+            None => "S2".to_string(),
+        }
+        .dimmed(),
+    );
+    println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
+    println!();
+    for line in exercise.description.lines() {
+        println!("  {line}");
+    }
+    println!();
+    if let Some(kc) = &exercise.key_concept {
+        println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
+    }
+    if let Some(cm) = &exercise.common_mistake {
+        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
+    }
+    if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
+        println!();
+    }
+    display::show_watching(source_path);
+    display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true);
 }
 
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
@@ -96,6 +203,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                     "  {} Temps écoulé ! Session exam terminée.",
                     "⏰".bold().red()
                 );
+                log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
                 break;
             }
         }
@@ -126,7 +234,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 
         println!(
             "  {} [{}/{}]  {}",
-            "Exercise".bold().green(),
+            "Exercice".bold().green(),
             (index + 1).to_string().bold(),
             total,
             exercise.title.bold(),
@@ -153,7 +261,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         println!();
 
         if let Some(kc) = &exercise.key_concept {
-            println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+            println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
         }
         if let Some(cm) = &exercise.common_mistake {
             println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
@@ -168,7 +276,6 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
         let exercise_clone = exercise.clone();
-        let conn_for_watch = progress::open_db()?;
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let already_recorded = Arc::new(AtomicBool::new(false));
@@ -187,95 +294,33 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
             },
             |key| {
                 // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
-                if !escape_buf.is_empty() {
-                    escape_buf.push(key);
-                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter key normalement
-                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
-                        escape_buf.clear();
-                    } else {
-                        if escape_buf.len() == 3 {
-                            let seq = std::mem::take(&mut escape_buf);
-                            if vis_active {
-                                let n = exercise_clone.visualizer.steps.len();
-                                match seq.as_slice() {
-                                    [0x1b, b'[', b'C'] => {
-                                        // Arrow right → next step
-                                        vis_step = (vis_step + 1).min(n.saturating_sub(1));
-                                        print!("\x1b[{}A\x1b[J", vis_lines);
-                                        let _ = std::io::stdout().flush().ok();
-                                        vis_lines =
-                                            display::show_visualizer(&exercise_clone, vis_step);
-                                    }
-                                    [0x1b, b'[', b'D'] => {
-                                        // Arrow left → previous step
-                                        vis_step = vis_step.saturating_sub(1);
-                                        print!("\x1b[{}A\x1b[J", vis_lines);
-                                        let _ = std::io::stdout().flush().ok();
-                                        vis_lines =
-                                            display::show_visualizer(&exercise_clone, vis_step);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        return None;
-                    }
-                }
-                if key == 0x1b {
-                    escape_buf.push(key);
+                let ch_ctx_inner = chapters::chapter_context_at(&chapter_blocks, index);
+                if handle_esc_sequence(
+                    key,
+                    &mut escape_buf,
+                    vis_active,
+                    &mut vis_step,
+                    &mut vis_lines,
+                    exercise_clone.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                )
+                .is_some()
+                {
                     return None;
                 }
 
                 // Any non-arrow key closes the visualizer
                 if vis_active {
                     vis_active = false;
-                    display::clear_screen();
-                    // Re-display the piscine header and exercise
-                    show_piscine_header(index, total, &start_time, deadline);
-                    let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
-                    display::show_chapter(&ch_ctx);
-                    println!();
-                    println!(
-                        "  {} [{}/{}]  {}",
-                        "Exercise".bold().green(),
-                        (index + 1).to_string().bold(),
+                    redisplay_piscine_exercise(
+                        index,
                         total,
-                        exercise.title.bold(),
-                    );
-                    println!(
-                        "  {}  {}   {}  {}   {}  {}",
-                        "│".dimmed(),
-                        display::difficulty_stars(exercise.difficulty),
-                        "│".dimmed(),
-                        exercise.subject.dimmed(),
-                        "│".dimmed(),
-                        match current_stage {
-                            Some(s) => format!("S{s}"),
-                            None => "S2".to_string(),
-                        }
-                        .dimmed(),
-                    );
-                    println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
-                    println!();
-                    for line in exercise.description.lines() {
-                        println!("  {line}");
-                    }
-                    println!();
-
-                    if let Some(kc) = &exercise.key_concept {
-                        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
-                    }
-                    if let Some(cm) = &exercise.common_mistake {
-                        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-                    }
-                    if exercise.key_concept.is_some() || exercise.common_mistake.is_some() {
-                        println!();
-                    }
-
-                    display::show_watching(&source_path);
-                    display::show_keybinds_with_vis(
-                        !exercise_clone.visualizer.steps.is_empty(),
-                        true,
+                        &start_time,
+                        deadline,
+                        Some(&ch_ctx_inner),
+                        exercise,
+                        current_stage,
+                        &source_path,
                     );
                     return None;
                 }
@@ -307,7 +352,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                             fail_count = 0;
                             if !already_recorded.swap(true, Ordering::SeqCst) {
                                 crate::record_and_show(
-                                    &conn_for_watch,
+                                    &conn,
                                     &exercise_clone.subject,
                                     &exercise_clone.id,
                                     true,
@@ -385,7 +430,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     let secs = elapsed.as_secs() % 60;
 
     if done == total {
-        progress::clear_piscine_checkpoint(&conn).ok();
+        log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
     }
 
     println!();
@@ -470,6 +515,7 @@ pub fn run_exam_piscine(
                     "  {} Temps écoulé ! Session exam terminée.",
                     "⏰".bold().red()
                 );
+                log_checkpoint_err("exam ", progress::clear_exam_checkpoint(&conn));
                 break;
             }
         }
@@ -490,7 +536,7 @@ pub fn run_exam_piscine(
 
         println!(
             "  {} [{}/{}]  {}",
-            "Exercise".bold().green(),
+            "Exercice".bold().green(),
             (index + 1).to_string().bold(),
             total,
             exercise.title.bold(),
@@ -517,7 +563,7 @@ pub fn run_exam_piscine(
         println!();
 
         if let Some(kc) = &exercise.key_concept {
-            println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+            println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
         }
         if let Some(cm) = &exercise.common_mistake {
             println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
@@ -532,7 +578,6 @@ pub fn run_exam_piscine(
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
         let exercise_clone = exercise.clone();
-        let conn_for_watch = progress::open_db()?;
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let already_recorded = Arc::new(AtomicBool::new(false));
@@ -550,91 +595,31 @@ pub fn run_exam_piscine(
                 WatchAction::Continue
             },
             |key| {
-                if !escape_buf.is_empty() {
-                    escape_buf.push(key);
-                    // Séquence invalide : ESC suivi d'un octet autre que '[' → vider et traiter key normalement
-                    if escape_buf.len() == 2 && escape_buf[1] != b'[' {
-                        escape_buf.clear();
-                    } else {
-                        if escape_buf.len() == 3 {
-                            let seq = std::mem::take(&mut escape_buf);
-                            if vis_active {
-                                let n = exercise_clone.visualizer.steps.len();
-                                match seq.as_slice() {
-                                    [0x1b, b'[', b'C'] => {
-                                        vis_step = (vis_step + 1).min(n.saturating_sub(1));
-                                        print!("\x1b[{}A\x1b[J", vis_lines);
-                                        let _ = std::io::stdout().flush().ok();
-                                        vis_lines =
-                                            display::show_visualizer(&exercise_clone, vis_step);
-                                    }
-                                    [0x1b, b'[', b'D'] => {
-                                        vis_step = vis_step.saturating_sub(1);
-                                        print!("\x1b[{}A\x1b[J", vis_lines);
-                                        let _ = std::io::stdout().flush().ok();
-                                        vis_lines =
-                                            display::show_visualizer(&exercise_clone, vis_step);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        return None;
-                    }
-                }
-                if key == 0x1b {
-                    escape_buf.push(key);
+                if handle_esc_sequence(
+                    key,
+                    &mut escape_buf,
+                    vis_active,
+                    &mut vis_step,
+                    &mut vis_lines,
+                    exercise_clone.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                )
+                .is_some()
+                {
                     return None;
                 }
 
                 if vis_active {
                     vis_active = false;
-                    display::clear_screen();
-                    show_piscine_header(index, total, &start_time, deadline);
-                    // Re-afficher l'exercice
-                    println!(
-                        "  {} [{}/{}]  {}",
-                        "Exercise".bold().green(),
-                        (index + 1).to_string().bold(),
+                    redisplay_piscine_exercise(
+                        index,
                         total,
-                        exercise_clone.title.bold(),
-                    );
-                    println!(
-                        "  {}  {}   {}  {}   {}  {}",
-                        "│".dimmed(),
-                        display::difficulty_stars(exercise_clone.difficulty),
-                        "│".dimmed(),
-                        exercise_clone.subject.dimmed(),
-                        "│".dimmed(),
-                        match current_stage {
-                            Some(s) => format!("S{s}"),
-                            None => "S2".to_string(),
-                        }
-                        .dimmed(),
-                    );
-                    println!("  {}", "─".repeat(HEADER_WIDTH).dimmed());
-                    println!();
-                    for line in exercise_clone.description.lines() {
-                        println!("  {line}");
-                    }
-                    println!();
-
-                    if let Some(kc) = &exercise_clone.key_concept {
-                        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
-                    }
-                    if let Some(cm) = &exercise_clone.common_mistake {
-                        println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
-                    }
-                    if exercise_clone.key_concept.is_some()
-                        || exercise_clone.common_mistake.is_some()
-                    {
-                        println!();
-                    }
-
-                    display::show_watching(&source_for_change);
-                    display::show_keybinds_with_vis(
-                        !exercise_clone.visualizer.steps.is_empty(),
-                        true,
+                        &start_time,
+                        deadline,
+                        None,
+                        &exercise_clone,
+                        current_stage,
+                        &source_for_change,
                     );
                     return None;
                 }
@@ -665,7 +650,7 @@ pub fn run_exam_piscine(
                             fail_count = 0;
                             if !already_recorded.swap(true, Ordering::SeqCst) {
                                 crate::record_and_show(
-                                    &conn_for_watch,
+                                    &conn,
                                     &exercise_clone.subject,
                                     &exercise_clone.id,
                                     true,
@@ -736,7 +721,7 @@ pub fn run_exam_piscine(
 
     let done = completed.iter().filter(|&&c| c).count();
     if index >= total {
-        progress::clear_exam_checkpoint(&conn).ok();
+        log_checkpoint_err("exam ", progress::clear_exam_checkpoint(&conn));
     }
 
     let elapsed = start_time.elapsed();

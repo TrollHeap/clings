@@ -317,6 +317,35 @@ impl Subject {
     }
 }
 
+/// Une question d'annale NSY103 avec le mapping vers les exercices clings.
+#[derive(Debug, Deserialize)]
+pub struct AnnaleQuestion {
+    #[serde(default)]
+    pub number: u32,
+    pub points: f32,
+    pub title: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub subjects: Vec<String>,
+    #[serde(default)]
+    pub exercises: Vec<String>,
+}
+
+/// Une session d'annale (examen) NSY103/UTC502.
+/// Utilisée à la fois pour l'affichage (`clings annales`) et le mode exam simulé.
+#[derive(Debug, Deserialize)]
+pub struct AnnaleSession {
+    #[serde(default)]
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub date: String,
+    #[serde(default)]
+    pub total_points: f32,
+    pub questions: Vec<AnnaleQuestion>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

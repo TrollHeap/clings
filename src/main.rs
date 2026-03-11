@@ -224,7 +224,6 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
         let exercise_clone = exercise.clone();
-        let conn_for_watch = progress::open_db()?;
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let mut vis_active = false;
@@ -262,6 +261,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                     print!("\x1b[{}A\x1b[J", vis_lines);
                                     io::stdout().flush().ok();
                                     vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                    return None;
                                 }
                                 [0x1b, b'[', b'D'] => {
                                     // Arrow left → previous step
@@ -269,12 +269,17 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                                     print!("\x1b[{}A\x1b[J", vis_lines);
                                     io::stdout().flush().ok();
                                     vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                                    return None;
                                 }
+                                // Séquence inconnue en mode visualizer → traiter `key` normalement
                                 _ => {}
                             }
+                        } else {
+                            // Séquence inconnue hors visualizer → ignorer
+                            return None;
                         }
-                        return None;
                     } else {
+                        // Séquence incomplète (len == 2, byte = '[')
                         return None;
                     }
                 }
@@ -345,7 +350,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                             consecutive_failures = 0;
                             if !already_recorded.swap(true, Ordering::SeqCst) {
                                 record_and_show(
-                                    &conn_for_watch,
+                                    &conn,
                                     &exercise_clone.subject,
                                     &exercise_clone.id,
                                     true,
@@ -496,7 +501,7 @@ pub(crate) fn install_ctrlc_handler() {
         println!();
         std::process::exit(0);
     }) {
-        eprintln!("Warning: failed to install Ctrl-C handler: {e}");
+        eprintln!("Avertissement : échec de l'installation du gestionnaire Ctrl-C : {e}");
     }
 }
 
@@ -511,10 +516,10 @@ pub(crate) fn record_and_show(
     if success {
         match progress::record_attempt(conn, subject, exercise_id, true) {
             Ok(sub) => display::show_mastery_update(&sub, true),
-            Err(e) => eprintln!("  {} {e}", "DB Error:".red()),
+            Err(e) => eprintln!("  {} {e}", "Erreur BD :".red()),
         }
     } else if let Err(e) = progress::record_attempt(conn, subject, exercise_id, false) {
-        eprintln!("  {} {e}", "DB Error:".red());
+        eprintln!("  {} {e}", "Erreur BD :".red());
     }
 }
 
@@ -571,7 +576,7 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
     )?;
 
     if matches!(action, WatchAction::Advance) {
-        println!("  {}", "Done!".bold().green());
+        println!("  {}", "Terminé !".bold().green());
     }
 
     Ok(())
@@ -724,7 +729,7 @@ fn cmd_annales() -> Result<()> {
     let exercises_dir = exercises::resolve_exercises_dir()?;
     let map_path = exercises_dir.join("annales_map.json");
     let raw = std::fs::read_to_string(&map_path)?;
-    let annales: Vec<display::AnnaleExam> = serde_json::from_str(&raw)
+    let annales: Vec<display::AnnaleSession> = serde_json::from_str(&raw)
         .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
     let (all_exercises, _) = exercises::load_all_exercises()?;
     display::show_annales(&annales, &all_exercises);

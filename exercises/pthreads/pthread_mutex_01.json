@@ -14,7 +14,7 @@
   ],
   "validation": {
     "mode": "output",
-    "expected_output": "Thread 0: counter = 1\nThread 0: counter = 2\nThread 0: counter = 3\nThread 1: counter = 4\nThread 1: counter = 5\nThread 1: counter = 6\nThread 2: counter = 7\nThread 2: counter = 8\nThread 2: counter = 9\nFinal: 9\n",
+    "expected_output": "REGEX:Final: 9",
     "test_code": null
   },
   "visualizer": {

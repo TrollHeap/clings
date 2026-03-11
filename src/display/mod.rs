@@ -15,37 +15,16 @@ pub use stats::*;
 pub use visualizer::*;
 
 use colored::{ColoredString, Colorize};
-use serde::Deserialize;
 
 use crate::constants::HEADER_WIDTH;
 use crate::models::Difficulty;
+
+pub use crate::models::AnnaleSession;
 
 thread_local! {
     pub(super) static GCC_RE: regex::Regex = regex::Regex::new(
         r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
     ).expect("static regex pattern is valid");
-}
-
-/// Une question d'annale NSY103.
-#[derive(Debug, Deserialize)]
-pub struct AnnaleQuestion {
-    pub number: u32,
-    pub points: f32,
-    pub title: String,
-    pub summary: String,
-    pub subjects: Vec<String>,
-    /// Exercices clings spécifiquement alignés sur cette question d'examen.
-    #[serde(default)]
-    pub exercises: Vec<String>,
-}
-
-/// Un examen NSY103 avec ses questions et le mapping vers les exercices.
-#[derive(Debug, Deserialize)]
-pub struct AnnaleExam {
-    pub title: String,
-    pub date: String,
-    pub total_points: f32,
-    pub questions: Vec<AnnaleQuestion>,
 }
 
 /// Render difficulty as colored star string.

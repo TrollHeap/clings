@@ -21,7 +21,7 @@ fn render_exercise_body(exercise: &Exercise) {
     println!();
 
     if let Some(kc) = &exercise.key_concept {
-        println!("  {} {}", "💡 Key concept:".bold().cyan(), kc);
+        println!("  {} {}", "💡 Concept clé :".bold().cyan(), kc);
     }
     if let Some(cm) = &exercise.common_mistake {
         println!("  {} {}", "⚠  Piège:".bold().yellow(), cm);
@@ -30,7 +30,7 @@ fn render_exercise_body(exercise: &Exercise) {
     match exercise.validation.mode {
         ValidationMode::Test | ValidationMode::Both => {
             println!(
-                "\n  {} Test-based validation (non supporté en CLI)",
+                "\n  {} Validation par tests (non supporté en CLI)",
                 "⚠".yellow()
             );
         }
@@ -60,7 +60,7 @@ pub fn show_exercise_watch(
 
     println!(
         "  {} [{}/{}]  {}",
-        "Exercise".bold().green(),
+        "Exercice".bold().green(),
         (index + 1).to_string().bold(),
         total,
         exercise.title.bold(),
@@ -99,7 +99,7 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
 
     println!(
         "  {} [{}/{}]  {}",
-        "Exercise".bold().green(),
+        "Exercice".bold().green(),
         index + 1,
         total,
         exercise.title.bold()
@@ -121,7 +121,7 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
 pub fn show_watching(source_path: &std::path::Path) {
     println!(
         "  {} {}",
-        "✎ Editing:".bold().green(),
+        "✎ Édition :".bold().green(),
         source_path.display().to_string().bold()
     );
     println!(
@@ -140,7 +140,7 @@ pub fn show_file_saved() {
 pub fn show_edit_instructions(source_path: &std::path::Path) {
     println!(
         "  {} {}",
-        "✎ Edit:".bold().green(),
+        "✎ Édition :".bold().green(),
         source_path.display().to_string().bold()
     );
     println!("  {}", "Sauvegardez pour compiler & valider...".dimmed());

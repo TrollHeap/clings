@@ -2,7 +2,7 @@ use colored::Colorize;
 
 /// Render a keybind table from a list of (key char, description) pairs.
 fn show_keybinds_list(binds: &[(char, &str)]) {
-    print!("  {} ", "Keys".bold().cyan());
+    print!("  {} ", "Touches".bold().cyan());
     let mut first = true;
     for (key, desc) in binds {
         if !first {

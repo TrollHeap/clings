@@ -50,8 +50,8 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     println!(
         "  {:<22} {:<16} {}",
         "Sujet".bold(),
-        "Mastery".bold(),
-        "Bar".bold()
+        "Maîtrise".bold(),
+        "Barre".bold()
     );
     println!("  {}", hr().dimmed());
 

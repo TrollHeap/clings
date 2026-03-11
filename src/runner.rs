@@ -153,10 +153,10 @@ fn spawn_gcc_and_collect(
             kill_process_group(&child);
             let _ = child.wait();
             if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+                eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
             }
             if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+                eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
             }
             let elapsed = start.elapsed();
             Err(KfError::Config(format!(
@@ -168,10 +168,10 @@ fn spawn_gcc_and_collect(
             kill_process_group(&child);
             let _ = child.wait();
             if let Err(e) = stdout_thread.join() {
-                eprintln!("Warning: stdout reader thread panicked: {e:?}");
+                eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
             }
             if let Err(e) = stderr_thread.join() {
-                eprintln!("Warning: stderr reader thread panicked: {e:?}");
+                eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
             }
             Err(KfError::Io(e))
         }
@@ -184,7 +184,7 @@ fn spawn_gcc_and_collect(
 fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
     let tmp_fallback = std::path::PathBuf::from("/tmp");
     let work_dir = source_path.parent().unwrap_or_else(|| {
-        eprintln!("warning: home directory unavailable, using /tmp for work directory");
+        eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
         tmp_fallback.as_path()
     });
     let output_path = work_dir.join("kf_run_test");
@@ -325,7 +325,7 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
 
     let tmp_fallback2 = std::path::PathBuf::from("/tmp");
     let work_dir = source_path.parent().unwrap_or_else(|| {
-        eprintln!("warning: home directory unavailable, using /tmp for work directory");
+        eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
         tmp_fallback2.as_path()
     });
     let output_path = work_dir.join("kf_run");
