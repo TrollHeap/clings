@@ -14,6 +14,8 @@ pub use progress::*;
 pub use stats::*;
 pub use visualizer::*;
 
+use std::sync::OnceLock;
+
 use colored::{ColoredString, Colorize};
 
 use crate::constants::HEADER_WIDTH;
@@ -21,10 +23,13 @@ use crate::models::Difficulty;
 
 pub use crate::models::AnnaleSession;
 
-thread_local! {
-    pub(super) static GCC_RE: regex::Regex = regex::Regex::new(
-        r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$"
-    ).expect("static regex pattern is valid");
+static GCC_RE: OnceLock<regex::Regex> = OnceLock::new();
+
+pub(super) fn gcc_re() -> &'static regex::Regex {
+    GCC_RE.get_or_init(|| {
+        regex::Regex::new(r"^[^:]+:(\d+):\d+: (error|warning|note): (.+)$")
+            .expect("static regex pattern is valid")
+    })
 }
 
 /// Render difficulty as colored star string.

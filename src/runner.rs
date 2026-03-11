@@ -11,6 +11,9 @@ use crate::constants::{
 use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
 
+/// Préfixe des messages de timeout — utilisé pour la création du message et les pattern matches.
+const TIMEOUT_MSG_PREFIX: &str = "Délai d'exécution dépassé";
+
 // Per-thread cache of compiled regexes: pattern string → compiled Regex (or None if invalid).
 thread_local! {
     static REGEX_CACHE: RefCell<HashMap<String, Option<regex::Regex>>> =
@@ -94,7 +97,7 @@ fn spawn_gcc_and_collect(
     let compile_result = gcc.output().map_err(|e| {
         KfError::Io(std::io::Error::new(
             e.kind(),
-            format!("Failed to run gcc: {e}. Is gcc installed?"),
+            format!("Impossible de lancer gcc : {e}. gcc est-il installé ?"),
         ))
     })?;
 
@@ -160,7 +163,7 @@ fn spawn_gcc_and_collect(
             }
             let elapsed = start.elapsed();
             Err(KfError::Config(format!(
-                "Execution timed out ({:.1}s limit)",
+                "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
                 elapsed.as_secs_f64()
             )))
         }
@@ -192,19 +195,19 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
 
     let user_code = match std::fs::read_to_string(source_path) {
         Ok(c) => c,
-        Err(e) => return make_compile_error(format!("Failed to read source file: {e}")),
+        Err(e) => return make_compile_error(format!("Impossible de lire le fichier source : {e}")),
     };
 
     let harness = exercise.validation.test_code.as_deref().unwrap_or("");
     let combined = format!("{}\n{}", user_code, harness);
 
     if let Err(e) = std::fs::write(&test_source_path, combined.as_bytes()) {
-        return make_compile_error(format!("Failed to write test source: {e}"));
+        return make_compile_error(format!("Impossible d'écrire la source de test : {e}"));
     }
 
     // Write additional files (headers etc.)
     if let Err(e) = write_exercise_files(exercise, work_dir) {
-        return make_compile_error(format!("Failed to write exercise files: {e}"));
+        return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
     }
 
     let output_path_str = output_path.to_string_lossy().into_owned();
@@ -224,9 +227,12 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
     let start = std::time::Instant::now();
-    match spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout) {
-        Ok((stdout, stderr, status)) => {
-            let duration_ms = start.elapsed().as_millis() as u64;
+    let gcc_result = spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout);
+    dispatch_gcc_result(
+        gcc_result,
+        timeout,
+        start,
+        |stdout, stderr, status, duration_ms| {
             let exit_ok = status.success();
             let output_ok = match exercise.validation.mode {
                 ValidationMode::Both => {
@@ -264,32 +270,8 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
                 compile_error: false,
                 timeout: false,
             }
-        }
-        Err(KfError::Config(msg)) if msg.starts_with("Execution timed out") => RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: msg,
-            duration_ms: timeout.as_millis() as u64,
-            compile_error: false,
-            timeout: true,
         },
-        Err(KfError::Config(msg)) => {
-            // gcc stderr or other config error — treat as compile error if it looks like
-            // a compiler diagnostic, otherwise treat as runtime error.
-            // The only non-gcc Config errors from spawn_gcc_and_collect are internal
-            // invariant violations; treat them uniformly as compile errors.
-            make_compile_error(msg)
-        }
-        Err(KfError::Io(e)) => RunResult {
-            success: false,
-            stdout: String::new(),
-            stderr: format!("Wait error: {e}"),
-            duration_ms: start.elapsed().as_millis() as u64,
-            compile_error: false,
-            timeout: false,
-        },
-        Err(e) => make_compile_error(format!("{e}")),
-    }
+    )
 }
 
 /// Compile and run a C source file, validating output against expected.
@@ -332,7 +314,7 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
 
     // Write additional files (headers etc.)
     if let Err(e) = write_exercise_files(exercise, work_dir) {
-        return make_compile_error(format!("Failed to write exercise files: {e}"));
+        return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
     }
 
     let output_path_str = output_path.to_string_lossy().into_owned();
@@ -352,9 +334,12 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         .unwrap_or(Duration::from_secs(EXECUTION_TIMEOUT_SECS));
 
     let start = Instant::now();
-    match spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout) {
-        Ok((stdout, stderr, status)) => {
-            let duration_ms = start.elapsed().as_millis() as u64;
+    let gcc_result = spawn_gcc_and_collect(source_path, &extra_args, work_dir, timeout);
+    dispatch_gcc_result(
+        gcc_result,
+        timeout,
+        start,
+        |stdout, stderr, status, duration_ms| {
             if !status.success() {
                 return RunResult {
                     success: false,
@@ -380,18 +365,34 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
                 compile_error: false,
                 timeout: false,
             }
+        },
+    )
+}
+
+/// Dispatch le résultat de `spawn_gcc_and_collect` vers un `RunResult`.
+///
+/// Le bras `Ok` est délégué à `on_ok(stdout, stderr, status, duration_ms)` pour permettre
+/// des validations différentes entre les modes Output et Test/Both.
+/// Les bras d'erreur communs (timeout, io, config) sont traités ici.
+fn dispatch_gcc_result(
+    gcc_result: crate::error::Result<(String, String, std::process::ExitStatus)>,
+    timeout: Duration,
+    start: Instant,
+    on_ok: impl FnOnce(String, String, std::process::ExitStatus, u64) -> RunResult,
+) -> RunResult {
+    match gcc_result {
+        Ok((stdout, stderr, status)) => {
+            let duration_ms = start.elapsed().as_millis() as u64;
+            on_ok(stdout, stderr, status, duration_ms)
         }
-        Err(KfError::Config(msg)) if msg.starts_with("Execution timed out") => {
-            // Timeout — kill already handled inside spawn_gcc_and_collect
-            RunResult {
-                success: false,
-                stdout: String::new(),
-                stderr: msg,
-                duration_ms: timeout.as_millis() as u64,
-                compile_error: false,
-                timeout: true,
-            }
-        }
+        Err(KfError::Config(msg)) if msg.starts_with(TIMEOUT_MSG_PREFIX) => RunResult {
+            success: false,
+            stdout: String::new(),
+            stderr: msg,
+            duration_ms: timeout.as_millis() as u64,
+            compile_error: false,
+            timeout: true,
+        },
         Err(KfError::Config(msg)) => make_compile_error(msg),
         Err(KfError::Io(e)) => RunResult {
             success: false,

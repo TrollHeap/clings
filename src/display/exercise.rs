@@ -4,7 +4,7 @@ use crate::constants::TEXT_WRAP_WIDTH;
 use crate::models::{Exercise, ValidationMode};
 use crate::runner::RunResult;
 
-use super::{difficulty_stars, hr, show_banner, wrap_text, GCC_RE};
+use super::{difficulty_stars, gcc_re, hr, show_banner, wrap_text};
 
 /// Render the description, key_concept, common_mistake, and validation warning
 /// for an exercise — shared between watch mode and single-run mode.
@@ -154,7 +154,8 @@ pub fn show_result(result: &RunResult, exercise: &Exercise) {
     if result.compile_error {
         println!("  {} {}", "╔══".red(), "ERREUR DE COMPILATION".bold().red());
         for line in result.stderr.lines() {
-            let formatted = GCC_RE.with(|re| {
+            let formatted = {
+                let re = gcc_re();
                 if let Some(caps) = re.captures(line) {
                     let lineno = &caps[1];
                     let sev = &caps[2];
@@ -185,7 +186,7 @@ pub fn show_result(result: &RunResult, exercise: &Exercise) {
                 } else {
                     format!("  {}  {}", "║".red(), line.dimmed())
                 }
-            });
+            };
             println!("{formatted}");
         }
         println!("  {}", "╚══".red());

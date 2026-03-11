@@ -83,7 +83,7 @@ where
                 _ => {}
             },
             Ok(Err(e)) => {
-                eprintln!("Watch error: {e}");
+                eprintln!("Erreur de surveillance : {e}");
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
