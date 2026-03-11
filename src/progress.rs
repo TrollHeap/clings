@@ -263,26 +263,25 @@ fn open_test_db() -> Result<Connection> {
     Ok(conn)
 }
 
-// === Generic KV helpers ===
-
+/// Upsert a key-value pair in the `kv` table.
 fn kv_set(conn: &Connection, key: &str, value: &str) -> Result<()> {
     let mut stmt = conn.prepare_cached("INSERT OR REPLACE INTO kv (key, value) VALUES (?1, ?2)")?;
     stmt.execute(params![key, value])?;
     Ok(())
 }
 
+/// Retrieve a value from the `kv` table. Returns `None` if the key does not exist.
 fn kv_get(conn: &Connection, key: &str) -> Result<Option<String>> {
     let mut stmt = conn.prepare_cached("SELECT value FROM kv WHERE key = ?1")?;
     Ok(stmt.query_row(params![key], |row| row.get(0)).optional()?)
 }
 
+/// Delete a key from the `kv` table. Succeeds silently if the key does not exist.
 fn kv_del(conn: &Connection, key: &str) -> Result<()> {
     let mut stmt = conn.prepare_cached("DELETE FROM kv WHERE key = ?1")?;
     stmt.execute(params![key])?;
     Ok(())
 }
-
-// === Checkpoints ===
 
 /// Save piscine checkpoint (current exercise index).
 pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
