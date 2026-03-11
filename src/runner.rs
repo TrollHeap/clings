@@ -78,7 +78,11 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
 /// Reads user code from `source_path`, appends the test harness, writes to a
 /// temporary file, compiles it, and validates by exit code (and optionally stdout).
 fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
-    let work_dir = source_path.parent().unwrap_or(Path::new("/tmp"));
+    let tmp_fallback = std::path::PathBuf::from("/tmp");
+    let work_dir = source_path.parent().unwrap_or_else(|| {
+        eprintln!("warning: home directory unavailable, using /tmp for work directory");
+        tmp_fallback.as_path()
+    });
     let output_path = work_dir.join("kf_run_test");
     let test_source_path = work_dir.join("kf_test.c");
 
@@ -142,8 +146,11 @@ fn compile_and_run_test(source_path: &Path, exercise: &Exercise) -> RunResult {
         }
     };
 
-    let (stdout_thread, stderr_thread) =
-        spawn_drain_threads(child.stdout.take().unwrap(), child.stderr.take().unwrap());
+    // stdout/stderr are always Some because we spawned with Stdio::piped().
+    let (stdout_thread, stderr_thread) = spawn_drain_threads(
+        child.stdout.take().expect("stdout piped"),
+        child.stderr.take().expect("stderr piped"),
+    );
 
     let timeout = exercise
         .validation
@@ -265,7 +272,11 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         return compile_and_run_test(source_path, exercise);
     }
 
-    let work_dir = source_path.parent().unwrap_or(Path::new("/tmp"));
+    let tmp_fallback2 = std::path::PathBuf::from("/tmp");
+    let work_dir = source_path.parent().unwrap_or_else(|| {
+        eprintln!("warning: home directory unavailable, using /tmp for work directory");
+        tmp_fallback2.as_path()
+    });
     let output_path = work_dir.join("kf_run");
 
     // Write additional files (headers etc.)
@@ -324,8 +335,11 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     // Drain stdout/stderr in background threads to prevent pipe buffer deadlock.
     // If the child writes more than ~64 KB without being read, write() blocks
     // and wait() never returns (classic pipe deadlock). Reading concurrently avoids it.
-    let (stdout_thread, stderr_thread) =
-        spawn_drain_threads(child.stdout.take().unwrap(), child.stderr.take().unwrap());
+    // stdout/stderr are always Some because we spawned with Stdio::piped().
+    let (stdout_thread, stderr_thread) = spawn_drain_threads(
+        child.stdout.take().expect("stdout piped"),
+        child.stderr.take().expect("stderr piped"),
+    );
 
     let timeout = exercise
         .validation
@@ -538,16 +552,17 @@ fn spawn_drain_threads(
     std::thread::JoinHandle<String>,
     std::thread::JoinHandle<String>,
 ) {
+    const MAX_OUTPUT_BYTES: u64 = 1024 * 1024; // 1 MiB — protection contre les programmes bavards
     let stdout_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
-        let mut s = stdout;
-        std::io::Read::read_to_string(&mut s, &mut buf).ok();
+        std::io::Read::read_to_string(&mut std::io::Read::take(stdout, MAX_OUTPUT_BYTES), &mut buf)
+            .ok();
         buf
     });
     let stderr_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
-        let mut s = stderr;
-        std::io::Read::read_to_string(&mut s, &mut buf).ok();
+        std::io::Read::read_to_string(&mut std::io::Read::take(stderr, MAX_OUTPUT_BYTES), &mut buf)
+            .ok();
         buf
     });
     (stdout_thread, stderr_thread)
