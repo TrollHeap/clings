@@ -118,8 +118,8 @@ pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
 
 /// Record a practice attempt and update mastery.
 ///
-/// All three writes (ensure subject, log entry, mastery update) are wrapped in an
-/// explicit transaction so a crash mid-way never leaves the DB in an inconsistent state.
+/// All three writes (ensure subject, log entry, mastery update) are wrapped in a
+/// transaction so a crash mid-way never leaves the DB in an inconsistent state.
 pub fn record_attempt(
     conn: &Connection,
     subject: &str,
@@ -129,64 +129,51 @@ pub fn record_attempt(
     let now = Utc::now().timestamp();
     let log_id = uuid::Uuid::new_v4().to_string();
 
-    conn.execute_batch("BEGIN")?;
+    let tx = conn.unchecked_transaction()?;
 
-    let result: Result<Subject> = (|| {
-        conn.execute(
-            "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
-            params![subject],
-        )?;
+    tx.execute(
+        "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
+        params![subject],
+    )?;
 
-        conn.execute(
-            "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![log_id, subject, exercise_id, success as i32, now],
-        )?;
+    tx.execute(
+        "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![log_id, subject, exercise_id, success as i32, now],
+    )?;
 
-        let mut sub =
-            get_subject(conn, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
-        mastery::update_mastery(&mut sub, success);
+    let mut sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
+    mastery::update_mastery(&mut sub, success);
 
-        let (next_review, new_interval) =
-            mastery::compute_next_review(sub.srs_interval_days, success, now);
-        sub.next_review_at = Some(next_review);
-        sub.srs_interval_days = new_interval;
+    let (next_review, new_interval) =
+        mastery::compute_next_review(sub.srs_interval_days, success, now);
+    sub.next_review_at = Some(next_review);
+    sub.srs_interval_days = new_interval;
 
-        conn.execute(
-            "UPDATE subjects SET
-                mastery_score = ?2,
-                last_practiced_at = ?3,
-                attempts_total = ?4,
-                attempts_success = ?5,
-                difficulty_unlocked = ?6,
-                next_review_at = ?7,
-                srs_interval_days = ?8
-             WHERE name = ?1",
-            params![
-                sub.name,
-                sub.mastery_score,
-                sub.last_practiced_at,
-                sub.attempts_total,
-                sub.attempts_success,
-                sub.difficulty_unlocked,
-                sub.next_review_at,
-                sub.srs_interval_days,
-            ],
-        )?;
+    tx.execute(
+        "UPDATE subjects SET
+            mastery_score = ?2,
+            last_practiced_at = ?3,
+            attempts_total = ?4,
+            attempts_success = ?5,
+            difficulty_unlocked = ?6,
+            next_review_at = ?7,
+            srs_interval_days = ?8
+         WHERE name = ?1",
+        params![
+            sub.name,
+            sub.mastery_score,
+            sub.last_practiced_at,
+            sub.attempts_total,
+            sub.attempts_success,
+            sub.difficulty_unlocked,
+            sub.next_review_at,
+            sub.srs_interval_days,
+        ],
+    )?;
 
-        Ok(sub)
-    })();
-
-    match result {
-        Ok(sub) => {
-            conn.execute_batch("COMMIT")?;
-            Ok(sub)
-        }
-        Err(e) => {
-            conn.execute_batch("ROLLBACK").ok();
-            Err(e)
-        }
-    }
+    tx.commit()?;
+    Ok(sub)
 }
 
 /// Get a single subject.
@@ -247,28 +234,17 @@ pub fn get_streak(conn: &Connection) -> Result<i64> {
 
 /// Réinitialise la progression d'un seul sujet (mastery + logs), atomiquement.
 pub fn reset_subject(conn: &Connection, subject_name: &str) -> Result<()> {
-    conn.execute_batch("BEGIN")?;
-    let result: Result<()> = (|| {
-        conn.execute(
-            "DELETE FROM subjects WHERE name = ?1",
-            params![subject_name],
-        )?;
-        conn.execute(
-            "DELETE FROM practice_log WHERE subject = ?1",
-            params![subject_name],
-        )?;
-        Ok(())
-    })();
-    match result {
-        Ok(()) => {
-            conn.execute_batch("COMMIT")?;
-            Ok(())
-        }
-        Err(e) => {
-            conn.execute_batch("ROLLBACK").ok();
-            Err(e)
-        }
-    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "DELETE FROM subjects WHERE name = ?1",
+        params![subject_name],
+    )?;
+    tx.execute(
+        "DELETE FROM practice_log WHERE subject = ?1",
+        params![subject_name],
+    )?;
+    tx.commit()?;
+    Ok(())
 }
 
 /// Reset all progress: removes every row from `practice_log` and `subjects`.
