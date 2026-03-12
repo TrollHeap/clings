@@ -20,6 +20,7 @@ pub enum WatchAction {
     /// Continue watching for changes
     Continue,
     /// User wants to skip
+    #[allow(dead_code)]
     Skip,
     /// User wants to quit
     Quit,

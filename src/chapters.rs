@@ -198,6 +198,7 @@ pub struct ChapterContext {
 }
 
 /// Get chapter context for a given exercise index in the flattened list.
+#[allow(dead_code)]
 pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> ChapterContext {
     let mut offset = 0;
     for block in blocks {
