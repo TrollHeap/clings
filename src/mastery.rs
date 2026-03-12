@@ -70,6 +70,7 @@ pub fn apply_decay(subject: &mut Subject) {
 /// Estime le nombre de jours avant le prochain review à partir du score de maîtrise.
 /// Utilisé pour l'affichage post-validation en mode review.
 /// Formule : round(mastery * interval_multiplier), borné entre base et max.
+#[allow(dead_code)]
 pub(crate) fn next_interval_days(mastery: f32) -> u32 {
     let cfg = &crate::config::get().srs;
     let raw = (mastery as f64 * cfg.interval_multiplier).round() as i64;

@@ -5,7 +5,6 @@ mod chapters;
 mod commands;
 pub mod config;
 pub mod constants;
-mod display;
 mod error;
 mod exam;
 mod exercises;
@@ -213,60 +212,5 @@ fn main() {
     if let Err(e) = result {
         eprintln!("{} {e}", "Erreur:".bold().red());
         std::process::exit(1);
-    }
-}
-
-/// RAII guard that restores crossterm raw mode on drop.
-struct RawModeGuard;
-
-impl RawModeGuard {
-    fn enable() -> Option<Self> {
-        crossterm::terminal::enable_raw_mode().ok().map(|_| {
-            // crossterm::enable_raw_mode() calls cfmakeraw() which clears OPOST|ONLCR.
-            // Restore output processing so println! still emits \r\n in raw mode.
-            #[cfg(unix)]
-            {
-                use std::os::unix::io::AsRawFd;
-                let fd = std::io::stdout().as_raw_fd();
-                unsafe {
-                    let mut t: libc::termios = std::mem::zeroed();
-                    if libc::tcgetattr(fd, &mut t) == 0 {
-                        t.c_oflag |= libc::OPOST | libc::ONLCR;
-                        let _ = libc::tcsetattr(fd, libc::TCSANOW, &t);
-                    }
-                }
-            }
-            Self
-        })
-    }
-}
-
-impl Drop for RawModeGuard {
-    fn drop(&mut self) {
-        let _ = crossterm::terminal::disable_raw_mode();
-    }
-}
-
-/// Enable terminal raw mode for single-key input.
-/// Returns a guard that restores the terminal on drop.
-pub(crate) fn enable_raw_mode() -> Option<RawModeGuard> {
-    RawModeGuard::enable()
-}
-
-/// Record a practice attempt and display the mastery update.
-/// On failure, only logs the attempt (no mastery display).
-pub(crate) fn record_and_show(
-    conn: &rusqlite::Connection,
-    subject: &str,
-    exercise_id: &str,
-    success: bool,
-) {
-    if success {
-        match progress::record_attempt(conn, subject, exercise_id, true) {
-            Ok(sub) => display::show_mastery_update(&sub, true),
-            Err(e) => eprintln!("  {} {e}", "Erreur BD :".red()),
-        }
-    } else if let Err(e) = progress::record_attempt(conn, subject, exercise_id, false) {
-        eprintln!("  {} {e}", "Erreur BD :".red());
     }
 }

@@ -2,7 +2,6 @@
 
 use colored::Colorize;
 
-use crate::display;
 use crate::error::{KfError, Result};
 use crate::exercises;
 use crate::models::{AnnaleQuestion, AnnaleSession};
@@ -89,10 +88,9 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     // 5. Afficher l'introduction
     println!();
     println!(
-        "  {}",
-        display::header_box(&format!(" EXAM SIMULÉ — {} ", session.title))
-            .bold()
-            .cyan()
+        "  {} EXAM SIMULÉ — {}",
+        "▶".bold().cyan(),
+        session.title.bold().cyan()
     );
     println!();
     println!(

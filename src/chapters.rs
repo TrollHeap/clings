@@ -184,6 +184,7 @@ pub fn flatten_chapters<'a>(blocks: &[ChapterBlock<'a>]) -> Vec<&'a Exercise> {
 }
 
 /// Informations de position d'un exercice dans sa progression par chapitre.
+#[allow(dead_code)]
 pub struct ChapterContext {
     /// Numéro du chapitre courant
     pub chapter_number: u8,

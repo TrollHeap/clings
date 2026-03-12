@@ -6,5 +6,6 @@ pub mod ui_annales;
 pub mod ui_exam_selector;
 pub mod ui_list;
 pub mod ui_piscine;
+pub mod ui_run;
 pub mod ui_stats;
 pub mod ui_watch;
