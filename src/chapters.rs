@@ -1,3 +1,5 @@
+//! NSY103 chapter definitions and curriculum-based exercise ordering.
+
 use crate::models::{Exercise, Subject};
 
 /// A chapter in the NSY103 learning path.

@@ -1,10 +1,14 @@
+//! TUI display for annales — past exam session selector and question mapping.
+
 use std::io::Read;
 
 use colored::Colorize;
 
 use crate::models::Exercise;
 
-use super::{hr, show_banner, AnnaleSession};
+use crate::constants::ANSI_CLEAR_SCREEN;
+
+use super::{hr, show_banner, try_parse_arrow, AnnaleSession, ArrowKey};
 
 /// Affiche les annales NSY103 avec le mapping vers les exercices clings.
 pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
@@ -103,7 +107,7 @@ pub fn select_exam_session(
 
     loop {
         // Clear screen and redraw
-        print!("\x1b[2J\x1b[H");
+        print!("{ANSI_CLEAR_SCREEN}");
         println!();
         println!("  {}", "Sélectionner une session d'exam".bold().cyan());
         println!(
@@ -140,7 +144,7 @@ pub fn select_exam_session(
         let byte = buf[0];
 
         // Accumulate ESC sequences
-        if byte == 0x1b {
+        if byte == crate::constants::ANSI_ESC_BYTE {
             esc_buf.clear();
             esc_buf.push(byte);
             // Try to read 2 more bytes with a short non-blocking window
@@ -152,13 +156,10 @@ pub fn select_exam_session(
                     esc_buf.push(b3[0]);
                 }
             }
-            // Arrow up: ESC [ A
-            if esc_buf == [0x1b, b'[', b'A'] {
-                cursor = cursor.saturating_sub(1);
-            }
-            // Arrow down: ESC [ B
-            if esc_buf == [0x1b, b'[', b'B'] && cursor + 1 < sessions.len() {
-                cursor += 1;
+            match try_parse_arrow(&esc_buf) {
+                Some(ArrowKey::Up) => cursor = cursor.saturating_sub(1),
+                Some(ArrowKey::Down) if cursor + 1 < sessions.len() => cursor += 1,
+                _ => {}
             }
             esc_buf.clear();
             continue;
@@ -172,11 +173,11 @@ pub fn select_exam_session(
                 }
             }
             b'\r' | b'\n' => {
-                print!("\x1b[2J\x1b[H");
+                print!("{ANSI_CLEAR_SCREEN}");
                 return Some(sessions[cursor].id.clone());
             }
             b'q' | b'Q' => {
-                print!("\x1b[2J\x1b[H");
+                print!("{ANSI_CLEAR_SCREEN}");
                 return None;
             }
             _ => {}

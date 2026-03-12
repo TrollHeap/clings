@@ -18,8 +18,17 @@ fn is_valid_executable(bin: &str) -> bool {
     if path.is_absolute() {
         return path.is_file();
     }
-    Command::new("which")
-        .arg(bin)
+    // Reject names with characters that could inject into a shell command.
+    if !bin
+        .chars()
+        .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return false;
+    }
+    // Use the POSIX shell builtin `command -v` with a positional argument ($1)
+    // so `bin` is never interpolated into the shell command string — no injection possible.
+    Command::new("sh")
+        .args(["-c", "command -v \"$1\"", "--", bin])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -59,6 +68,15 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
 
     let editor = resolve_editor();
     let pane_width = crate::config::get().ui.tmux_pane_width.to_string();
+    // Split editor string into binary + extra args so that editors like "nvim -u init.lua"
+    // are passed to tmux as separate tokens, not as a single arg.
+    let editor_parts: Vec<&str> = editor.split_whitespace().collect();
+    let (editor_bin, editor_args) = editor_parts.split_first()?;
+    // Reject any arg that contains shell-special characters to prevent injection.
+    let safe_chars = |c: char| c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '=');
+    if editor_args.iter().any(|a| !a.chars().all(safe_chars)) {
+        return None;
+    }
     let output = Command::new("tmux")
         .args([
             "split-window",
@@ -68,9 +86,10 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
             "-P",
             "-F",
             "#{pane_id}",
-            &editor,
-            "--",
         ])
+        .arg(editor_bin)
+        .args(editor_args)
+        .arg("--")
         .arg(file)
         .output()
         .ok()?;

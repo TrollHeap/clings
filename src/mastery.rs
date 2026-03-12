@@ -8,12 +8,11 @@ use chrono::Utc;
 
 use crate::constants::{
     DIFFICULTY_2_UNLOCK, DIFFICULTY_3_UNLOCK, DIFFICULTY_4_UNLOCK, DIFFICULTY_5_UNLOCK,
-    MASTERY_FAILURE_DELTA, MASTERY_SUCCESS_DELTA,
+    MASTERY_FAILURE_DELTA, MASTERY_SUCCESS_DELTA, SECS_PER_DAY,
 };
 use crate::models::{MasteryScore, Subject};
 
 const DECAY_AMOUNT: f64 = 0.5;
-const SECS_PER_DAY: i64 = 86_400;
 
 /// Retourne le delta de score correspondant à un succès ou un échec.
 pub fn mastery_delta(success: bool) -> f64 {
@@ -55,7 +54,7 @@ pub fn apply_decay(subject: &mut Subject) {
     };
 
     let now = Utc::now().timestamp();
-    let days_since = ((now - last_epoch) / SECS_PER_DAY).max(0);
+    let days_since = (now.saturating_sub(last_epoch) / SECS_PER_DAY).max(0);
     let decay_days = crate::config::get().srs.decay_days;
 
     if days_since >= decay_days {
@@ -177,7 +176,7 @@ mod tests {
         // SRS_INTERVAL_MULTIPLIER = 2.5 : round(1 * 2.5) = 3
         let (next, interval) = compute_next_review(1, true, 1_000_000);
         assert_eq!(interval, 3);
-        assert_eq!(next, 1_000_000 + 3 * 86400);
+        assert_eq!(next, 1_000_000 + 3 * SECS_PER_DAY);
     }
 
     #[test]

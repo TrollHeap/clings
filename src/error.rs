@@ -1,3 +1,5 @@
+//! Application error type (`KfError`) and crate-level `Result` alias.
+
 use thiserror::Error;
 
 /// Erreurs applicatives de clings.

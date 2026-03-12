@@ -1,3 +1,5 @@
+//! TUI display for a single exercise — title, description, hints, and run results.
+
 use colored::Colorize;
 
 use crate::constants::TEXT_WRAP_WIDTH;

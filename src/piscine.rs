@@ -1,13 +1,15 @@
+//! Piscine mode — linear progression through all exercises with checkpoint persistence.
+
 use std::time::Instant;
 
 use colored::Colorize;
 
 use crate::chapters;
-use crate::constants::{HEADER_WIDTH, SUCCESS_PAUSE_SECS};
+use crate::constants::{
+    CTRL_C, CTRL_Z, HEADER_WIDTH, MSG_EXERCISE_SOLVED_ADVANCING, MSG_PRESS_KEY_RETURN,
+    PISCINE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS,
+};
 use crate::display::handle_esc_sequence;
-
-const CTRL_C: u8 = 0x03;
-const CTRL_Z: u8 = 0x1a;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::watcher::WatchAction;
@@ -250,7 +252,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                             }
                             Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
                         }
-                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
+                        println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
                         None
                     }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
@@ -270,16 +272,13 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                                     true,
                                 );
                             }
-                            println!(
-                                "  {}",
-                                "Exercice résolu ! Avancement dans 2s...".bold().green()
-                            );
+                            println!("  {}", MSG_EXERCISE_SOLVED_ADVANCING.bold().green());
                             std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                             return Some(WatchAction::Advance);
                         }
                         if !result.compile_error {
                             fail_count += 1;
-                            if fail_count >= 2 {
+                            if fail_count >= PISCINE_FAILURE_THRESHOLD {
                                 if let Some(cm) = &exercise.common_mistake {
                                     println!(
                                         "  {} {}",
@@ -519,7 +518,7 @@ pub fn run_exam_piscine(
                             }
                             Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
                         }
-                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
+                        println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
                         None
                     }
                     b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
@@ -539,16 +538,13 @@ pub fn run_exam_piscine(
                                     true,
                                 );
                             }
-                            println!(
-                                "  {}",
-                                "Exercice résolu ! Avancement dans 2s...".bold().green()
-                            );
+                            println!("  {}", MSG_EXERCISE_SOLVED_ADVANCING.bold().green());
                             std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                             return Some(WatchAction::Advance);
                         }
                         if !result.compile_error {
                             fail_count += 1;
-                            if fail_count >= 2 {
+                            if fail_count >= PISCINE_FAILURE_THRESHOLD {
                                 if let Some(cm) = &exercise.common_mistake {
                                     println!(
                                         "  {} {}",
@@ -593,7 +589,8 @@ pub fn run_exam_piscine(
                 save_exam_checkpoint(&conn, session_id, index);
                 break;
             }
-            WatchAction::Continue => continue,
+            // Ne pas sauvegarder le checkpoint sur un simple événement fichier
+            WatchAction::Continue => {}
         }
         save_exam_checkpoint(&conn, session_id, index);
     }

@@ -2,6 +2,7 @@
 
 // === Timing ===
 pub const EXECUTION_TIMEOUT_SECS: u64 = 10;
+pub const SECS_PER_DAY: i64 = 86_400;
 pub const POLL_INTERVAL_MS: u64 = 50;
 pub const DEBOUNCE_INTERVAL_MS: u64 = 200;
 pub const KEY_CHECK_TIMEOUT_MS: u64 = 50;
@@ -34,6 +35,8 @@ pub const PROGRESS_HR_WIDTH: usize = 58;
 // === Display thresholds ===
 pub const MINIMAP_MAX_ITEMS: usize = 60;
 pub const CONSECUTIVE_FAILURE_THRESHOLD: usize = 3;
+/// Seuil de piscine/exam : plus bas car la progression est linéaire sans navigation libre.
+pub const PISCINE_FAILURE_THRESHOLD: u32 = 2;
 pub const MASTERY_BAR_GREEN_THRESHOLD: f64 = 4.0;
 pub const MASTERY_BAR_YELLOW_THRESHOLD: f64 = 2.0;
 pub const STATS_TOP_SUBJECTS_COUNT: usize = 5;
@@ -59,3 +62,20 @@ pub const DB_USER_VERSION_CURRENT: i32 = 1;
 // === tmux ===
 pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";
 pub const TMUX_EDITOR: &str = "nvim";
+
+// === Keyboard control bytes ===
+pub const CTRL_C: u8 = 0x03;
+pub const CTRL_Z: u8 = 0x1a;
+pub const ANSI_ESC_BYTE: u8 = 0x1b;
+
+// === ANSI escape sequences ===
+pub const ANSI_CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";
+
+// === UI messages ===
+pub const MSG_PRESS_KEY_RETURN: &str = "Appuyez sur une touche pour revenir...";
+pub const MSG_EXERCISE_SOLVED_ADVANCING: &str = "Exercice résolu ! Avancement dans 2s...";
+
+// === Test harness output tokens ===
+pub const TEST_SUMMARY_TESTS: &str = "Tests";
+pub const TEST_SUMMARY_FAILURES: &str = "Failures";
+pub const TEST_SUMMARY_IGNORED: &str = "Ignored";

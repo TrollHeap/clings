@@ -1,3 +1,5 @@
+//! CLI entry point — parses subcommands and dispatches to clings modules.
+
 mod authoring;
 mod chapters;
 pub mod config;
@@ -20,7 +22,10 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
-use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
+use crate::constants::{
+    CONSECUTIVE_FAILURE_THRESHOLD, CTRL_C, CTRL_Z, MSG_EXERCISE_SOLVED_ADVANCING,
+    MSG_PRESS_KEY_RETURN, SECS_PER_DAY, SUCCESS_PAUSE_SECS,
+};
 use crate::error::{KfError, Result};
 use crate::watcher::WatchAction;
 
@@ -245,6 +250,22 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
     // Enable raw mode for keyboard input if possible
     let _raw_guard = enable_raw_mode();
 
+    // Pre-compute next_review_days from already-loaded subjects to avoid N+1 DB queries.
+    let now_ts = chrono::Utc::now().timestamp();
+    let review_map: std::collections::HashMap<&str, Option<i64>> = subjects
+        .iter()
+        .map(|s| {
+            (
+                s.name.as_str(),
+                s.next_review_at.map(|ts| (ts - now_ts) / SECS_PER_DAY),
+            )
+        })
+        .collect();
+
+    // Pre-build id→exercise map for O(1) prerequisite lookups inside the watch loop.
+    let exercise_by_id: std::collections::HashMap<&str, &crate::models::Exercise> =
+        all_exercises.iter().map(|e| (e.id.as_str(), e)).collect();
+
     let mut index = 0;
     while index < total {
         let exercise = exercise_order[index];
@@ -254,16 +275,12 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 
         // Display exercise
         let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
-        let next_review = progress::get_next_review_days(&conn, &exercise.subject).unwrap_or(None);
+        let next_review = review_map.get(exercise.subject.as_str()).copied().flatten();
         let unmet_prereqs: Vec<String> = exercise
             .prerequisites
             .iter()
             .filter_map(|pid| {
-                let subj = all_exercises
-                    .iter()
-                    .find(|e| &e.id == pid)?
-                    .subject
-                    .as_str();
+                let subj = exercise_by_id.get(pid.as_str())?.subject.as_str();
                 let mastery = *mastery_map.get(subj).unwrap_or(&0.0);
                 (mastery < 2.0).then(|| pid.clone())
             })
@@ -287,7 +304,6 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         // Open/update neovim pane in tmux
         editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
 
-        let exercise_clone = exercise.clone();
         let source_for_change = source_path.clone();
         let mut hint_shown = false;
         let mut vis_active = false;
@@ -302,11 +318,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
             // On file change: notify only, no auto-compile
             || {
                 display::show_file_saved();
-                display::show_keybinds_with_vis(
-                    !exercise_clone.visualizer.steps.is_empty(),
-                    false,
-                    true,
-                );
+                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false, true);
                 WatchAction::Continue
             },
             // On keyboard input
@@ -318,8 +330,8 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     vis_active,
                     &mut vis_step,
                     &mut vis_lines,
-                    exercise_clone.visualizer.steps.len(),
-                    &mut |step| display::show_visualizer(&exercise_clone, step),
+                    exercise.visualizer.steps.len(),
+                    &mut |step| display::show_visualizer(exercise, step),
                 )
                 .is_some()
                 {
@@ -330,7 +342,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                 if vis_active {
                     vis_active = false;
                     display::show_exercise_watch(
-                        &exercise_clone,
+                        exercise,
                         index,
                         total,
                         &completed,
@@ -338,7 +350,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                         &watch_meta,
                     );
                     display::show_keybinds_with_vis(
-                        !exercise_clone.visualizer.steps.is_empty(),
+                        !exercise.visualizer.steps.is_empty(),
                         false,
                         true,
                     );
@@ -347,17 +359,17 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 
                 match key {
                     b'v' | b'V' => {
-                        if !exercise_clone.visualizer.steps.is_empty() {
+                        if !exercise.visualizer.steps.is_empty() {
                             vis_step = 0;
                             vis_active = true;
-                            vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                            vis_lines = display::show_visualizer(exercise, vis_step);
                         }
                         None
                     }
                     b'h' | b'H' => {
                         if !hint_shown {
                             println!();
-                            display::show_hints(&exercise_clone);
+                            display::show_hints(exercise);
                             hint_shown = true;
                         }
                         None
@@ -365,55 +377,40 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     b'n' | b'N' => Some(WatchAction::Skip),
                     b'j' | b'J' => Some(WatchAction::Next),
                     b'k' | b'K' => Some(WatchAction::Prev),
-                    b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                    b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
                     b'l' | b'L' => {
                         // Quick exercise list — reuse subjects already loaded at session start
-                        match exercises::load_all_exercises() {
-                            Ok((all, _)) => {
-                                display::show_exercise_list(&all, &subjects, None, None)
-                            }
-                            // Dégradation gracieuse : échec de rechargement des exercices,
-                            // on reste sur l'exercice courant.
-                            Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
-                        }
-                        println!("  {}", "Appuyez sur une touche pour revenir...".dimmed());
+                        display::show_exercise_list(&all_exercises, &subjects, None, None);
+                        println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
                         None
                     }
                     b'r' | b'R' => {
                         // Explicit run: compile and check now
-                        let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-                        display::show_result(&result, &exercise_clone);
+                        let result = runner::compile_and_run(&source_for_change, exercise);
+                        display::show_result(&result, exercise);
                         if result.success {
                             consecutive_failures = 0;
                             if !already_recorded {
                                 already_recorded = true;
-                                record_and_show(
-                                    &conn,
-                                    &exercise_clone.subject,
-                                    &exercise_clone.id,
-                                    true,
-                                );
+                                record_and_show(&conn, &exercise.subject, &exercise.id, true);
                             }
-                            println!(
-                                "  {}",
-                                "Exercice résolu ! Avancement dans 2s...".bold().green()
-                            );
+                            println!("  {}", MSG_EXERCISE_SOLVED_ADVANCING.bold().green());
                             std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
                             return Some(WatchAction::Advance);
                         }
                         consecutive_failures += 1;
                         if consecutive_failures >= CONSECUTIVE_FAILURE_THRESHOLD as u32
-                            && !exercise_clone.hints.is_empty()
+                            && !exercise.hints.is_empty()
                         {
                             println!();
                             println!(
                                 "  {}",
                                 "Indice automatique après 3 tentatives :".dimmed().yellow()
                             );
-                            display::show_hints(&exercise_clone);
+                            display::show_hints(exercise);
                         }
                         display::show_keybinds_with_vis(
-                            !exercise_clone.visualizer.steps.is_empty(),
+                            !exercise.visualizer.steps.is_empty(),
                             false,
                             true,
                         );
@@ -603,7 +600,7 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
 
     display::show_edit_instructions(&source_path);
     display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), false, false);
-    let exercise_clone = exercise.clone();
+    let exercise = exercise.clone();
     let source_for_change = source_path.clone();
 
     let mut vis_active = false;
@@ -614,17 +611,17 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
     let action = watcher::watch_file_interactive(
         &source_path,
         || {
-            let result = runner::compile_and_run(&source_for_change, &exercise_clone);
-            display::show_result(&result, &exercise_clone);
+            let result = runner::compile_and_run(&source_for_change, &exercise);
+            display::show_result(&result, &exercise);
 
             if result.success {
-                record_and_show(&conn, &exercise_clone.subject, &exercise_clone.id, true);
+                record_and_show(&conn, &exercise.subject, &exercise.id, true);
                 println!("  {}", "Exercice résolu !".bold().green());
                 return WatchAction::Advance;
             }
 
             if !result.compile_error {
-                record_and_show(&conn, &exercise_clone.subject, &exercise_clone.id, false);
+                record_and_show(&conn, &exercise.subject, &exercise.id, false);
             }
 
             println!("  {}", "En attente de la prochaine sauvegarde...".dimmed());
@@ -637,8 +634,8 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
                 vis_active,
                 &mut vis_step,
                 &mut vis_lines,
-                exercise_clone.visualizer.steps.len(),
-                &mut |step| display::show_visualizer(&exercise_clone, step),
+                exercise.visualizer.steps.len(),
+                &mut |step| display::show_visualizer(&exercise, step),
             )
             .is_some()
             {
@@ -647,9 +644,9 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
 
             if vis_active {
                 vis_active = false;
-                display::show_exercise(&exercise_clone, 0, 1);
+                display::show_exercise(&exercise, 0, 1);
                 display::show_keybinds_with_vis(
-                    !exercise_clone.visualizer.steps.is_empty(),
+                    !exercise.visualizer.steps.is_empty(),
                     false,
                     false,
                 );
@@ -657,13 +654,13 @@ fn cmd_run(exercise_id: &str) -> Result<()> {
             }
 
             match key {
-                b'v' | b'V' if !exercise_clone.visualizer.steps.is_empty() => {
+                b'v' | b'V' if !exercise.visualizer.steps.is_empty() => {
                     vis_step = 0;
                     vis_active = true;
-                    vis_lines = display::show_visualizer(&exercise_clone, vis_step);
+                    vis_lines = display::show_visualizer(&exercise, vis_step);
                     None
                 }
-                b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
+                b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
                 _ => None,
             }
         },
@@ -741,20 +738,31 @@ fn cmd_review() -> Result<()> {
     let subject_map: std::collections::HashMap<&str, &crate::models::Subject> =
         subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
+    // Pre-build O(1) lookup maps for the review loop.
+    let exercise_by_id: std::collections::HashMap<&str, &crate::models::Exercise> =
+        all_exercises.iter().map(|e| (e.id.as_str(), e)).collect();
+    let mut exercise_by_subject: std::collections::HashMap<&str, &crate::models::Exercise> =
+        std::collections::HashMap::new();
+    for e in &all_exercises {
+        exercise_by_subject.entry(e.subject.as_str()).or_insert(e);
+    }
+
     // For each due subject, prefer the weakest exercise (by exercise_scores); fallback to first
-    let weakest_by_subject = progress::get_all_weakest_exercises(&conn).unwrap_or_default();
+    let weakest_by_subject = progress::get_all_weakest_exercises(&conn).unwrap_or_else(|e| {
+        eprintln!("  [clings] avertissement : weakest_exercises indisponible : {e}");
+        std::collections::HashMap::new()
+    });
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
         .filter_map(|subject_name| {
             // Prioritise the exercise with the lowest success rate for this subject.
-            let weakest_id = weakest_by_subject.get(subject_name.as_str()).cloned();
-            if let Some(ref id) = weakest_id {
-                if let Some(ex) = all_exercises.iter().find(|e| &e.id == id) {
-                    return Some(ex);
+            if let Some(id) = weakest_by_subject.get(subject_name.as_str()) {
+                if let Some(ex) = exercise_by_id.get(id.as_str()) {
+                    return Some(*ex);
                 }
             }
             // Fallback: first exercise belonging to this subject
-            all_exercises.iter().find(|e| &e.subject == subject_name)
+            exercise_by_subject.get(subject_name.as_str()).copied()
         })
         .collect();
 
@@ -856,7 +864,10 @@ fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
 fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
     let json = std::fs::read_to_string(input)?;
     let mut conn = progress::open_db()?;
-    let count = progress::import_progress(&mut conn, &json, overwrite)?;
+    let (count, warnings) = progress::import_progress(&mut conn, &json, overwrite)?;
+    for w in &warnings {
+        eprintln!("  {} {}", "⚠".yellow(), w);
+    }
     display::show_import_done(count, overwrite);
     Ok(())
 }

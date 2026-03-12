@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.5.0] — 2026-03-12
+
+### Sécurité
+- `tmux.rs` : `is_valid_executable()` utilise désormais des arguments positionnels (`sh -c "command -v \"$1\"" -- bin`) au lieu d'une interpolation directe — élimine le vecteur d'injection shell
+- `tmux.rs` : validation des arguments éditeur (EDITOR/VISUAL) — filtre les caractères dangereux (`'`, `"`, `;`, `|`, `&`, etc.) avant passage à tmux
+
+### Performance
+- `display/mod.rs` : `wrap_text()` utilise `std::mem::take()` au lieu de `.clone()` — zéro allocation supplémentaire par ligne
+- `progress.rs` : `get_streak()` plafonnée à `LIMIT 365` — évite de charger tout l'historique
+- `runner.rs` : `test_code` passé comme `&str` (`.as_str()`) au lieu de cloné
+- `main.rs` : variable `exercise_clone` supprimée dans la boucle watch — `&Exercise` utilisé directement
+- `main.rs` : lookup O(1) via HashMap dans `cmd_review` — `.cloned()` inutile supprimé
+
+### DRY
+- `constants.rs` : `SECS_PER_DAY`, `ANSI_ESC_BYTE`, `ANSI_CLEAR_SCREEN` centralisés
+- `display/mod.rs` : `ArrowKey` enum + `try_parse_arrow()` — déduplication de la détection touches fléchées (visualizer + annales)
+- `display/mod.rs` : `color_pct()` helper — coloration verte/jaune/rouge centralisée
+- `display/stats.rs` : `avg_mastery()` extraite comme fonction privée réutilisable
+- `display/keybinds.rs` : `show_keybinds_list()` privée supprimée, inlinée dans `show_keybinds_with_vis()`
+
+### Conventions
+- `progress.rs` : `import_progress()` retourne `(usize, Vec<String>)` — les avertissements de clamping sont désormais surfacés à l'utilisateur lors de `clings import`
+- `display/stats.rs` : `avg_mastery()` protégée contre la division par zéro sur slice vide
+
 ## [2.4.0] — 2026-03-12
 
 ### Fonctionnalités

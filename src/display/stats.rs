@@ -1,7 +1,16 @@
+//! Statistics display — global practice summary and top-5 subjects.
+
 use colored::Colorize;
 
 use crate::constants::STATS_TOP_SUBJECTS_COUNT;
 use crate::models::Subject;
+
+fn avg_mastery(subjects: &[Subject]) -> f64 {
+    if subjects.is_empty() {
+        return 0.0;
+    }
+    subjects.iter().map(|s| s.mastery_score.get()).sum::<f64>() / subjects.len() as f64
+}
 
 use super::{footer_box, header_box, hr, mastery_bar, show_banner};
 
@@ -56,8 +65,7 @@ pub fn show_stats_detailed(
         return;
     }
 
-    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score.get()).sum();
-    let avg = total_mastery / subjects.len() as f64;
+    let avg = avg_mastery(subjects);
     println!(
         "  {} {}",
         "Maîtrise moyenne:".bold().cyan(),
@@ -124,8 +132,7 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
         return;
     }
 
-    let total_mastery: f64 = subjects.iter().map(|s| s.mastery_score.get()).sum();
-    let avg = total_mastery / subjects.len() as f64;
+    let avg = avg_mastery(subjects);
     println!(
         "  {} {}",
         "Maîtrise moyenne:".bold().cyan(),

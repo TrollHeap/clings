@@ -154,6 +154,66 @@ Tous les exercices lus montrent:
 - Niveaux de difficulté appropriés au contenu
 - `exercise_type: "complete"` uniformément (complétion de code)
 
+## 9. Full-audit remediation findings (2026-03-12)
+
+### Stack
+Rust 2021, rusqlite 0.38, clap 4, notify 8, colored 3, serde_json 1, libc 0.2, thiserror 2
+
+### Fonctions réutilisables
+
+| Fonction | Fichier:ligne | Notes |
+|---|---|---|
+| `OnceLock<regex::Regex>` pattern | `src/display/mod.rs:31-38` | Pattern canonique static regex |
+| `thread_local! REGEX_CACHE` | `src/runner.rs:~240` | Correct, aucune modif |
+| `params![] + prepare_cached` | `src/progress.rs` partout | Convention rusqlite |
+| `conn.unchecked_transaction()` | `src/progress.rs` | Pattern transaction existant |
+
+### SECURITY
+
+**S1 — `is_valid_executable()` PATH injection** (`src/tmux.rs:16-26`)
+- `Command::new("which").arg(bin)` — bin vient d'env var non validée
+- Fix: si absolu → `Path::new(bin).is_file()` ; sinon → valider `[a-zA-Z0-9_.-]` puis `sh -c "command -v NAME"`
+
+**S2 — `editor_args` non validés** (`src/tmux.rs:64-77`)
+- args splittés depuis `EDITOR`/`VISUAL`, passés à tmux
+- Fix: valider chaque arg — caractères sûrs uniquement
+
+### PERFORMANCE
+
+**P1 — `get_streak()` sans LIMIT** (`src/progress.rs:243-247`)
+- `SELECT DISTINCT date... ORDER BY day DESC` — sans LIMIT, charge toute la table
+- Fix: ajouter `LIMIT 365`
+
+**P2 — `test_code.clone()` inutile** (`src/runner.rs:276`)
+- `Some(c) => c.clone()` — `&String` → clone inutile
+- Fix: `c.as_str()` avec type `&str`
+
+**P3 — `exercise_clone = exercise.clone()` dans watch loop** (`src/main.rs:307`)
+- `exercise` est déjà `&Exercise` — clone complet inutile
+- Fix: supprimer, utiliser `exercise` directement dans closures
+
+### DRY
+
+**D1 — Magic number `86400` / `86_400`**
+- `src/progress.rs:470` (prod), lignes `782, 825, 843, 853, 867, 882` (tests), `src/main.rs:261`
+- Fix: `pub const SECS_PER_DAY: i64 = 86_400;` dans `src/constants.rs`
+
+**D2 — `avg_mastery` dupliqué** (`src/display/stats.rs:61-62` et `130-131`)
+- Même 2-ligne dupliquée dans `show_stats_detailed` et `show_stats`
+- Fix: `pub(super) fn avg_mastery(subjects: &[Subject]) -> f64`
+
+### CONVENTIONS
+
+**C1 — Stub `ValidationMode::Test/Both` sans commentaire** (`src/runner.rs`)
+- Skip silencieux — ajouter `// NOTE:` explicatif (pas un TODO)
+
+### Patterns à respecter
+- Error handling: `thiserror` + `KfError` + `Result<T>` alias dans `src/error.rs`
+- Imports: `use crate::constants::NOM_CONSTANTE;`
+- Tests: `#[cfg(test)] mod tests` en fin de fichier
+
+---
+
 ## 8. Qualité du code (audit 2026-03-10)
 
 ### Couverture API docs

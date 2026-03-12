@@ -1,3 +1,5 @@
+//! Core data types: `Exercise`, `Subject`, `ValidationMode`, and supporting enums.
+
 use serde::{Deserialize, Serialize};
 
 /// Niveau de difficulté d'un exercice, de 1 (Facile) à 5 (Expert).
