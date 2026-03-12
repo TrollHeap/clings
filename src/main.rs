@@ -16,6 +16,7 @@ mod progress;
 mod runner;
 mod search;
 mod tmux;
+mod tui;
 mod watcher;
 
 use std::path::PathBuf;
