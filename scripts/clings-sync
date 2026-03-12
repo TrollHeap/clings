@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# clings-sync — synchronise la progression clings via un repo git dotfiles
+#
+# Usage:
+#   clings-sync push   # export + git commit + git push
+#   clings-sync pull   # git pull + import (merge max mastery)
+#
+# Configuration (variables d'environnement) :
+#   CLINGS_DOTFILES   — chemin vers le repo git dotfiles (obligatoire)
+#   CLINGS_SYNC_FILE  — nom du fichier JSON dans le repo (défaut: clings-progress.json)
+#
+# Exemple .bashrc / .zshrc :
+#   export CLINGS_DOTFILES=~/dotfiles
+
+set -Eeuo pipefail
+
+# ─── Configuration ────────────────────────────────────────────────────────────
+
+CLINGS_SYNC_FILE="${CLINGS_SYNC_FILE:-clings-progress.json}"
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+err() { echo "clings-sync: erreur: $*" >&2; }
+die() { err "$*"; exit 1; }
+info() { echo "clings-sync: $*"; }
+
+usage() {
+    cat >&2 <<EOF
+Usage: clings-sync <commande>
+
+Commandes:
+  push   Exporte la progression et la pousse vers le repo dotfiles
+  pull   Tire le repo dotfiles et importe la progression
+  watch  Surveille progress.db et pousse automatiquement après chaque changement
+
+Variables d'environnement:
+  CLINGS_DOTFILES   Chemin vers le repo git dotfiles (obligatoire)
+  CLINGS_SYNC_FILE  Nom du fichier JSON (défaut: clings-progress.json)
+
+Exemple:
+  export CLINGS_DOTFILES=~/dotfiles
+  clings-sync push
+  clings-sync pull
+  clings-sync watch
+EOF
+    exit 1
+}
+
+check_deps() {
+    local missing=()
+    for cmd in clings git; do
+        command -v "$cmd" &>/dev/null || missing+=("$cmd")
+    done
+    [[ ${#missing[@]} -eq 0 ]] || die "commande(s) introuvable(s) dans le PATH: ${missing[*]}"
+}
+
+check_watch_deps() {
+    command -v inotifywait &>/dev/null \
+        || die "inotifywait introuvable — installer inotify-tools (ex: dnf install inotify-tools)"
+}
+
+check_dotfiles_repo() {
+    : "${CLINGS_DOTFILES:?La variable CLINGS_DOTFILES doit être définie (ex: export CLINGS_DOTFILES=~/dotfiles)}"
+    [[ -d "$CLINGS_DOTFILES" ]] || die "CLINGS_DOTFILES n'est pas un répertoire: $CLINGS_DOTFILES"
+    git -C "$CLINGS_DOTFILES" rev-parse --git-dir &>/dev/null \
+        || die "CLINGS_DOTFILES n'est pas un repo git valide: $CLINGS_DOTFILES"
+}
+
+# ─── Sous-commandes ───────────────────────────────────────────────────────────
+
+cmd_push() {
+    check_dotfiles_repo
+
+    local sync_path="$CLINGS_DOTFILES/$CLINGS_SYNC_FILE"
+
+    info "export → $sync_path"
+    clings export --output "$sync_path"
+
+    git -C "$CLINGS_DOTFILES" add "$CLINGS_SYNC_FILE"
+
+    if git -C "$CLINGS_DOTFILES" diff --cached --quiet; then
+        info "aucun changement à commiter"
+        return 0
+    fi
+
+    local timestamp
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    local last_subject
+    last_subject=$(git -C "$CLINGS_DOTFILES" log -1 --format="%s" 2>/dev/null || true)
+
+    if [[ "$last_subject" == clings:\ sync\ progress* ]]; then
+        git -C "$CLINGS_DOTFILES" commit --amend --no-edit
+        info "push vers origin (amend)..."
+        git -C "$CLINGS_DOTFILES" push --force-with-lease
+    else
+        git -C "$CLINGS_DOTFILES" commit -m "clings: sync progress $timestamp"
+        info "push vers origin..."
+        git -C "$CLINGS_DOTFILES" push
+    fi
+
+    info "push terminé"
+}
+
+cmd_pull() {
+    check_dotfiles_repo
+
+    local sync_path="$CLINGS_DOTFILES/$CLINGS_SYNC_FILE"
+
+    info "pull depuis origin..."
+    git -C "$CLINGS_DOTFILES" pull --ff-only
+
+    [[ -f "$sync_path" ]] \
+        || die "fichier de progression introuvable après pull: $sync_path"
+
+    info "import depuis $sync_path (merge max mastery)"
+    clings import "$sync_path"
+
+    info "pull terminé"
+}
+
+cmd_watch() {
+    check_dotfiles_repo
+    check_watch_deps
+
+    local db_path="${HOME}/.clings/progress.db"
+    [[ -f "$db_path" ]] || die "base de données introuvable: $db_path (lancer clings au moins une fois)"
+
+    info "surveillance de $db_path (Ctrl+C pour arrêter)"
+    while inotifywait -e close_write -q "$db_path" 2>/dev/null; do
+        info "changement détecté, push dans 5s..."
+        sleep 5
+        cmd_push
+    done
+}
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+check_deps
+
+case "${1:-}" in
+    push)      cmd_push ;;
+    pull)      cmd_pull ;;
+    watch)     cmd_watch ;;
+    -h|--help) usage ;;
+    *)         usage ;;
+esac

@@ -1,4 +1,4 @@
-.PHONY: build release dev install-release install dev-link watch list progress review stats test lint fmt clean help
+.PHONY: build release dev install-release install-sync install dev-link watch list progress review stats test lint fmt clean help
 
 CARGO_RUN = cargo run --
 
@@ -14,7 +14,11 @@ install-release:
 	cargo build --release
 	cargo install --path .
 
-install: install-release
+install-sync:
+	install -Dm755 scripts/clings-sync ~/.local/bin/clings-sync
+	@echo "clings-sync → ~/.local/bin/clings-sync"
+
+install: install-release install-sync
 
 dev-link:
 	mkdir -p ~/.local/bin
@@ -56,7 +60,8 @@ help:
 	@echo "  release         — cargo build --release"
 	@echo "  dev             — build debug + symlink clings-dev"
 	@echo "  install-release — build release + installe dans ~/.cargo/bin/"
-	@echo "  install         — alias → install-release"
+	@echo "  install-sync    — installe scripts/clings-sync dans ~/.local/bin/"
+	@echo "  install         — install-release + install-sync"
 	@echo "  dev-link        — symlink clings-dev → target/debug/clings"
 	@echo "  watch     — kf watch (mode exercice par défaut)"
 	@echo "  list      — kf list"
