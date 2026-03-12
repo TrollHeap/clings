@@ -3,7 +3,7 @@
 use colored::Colorize;
 
 use crate::error::{KfError, Result};
-use crate::{display, exercises, progress, search};
+use crate::{exercises, progress, search};
 
 pub fn cmd_list(filter_subject: Option<&str>, filter_due: bool) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
@@ -28,7 +28,25 @@ pub fn cmd_hint(exercise_id: &str) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let exercise = exercises::find_exercise(&all_exercises, exercise_id)
         .ok_or_else(|| KfError::ExerciseNotFound(exercise_id.to_string()))?;
-    display::show_hints(exercise);
+
+    println!();
+    println!(
+        "  {} — {}",
+        "Indices".bold().cyan(),
+        exercise.title.bold().green()
+    );
+    println!();
+    for (i, hint) in exercise.hints.iter().enumerate() {
+        println!(
+            "  {} Indice {} :\n",
+            (i + 1).to_string().bold(),
+            (i + 1).to_string().bold()
+        );
+        for line in hint.lines() {
+            println!("      {}", line.dimmed());
+        }
+        println!();
+    }
     Ok(())
 }
 
@@ -51,7 +69,19 @@ pub fn cmd_solution(exercise_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    display::show_solution(exercise);
+    println!();
+    println!(
+        "  {} — {}",
+        "Solution".bold().cyan(),
+        exercise.title.bold().green()
+    );
+    println!();
+    println!("  Code solution :");
+    println!();
+    for line in exercise.solution_code.lines() {
+        println!("      {}", line);
+    }
+    println!();
     Ok(())
 }
 
@@ -68,11 +98,43 @@ pub fn cmd_search(query: &str, filter_subject: Option<&str>) -> Result<()> {
 
     let results = search::search_exercises(&all_exercises, query, filter_subject);
     if results.is_empty() {
-        println!("Aucun exercice trouvé pour « {query} ».");
+        println!("  {} Aucun exercice trouvé pour « {query} ».", "✗".dimmed());
     } else {
-        let matched: Vec<crate::models::Exercise> =
-            results.iter().map(|(ex, _)| (*ex).clone()).collect();
-        display::show_exercise_list(&matched, &subjects, None, None);
+        println!();
+        println!(
+            "  {} {} résultats trouvé(s) pour « {query} »",
+            "🔍".cyan(),
+            results.len().to_string().bold()
+        );
+        println!();
+
+        // Build subject map for mastery score display
+        let subject_map: std::collections::HashMap<&str, &crate::models::Subject> =
+            subjects.iter().map(|s| (s.name.as_str(), s)).collect();
+
+        for (i, (exercise, _score)) in results.iter().enumerate() {
+            let mastery = subject_map
+                .get(exercise.subject.as_str())
+                .map(|s| s.mastery_score.get())
+                .unwrap_or(0.0);
+            let diff_stars = match exercise.difficulty {
+                crate::models::Difficulty::Easy => "★☆☆☆☆".green(),
+                crate::models::Difficulty::Medium => "★★☆☆☆".yellow(),
+                crate::models::Difficulty::Hard => "★★★☆☆".red(),
+                crate::models::Difficulty::Advanced => "★★★★☆".magenta(),
+                crate::models::Difficulty::Expert => "★★★★★".cyan(),
+            };
+
+            println!(
+                "  {} [{}] {} | {} | {}",
+                (i + 1).to_string().bold(),
+                exercise.id.yellow(),
+                exercise.title.bold().green(),
+                diff_stars,
+                format!("{:.1}/5.0", mastery).dimmed()
+            );
+        }
+        println!();
     }
     Ok(())
 }

@@ -6,7 +6,7 @@ use std::io::Write;
 use colored::Colorize;
 
 use crate::error::{KfError, Result};
-use crate::{authoring, config, display, exercises, progress};
+use crate::{authoring, config, exercises, progress};
 
 pub fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
     let conn = progress::open_db()?;
@@ -16,11 +16,15 @@ pub fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
     match output {
         Some(path) => {
             std::fs::write(path, &json)?;
-            display::show_export_done(Some(path), count);
+            println!(
+                "  {} {count} sujet(s) exporté(s) vers {}",
+                "✓".bold().green(),
+                path.display()
+            );
         }
         None => {
             print!("{json}");
-            display::show_export_done(None, count);
+            println!("  {} {count} sujet(s) affiché(s).", "✓".bold().green());
         }
     }
     Ok(())
@@ -33,7 +37,17 @@ pub fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
     for w in &warnings {
         eprintln!("  {} {}", "⚠".yellow(), w);
     }
-    display::show_import_done(count, overwrite);
+    if overwrite {
+        println!(
+            "  {} {count} sujet(s) importé(s) (mode remplacement).",
+            "✓".bold().green()
+        );
+    } else {
+        println!(
+            "  {} {count} sujet(s) importé(s) (mode fusion).",
+            "✓".bold().green()
+        );
+    }
     Ok(())
 }
 
@@ -97,8 +111,13 @@ pub fn cmd_new(
     // ── Mode --validate-only ──────────────────────────────────────────────
     if let Some(path) = validate_only {
         let errors = authoring::validate_exercise(path);
-        display::show_authoring_result(path, &errors);
-        if !errors.is_empty() {
+        if errors.is_empty() {
+            println!("  {} Validation réussie.", "✓".bold().green());
+        } else {
+            eprintln!("  {} Erreurs de validation :", "✗".bold().red());
+            for err in &errors {
+                eprintln!("    {} {}", "•".dimmed(), err);
+            }
             return Err(KfError::Config("validation échouée".to_string()));
         }
         return Ok(());

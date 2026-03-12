@@ -1,20 +1,18 @@
 //! Commandes de progression — progress et stats.
 
 use crate::error::Result;
-use crate::{display, progress};
+use crate::progress;
 
 pub fn cmd_progress(subject: Option<&str>) -> Result<()> {
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;
     if let Some(s) = subject {
-        let scores = progress::get_exercise_scores(&conn, s)?;
-        display::show_exercise_scores(s, &scores);
+        let _scores = progress::get_exercise_scores(&conn, s)?;
+        crate::tui::ui_list::run_list(&[], &[], Some(s), None)
     } else {
         let subjects = progress::get_all_subjects(&conn)?;
-        let streak = progress::get_streak(&conn)?;
-        display::show_progress(&subjects, streak);
+        crate::tui::ui_stats::run_stats(&subjects, 0, None, None)
     }
-    Ok(())
 }
 
 pub fn cmd_stats(detailed: bool) -> Result<()> {
