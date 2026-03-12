@@ -3,3 +3,4 @@ target/
 docs/
 log.txt
 output.txt
+.worktrees/
