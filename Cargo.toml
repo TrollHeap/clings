@@ -25,7 +25,7 @@ libc = "0.2"
 ctrlc = "3"
 thiserror = "2"
 regex = "1"
-toml = "0.8"
+toml = "1"
 
 [profile.release]
 lto = "thin"          # Link-time optimization (thin = bon compromis vitesse/taille)
