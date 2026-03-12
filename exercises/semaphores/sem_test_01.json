@@ -1,0 +1,25 @@
+{
+  "id": "sem-test-01",
+  "subject": "semaphores",
+  "lang": "c",
+  "difficulty": 3,
+  "title": "Sémaphores POSIX : init, wait, post, destroy",
+  "description": "Implémentez trois fonctions utilitaires autour des sémaphores POSIX (unnamed) :\n- `int sem_counter(sem_t *s)` — retourne la valeur courante du sémaphore via `sem_getvalue`.\n- `int sem_down_n(sem_t *s, int n)` — effectue `n` appels à `sem_wait` et retourne 0 en cas de succès, -1 en cas d'erreur.\n- `int sem_up_n(sem_t *s, int n)` — effectue `n` appels à `sem_post` et retourne 0 en cas de succès, -1 en cas d'erreur.",
+  "starter_code": "#include <stdio.h>\n#include <semaphore.h>\n\n/* Retourne la valeur courante du sémaphore s via sem_getvalue. */\nint sem_counter(sem_t *s) {\n    /* TODO */\n    return -1;\n}\n\n/* Appelle sem_wait n fois sur s. Retourne 0 si tout réussit, -1 sinon. */\nint sem_down_n(sem_t *s, int n) {\n    /* TODO */\n    return -1;\n}\n\n/* Appelle sem_post n fois sur s. Retourne 0 si tout réussit, -1 sinon. */\nint sem_up_n(sem_t *s, int n) {\n    /* TODO */\n    return -1;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <semaphore.h>\n\nint sem_counter(sem_t *s) {\n    int val;\n    if (sem_getvalue(s, &val) != 0) return -1;\n    return val;\n}\n\nint sem_down_n(sem_t *s, int n) {\n    for (int i = 0; i < n; i++) {\n        if (sem_wait(s) != 0) return -1;\n    }\n    return 0;\n}\n\nint sem_up_n(sem_t *s, int n) {\n    for (int i = 0; i < n; i++) {\n        if (sem_post(s) != 0) return -1;\n    }\n    return 0;\n}\n",
+  "hints": [
+    "`sem_getvalue(sem_t *sem, int *sval)` écrit la valeur courante dans `*sval` et retourne 0 en cas de succès.",
+    "Pour sem_down_n : une boucle `for (int i = 0; i < n; i++) sem_wait(s);` suffit. Vérifiez le code de retour de chaque appel.",
+    "sem_post incrémente le compteur ; sem_wait le décrémente (bloque si 0). Initialisez le sémaphore avec `sem_init(&s, 0, valeur_initiale)`."
+  ],
+  "validation": {
+    "mode": "test",
+    "test_code": "void test_sem_counter_initial(void) {\n    sem_t s;\n    sem_init(&s, 0, 3);\n    TEST_ASSERT_EQUAL_INT(3, sem_counter(&s));\n    sem_destroy(&s);\n}\n\nvoid test_sem_up_increments(void) {\n    sem_t s;\n    sem_init(&s, 0, 0);\n    TEST_ASSERT_EQUAL_INT(0, sem_up_n(&s, 4));\n    TEST_ASSERT_EQUAL_INT(4, sem_counter(&s));\n    sem_destroy(&s);\n}\n\nvoid test_sem_down_decrements(void) {\n    sem_t s;\n    sem_init(&s, 0, 5);\n    TEST_ASSERT_EQUAL_INT(0, sem_down_n(&s, 3));\n    TEST_ASSERT_EQUAL_INT(2, sem_counter(&s));\n    sem_destroy(&s);\n}\n\nvoid test_sem_up_then_down(void) {\n    sem_t s;\n    sem_init(&s, 0, 0);\n    sem_up_n(&s, 6);\n    sem_down_n(&s, 6);\n    TEST_ASSERT_EQUAL_INT(0, sem_counter(&s));\n    sem_destroy(&s);\n}\n\nvoid test_sem_counter_after_post(void) {\n    sem_t s;\n    sem_init(&s, 0, 1);\n    sem_post(&s);\n    sem_post(&s);\n    TEST_ASSERT_EQUAL_INT(3, sem_counter(&s));\n    sem_destroy(&s);\n}\n\nint main(void) {\n    RUN_TEST(test_sem_counter_initial);\n    RUN_TEST(test_sem_up_increments);\n    RUN_TEST(test_sem_down_decrements);\n    RUN_TEST(test_sem_up_then_down);\n    RUN_TEST(test_sem_counter_after_post);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+  },
+  "key_concept": "Les sémaphores POSIX (unnamed) s'utilisent avec sem_init / sem_wait / sem_post / sem_destroy. sem_getvalue lit la valeur sans bloquer.",
+  "common_mistake": "Appeler sem_wait sur un sémaphore à 0 bloque indéfiniment — utiliser sem_trywait pour un essai non-bloquant, ou s'assurer que la valeur initiale est suffisante.",
+  "exercise_type": "complete",
+  "prerequisites": [],
+  "files": [],
+  "kc_ids": ["sem-init", "sem-wait", "sem-post", "sem-getvalue"]
+}

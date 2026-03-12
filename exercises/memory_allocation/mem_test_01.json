@@ -1,0 +1,25 @@
+{
+  "id": "mem-test-01",
+  "subject": "memory_allocation",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "malloc / realloc / free — tableau dynamique",
+  "description": "Implémentez trois fonctions :\n- `int *alloc_ints(int n)` — alloue un tableau de `n` entiers initialisés à zéro et le retourne (NULL si n ≤ 0).\n- `int *grow_ints(int *arr, int old_n, int new_n)` — agrandit le tableau via `realloc` et initialise les nouvelles cases à zéro.\n- `void free_ints(int *arr)` — libère la mémoire.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* Alloue n entiers initialisés à 0. Retourne NULL si n <= 0. */\nint *alloc_ints(int n) {\n    /* TODO */\n    return NULL;\n}\n\n/* Agrandit arr de old_n à new_n éléments.\n * Les nouvelles cases sont initialisées à 0. */\nint *grow_ints(int *arr, int old_n, int new_n) {\n    /* TODO */\n    return NULL;\n}\n\n/* Libère la mémoire allouée par alloc_ints / grow_ints. */\nvoid free_ints(int *arr) {\n    /* TODO */\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_ints(int n) {\n    if (n <= 0) return NULL;\n    int *arr = malloc((size_t)n * sizeof(int));\n    if (arr) memset(arr, 0, (size_t)n * sizeof(int));\n    return arr;\n}\n\nint *grow_ints(int *arr, int old_n, int new_n) {\n    int *new_arr = realloc(arr, (size_t)new_n * sizeof(int));\n    if (!new_arr) return NULL;\n    if (new_n > old_n)\n        memset(new_arr + old_n, 0, (size_t)(new_n - old_n) * sizeof(int));\n    return new_arr;\n}\n\nvoid free_ints(int *arr) {\n    free(arr);\n}\n",
+  "hints": [
+    "Utilisez `malloc(n * sizeof(int))` puis `memset` pour initialiser à zéro, ou `calloc(n, sizeof(int))` directement.",
+    "Pour grow_ints : `realloc` peut déplacer le bloc — utilisez le pointeur retourné, pas l'ancien. Initialisez les cases `[old_n, new_n)` avec `memset`.",
+    "free_ints appelle simplement `free(arr)` — passer NULL à free est valide en C."
+  ],
+  "validation": {
+    "mode": "test",
+    "test_code": "void test_alloc_returns_non_null(void) {\n    int *arr = alloc_ints(5);\n    TEST_ASSERT_NOT_NULL(arr);\n    free_ints(arr);\n}\n\nvoid test_alloc_zero_initialized(void) {\n    int *arr = alloc_ints(4);\n    TEST_ASSERT_NOT_NULL(arr);\n    TEST_ASSERT_EQUAL_INT(0, arr[0]);\n    TEST_ASSERT_EQUAL_INT(0, arr[3]);\n    free_ints(arr);\n}\n\nvoid test_alloc_invalid(void) {\n    TEST_ASSERT_NULL(alloc_ints(0));\n    TEST_ASSERT_NULL(alloc_ints(-1));\n}\n\nvoid test_grow_preserves_data(void) {\n    int *arr = alloc_ints(3);\n    TEST_ASSERT_NOT_NULL(arr);\n    arr[0] = 10; arr[1] = 20; arr[2] = 30;\n    arr = grow_ints(arr, 3, 6);\n    TEST_ASSERT_NOT_NULL(arr);\n    TEST_ASSERT_EQUAL_INT(10, arr[0]);\n    TEST_ASSERT_EQUAL_INT(20, arr[1]);\n    TEST_ASSERT_EQUAL_INT(30, arr[2]);\n    free_ints(arr);\n}\n\nvoid test_grow_new_cells_zero(void) {\n    int *arr = alloc_ints(2);\n    TEST_ASSERT_NOT_NULL(arr);\n    arr[0] = 1; arr[1] = 2;\n    arr = grow_ints(arr, 2, 5);\n    TEST_ASSERT_NOT_NULL(arr);\n    TEST_ASSERT_EQUAL_INT(0, arr[2]);\n    TEST_ASSERT_EQUAL_INT(0, arr[3]);\n    TEST_ASSERT_EQUAL_INT(0, arr[4]);\n    free_ints(arr);\n}\n\nint main(void) {\n    RUN_TEST(test_alloc_returns_non_null);\n    RUN_TEST(test_alloc_zero_initialized);\n    RUN_TEST(test_alloc_invalid);\n    RUN_TEST(test_grow_preserves_data);\n    RUN_TEST(test_grow_new_cells_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+  },
+  "key_concept": "`malloc` alloue de la mémoire non initialisée ; `calloc` ou `memset` l'initialise à zéro. `realloc` peut déplacer le bloc : toujours utiliser le pointeur retourné.",
+  "common_mistake": "Oublier de vérifier que malloc/realloc ne retourne pas NULL, ou réutiliser l'ancien pointeur après realloc (double-free / use-after-free si realloc déplace le bloc).",
+  "exercise_type": "complete",
+  "prerequisites": [],
+  "files": [],
+  "kc_ids": ["malloc", "realloc", "free", "memset"]
+}

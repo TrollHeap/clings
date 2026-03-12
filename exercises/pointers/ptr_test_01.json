@@ -1,0 +1,24 @@
+{
+  "id": "ptr-test-01",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Arithmétique de pointeurs — validation par tests",
+  "description": "Implémentez la fonction `int sum_array(int *arr, int n)` qui retourne la somme des éléments d'un tableau en utilisant l'arithmétique de pointeurs (pas d'accès par index).",
+  "starter_code": "#include <stdio.h>\n\n/* Retourne la somme des n éléments pointés par arr.\n * Utilisez uniquement l'arithmétique de pointeurs (ptr++, *ptr…). */\nint sum_array(int *arr, int n) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint sum_array(int *arr, int n) {\n    int sum = 0;\n    int *end = arr + n;\n    for (int *p = arr; p < end; p++) {\n        sum += *p;\n    }\n    return sum;\n}\n",
+  "hints": [
+    "Utilisez un pointeur `p` qui commence à `arr` et s'arrête à `arr + n`.",
+    "La boucle : `for (int *p = arr; p < arr + n; p++) { sum += *p; }`"
+  ],
+  "validation": {
+    "mode": "test",
+    "test_code": "void test_sum_empty(void) {\n    int arr[] = {0};\n    TEST_ASSERT_EQUAL_INT(0, sum_array(arr, 0));\n}\n\nvoid test_sum_single(void) {\n    int arr[] = {42};\n    TEST_ASSERT_EQUAL_INT(42, sum_array(arr, 1));\n}\n\nvoid test_sum_multiple(void) {\n    int arr[] = {1, 2, 3, 4, 5};\n    TEST_ASSERT_EQUAL_INT(15, sum_array(arr, 5));\n}\n\nvoid test_sum_negative(void) {\n    int arr[] = {-3, 7, -2};\n    TEST_ASSERT_EQUAL_INT(2, sum_array(arr, 3));\n}\n\nint main(void) {\n    RUN_TEST(test_sum_empty);\n    RUN_TEST(test_sum_single);\n    RUN_TEST(test_sum_multiple);\n    RUN_TEST(test_sum_negative);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+  },
+  "key_concept": "L'arithmétique de pointeurs permet de parcourir un tableau sans index : `p++` avance d'un `sizeof(int)` en mémoire.",
+  "common_mistake": "Oublier que `arr + n` est un pointeur passé la fin — déréférencer ce pointeur est UB.",
+  "exercise_type": "complete",
+  "prerequisites": [],
+  "files": [],
+  "kc_ids": ["ptr-arith", "ptr-deref"]
+}
