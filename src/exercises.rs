@@ -1,6 +1,6 @@
 //! Exercise loader — discovers and parses JSON exercise files.
 //!
-//! Resolution order: `CLINGS_EXERCISES` env var → binary ancestors → CWD.
+//! Resolution order: `CLINGS_EXERCISES` env var → embedded binary data.
 //! Each exercise is a JSON file under `exercises/<subject>/`.
 //! Also loads `annales_map.json` for past exam mappings.
 
@@ -10,6 +10,11 @@ use std::path::{Path, PathBuf};
 use crate::constants::EXERCISES_ENV_VAR;
 use crate::error::{KfError, Result};
 use crate::models::Exercise;
+
+/// Exercises embedded at compile time from the `exercises/` directory.
+#[derive(rust_embed::RustEmbed)]
+#[folder = "exercises/"]
+struct EmbeddedExercises;
 
 /// Ensemble d'exercices : liste complète + index par sujet (indices dans le Vec).
 pub type ExerciseSet = (Vec<Exercise>, HashMap<String, Vec<usize>>);
@@ -97,24 +102,78 @@ pub fn resolve_exercises_dir() -> Result<PathBuf> {
     ))
 }
 
-/// Charge tous les exercices JSON depuis le répertoire résolu, groupés par sujet.
-/// Retourne une erreur si aucun exercice n'est trouvé.
-pub fn load_all_exercises() -> Result<ExerciseSet> {
-    let dir = resolve_exercises_dir()?;
-    let exercises = load_exercises_from_dir(&dir);
-    if exercises.is_empty() {
-        return Err(KfError::Config(format!(
-            "No exercises found in {}",
-            dir.display()
-        )));
-    }
-
+/// Build a subject → indices map from a slice of exercises.
+fn build_subject_index(exercises: &[Exercise]) -> HashMap<String, Vec<usize>> {
     let mut by_subject: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, ex) in exercises.iter().enumerate() {
         by_subject.entry(ex.subject.clone()).or_default().push(i);
     }
+    by_subject
+}
 
+/// Charge tous les exercices JSON.
+/// - Si `CLINGS_EXERCISES` est défini : charge depuis le système de fichiers (comportement authoring).
+/// - Sinon : charge depuis les données embarquées dans le binaire.
+pub fn load_all_exercises() -> Result<ExerciseSet> {
+    if std::env::var(EXERCISES_ENV_VAR).is_ok() {
+        let dir = resolve_exercises_dir()?;
+        let exercises = load_exercises_from_dir(&dir);
+        if exercises.is_empty() {
+            return Err(KfError::Config(format!(
+                "No exercises found in {}",
+                dir.display()
+            )));
+        }
+        let by_subject = build_subject_index(&exercises);
+        return Ok((exercises, by_subject));
+    }
+
+    let mut exercises = Vec::new();
+    for path in EmbeddedExercises::iter() {
+        let p = path.as_ref();
+        if !p.ends_with(".json") {
+            continue;
+        }
+        let filename = std::path::Path::new(p)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("");
+        if filename == "annales_map.json" || filename == "kc_error_map.json" {
+            continue;
+        }
+        let file = EmbeddedExercises::get(p).unwrap();
+        let text = std::str::from_utf8(file.data.as_ref())
+            .map_err(|e| KfError::Config(format!("UTF-8 invalide {p}: {e}")))?;
+        match serde_json::from_str::<Exercise>(text) {
+            Ok(ex) => exercises.push(ex),
+            Err(e) => eprintln!("Avertissement : {p} ignoré ({e})"),
+        }
+    }
+
+    if exercises.is_empty() {
+        return Err(KfError::Config(
+            "Aucun exercice embarqué trouvé dans le binaire.".to_string(),
+        ));
+    }
+    let by_subject = build_subject_index(&exercises);
     Ok((exercises, by_subject))
+}
+
+/// Charge le fichier `annales_map.json`.
+/// - Si `CLINGS_EXERCISES` est défini : lit depuis le système de fichiers.
+/// - Sinon : charge depuis les données embarquées.
+pub fn load_annales_map() -> Result<Vec<crate::models::AnnaleSession>> {
+    if std::env::var(EXERCISES_ENV_VAR).is_ok() {
+        let dir = resolve_exercises_dir()?;
+        let raw = std::fs::read_to_string(dir.join("annales_map.json"))?;
+        return serde_json::from_str(&raw)
+            .map_err(|e| KfError::Config(format!("annales_map.json: {e}")));
+    }
+    let file = EmbeddedExercises::get("annales_map.json")
+        .ok_or_else(|| KfError::Config("annales_map.json non trouvé dans le binaire".into()))?;
+    let text = std::str::from_utf8(file.data.as_ref())
+        .map_err(|e| KfError::Config(format!("annales_map.json UTF-8: {e}")))?;
+    serde_json::from_str(text).map_err(|e| KfError::Config(format!("annales_map.json: {e}")))
 }
 
 /// Recherche un exercice par identifiant exact dans la liste fournie.

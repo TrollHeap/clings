@@ -1,14 +1,13 @@
 //! File watcher and keyboard input handler for watch mode.
 //!
 //! Uses the `notify` crate with 200ms debounce for file change detection.
-//! A separate stdin thread reads keyboard input. Returns `WatchAction` variants.
+//! Keyboard input is handled via crossterm `event::poll`. Returns `WatchAction` variants.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crossterm::event::{Event, KeyEvent};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::constants::{DEBOUNCE_INTERVAL_MS, KEY_CHECK_TIMEOUT_MS};
@@ -32,7 +31,7 @@ pub enum WatchAction {
 
 /// Watch a file for modifications while also listening for keyboard commands.
 /// The `on_change` callback is called on each file save.
-/// The `on_key` callback is called when a key is pressed (non-blocking).
+/// The `on_key` callback is called when a key is pressed.
 pub fn watch_file_interactive<F, K>(
     path: &Path,
     mut on_change: F,
@@ -40,7 +39,7 @@ pub fn watch_file_interactive<F, K>(
 ) -> Result<WatchAction>
 where
     F: FnMut() -> WatchAction,
-    K: FnMut(u8) -> Option<WatchAction>,
+    K: FnMut(KeyEvent) -> Option<WatchAction>,
 {
     let (tx, rx) = mpsc::channel();
 
@@ -48,40 +47,20 @@ where
 
     watcher.watch(path, RecursiveMode::NonRecursive)?;
 
-    // Set up non-blocking stdin
-    let (key_tx, key_rx) = mpsc::channel();
-    let stop = Arc::new(AtomicBool::new(false));
-    let stop_clone = Arc::clone(&stop);
-    let stdin_thread = std::thread::spawn(move || {
-        use std::io::Read;
-        let stdin = std::io::stdin();
-        let mut buf = [0u8; 1];
-        loop {
-            if stop_clone.load(Ordering::Acquire) {
-                break;
-            }
-            if stdin.lock().read_exact(&mut buf).is_err() {
-                break;
-            }
-            if key_tx.send(buf[0]).is_err() {
-                break;
-            }
-        }
-    });
-
     let mut last_event = Instant::now();
     let debounce = Duration::from_millis(DEBOUNCE_INTERVAL_MS);
+    let key_timeout = Duration::from_millis(KEY_CHECK_TIMEOUT_MS);
 
-    let result = loop {
-        // Check for file changes
-        match rx.recv_timeout(Duration::from_millis(KEY_CHECK_TIMEOUT_MS)) {
+    loop {
+        // Check for file changes (non-blocking)
+        match rx.try_recv() {
             Ok(Ok(event)) => match event.kind {
                 EventKind::Modify(_) | EventKind::Create(_) => {
                     if last_event.elapsed() >= debounce {
                         last_event = Instant::now();
                         match on_change() {
                             WatchAction::Continue => {}
-                            action => break Ok(action),
+                            action => return Ok(action),
                         }
                     }
                 }
@@ -90,25 +69,19 @@ where
             Ok(Err(e)) => {
                 eprintln!("Erreur de surveillance : {e}");
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                break Err(KfError::Config("File watcher disconnected".to_string()));
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {
+                return Err(KfError::Config("File watcher disconnected".to_string()));
             }
         }
 
-        // Check for keyboard input
-        if let Ok(key) = key_rx.try_recv() {
-            if let Some(action) = on_key(key) {
-                break Ok(action);
+        // Poll for keyboard events with timeout
+        if crossterm::event::poll(key_timeout)? {
+            if let Event::Key(key_event) = crossterm::event::read()? {
+                if let Some(action) = on_key(key_event) {
+                    return Ok(action);
+                }
             }
         }
-    };
-
-    stop.store(true, Ordering::Release);
-    // The stdin thread is blocked on read_exact; detach it instead of joining.
-    // It will exit on the next keypress (stop == true) or when key_rx is dropped
-    // (causing key_tx.send to fail).
-    drop(stdin_thread);
-
-    result
+    }
 }

@@ -222,7 +222,22 @@ pub fn record_attempt(
     )?;
 
     tx.commit()?;
+    trim_practice_log(conn)?;
     Ok(sub)
+}
+
+/// Supprime les lignes de `practice_log` au-delà des 10 000 plus récentes.
+/// Sans effet si le nombre de lignes est inférieur à ce seuil.
+fn trim_practice_log(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM practice_log
+         WHERE practiced_at < (
+             SELECT practiced_at FROM practice_log
+             ORDER BY practiced_at DESC LIMIT 1 OFFSET 9999
+         )",
+        [],
+    )?;
+    Ok(())
 }
 
 /// Get a single subject.
@@ -244,7 +259,7 @@ pub fn get_streak(conn: &Connection) -> Result<i64> {
         "SELECT DISTINCT date(practiced_at, 'unixepoch') as day
          FROM practice_log
          ORDER BY day DESC
-         LIMIT 365",
+         LIMIT 90",
     )?;
 
     let days: Vec<String> = stmt
@@ -483,9 +498,26 @@ pub fn get_daily_activity(conn: &Connection, days: u32) -> Result<Vec<(String, u
         .map_err(crate::error::KfError::from)
 }
 
-/// Apply decay to all subjects (batched in single transaction).
+/// Apply decay to all subjects that are candidates for decay (batched in single transaction).
+///
+/// Only fetches subjects with `mastery_score > 0`, a known `last_practiced_at`, and enough
+/// elapsed time — skipping the rest entirely instead of loading the full table.
 pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
-    let mut subjects = get_all_subjects(conn)?;
+    let decay_days = crate::config::get().srs.decay_days;
+    let mut stmt = conn.prepare_cached(
+        "SELECT name, mastery_score, last_practiced_at, attempts_total, attempts_success,
+                difficulty_unlocked, next_review_at, srs_interval_days
+         FROM subjects
+         WHERE mastery_score > 0.0
+           AND last_practiced_at IS NOT NULL
+           AND last_practiced_at < unixepoch('now') - (?1 * 86400)
+         ORDER BY name",
+    )?;
+    let mut subjects = stmt
+        .query_map([decay_days], row_to_subject)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    drop(stmt);
+
     let tx = conn.transaction()?;
     for sub in &mut subjects {
         let old_score = sub.mastery_score;

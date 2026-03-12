@@ -33,11 +33,7 @@ fn collect_unique_ids(questions: &[AnnaleQuestion]) -> Vec<String> {
 
 pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     // 1. Charger annales_map.json
-    let exercises_dir = exercises::resolve_exercises_dir()?;
-    let map_path = exercises_dir.join("annales_map.json");
-    let raw = std::fs::read_to_string(&map_path)?;
-    let sessions: Vec<AnnaleSession> = serde_json::from_str(&raw)
-        .map_err(|e| KfError::Config(format!("annales_map.json: {e}")))?;
+    let sessions: Vec<AnnaleSession> = exercises::load_annales_map()?;
 
     // 2. Si --list : afficher les sessions textuellement
     if list_sessions {
@@ -94,19 +90,7 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     println!();
     println!(
         "  {}",
-        "╔════════════════════════════════════════════════════════╗"
-            .bold()
-            .cyan()
-    );
-    println!(
-        "  {}  {}  {}",
-        "║".bold().cyan(),
-        format!(" EXAM SIMULÉ — {} ", session.title).bold().cyan(),
-        "║".bold().cyan()
-    );
-    println!(
-        "  {}",
-        "╚════════════════════════════════════════════════════════╝"
+        display::header_box(&format!(" EXAM SIMULÉ — {} ", session.title))
             .bold()
             .cyan()
     );
