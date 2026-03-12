@@ -119,7 +119,7 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
         "▶".bold().green()
     );
     use std::io::Write;
-    std::io::stdout().flush().ok();
+    std::io::stdout().flush().ok(); // best-effort flush — non-critique
     let mut input = String::new();
     std::io::stdin().read_line(&mut input)?;
     if input.trim().eq_ignore_ascii_case("q") {
