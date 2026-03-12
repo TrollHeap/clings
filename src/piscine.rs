@@ -1,15 +1,17 @@
 //! Piscine mode — linear progression through all exercises with checkpoint persistence.
 
+use std::io::Write;
 use std::time::Instant;
 
 use colored::Colorize;
 
+use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+
 use crate::chapters;
 use crate::constants::{
-    CTRL_C, CTRL_Z, HEADER_WIDTH, MSG_EXERCISE_SOLVED_ADVANCING, MSG_PRESS_KEY_RETURN,
-    PISCINE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS,
+    HEADER_WIDTH, MSG_EXERCISE_SOLVED_ADVANCING, MSG_PRESS_KEY_RETURN, PISCINE_FAILURE_THRESHOLD,
+    SUCCESS_PAUSE_SECS,
 };
-use crate::display::handle_esc_sequence;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::watcher::WatchAction;
@@ -91,8 +93,6 @@ fn redisplay_piscine_exercise(
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
-    crate::install_ctrlc_handler();
-
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let mut conn = progress::open_db()?;
 
@@ -185,7 +185,6 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         let mut vis_active = false;
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
-        let mut escape_buf: Vec<u8> = Vec::new();
         let mut fail_count: u32 = 0;
 
         let action = crate::watcher::watch_file_interactive(
@@ -195,41 +194,51 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                 display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
                 WatchAction::Continue
             },
-            |key| {
-                // Accumulate escape sequences for arrow keys (3-byte: ESC [ C/D)
+            |key_event| {
+                if key_event.kind != KeyEventKind::Press {
+                    return None;
+                }
+
                 let ch_ctx_inner = chapters::chapter_context_at(&chapter_blocks, index);
-                if handle_esc_sequence(
-                    key,
-                    &mut escape_buf,
-                    vis_active,
-                    &mut vis_step,
-                    &mut vis_lines,
-                    exercise.visualizer.steps.len(),
-                    &mut |step| display::show_visualizer(exercise, step),
-                )
-                .is_some()
-                {
-                    return None;
-                }
 
-                // Any non-arrow key closes the visualizer
                 if vis_active {
-                    vis_active = false;
-                    redisplay_piscine_exercise(
-                        index,
-                        total,
-                        &start_time,
-                        deadline,
-                        Some(&ch_ctx_inner),
-                        exercise,
-                        current_stage,
-                        &source_path,
-                    );
-                    return None;
+                    match key_event.code {
+                        KeyCode::Right => {
+                            vis_step = display::vis_step_forward(
+                                vis_step,
+                                exercise.visualizer.steps.len(),
+                            );
+                            print!("\x1b[{}A\x1b[J", vis_lines);
+                            let _ = std::io::stdout().flush(); // best-effort flush
+                            vis_lines = display::show_visualizer(exercise, vis_step);
+                            return None;
+                        }
+                        KeyCode::Left => {
+                            vis_step = display::vis_step_back(vis_step);
+                            print!("\x1b[{}A\x1b[J", vis_lines);
+                            let _ = std::io::stdout().flush(); // best-effort flush
+                            vis_lines = display::show_visualizer(exercise, vis_step);
+                            return None;
+                        }
+                        _ => {
+                            vis_active = false;
+                            redisplay_piscine_exercise(
+                                index,
+                                total,
+                                &start_time,
+                                deadline,
+                                Some(&ch_ctx_inner),
+                                exercise,
+                                current_stage,
+                                &source_path,
+                            );
+                            return None;
+                        }
+                    }
                 }
 
-                match key {
-                    b'v' | b'V' => {
+                match key_event.code {
+                    KeyCode::Char('v') | KeyCode::Char('V') => {
                         if !exercise.visualizer.steps.is_empty() {
                             vis_step = 0;
                             vis_active = true;
@@ -237,7 +246,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         }
                         None
                     }
-                    b'h' | b'H' => {
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
                         if !hint_shown {
                             println!();
                             display::show_hints(exercise);
@@ -245,7 +254,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         }
                         None
                     }
-                    b'l' | b'L' => {
+                    KeyCode::Char('l') | KeyCode::Char('L') => {
                         match progress::get_all_subjects(&conn) {
                             Ok(subjects) => {
                                 display::show_exercise_list(&all_exercises, &subjects, None, None)
@@ -255,10 +264,19 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
                         println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
                         None
                     }
-                    b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
-                    b'k' | b'K' => Some(WatchAction::Prev),
-                    b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
-                    b'r' | b'R' => {
+                    KeyCode::Char('n')
+                    | KeyCode::Char('N')
+                    | KeyCode::Char('j')
+                    | KeyCode::Char('J') => Some(WatchAction::Next),
+                    KeyCode::Char('k') | KeyCode::Char('K') => Some(WatchAction::Prev),
+                    KeyCode::Char('q') | KeyCode::Char('Q') => Some(WatchAction::Quit),
+                    KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                        Some(WatchAction::Quit)
+                    }
+                    KeyCode::Char('z') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                        Some(WatchAction::Quit)
+                    }
+                    KeyCode::Char('r') | KeyCode::Char('R') => {
                         let result = runner::compile_and_run(&source_path, exercise);
                         display::show_result(&result, exercise);
                         if result.success {
@@ -387,7 +405,6 @@ pub fn run_exam_piscine(
     timed_minutes: Option<u64>,
     session_id: Option<&str>,
 ) -> crate::error::Result<()> {
-    crate::install_ctrlc_handler();
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;
     progress::ensure_subjects_batch(&mut conn, &exercises)?;
@@ -455,7 +472,6 @@ pub fn run_exam_piscine(
         let mut vis_active = false;
         let mut vis_step: usize = 0;
         let mut vis_lines: usize = 0;
-        let mut escape_buf: Vec<u8> = Vec::new();
         let mut fail_count: u32 = 0;
 
         let action = crate::watcher::watch_file_interactive(
@@ -465,37 +481,47 @@ pub fn run_exam_piscine(
                 display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
                 WatchAction::Continue
             },
-            |key| {
-                if handle_esc_sequence(
-                    key,
-                    &mut escape_buf,
-                    vis_active,
-                    &mut vis_step,
-                    &mut vis_lines,
-                    exercise.visualizer.steps.len(),
-                    &mut |step| display::show_visualizer(exercise, step),
-                )
-                .is_some()
-                {
+            |key_event| {
+                if key_event.kind != KeyEventKind::Press {
                     return None;
                 }
-
                 if vis_active {
-                    vis_active = false;
-                    redisplay_piscine_exercise(
-                        index,
-                        total,
-                        &start_time,
-                        deadline,
-                        None,
-                        exercise,
-                        current_stage,
-                        &source_path,
-                    );
-                    return None;
+                    match key_event.code {
+                        KeyCode::Right => {
+                            vis_step = display::vis_step_forward(
+                                vis_step,
+                                exercise.visualizer.steps.len(),
+                            );
+                            print!("\x1b[{vis_lines}A\x1b[J");
+                            let _ = std::io::stdout().flush(); // best-effort flush
+                            vis_lines = display::show_visualizer(exercise, vis_step);
+                            return None;
+                        }
+                        KeyCode::Left => {
+                            vis_step = display::vis_step_back(vis_step);
+                            print!("\x1b[{vis_lines}A\x1b[J");
+                            let _ = std::io::stdout().flush(); // best-effort flush
+                            vis_lines = display::show_visualizer(exercise, vis_step);
+                            return None;
+                        }
+                        _ => {
+                            vis_active = false;
+                            redisplay_piscine_exercise(
+                                index,
+                                total,
+                                &start_time,
+                                deadline,
+                                None,
+                                exercise,
+                                current_stage,
+                                &source_path,
+                            );
+                            return None;
+                        }
+                    }
                 }
-                match key {
-                    b'v' | b'V' => {
+                match key_event.code {
+                    KeyCode::Char('v') | KeyCode::Char('V') => {
                         if !exercise.visualizer.steps.is_empty() {
                             vis_step = 0;
                             vis_active = true;
@@ -503,7 +529,7 @@ pub fn run_exam_piscine(
                         }
                         None
                     }
-                    b'h' | b'H' => {
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
                         if !hint_shown {
                             println!();
                             display::show_hints(exercise);
@@ -511,7 +537,7 @@ pub fn run_exam_piscine(
                         }
                         None
                     }
-                    b'l' | b'L' => {
+                    KeyCode::Char('l') | KeyCode::Char('L') => {
                         match progress::get_all_subjects(&conn) {
                             Ok(subjects) => {
                                 display::show_exercise_list(&exercises, &subjects, None, None)
@@ -521,10 +547,19 @@ pub fn run_exam_piscine(
                         println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
                         None
                     }
-                    b'n' | b'N' | b'j' | b'J' => Some(WatchAction::Next),
-                    b'k' | b'K' => Some(WatchAction::Prev),
-                    b'q' | b'Q' | CTRL_C | CTRL_Z => Some(WatchAction::Quit),
-                    b'r' | b'R' => {
+                    KeyCode::Char('n')
+                    | KeyCode::Char('N')
+                    | KeyCode::Char('j')
+                    | KeyCode::Char('J') => Some(WatchAction::Next),
+                    KeyCode::Char('k') | KeyCode::Char('K') => Some(WatchAction::Prev),
+                    KeyCode::Char('q') | KeyCode::Char('Q') => Some(WatchAction::Quit),
+                    KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                        Some(WatchAction::Quit)
+                    }
+                    KeyCode::Char('z') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                        Some(WatchAction::Quit)
+                    }
+                    KeyCode::Char('r') | KeyCode::Char('R') => {
                         let result = runner::compile_and_run(&source_path, exercise);
                         display::show_result(&result, exercise);
                         if result.success {
@@ -592,7 +627,6 @@ pub fn run_exam_piscine(
             // Ne pas sauvegarder le checkpoint sur un simple événement fichier
             WatchAction::Continue => {}
         }
-        save_exam_checkpoint(&conn, session_id, index);
     }
 
     drop(_raw_guard);

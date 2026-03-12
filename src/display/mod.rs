@@ -14,7 +14,6 @@ pub use keybinds::*;
 pub use list::*;
 pub use progress::*;
 pub use stats::*;
-pub(crate) use visualizer::handle_esc_sequence;
 pub use visualizer::*;
 
 use std::sync::OnceLock;
@@ -23,7 +22,7 @@ use colored::{ColoredString, Colorize};
 
 use crate::constants::{
     ANSI_CLEAR_SCREEN, HEADER_WIDTH, MASTERY_BAR_GREEN_THRESHOLD, MASTERY_BAR_YELLOW_THRESHOLD,
-    MASTERY_MAX,
+    MASTERY_MAX, PCT_GREEN_THRESHOLD, PCT_YELLOW_THRESHOLD,
 };
 use crate::models::Difficulty;
 
@@ -69,32 +68,12 @@ pub fn clear_screen() {
     print!("{ANSI_CLEAR_SCREEN}");
 }
 
-/// Direction d'une touche fléchée ANSI (séquence ESC [ A/B/C/D).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ArrowKey {
-    Up,
-    Down,
-    Right,
-    Left,
-}
-
-/// Parse une séquence de 3 octets ESC-[ en `ArrowKey`, si reconnue.
-pub(super) fn try_parse_arrow(buf: &[u8]) -> Option<ArrowKey> {
-    match buf {
-        [0x1b, b'[', b'A'] => Some(ArrowKey::Up),
-        [0x1b, b'[', b'B'] => Some(ArrowKey::Down),
-        [0x1b, b'[', b'C'] => Some(ArrowKey::Right),
-        [0x1b, b'[', b'D'] => Some(ArrowKey::Left),
-        _ => None,
-    }
-}
-
 /// Colorise un pourcentage entier : vert ≥ 75, jaune ≥ 25, rouge < 25.
 pub(super) fn color_pct(pct: u32) -> ColoredString {
     let s = format!("{}%", pct);
-    if pct >= 75 {
+    if pct >= PCT_GREEN_THRESHOLD {
         s.green()
-    } else if pct >= 25 {
+    } else if pct >= PCT_YELLOW_THRESHOLD {
         s.yellow()
     } else {
         s.red()
@@ -142,7 +121,7 @@ pub(super) fn hr() -> String {
     "─".repeat(HEADER_WIDTH)
 }
 
-pub(super) fn header_box(title: &str) -> String {
+pub fn header_box(title: &str) -> String {
     let pad = HEADER_WIDTH.saturating_sub(title.chars().count() + 6);
     let left = pad / 2;
     let right = pad - left;
@@ -154,29 +133,21 @@ pub(super) fn header_box(title: &str) -> String {
     )
 }
 
-pub(super) fn footer_box() -> String {
+pub fn footer_box() -> String {
     format!("╚{}╝", "═".repeat(HEADER_WIDTH - 2))
 }
 
 /// Word-wrap `text` to at most `width` visible chars per line.
 pub(super) fn wrap_text(text: &str, width: usize) -> Vec<String> {
-    let mut lines: Vec<String> = Vec::new();
-    let mut current = String::new();
-    for word in text.split_whitespace() {
-        if current.is_empty() {
-            current = word.to_string();
-        } else if current.chars().count() + 1 + word.chars().count() <= width {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(std::mem::take(&mut current));
-            current = word.to_string();
-        }
+    if text.is_empty() {
+        return Vec::new();
     }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    lines
+    let options =
+        textwrap::Options::new(width).word_splitter(textwrap::WordSplitter::NoHyphenation);
+    textwrap::wrap(text, options)
+        .into_iter()
+        .map(String::from)
+        .collect()
 }
 
 /// Display the main banner.
@@ -316,9 +287,10 @@ mod tests {
 
     #[test]
     fn wrap_text_single_word_longer_than_width() {
-        // A word longer than width still goes on its own line
+        // textwrap splits words longer than width at character boundaries
         let lines = wrap_text("superlongword", 5);
-        assert_eq!(lines, vec!["superlongword"]);
+        assert!(!lines.is_empty());
+        assert_eq!(lines.concat(), "superlongword");
     }
 
     // ── hr ──────────────────────────────────────────────────────────────

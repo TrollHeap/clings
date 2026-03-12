@@ -1,6 +1,6 @@
 [package]
 name = "clings"
-version = "2.5.0"
+version = "2.7.0"
 edition = "2021"
 description = "NSY103 C systems programming trainer — rustlings-style TUI"
 license = "MIT"
@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.38", features = ["bundled"] }
@@ -22,10 +23,13 @@ chrono = "0.4"
 uuid = { version = "1", features = ["v4"] }
 colored = "3"
 libc = "0.2"
-ctrlc = "3"
 thiserror = "2"
 regex = "1"
 toml = "1"
+crossterm = "0.28"
+textwrap = "0.16"
+rust-embed = { version = "8", features = ["include-exclude"] }
+nucleo-matcher = "0.3"
 
 [profile.release]
 lto = "thin"          # Link-time optimization (thin = bon compromis vitesse/taille)

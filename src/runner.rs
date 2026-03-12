@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::constants::{
     CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
-    MAX_OUTPUT_BYTES, POLL_INTERVAL_MS, REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED,
+    MAX_OUTPUT_BYTES, REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED,
     TEST_SUMMARY_TESTS,
 };
 use crate::error::KfError;
@@ -137,7 +137,6 @@ fn spawn_gcc_and_collect(
 
     let _ = source_path; // consumed by gcc via extra_args; kept in signature for clarity
 
-    let start = Instant::now();
     let mut child = Command::new(&output_path)
         .current_dir(work_dir)
         .stdout(std::process::Stdio::piped())
@@ -157,31 +156,35 @@ fn spawn_gcc_and_collect(
         .ok_or_else(|| KfError::Config("stderr pipe non disponible".to_owned()))?;
     let (stdout_thread, stderr_thread) = spawn_drain_threads(stdout, stderr);
 
-    match child.wait_timeout(timeout) {
-        Ok(Some(status)) => {
-            let stdout = stdout_thread
-                .join()
-                .map_err(|_| KfError::Config("stdout reader thread paniqué".to_owned()))?;
-            let stderr = stderr_thread
-                .join()
-                .map_err(|_| KfError::Config("stderr reader thread paniqué".to_owned()))?;
-            Ok((stdout, stderr, status))
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    kill_and_drain(&child, stdout_thread, stderr_thread);
+                    let _ = child.wait();
+                    return Err(KfError::Config(format!(
+                        "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
+                        timeout.as_secs_f64()
+                    )));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(e) => {
+                kill_and_drain(&child, stdout_thread, stderr_thread);
+                let _ = child.wait();
+                return Err(KfError::Io(e));
+            }
         }
-        Ok(None) => {
-            kill_and_drain(&child, stdout_thread, stderr_thread);
-            let _ = child.wait(); // reap zombie; error already handled by timeout path
-            let elapsed = start.elapsed();
-            Err(KfError::Config(format!(
-                "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
-                elapsed.as_secs_f64()
-            )))
-        }
-        Err(e) => {
-            kill_and_drain(&child, stdout_thread, stderr_thread);
-            let _ = child.wait(); // reap zombie; real error propagated below
-            Err(KfError::Io(e))
-        }
-    }
+    };
+    let stdout = stdout_thread
+        .join()
+        .map_err(|_| KfError::Config("stdout reader thread paniqué".to_owned()))?;
+    let stderr = stderr_thread
+        .join()
+        .map_err(|_| KfError::Config("stderr reader thread paniqué".to_owned()))?;
+    Ok((stdout, stderr, status))
 }
 
 /// Compile and run a C source file, validating output against expected.
@@ -453,14 +456,16 @@ fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
 }
 
 /// Normalize output: trim, normalize newlines, remove trailing whitespace per line.
+/// `.lines()` already splits on `\r\n`, `\n`, and `\r` — no pre-replace needed.
 fn normalize(s: &str) -> String {
-    s.replace("\r\n", "\n")
-        .lines()
-        .map(|l| l.trim_end())
-        .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_string()
+    let mut out = String::with_capacity(s.len());
+    for line in s.lines() {
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(line.trim_end());
+    }
+    out.trim().to_string()
 }
 
 /// Get the working directory for exercises.
@@ -612,37 +617,6 @@ fn kill_process_group(child: &std::process::Child) {
     // to clean up any subprocesses spawned by the C program.
     unsafe {
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
-    }
-}
-
-/// Trait to add wait_timeout to Child (not in std).
-trait ChildExt {
-    fn wait_timeout(
-        &mut self,
-        timeout: Duration,
-    ) -> std::io::Result<Option<std::process::ExitStatus>>;
-}
-
-impl ChildExt for std::process::Child {
-    fn wait_timeout(
-        &mut self,
-        timeout: Duration,
-    ) -> std::io::Result<Option<std::process::ExitStatus>> {
-        // Poll-based busy-wait: std does not expose async wait.
-        // POLL_INTERVAL_MS (50 ms) keeps CPU usage negligible while staying
-        // responsive enough for a 10-second exercise timeout.
-        let start = Instant::now();
-        loop {
-            match self.try_wait()? {
-                Some(status) => return Ok(Some(status)),
-                None => {
-                    if start.elapsed() >= timeout {
-                        return Ok(None);
-                    }
-                    std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
-                }
-            }
-        }
     }
 }
 

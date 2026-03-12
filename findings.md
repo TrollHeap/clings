@@ -1,253 +1,82 @@
-# findings.md — Audit d'alignement NSY103 / UTC502 / clings
+# Findings — Full Audit Remediation (2026-03-12)
 
-Date: 2026-03-09
+## T1 — Visualizer nav DRY (4× duplication + inconsistance)
 
-## 1. Structure documentaire
+**Fichiers :** `src/main.rs`, `src/piscine.rs`
+**Pattern canonique** (main.rs:331–366, main.rs:600–628, piscine.rs:206–237) :
+```rust
+KeyCode::Right => {
+    let n = exercise.visualizer.steps.len();
+    vis_step = (vis_step + 1).min(n.saturating_sub(1));
+    print!("\x1b[{vis_lines}A\x1b[J");
+    vis_lines = display::show_visualizer(exercise, vis_step);
+}
+```
+**Pattern incohérent** (piscine.rs:490–524, `run_exam_piscine`) :
+```rust
+KeyCode::Right => {
+    let total_steps = exercise.visualizer.steps.len();
+    if vis_step + 1 < total_steps {   // conditionnel — pas de redraw si dernière étape
+        print!("\x1b[{vis_lines}A\x1b[J");
+        vis_step += 1;
+        vis_lines = display::show_visualizer(exercise, vis_step);
+    }
+    return None;
+}
+```
+**Fix :** Extraire `fn step_forward(step: usize, total: usize) -> usize` et `fn step_back(step: usize) -> usize`
+dans `src/display/visualizer.rs`, réutiliser dans les 4 sites.
 
-### Cours référencés
+## T2 — apply_all_decay() full table scan
 
-| Dossier | Cours | Description |
-|---------|-------|-------------|
-| `docs/nsy103/` | NSY103 | "Linux : noyau et programmation système" — cours principal ciblé |
-| `docs/utc502/` | UTC502 | "Gestion des ressources informatiques" — cours connexe, niveau plus élevé |
+**Fichier :** `src/progress.rs:487`
+**Problème :** appelle `get_all_subjects(conn)?` — retourne TOUTES les lignes même avec mastery=0.
+**Fix :** Nouvelle requête SQL directe avec WHERE :
+```sql
+SELECT subject, mastery_score, last_practiced_at, next_review_at, difficulty_unlocked
+FROM subjects
+WHERE mastery_score > 0.0
+  AND last_practiced_at IS NOT NULL
+  AND last_practiced_at < unixepoch('now') - (?1 * 86400)
+```
+Paramètre : `decay_days: i64` depuis `crate::config::get().srs.decay_days`.
+**Call sites :** `src/main.rs` — adapter l'appel à `progress::apply_all_decay(conn, decay_days)`.
 
-**Important**: `docs/utc502/ex.md` et les exercices FIFO/LRU/MFU appartiennent à **UTC502**, pas à NSY103.
+## T3 — get_streak() LIMIT 365
 
-### Annales disponibles
+**Fichier :** `src/progress.rs:244`
+**Fix :** `LIMIT 365` → `LIMIT 90`
 
-**NSY103** (`docs/nsy103/annales/`) :
-- `premieresession20223024NSY103FOD.pdf` — Session 1 2023-24
-- `secondesessionNSY103FODS220222023.pdf` — Session 2 2022-23
-- `deuxièmesessionNsy103FODS120222023.pdf` — Session 2 2022-23
+## T4 — normalize() 4 allocations
 
-**UTC502** (`docs/utc502/example examen/`) :
-- `premieresession20212022UTC502FOD.pdf`
-- `secondedsession20212022UTC502FOD.pdf`
-- `NFA003_23-24.pdf` — cours NFA003 (différent)
+**Fichier :** `src/runner.rs:458`
+**Fix (2 allocs) :**
+```rust
+fn normalize(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for line in s.lines() {
+        if !out.is_empty() { out.push('\n'); }
+        out.push_str(line.trim_end());
+    }
+    out.trim().to_string()
+}
+```
 
-### Code source exemples (UTC502 examen)
+## T5 — Import redondant piscine.rs
 
-`docs/utc502/example examen/SourcesC_Processus_Thread_Mutex/` :
-- `fork0.c`, `fork1.c` — fork basique
-- `fork_boucle.c`, `fork_boucle_wait.c` — fork en boucle
-- `thread_sans_mutex.c`, `thread_with_mutex.c` — threads mutex
-- `stock1.c` — problème producteur-consommateur
+**Fichier :** `src/piscine.rs:486`
+```rust
+use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};  // doublon ligne 8
+```
+**Fix :** Supprimer la ligne locale (~486).
 
-## 2. Inventaire des exercices (274 total)
+## T6 — Swallowed flush errors
 
-| Sujet | Exercices | Ch. | Statut |
-|-------|-----------|-----|--------|
-| bitwise_ops | 12 | 2 | Complet |
-| capstones | 12 | 15 | Complet |
-| errno | 12 | 3 | Complet |
-| fd_basics | 12 | 4 | Complet |
-| file_io | 13 | 4 | Complet |
-| filesystem | 12 | 5 | Complet |
-| memory_allocation | 13 | 3 | Complet |
-| message_queues | 12 | 9 | Complet |
-| pipes | 12 | 8 | Complet |
-| pointers | 13 | 1 | Complet |
-| proc_memory | 12 | 14 | Complet |
-| processes | 12 | 6 | Complet |
-| pthreads | 13 | 12 | Complet |
-| semaphores | 12 | 11 | Complet |
-| shared_memory | 12 | 10 | Complet |
-| signals | 12 | 7 | Complet |
-| sockets | 13 | 13 | Complet |
-| string_formatting | 12 | 2 | Complet |
-| structs | 13 | 1 | Complet |
-| sync_concepts | 12 | 12 | Complet |
-| virtual_memory | 14 | 14 | Complet |
+**Fichier :** `src/main.rs` (lignes ~337, ~344, ~606, ~613)
+**Fix :** Ajouter commentaire `// best-effort flush` ou remplacer par `.ok()`.
 
-### Distribution des difficultés
+## Patterns réutilisables
 
-| Niveau | Count | % |
-|--------|-------|---|
-| D1 Easy | ~89 | 32% |
-| D2 Medium | ~80 | 29% |
-| D3 Advanced | ~63 | 23% |
-| D4 Hard | ~34 | 12% |
-| D5 Expert | ~8 | 3% |
-
-## 3. Alignement NSY103
-
-### Sujets d'examen récurrents (d'après annales 2022-24)
-
-1. **fork() et processus** — toujours présent (8 pts en 2023-24)
-2. **Gestion du FS** — inodes, blocs (3 pts)
-3. **Files de messages** ou **Sockets** — communication (4 pts)
-4. **Threads et mutexes** — sync pthread (variable)
-5. **Tubes anonymes** — occasionnel
-
-### Couverture par thème NSY103
-
-| Thème NSY103 | Couverture KF | Exercices |
-|---|---|---|
-| Processus (fork/exec/wait) | Excellente | 12 exercices Ch.6 |
-| Signaux POSIX (1-63) | Excellente | 12 exercices Ch.7 |
-| Tubes anonymes | Excellente | 12 exercices Ch.8 |
-| Files de messages (SysV) | Excellente | 12 exercices Ch.9 |
-| Mémoire partagée | Excellente | 12 exercices Ch.10 |
-| Sémaphores POSIX | Excellente | 12 exercices Ch.11 |
-| Threads POSIX (pthreads) | Excellente | 13 exercices Ch.12 |
-| Sockets TCP/UDP | Bonne | 13 exercices Ch.13 |
-| Système de fichiers (inode) | Bonne | 12 exercices Ch.5 |
-| Producteur-consommateur | Couverte | sem_prodcons_01, pthread_pool_01 |
-| Lecteurs-rédacteurs | Couverte | sem_readers_01, pthread_rwlock_01 |
-| **Tubes nommés (FIFO)** | **Absente** | 0 exercice dédié |
-
-## 4. Alignement UTC502
-
-### Thèmes UTC502 dans docs/utc502/Chapitres/
-
-- Ch.1a/1b — Introduction, ordonnancement processus
-- Ch.2 — Gestion de la mémoire
-- Ch.3 — Mémoire virtuelle, pagination
-- Ch.4 — Algorithmes de remplacement de pages (FIFO, LRU, MFU, Optimal)
-- Ch.5 — Système de fichiers
-- Ch.6 — Ordonnancement
-- Ch.7 — E/S et interruptions
-- Ch.8 — Sécurité
-
-### Couverture UTC502 par clings
-
-| Thème UTC502 | Couverture KF | Notes |
-|---|---|---|
-| Pagination / pages mémoire | Partielle | vm_page_01 (getpagesize seulement) |
-| **Algorithmes FIFO/LRU/MFU** | **ABSENTE** | ex.md montre que c'est clé d'examen |
-| **Ordonnancement (FIFO/RR/SJF)** | **ABSENTE** | Aucun exercice |
-| Mémoire virtuelle avancée | Bonne | 14 exercices (CoW, mmap, TLB, NUMA) |
-| Système de fichiers (FS) | Bonne | 12 exercices Ch.5 |
-| Processus / threads | Excellente | Ch.6, Ch.12 |
-
-## 5. Lacunes identifiées
-
-### Critiques (examen)
-
-1. **Page replacement (FIFO/LRU/MFU)** — directement dans `docs/utc502/ex.md`
-   - Exercices à créer: `vm_fifo_01.json`, `vm_lru_01.json`, `vm_mfu_01.json`
-   - Exercice: simuler algorithme sur séquence d'accès, compter défauts de page
-
-2. **Ordonnancement (scheduling)** — Ch.1 et Ch.6 UTC502, Ch.1 NSY103
-   - Exercices à créer: simulation FIFO/Round-Robin/SJF avec processus et quantum
-
-3. **Tubes nommés (FIFO nommés / mkfifo)** — dans `lestubesanonymes.pdf` NSY103
-   - Exercice à créer: `pipe_fifo_named_01.json`
-
-### Secondaires (enrichissement)
-
-4. **Unix domain sockets** — IPC avancée (sock_unix_01 existe mais à vérifier)
-5. **Signalfd / eventfd** — sig_signalfd_01 existe
-6. **Namespaces Linux** — non couverts (hors scope NSY103, pertinent UTC502)
-7. **Cgroups** — hors scope NSY103
-
-## 6. Sujets sur-représentés
-
-- `virtual_memory`: 14 exercices (2 de plus que la moyenne)
-- Le contenu est de qualité mais légèrement redondant sur les bases (vm_page_01 + vm_align_01 traitent des concepts très proches)
-
-## 7. Qualité des exercices échantillonnés
-
-Tous les exercices lus montrent:
-- Structure JSON bien définie (id, subject, difficulty, key_concept, starter_code, solution_code, hints, validation)
-- Progressions pédagogiques cohérentes au sein de chaque sujet
-- Niveaux de difficulté appropriés au contenu
-- `exercise_type: "complete"` uniformément (complétion de code)
-
-## 9. Full-audit remediation findings (2026-03-12)
-
-### Stack
-Rust 2021, rusqlite 0.38, clap 4, notify 8, colored 3, serde_json 1, libc 0.2, thiserror 2
-
-### Fonctions réutilisables
-
-| Fonction | Fichier:ligne | Notes |
-|---|---|---|
-| `OnceLock<regex::Regex>` pattern | `src/display/mod.rs:31-38` | Pattern canonique static regex |
-| `thread_local! REGEX_CACHE` | `src/runner.rs:~240` | Correct, aucune modif |
-| `params![] + prepare_cached` | `src/progress.rs` partout | Convention rusqlite |
-| `conn.unchecked_transaction()` | `src/progress.rs` | Pattern transaction existant |
-
-### SECURITY
-
-**S1 — `is_valid_executable()` PATH injection** (`src/tmux.rs:16-26`)
-- `Command::new("which").arg(bin)` — bin vient d'env var non validée
-- Fix: si absolu → `Path::new(bin).is_file()` ; sinon → valider `[a-zA-Z0-9_.-]` puis `sh -c "command -v NAME"`
-
-**S2 — `editor_args` non validés** (`src/tmux.rs:64-77`)
-- args splittés depuis `EDITOR`/`VISUAL`, passés à tmux
-- Fix: valider chaque arg — caractères sûrs uniquement
-
-### PERFORMANCE
-
-**P1 — `get_streak()` sans LIMIT** (`src/progress.rs:243-247`)
-- `SELECT DISTINCT date... ORDER BY day DESC` — sans LIMIT, charge toute la table
-- Fix: ajouter `LIMIT 365`
-
-**P2 — `test_code.clone()` inutile** (`src/runner.rs:276`)
-- `Some(c) => c.clone()` — `&String` → clone inutile
-- Fix: `c.as_str()` avec type `&str`
-
-**P3 — `exercise_clone = exercise.clone()` dans watch loop** (`src/main.rs:307`)
-- `exercise` est déjà `&Exercise` — clone complet inutile
-- Fix: supprimer, utiliser `exercise` directement dans closures
-
-### DRY
-
-**D1 — Magic number `86400` / `86_400`**
-- `src/progress.rs:470` (prod), lignes `782, 825, 843, 853, 867, 882` (tests), `src/main.rs:261`
-- Fix: `pub const SECS_PER_DAY: i64 = 86_400;` dans `src/constants.rs`
-
-**D2 — `avg_mastery` dupliqué** (`src/display/stats.rs:61-62` et `130-131`)
-- Même 2-ligne dupliquée dans `show_stats_detailed` et `show_stats`
-- Fix: `pub(super) fn avg_mastery(subjects: &[Subject]) -> f64`
-
-### CONVENTIONS
-
-**C1 — Stub `ValidationMode::Test/Both` sans commentaire** (`src/runner.rs`)
-- Skip silencieux — ajouter `// NOTE:` explicatif (pas un TODO)
-
-### Patterns à respecter
-- Error handling: `thiserror` + `KfError` + `Result<T>` alias dans `src/error.rs`
-- Imports: `use crate::constants::NOM_CONSTANTE;`
-- Tests: `#[cfg(test)] mod tests` en fin de fichier
-
----
-
-## 8. Qualité du code (audit 2026-03-10)
-
-### Couverture API docs
-
-| État | Avant | Après |
-|------|-------|-------|
-| Symboles publics documentés | ~92% | ~98% |
-| Fonctions sans doc `///` | `compile_and_run`, `reset_progress` | 0 critique |
-| Exemples (`# Examples`) | 0 | 1 (`compile_and_run`) |
-
-### Couverture tests
-
-| État | Avant | Après |
-|------|-------|-------|
-| Tests totaux | 124 | 134 |
-| Fichiers avec tests | 7 | 9 |
-| Nouveaux fichiers testés | — | `error.rs`, `tmux.rs` |
-| Tests display ajoutés | — | `difficulty_stars` (×2) |
-
-### Sécurité (commits bdff318)
-
-| Fix | Fichier | Nature |
-|-----|---------|--------|
-| Path traversal | `src/runner.rs` | `canonicalize()` après création fichier |
-| Atomic write | `src/runner.rs` | `rename()` depuis `.tmp` |
-| HOME hard-fail | `src/progress.rs`, `src/runner.rs` | Erreur explicite si `$HOME` absent |
-
-### Gaps non résolus (TUI/terminal — intentionnel)
-
-| Fichier | Raison |
-|---------|--------|
-| `src/main.rs` | `cmd_*` : I/O + DB, nécessite injection de dépendances |
-| `src/watcher.rs` | boucle inotify + stdin thread, fd mock difficile |
-| `src/piscine.rs` | boucle raw mode TUI, pas testable sans terminal |
-
-Ces 3 fichiers représentent la couche d'entrée/TUI — les tests unitaires seraient fragiles.
-La logique métier sous-jacente (mastery, progress, runner) est couverte.
+- `crate::config::get().srs.decay_days` → valeur dynamique decay
+- `display::show_visualizer(exercise, step) -> usize` → retourne nombre de lignes affichées
+- `let _ = std::io::Write::flush(...)` pattern existant dans annales.rs:135

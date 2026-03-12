@@ -212,7 +212,11 @@ mod tests {
         let result = sparkline(&[5, 5, 5]);
         // All same value → all same character (the max → last bar '█')
         assert_eq!(result.chars().count(), 3);
-        assert!(result.chars().all(|c| c == result.chars().next().unwrap()));
+        let first = result
+            .chars()
+            .next()
+            .expect("sparkline(3 items) is non-empty");
+        assert!(result.chars().all(|c| c == first));
     }
 
     #[test]
@@ -240,7 +244,10 @@ mod tests {
         assert_eq!(result.chars().count(), 1);
         // Single value is maximum → should be '█'
         assert_eq!(
-            result.chars().next().unwrap(),
+            result
+                .chars()
+                .next()
+                .expect("sparkline(1 item) is non-empty"),
             SPARK_BARS[SPARK_BARS.len() - 1]
         );
     }

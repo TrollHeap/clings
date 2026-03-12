@@ -1,63 +1,11 @@
 //! Interactive memory visualizer — step-through stack/heap diagram for pointer exercises.
 
-use std::io::Write;
-
 use colored::Colorize;
 
-use crate::constants::{ANSI_ESC_BYTE, HEADER_WIDTH};
+use crate::constants::HEADER_WIDTH;
 use crate::models::{Exercise, VisVar};
 
-use super::{footer_box, header_box, try_parse_arrow, wrap_text, ArrowKey, INNER_W};
-
-/// Handles accumulating ESC sequences and navigating visualizer steps.
-///
-/// Returns `Some(())` if the key was consumed (caller should `return None`),
-/// `None` if the key was not an ESC sequence and should be processed normally.
-pub(crate) fn handle_esc_sequence(
-    key: u8,
-    escape_buf: &mut Vec<u8>,
-    vis_active: bool,
-    vis_step: &mut usize,
-    vis_lines: &mut usize,
-    visualizer_steps_len: usize,
-    show_vis: &mut impl FnMut(usize) -> usize,
-) -> Option<()> {
-    if !escape_buf.is_empty() {
-        escape_buf.push(key);
-        // Invalid sequence: ESC followed by something other than '[' → clear and process normally
-        if escape_buf.len() == 2 && escape_buf[1] != b'[' {
-            escape_buf.clear();
-        } else {
-            if escape_buf.len() == 3 {
-                let seq = std::mem::take(escape_buf);
-                if vis_active {
-                    let n = visualizer_steps_len;
-                    match try_parse_arrow(seq.as_slice()) {
-                        Some(ArrowKey::Right) => {
-                            *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
-                            print!("\x1b[{}A\x1b[J", *vis_lines);
-                            let _ = std::io::stdout().flush();
-                            *vis_lines = show_vis(*vis_step);
-                        }
-                        Some(ArrowKey::Left) => {
-                            *vis_step = vis_step.saturating_sub(1);
-                            print!("\x1b[{}A\x1b[J", *vis_lines);
-                            let _ = std::io::stdout().flush();
-                            *vis_lines = show_vis(*vis_step);
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            return Some(());
-        }
-    }
-    if key == ANSI_ESC_BYTE {
-        escape_buf.push(key);
-        return Some(());
-    }
-    None
-}
+use super::{footer_box, header_box, wrap_text, INNER_W};
 
 /// Width of each column in the two-column memory visualizer layout.
 const COL_W: usize = 26;
@@ -191,6 +139,16 @@ fn render_step(step: usize, total: usize, s: &crate::models::VisStep) -> usize {
     lines += 1;
 
     lines
+}
+
+/// Advance visualizer step, clamped to the last step.
+pub fn vis_step_forward(step: usize, total: usize) -> usize {
+    (step + 1).min(total.saturating_sub(1))
+}
+
+/// Retreat visualizer step, clamped to zero.
+pub fn vis_step_back(step: usize) -> usize {
+    step.saturating_sub(1)
 }
 
 /// Display a visualizer step for the given exercise.

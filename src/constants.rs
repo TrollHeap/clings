@@ -3,7 +3,6 @@
 // === Timing ===
 pub const EXECUTION_TIMEOUT_SECS: u64 = 10;
 pub const SECS_PER_DAY: i64 = 86_400;
-pub const POLL_INTERVAL_MS: u64 = 50;
 pub const DEBOUNCE_INTERVAL_MS: u64 = 200;
 pub const KEY_CHECK_TIMEOUT_MS: u64 = 50;
 pub const DB_BUSY_TIMEOUT_MS: i32 = 5000;
@@ -33,6 +32,8 @@ pub const PROGRESS_SUBJECT_WIDTH: usize = 20;
 pub const PROGRESS_HR_WIDTH: usize = 58;
 
 // === Display thresholds ===
+pub const PCT_GREEN_THRESHOLD: u32 = 75;
+pub const PCT_YELLOW_THRESHOLD: u32 = 25;
 pub const MINIMAP_MAX_ITEMS: usize = 60;
 pub const CONSECUTIVE_FAILURE_THRESHOLD: usize = 3;
 /// Seuil de piscine/exam : plus bas car la progression est linéaire sans navigation libre.
@@ -62,11 +63,6 @@ pub const DB_USER_VERSION_CURRENT: i32 = 1;
 // === tmux ===
 pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";
 pub const TMUX_EDITOR: &str = "nvim";
-
-// === Keyboard control bytes ===
-pub const CTRL_C: u8 = 0x03;
-pub const CTRL_Z: u8 = 0x1a;
-pub const ANSI_ESC_BYTE: u8 = 0x1b;
 
 // === ANSI escape sequences ===
 pub const ANSI_CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";

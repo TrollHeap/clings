@@ -1,14 +1,13 @@
 //! TUI display for annales — past exam session selector and question mapping.
 
-use std::io::Read;
-
 use colored::Colorize;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use crate::models::Exercise;
 
 use crate::constants::ANSI_CLEAR_SCREEN;
 
-use super::{hr, show_banner, try_parse_arrow, AnnaleSession, ArrowKey};
+use super::{hr, show_banner, AnnaleSession};
 
 /// Affiche les annales NSY103 avec le mapping vers les exercices clings.
 pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
@@ -101,7 +100,6 @@ pub fn select_exam_session(
         .and_then(|id| sessions.iter().position(|s| s.id == id))
         .unwrap_or(0);
     let mut cursor = initial;
-    let mut esc_buf: Vec<u8> = Vec::new();
 
     let _raw = crate::enable_raw_mode();
 
@@ -136,51 +134,30 @@ pub fn select_exam_session(
         println!();
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
-        // Read one byte
-        let mut buf = [0u8; 1];
-        if std::io::stdin().read_exact(&mut buf).is_err() {
-            return None;
-        }
-        let byte = buf[0];
-
-        // Accumulate ESC sequences
-        if byte == crate::constants::ANSI_ESC_BYTE {
-            esc_buf.clear();
-            esc_buf.push(byte);
-            // Try to read 2 more bytes with a short non-blocking window
-            let mut b2 = [0u8; 1];
-            if std::io::stdin().read_exact(&mut b2).is_ok() {
-                esc_buf.push(b2[0]);
-                let mut b3 = [0u8; 1];
-                if std::io::stdin().read_exact(&mut b3).is_ok() {
-                    esc_buf.push(b3[0]);
+        if event::poll(std::time::Duration::from_millis(100)).unwrap_or(false) {
+            if let Ok(Event::Key(key)) = event::read() {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                            cursor = cursor.saturating_sub(1);
+                        }
+                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                            if cursor + 1 < sessions.len() {
+                                cursor += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            print!("{ANSI_CLEAR_SCREEN}");
+                            return Some(sessions[cursor].id.clone());
+                        }
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
+                            print!("{ANSI_CLEAR_SCREEN}");
+                            return None;
+                        }
+                        _ => {}
+                    }
                 }
             }
-            match try_parse_arrow(&esc_buf) {
-                Some(ArrowKey::Up) => cursor = cursor.saturating_sub(1),
-                Some(ArrowKey::Down) if cursor + 1 < sessions.len() => cursor += 1,
-                _ => {}
-            }
-            esc_buf.clear();
-            continue;
-        }
-
-        match byte {
-            b'k' | b'K' => cursor = cursor.saturating_sub(1),
-            b'j' | b'J' => {
-                if cursor + 1 < sessions.len() {
-                    cursor += 1;
-                }
-            }
-            b'\r' | b'\n' => {
-                print!("{ANSI_CLEAR_SCREEN}");
-                return Some(sessions[cursor].id.clone());
-            }
-            b'q' | b'Q' => {
-                print!("{ANSI_CLEAR_SCREEN}");
-                return None;
-            }
-            _ => {}
         }
     }
 }
