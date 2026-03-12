@@ -14,6 +14,12 @@ use crate::tui::app::AppState;
 pub fn view(f: &mut Frame, state: &AppState) {
     let area = f.area();
 
+    // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
+    f.render_widget(
+        Block::default().style(Style::default().bg(Color::Black)),
+        area,
+    );
+
     if state.exercises.is_empty() {
         f.render_widget(
             Paragraph::new("Aucun exercice disponible.").block(Block::bordered()),
@@ -107,8 +113,11 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // Ligne 1 : [idx/total] titre + droit: mini-map
     let pad1 = {
-        let left_len = format!("[{}/{}] {}", idx + 1, total, exercise.title).len();
-        let right_len = map.len() + exercise.subject.len() + 2;
+        let left_len = format!("[{}/{}] {}", idx + 1, total, exercise.title)
+            .chars()
+            .count();
+        // chars().count() pour ●◉○ (3 octets chacun, 1 col d'affichage)
+        let right_len = map.chars().count() + exercise.subject.chars().count() + 2;
         width.saturating_sub(left_len + right_len + 4)
     };
     let line1 = Line::from(vec![
@@ -123,12 +132,9 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(map, Style::default().fg(Color::DarkGray)),
+        Span::styled(map, Style::default().fg(Color::Gray)),
         Span::raw("  "),
-        Span::styled(
-            exercise.subject.as_str(),
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
     ]);
 
     // Ligne 2 : difficulté | sujet | stage | temps écoulé
@@ -137,10 +143,7 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let mut meta_spans = vec![
         Span::styled(stars, Style::default().fg(diff_color)),
         Span::raw("  │  "),
-        Span::styled(
-            exercise.subject.as_str(),
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
     ];
 
     if let Some(stage) = state.current_stage {
@@ -152,20 +155,14 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
             _ => "S4",
         };
         meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(
-            stage_label,
-            Style::default().fg(Color::DarkGray),
-        ));
+        meta_spans.push(Span::styled(stage_label, Style::default().fg(Color::Gray)));
     }
 
     if let Some(start) = state.piscine_start {
         let elapsed = start.elapsed().as_secs();
         let elapsed_str = format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
         meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(
-            elapsed_str,
-            Style::default().fg(Color::DarkGray),
-        ));
+        meta_spans.push(Span::styled(elapsed_str, Style::default().fg(Color::Gray)));
     }
 
     let line2 = Line::from(meta_spans);
@@ -266,34 +263,34 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
     for line in exercise.description.lines() {
         lines.push(Line::from(line));
     }
-    lines.push(Line::raw(""));
+    let has_meta = exercise.key_concept.is_some()
+        || exercise.common_mistake.is_some()
+        || !exercise.files.is_empty();
+    if has_meta {
+        lines.push(Line::styled(
+            "─".repeat(36),
+            Style::default().fg(Color::DarkGray),
+        ));
+    } else {
+        lines.push(Line::raw(""));
+    }
 
     if let Some(kc) = &exercise.key_concept {
         lines.push(Line::from(vec![
-            Span::styled(
-                "💡 Concept clé : ",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("concept : ", Style::default().fg(Color::Cyan)),
             Span::raw(kc.as_str()),
         ]));
     }
     if let Some(cm) = &exercise.common_mistake {
         lines.push(Line::from(vec![
-            Span::styled(
-                "⚠ Piège : ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("piège   : ", Style::default().fg(Color::Yellow)),
             Span::styled(cm.as_str(), Style::default().fg(Color::DarkGray)),
         ]));
     }
     if !exercise.files.is_empty() {
         let names: Vec<&str> = exercise.files.iter().map(|f| f.name.as_str()).collect();
         lines.push(Line::from(vec![
-            Span::styled("📎 Fichiers : ", Style::default().fg(Color::Cyan)),
+            Span::styled("fichiers: ", Style::default().fg(Color::Gray)),
             Span::styled(names.join(", "), Style::default().fg(Color::DarkGray)),
         ]));
     }
@@ -310,7 +307,11 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
     }
 
     let title = if let Some(path) = &state.source_path {
-        format!("Exercice — {}", path.display())
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("current.c");
+        format!("Exercice — {}", filename)
     } else {
         "Exercice".to_string()
     };
@@ -554,11 +555,12 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
 
     lines.push(Line::from(vec![
         Span::styled(
-            format!("{:<28}", "STACK"),
+            format!("{:<25}", "STACK"),
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         ),
+        Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             "HEAP",
             Style::default()
@@ -586,7 +588,8 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
                 }
             });
         lines.push(Line::from(vec![
-            Span::styled(format!("{:<28}", left), Style::default().fg(Color::Green)),
+            Span::styled(format!("{:<25}", left), Style::default().fg(Color::Green)),
+            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
             Span::styled(right, Style::default().fg(Color::Cyan)),
         ]));
     }
@@ -595,14 +598,14 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
 
     if !step.explanation.is_empty() {
         for part in step.explanation.split(". ") {
-            lines.push(Line::styled(part, Style::default().fg(Color::DarkGray)));
+            lines.push(Line::styled(part, Style::default().fg(Color::Gray)));
         }
     }
 
     lines.push(Line::raw(""));
     lines.push(Line::styled(
         "[←] préc   [→] suiv   [v] fermer",
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(Color::Gray),
     ));
 
     let title = format!("Visualiseur {}/{}", step_idx + 1, steps.len());
@@ -611,6 +614,7 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
             .block(
                 Block::bordered()
                     .title(title)
+                    .style(Style::default().bg(Color::Black))
                     .border_style(Style::default().fg(Color::Yellow)),
             )
             .wrap(Wrap { trim: false }),
@@ -622,15 +626,18 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
 
+    let has_hints = !exercise.hints.is_empty();
     let left_msg = if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
         let mut parts = vec![
             "[r] compiler".to_string(),
-            "[h] indice".to_string(),
             "[n] suivant".to_string(),
             "[k] précédent".to_string(),
         ];
+        if has_hints {
+            parts.insert(1, "[h] indice".to_string());
+        }
         if has_vis {
             parts.push("[v] vis".to_string());
         }
