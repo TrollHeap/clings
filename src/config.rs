@@ -114,8 +114,8 @@ pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
         ("srs", "decay_days"),
         ("srs", "base_interval_days"),
         ("ui", "editor"),
-        ("tmux", "open_in_tmux"),
-        ("tmux", "pane_width"),
+        ("tmux", "enabled"),
+        ("ui", "tmux_pane_width"),
     ];
     if !ALLOWED.iter().any(|(s, k)| *s == section && *k == key) {
         return Err(format!(

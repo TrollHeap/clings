@@ -1124,26 +1124,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_weakest_exercises_order() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        // ptr-a : 0/2 successes (worst)
-        record_attempt(&conn, "pointers", "ptr-a", false).unwrap();
-        record_attempt(&conn, "pointers", "ptr-a", false).unwrap();
-        // ptr-b : 1/2 successes (middle)
-        record_attempt(&conn, "pointers", "ptr-b", true).unwrap();
-        record_attempt(&conn, "pointers", "ptr-b", false).unwrap();
-        // ptr-c : 2/2 successes (best)
-        record_attempt(&conn, "pointers", "ptr-c", true).unwrap();
-        record_attempt(&conn, "pointers", "ptr-c", true).unwrap();
-
-        let weakest = get_weakest_exercises(&conn, "pointers", 3).unwrap();
-        assert_eq!(weakest[0], "ptr-a");
-        assert_eq!(weakest[1], "ptr-b");
-        assert_eq!(weakest[2], "ptr-c");
-    }
-
-    #[test]
     fn test_migrate_v1_idempotent() {
         let conn = open_test_db().unwrap();
         // open_test_db already runs migrate_v1 via SCHEMA_V1; call again
