@@ -9,6 +9,7 @@ mod progress;
 mod stats;
 mod visualizer;
 
+#[allow(unused_imports)]
 pub use annales::*;
 pub use exercise::*;
 pub use keybinds::*;
