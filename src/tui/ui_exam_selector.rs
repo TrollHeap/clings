@@ -75,6 +75,17 @@ fn run_selector_loop(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn select_exam_session_returns_none_on_empty_list() {
+        assert_eq!(select_exam_session(&[], None), None);
+        assert_eq!(select_exam_session(&[], Some("nsy103-2023")), None);
+    }
+}
+
 fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
