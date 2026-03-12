@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::error::Result;
 use crate::models::{Exercise, Subject};
+use crate::tui::common;
 
 /// Lance une vue Ratatui autonome pour afficher la liste d'exercices.
 pub fn run_list(
@@ -87,28 +88,6 @@ pub fn run_list(
     Ok(())
 }
 
-fn difficulty_color(diff: crate::models::Difficulty) -> Color {
-    use crate::models::Difficulty;
-    match diff {
-        Difficulty::Easy => Color::Green,
-        Difficulty::Medium => Color::Yellow,
-        Difficulty::Hard => Color::Red,
-        Difficulty::Advanced => Color::Magenta,
-        Difficulty::Expert => Color::Cyan,
-    }
-}
-
-fn difficulty_stars(d: crate::models::Difficulty) -> &'static str {
-    use crate::models::Difficulty;
-    match d {
-        Difficulty::Easy => "★☆☆☆☆",
-        Difficulty::Medium => "★★☆☆☆",
-        Difficulty::Hard => "★★★☆☆",
-        Difficulty::Advanced => "★★★★☆",
-        Difficulty::Expert => "★★★★★",
-    }
-}
-
 fn draw_list(
     f: &mut ratatui::Frame,
     filtered: &[&Exercise],
@@ -149,8 +128,8 @@ fn draw_list(
         .iter()
         .map(|ex| {
             let subject = subject_map.get(ex.subject.as_str()).copied();
-            let diff = difficulty_stars(ex.difficulty);
-            let diff_color = difficulty_color(ex.difficulty);
+            let diff = common::difficulty_stars(ex.difficulty);
+            let diff_color = common::difficulty_color(ex.difficulty);
             let mastery_info = subject
                 .map(|s| format!(" [{:.1}]", s.mastery_score.get()))
                 .unwrap_or_default();

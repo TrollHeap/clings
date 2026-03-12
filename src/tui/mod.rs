@@ -1,6 +1,7 @@
 //! Ratatui TUI framework integration.
 
 pub mod app;
+pub mod common;
 pub mod events;
 pub mod ui_annales;
 pub mod ui_exam_selector;

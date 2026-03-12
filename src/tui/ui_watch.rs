@@ -3,12 +3,11 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::models::{Difficulty, ValidationMode};
-use crate::runner::RunResult;
 use crate::tui::app::AppState;
+use crate::tui::common;
 
 /// Point d'entrée du rendu watch (appelé par App::run_watch).
 pub fn view(f: &mut Frame, state: &AppState) {
@@ -39,32 +38,12 @@ pub fn view(f: &mut Frame, state: &AppState) {
     render_header(f, header_area, state);
 
     if state.vis_active {
-        render_visualizer_overlay(f, body_area, state);
+        common::render_visualizer_overlay(f, body_area, state);
     } else {
         render_body(f, body_area, state);
     }
 
     render_status_bar(f, status_area, state);
-}
-
-fn difficulty_color(d: Difficulty) -> Color {
-    match d {
-        Difficulty::Easy => Color::Green,
-        Difficulty::Medium => Color::Yellow,
-        Difficulty::Hard => Color::Red,
-        Difficulty::Advanced => Color::Magenta,
-        Difficulty::Expert => Color::Cyan,
-    }
-}
-
-fn difficulty_stars(d: Difficulty) -> &'static str {
-    match d {
-        Difficulty::Easy => "★☆☆☆☆",
-        Difficulty::Medium => "★★☆☆☆",
-        Difficulty::Hard => "★★★☆☆",
-        Difficulty::Advanced => "★★★★☆",
-        Difficulty::Expert => "★★★★★",
-    }
 }
 
 /// Barre de mastery unicode avec couleur gradient.
@@ -73,41 +52,7 @@ fn mastery_bar(score: f64, width: usize) -> (String, Color) {
     let filled = (score.clamp(0.0, 5.0) / 5.0 * width as f64).round() as usize;
     let full = "█".repeat(filled);
     let empty = "░".repeat(width - filled);
-    let color = if score < 1.0 {
-        Color::Red
-    } else if score < 2.5 {
-        Color::Yellow
-    } else if score < 4.0 {
-        Color::Green
-    } else {
-        Color::Cyan
-    };
-    (format!("{}{}", full, empty), color)
-}
-
-/// Mini-map de 8 exercices autour du curseur (●=courant, ◉=complété, ○=pas encore).
-fn mini_map(completed: &[bool], current: usize) -> String {
-    let total = completed.len();
-    if total == 0 {
-        return String::new();
-    }
-    let half = 4usize;
-    let start = current.saturating_sub(half);
-    let end = (start + 9).min(total);
-    let start = end.saturating_sub(9).min(start);
-
-    (start..end)
-        .map(|i| {
-            if i == current {
-                "●"
-            } else if completed.get(i).copied().unwrap_or(false) {
-                "◉"
-            } else {
-                "○"
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("")
+    (format!("{}{}", full, empty), common::mastery_color(score))
 }
 
 fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
@@ -123,7 +68,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         .copied()
         .unwrap_or(0.0);
     let (bar, bar_color) = mastery_bar(mastery, 10);
-    let map = mini_map(&state.completed, idx);
+    let map = common::mini_map(&state.completed, idx);
 
     // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
     let left1 = format!("[{}/{}] {}", idx + 1, total, exercise.title);
@@ -148,8 +93,8 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     ]);
 
     // ── Ligne 2 : stars | type | stage ── + droit: mastery bar ────────
-    let stars = difficulty_stars(exercise.difficulty);
-    let diff_color = difficulty_color(exercise.difficulty);
+    let stars = common::difficulty_stars(exercise.difficulty);
+    let diff_color = common::difficulty_color(exercise.difficulty);
     let mut meta_spans: Vec<Span> = vec![
         Span::styled(stars, Style::default().fg(diff_color)),
         Span::raw("  │  "),
@@ -205,17 +150,6 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(Paragraph::new(text).block(block), area);
 }
 
-/// Hauteur dynamique du panneau run_result.
-fn run_result_height(result: &RunResult) -> u16 {
-    if result.success || result.timeout {
-        3
-    } else if result.compile_error {
-        7
-    } else {
-        9
-    }
-}
-
 fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
 
@@ -230,7 +164,7 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 
     // Layout contenu : description (fill) | result (hauteur dynamique si présent)
     let body_areas = if let Some(result) = &state.run_result {
-        let h = run_result_height(result);
+        let h = common::run_result_height(result);
         let [desc, res] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
         vec![desc, res]
@@ -308,7 +242,7 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
     // ── Résultat de compilation ──────────────────────────────────────────
     if let Some(result_area) = body_areas.get(1) {
         if let Some(result) = &state.run_result {
-            render_run_result(f, *result_area, result, exercise);
+            common::render_run_result(f, *result_area, result, exercise);
         }
     }
 
@@ -397,224 +331,6 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 
     let block = Block::bordered().title("Progression");
     f.render_widget(Paragraph::new(lines).block(block), area);
-}
-
-fn render_run_result(
-    f: &mut Frame,
-    area: Rect,
-    result: &crate::runner::RunResult,
-    exercise: &crate::models::Exercise,
-) {
-    let (title, title_color) = if result.success {
-        (format!("✓ SUCCÈS ({}ms)", result.duration_ms), Color::Green)
-    } else if result.compile_error {
-        ("✗ ERREUR DE COMPILATION".to_string(), Color::Red)
-    } else if result.timeout {
-        ("✗ TIMEOUT".to_string(), Color::Red)
-    } else {
-        let is_test = matches!(
-            exercise.validation.mode,
-            ValidationMode::Test | ValidationMode::Both
-        );
-        if is_test {
-            ("✗ TESTS ÉCHOUÉS".to_string(), Color::Red)
-        } else {
-            ("✗ SORTIE INCORRECTE".to_string(), Color::Red)
-        }
-    };
-
-    let color = title_color;
-    let mut lines: Vec<Line> = Vec::new();
-
-    if result.success {
-        for line in result.stdout.lines() {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::Green),
-            )));
-        }
-    } else if result.compile_error {
-        for line in result.stderr.lines().take(5) {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::Red),
-            )));
-        }
-    } else if result.timeout {
-        lines.push(Line::from("Dépassement de 10s — boucle infinie ?"));
-    } else if let Some(expected) = &exercise.validation.expected_output {
-        let exp_lines: Vec<&str> = expected.trim().lines().collect();
-        let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
-        let max_len = exp_lines.len().max(got_lines.len());
-        for i in 0..max_len.min(4) {
-            match (exp_lines.get(i), got_lines.get(i)) {
-                (Some(e), Some(g)) if *e == *g => {
-                    lines.push(Line::from(Span::styled(
-                        format!("  {}", e),
-                        Style::default().fg(Color::Green),
-                    )));
-                }
-                (Some(e), Some(g)) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("- {}", e),
-                        Style::default().fg(Color::Red),
-                    )));
-                    lines.push(Line::from(Span::styled(
-                        format!("+ {}", g),
-                        Style::default().fg(Color::Yellow),
-                    )));
-                }
-                (Some(e), None) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("- {}", e),
-                        Style::default().fg(Color::Red),
-                    )));
-                }
-                (None, Some(g)) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("+ {}", g),
-                        Style::default().fg(Color::Yellow),
-                    )));
-                }
-                (None, None) => {}
-            }
-        }
-    }
-
-    let block = Block::bordered()
-        .title(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ))
-        .border_style(Style::default().fg(color));
-    f.render_widget(Paragraph::new(lines).block(block), area);
-}
-
-/// Calcule la taille du popup visualiseur en fonction du contenu.
-fn popup_size_for_vis(step: &crate::models::VisStep) -> (u16, u16) {
-    let n_items = (step.stack.len() + step.heap.len()).max(3) as u16;
-    let h_pct = (n_items * 6).clamp(35, 60);
-    let w_pct = 65u16;
-    (w_pct, h_pct)
-}
-
-fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
-    let steps = &exercise.visualizer.steps;
-
-    if steps.is_empty() {
-        return;
-    }
-
-    let step_idx = state.vis_step.min(steps.len() - 1);
-    let step = &steps[step_idx];
-
-    let (w_pct, h_pct) = popup_size_for_vis(step);
-    let margin_v = (100u16.saturating_sub(h_pct)) / 2;
-    let margin_h = (100u16.saturating_sub(w_pct)) / 2;
-
-    let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(margin_v),
-        Constraint::Percentage(h_pct),
-        Constraint::Percentage(margin_v),
-    ])
-    .areas(area);
-    let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(margin_h),
-        Constraint::Percentage(w_pct),
-        Constraint::Percentage(margin_h),
-    ])
-    .areas(popup_v);
-
-    f.render_widget(Clear, popup);
-
-    let mut lines: Vec<Line> = Vec::new();
-
-    let dots: String = (0..steps.len())
-        .map(|i| if i == step_idx { "●" } else { "○" })
-        .collect::<Vec<_>>()
-        .join(" ");
-    lines.push(Line::styled(dots, Style::default().fg(Color::Yellow)));
-    lines.push(Line::raw(""));
-
-    let label = if !step.step_label.is_empty() {
-        &step.step_label
-    } else {
-        &step.label
-    };
-    lines.push(Line::styled(
-        label.as_str(),
-        Style::default().add_modifier(Modifier::BOLD),
-    ));
-    lines.push(Line::raw(""));
-
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("{:<25}", "STACK"),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            "HEAP",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]));
-
-    let max_rows = step.stack.len().max(step.heap.len()).max(1);
-    for i in 0..max_rows {
-        let left = step
-            .stack
-            .get(i)
-            .map(|v| format!("{}: {}", v.name, v.value))
-            .unwrap_or_default();
-        let right = step
-            .heap
-            .get(i)
-            .map(|v| format!("{}: {}", v.name, v.value))
-            .unwrap_or_else(|| {
-                if step.heap.is_empty() && i == 0 {
-                    "(vide)".to_string()
-                } else {
-                    String::new()
-                }
-            });
-        lines.push(Line::from(vec![
-            Span::styled(format!("{:<25}", left), Style::default().fg(Color::Green)),
-            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(right, Style::default().fg(Color::Cyan)),
-        ]));
-    }
-
-    lines.push(Line::raw(""));
-
-    if !step.explanation.is_empty() {
-        for part in step.explanation.split(". ") {
-            lines.push(Line::styled(part, Style::default().fg(Color::Gray)));
-        }
-    }
-
-    lines.push(Line::raw(""));
-    lines.push(Line::styled(
-        "[←] préc   [→] suiv   [v] fermer",
-        Style::default().fg(Color::Gray),
-    ));
-
-    let title = format!("Visualiseur {}/{}", step_idx + 1, steps.len());
-    f.render_widget(
-        Paragraph::new(lines)
-            .block(
-                Block::bordered()
-                    .title(title)
-                    .style(Style::default().bg(Color::Black))
-                    .border_style(Style::default().fg(Color::Yellow)),
-            )
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
 }
 
 fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {

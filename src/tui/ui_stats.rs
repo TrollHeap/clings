@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::error::Result;
 use crate::models::Subject;
+use crate::tui::common;
 
 fn avg_mastery(subjects: &[Subject]) -> f64 {
     if subjects.is_empty() {
@@ -22,13 +23,7 @@ fn mastery_bar_spans(score: f64) -> Vec<Span<'static>> {
     let filled = (score / 5.0 * 10.0).round() as usize;
     let empty = 10 - filled.min(10);
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
-    let color = if score >= 4.0 {
-        Color::Green
-    } else if score >= 2.5 {
-        Color::Yellow
-    } else {
-        Color::Red
-    };
+    let color = common::mastery_color(score);
     vec![
         Span::styled(bar, Style::default().fg(color)),
         Span::raw(format!(" {:.1}", score)),
