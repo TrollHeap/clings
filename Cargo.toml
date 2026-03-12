@@ -30,6 +30,7 @@ crossterm = "0.28"
 textwrap = "0.16"
 rust-embed = { version = "8", features = ["include-exclude"] }
 nucleo-matcher = "0.3"
+ratatui = "0.29"
 
 [profile.release]
 lto = "thin"          # Link-time optimization (thin = bon compromis vitesse/taille)
