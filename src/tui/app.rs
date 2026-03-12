@@ -159,7 +159,10 @@ impl App {
         // Open/update neovim pane in tmux
         let pane = crate::tmux::update_editor_pane(
             self.state.editor_pane.as_deref(),
-            self.state.source_path.as_ref().unwrap(),
+            self.state
+                .source_path
+                .as_ref()
+                .expect("source_path toujours Some après load_current_exercise"),
         );
         self.state.editor_pane = pane;
 
@@ -218,13 +221,17 @@ impl App {
                         let next = self.state.current_index + 1;
                         if next < self.state.exercises.len() {
                             self.state.current_index = next;
-                            let _ = self.load_current_exercise(conn);
+                            if let Err(e) = self.load_current_exercise(conn) {
+                                eprintln!("[clings] erreur chargement exercice: {e}");
+                            }
                         }
                     }
                     KeyCode::Char('k') | KeyCode::Char('K') => {
                         if self.state.current_index > 0 {
                             self.state.current_index -= 1;
-                            let _ = self.load_current_exercise(conn);
+                            if let Err(e) = self.load_current_exercise(conn) {
+                                eprintln!("[clings] erreur chargement exercice: {e}");
+                            }
                         }
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
@@ -238,12 +245,14 @@ impl App {
                                 self.state.consecutive_failures = 0;
                                 if !self.state.already_recorded {
                                     self.state.already_recorded = true;
-                                    let _ = crate::progress::record_attempt(
+                                    if let Err(e) = crate::progress::record_attempt(
                                         conn,
-                                        &exercise.subject.clone(),
-                                        &exercise.id.clone(),
+                                        &exercise.subject,
+                                        &exercise.id,
                                         true,
-                                    );
+                                    ) {
+                                        eprintln!("[clings] erreur enregistrement tentative: {e}");
+                                    }
                                 }
                                 // Advance after short delay
                                 std::thread::sleep(std::time::Duration::from_secs(
@@ -253,7 +262,9 @@ impl App {
                                 self.state.completed[self.state.current_index] = true;
                                 if next < self.state.exercises.len() {
                                     self.state.current_index = next;
-                                    let _ = self.load_current_exercise(conn);
+                                    if let Err(e) = self.load_current_exercise(conn) {
+                                        eprintln!("[clings] erreur chargement exercice: {e}");
+                                    }
                                 } else {
                                     self.state.should_quit = true;
                                 }
@@ -265,14 +276,15 @@ impl App {
                                 {
                                     self.state.hint_shown = true;
                                 }
-                                let _ = crate::progress::record_attempt(
-                                    conn,
-                                    &self.state.exercises[self.state.current_index]
-                                        .subject
-                                        .clone(),
-                                    &self.state.exercises[self.state.current_index].id.clone(),
-                                    false,
-                                );
+                                let subj = self.state.exercises[self.state.current_index]
+                                    .subject
+                                    .clone();
+                                let id = self.state.exercises[self.state.current_index].id.clone();
+                                if let Err(e) =
+                                    crate::progress::record_attempt(conn, &subj, &id, false)
+                                {
+                                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                                }
                             }
                         }
                     }
@@ -405,7 +417,9 @@ impl App {
                         let next = self.state.current_index + 1;
                         if next < self.state.exercises.len() {
                             self.state.current_index = next;
-                            let _ = self.load_current_exercise(conn);
+                            if let Err(e) = self.load_current_exercise(conn) {
+                                eprintln!("[clings] erreur chargement exercice: {e}");
+                            }
                             let idx = self.state.current_index;
                             let _ = crate::progress::save_piscine_checkpoint(conn, idx);
                             if let Some(sid) = session_id {
@@ -424,7 +438,9 @@ impl App {
                     KeyCode::Char('k') | KeyCode::Char('K') => {
                         if self.state.current_index > 0 {
                             self.state.current_index -= 1;
-                            let _ = self.load_current_exercise(conn);
+                            if let Err(e) = self.load_current_exercise(conn) {
+                                eprintln!("[clings] erreur chargement exercice: {e}");
+                            }
                             let idx = self.state.current_index;
                             let _ = crate::progress::save_piscine_checkpoint(conn, idx);
                             if let Some(sid) = session_id {
@@ -444,12 +460,14 @@ impl App {
                                 self.state.piscine_fail_count = 0;
                                 if !self.state.already_recorded {
                                     self.state.already_recorded = true;
-                                    let _ = crate::progress::record_attempt(
+                                    if let Err(e) = crate::progress::record_attempt(
                                         conn,
-                                        &exercise.subject.clone(),
-                                        &exercise.id.clone(),
+                                        &exercise.subject,
+                                        &exercise.id,
                                         true,
-                                    );
+                                    ) {
+                                        eprintln!("[clings] erreur enregistrement tentative: {e}");
+                                    }
                                 }
                                 // Advance after short delay
                                 std::thread::sleep(std::time::Duration::from_secs(
@@ -459,7 +477,9 @@ impl App {
                                 let next = self.state.current_index + 1;
                                 if next < self.state.exercises.len() {
                                     self.state.current_index = next;
-                                    let _ = self.load_current_exercise(conn);
+                                    if let Err(e) = self.load_current_exercise(conn) {
+                                        eprintln!("[clings] erreur chargement exercice: {e}");
+                                    }
                                     let idx = self.state.current_index;
                                     let _ = crate::progress::save_piscine_checkpoint(conn, idx);
                                     if let Some(sid) = session_id {
@@ -487,12 +507,14 @@ impl App {
                                         }
                                     }
                                 }
-                                let _ = crate::progress::record_attempt(
+                                if let Err(e) = crate::progress::record_attempt(
                                     conn,
-                                    &exercise.subject.clone(),
-                                    &exercise.id.clone(),
+                                    &exercise.subject,
+                                    &exercise.id,
                                     false,
-                                );
+                                ) {
+                                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                                }
                             }
                         }
                     }
