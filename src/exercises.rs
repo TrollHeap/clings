@@ -1,3 +1,9 @@
+//! Exercise loader — discovers and parses JSON exercise files.
+//!
+//! Resolution order: `CLINGS_EXERCISES` env var → binary ancestors → CWD.
+//! Each exercise is a JSON file under `exercises/<subject>/`.
+//! Also loads `annales_map.json` for past exam mappings.
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 

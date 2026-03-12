@@ -1,3 +1,8 @@
+//! File watcher and keyboard input handler for watch mode.
+//!
+//! Uses the `notify` crate with 200ms debounce for file change detection.
+//! A separate stdin thread reads keyboard input. Returns `WatchAction` variants.
+
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;

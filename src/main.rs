@@ -271,7 +271,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         let watch_meta = display::WatchMeta {
             stage: current_stage,
             next_review_days: next_review,
-            unmet_prereqs: unmet_prereqs.clone(),
+            unmet_prereqs,
         };
         display::show_exercise_watch(
             exercise,
@@ -367,16 +367,11 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     b'k' | b'K' => Some(WatchAction::Prev),
                     b'q' | b'Q' | 0x03 | 0x1a => Some(WatchAction::Quit),
                     b'l' | b'L' => {
-                        // Quick exercise list
+                        // Quick exercise list — reuse subjects already loaded at session start
                         match exercises::load_all_exercises() {
-                            Ok((all, _)) => match progress::get_all_subjects(&conn) {
-                                Ok(subjects) => {
-                                    display::show_exercise_list(&all, &subjects, None, None)
-                                }
-                                // Dégradation gracieuse : l'affichage de la liste est optionnel ;
-                                // une erreur DB ne doit pas interrompre la session watch.
-                                Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
-                            },
+                            Ok((all, _)) => {
+                                display::show_exercise_list(&all, &subjects, None, None)
+                            }
                             // Dégradation gracieuse : échec de rechargement des exercices,
                             // on reste sur l'exercice courant.
                             Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
@@ -474,7 +469,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 }
 
 /// RAII guard that restores libc raw mode on drop.
-pub(crate) struct RawModeGuard;
+struct RawModeGuard;
 
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
@@ -747,13 +742,12 @@ fn cmd_review() -> Result<()> {
         subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
     // For each due subject, prefer the weakest exercise (by exercise_scores); fallback to first
+    let weakest_by_subject = progress::get_all_weakest_exercises(&conn).unwrap_or_default();
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
         .filter_map(|subject_name| {
             // Prioritise the exercise with the lowest success rate for this subject.
-            let weakest_id = progress::get_weakest_exercises(&conn, subject_name, 1)
-                .ok()
-                .and_then(|v| v.into_iter().next());
+            let weakest_id = weakest_by_subject.get(subject_name.as_str()).cloned();
             if let Some(ref id) = weakest_id {
                 if let Some(ex) = all_exercises.iter().find(|e| &e.id == id) {
                     return Some(ex);

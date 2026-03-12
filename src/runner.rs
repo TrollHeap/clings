@@ -1,3 +1,9 @@
+//! C code compilation and execution engine.
+//!
+//! Compiles user code with `gcc -Wall -Wextra -std=c11`, writes it to `~/.clings/current.c`,
+//! runs it with a 10-second timeout, and validates stdout against expected output.
+//! Supports `Output`, `Test`, and `Both` validation modes via `compile_and_run()`.
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

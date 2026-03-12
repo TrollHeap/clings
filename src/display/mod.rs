@@ -19,7 +19,9 @@ use std::sync::OnceLock;
 
 use colored::{ColoredString, Colorize};
 
-use crate::constants::{HEADER_WIDTH, MASTERY_MAX};
+use crate::constants::{
+    HEADER_WIDTH, MASTERY_BAR_GREEN_THRESHOLD, MASTERY_BAR_YELLOW_THRESHOLD, MASTERY_MAX,
+};
 use crate::models::Difficulty;
 
 pub use crate::models::AnnaleSession;
@@ -49,9 +51,9 @@ pub fn mastery_bar(score: f64) -> String {
     let filled = (score / MASTERY_MAX * 10.0).round() as usize;
     let empty = 10 - filled.min(10);
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
-    let colored = if score >= 4.0 {
+    let colored = if score >= MASTERY_BAR_GREEN_THRESHOLD {
         bar.green().to_string()
-    } else if score >= 2.0 {
+    } else if score >= MASTERY_BAR_YELLOW_THRESHOLD {
         bar.yellow().to_string()
     } else {
         bar.red().to_string()
