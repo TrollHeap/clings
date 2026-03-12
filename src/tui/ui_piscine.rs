@@ -7,6 +7,7 @@ use ratatui::widgets::{Block, Clear, Gauge, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::models::{Difficulty, ValidationMode};
+use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
 /// Point d'entrée du rendu piscine (appelé par App::run_piscine).
@@ -21,7 +22,7 @@ pub fn view(f: &mut Frame, state: &AppState) {
         return;
     }
 
-    // Layout : header (3) | timer (3 si timed) | body (fill) | result (si présent, max 12) | status (1)
+    // Layout : header (4) | timer (3 si timed) | body (fill) | status (1)
     let timer_constraint = if state.piscine_deadline.is_some() {
         Constraint::Length(3)
     } else {
@@ -29,7 +30,7 @@ pub fn view(f: &mut Frame, state: &AppState) {
     };
 
     let [header_area, timer_area, body_rest, status_area] = Layout::vertical([
-        Constraint::Length(3),
+        Constraint::Length(4),
         timer_constraint,
         Constraint::Fill(1),
         Constraint::Length(1),
@@ -71,23 +72,64 @@ fn difficulty_stars(d: Difficulty) -> &'static str {
     }
 }
 
+/// Mini-map de 8 exercices autour du curseur.
+fn mini_map(completed: &[bool], current: usize) -> String {
+    let total = completed.len();
+    if total == 0 {
+        return String::new();
+    }
+    let half = 4usize;
+    let start = current.saturating_sub(half);
+    let end = (start + 9).min(total);
+    let start = end.saturating_sub(9).min(start);
+
+    (start..end)
+        .map(|i| {
+            if i == current {
+                "●"
+            } else if completed.get(i).copied().unwrap_or(false) {
+                "◉"
+            } else {
+                "○"
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("")
+}
+
 fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let total = state.exercises.len();
     let idx = state.current_index;
+    let width = area.width as usize;
 
-    // Ligne 1 : [idx/total] titre
-    let progress_span = Span::styled(
-        format!("[{}/{}] ", idx + 1, total),
-        Style::default()
-            .fg(Color::Green)
-            .add_modifier(Modifier::BOLD),
-    );
-    let title_span = Span::styled(
-        exercise.title.as_str(),
-        Style::default().add_modifier(Modifier::BOLD),
-    );
-    let line1 = Line::from(vec![progress_span, title_span]);
+    let map = mini_map(&state.completed, idx);
+
+    // Ligne 1 : [idx/total] titre + droit: mini-map
+    let pad1 = {
+        let left_len = format!("[{}/{}] {}", idx + 1, total, exercise.title).len();
+        let right_len = map.len() + exercise.subject.len() + 2;
+        width.saturating_sub(left_len + right_len + 4)
+    };
+    let line1 = Line::from(vec![
+        Span::styled(
+            format!("[{}/{}] ", idx + 1, total),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            exercise.title.as_str(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" ".repeat(pad1 + 1)),
+        Span::styled(map, Style::default().fg(Color::DarkGray)),
+        Span::raw("  "),
+        Span::styled(
+            exercise.subject.as_str(),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ]);
 
     // Ligne 2 : difficulté | sujet | stage | temps écoulé
     let stars = difficulty_stars(exercise.difficulty);
@@ -103,11 +145,11 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     if let Some(stage) = state.current_stage {
         let stage_label = match stage {
-            0 => "S0 Exemple",
-            1 => "S1 Guide",
-            2 => "S2 Blancs",
-            3 => "S3 Squelette",
-            _ => "S4 Autonome",
+            0 => "S0",
+            1 => "S1",
+            2 => "S2",
+            3 => "S3",
+            _ => "S4",
         };
         meta_spans.push(Span::raw("  │  "));
         meta_spans.push(Span::styled(
@@ -116,10 +158,9 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
         ));
     }
 
-    // Temps écoulé
     if let Some(start) = state.piscine_start {
         let elapsed = start.elapsed().as_secs();
-        let elapsed_str = format!("{}m{:02}s", elapsed / 60, elapsed % 60);
+        let elapsed_str = format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
         meta_spans.push(Span::raw("  │  "));
         meta_spans.push(Span::styled(
             elapsed_str,
@@ -129,7 +170,17 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     let line2 = Line::from(meta_spans);
 
-    let text = Text::from(vec![line1, line2]);
+    // Ligne 3 : échecs cumulés si > 0
+    let line3 = if state.piscine_fail_count > 0 {
+        Line::from(Span::styled(
+            format!("✗ {} échec(s) cumulé(s)", state.piscine_fail_count),
+            Style::default().fg(Color::Red),
+        ))
+    } else {
+        Line::raw("")
+    };
+
+    let text = Text::from(vec![line1, line2, line3]);
     let block = Block::bordered().title("clings — piscine");
     f.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -175,23 +226,43 @@ fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {
     }
 }
 
+/// Hauteur dynamique du panneau run_result.
+fn run_result_height(result: &RunResult) -> u16 {
+    if result.success || result.timeout {
+        3
+    } else if result.compile_error {
+        7
+    } else {
+        9
+    }
+}
+
 fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
 
-    // Layout body : description (fill) | result (si run_result present, max 12)
-    let body_areas = if state.run_result.is_some() {
-        let [desc, result] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(12)]).areas(area);
-        vec![desc, result]
+    // Layout body : [left | right sidebar (si width >= 90)]
+    let (content_area, sidebar_opt) = if area.width >= 90 {
+        let [left, right] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(26)]).areas(area);
+        (left, Some(right))
     } else {
-        vec![area]
+        (area, None)
+    };
+
+    // Layout contenu : description (fill) | result (hauteur dynamique si présent)
+    let body_areas = if let Some(result) = &state.run_result {
+        let h = run_result_height(result);
+        let [desc, res] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
+        vec![desc, res]
+    } else {
+        vec![content_area]
     };
 
     // ── Description / hints ──────────────────────────────────────────────
     let desc_area = body_areas[0];
     let mut lines: Vec<Line> = Vec::new();
 
-    // Description
     for line in exercise.description.lines() {
         lines.push(Line::from(line));
     }
@@ -257,6 +328,84 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
             render_run_result(f, *result_area, result, exercise);
         }
     }
+
+    // ── Sidebar piscine ──────────────────────────────────────────────────
+    if let Some(sb_area) = sidebar_opt {
+        render_piscine_sidebar(f, sb_area, state);
+    }
+}
+
+fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
+    let total = state.exercises.len();
+    let done = state.completed.iter().filter(|&&c| c).count();
+    let ratio = if total > 0 {
+        done as f64 / total as f64
+    } else {
+        0.0
+    };
+
+    let idx = state.current_index;
+    let map = mini_map(&state.completed, idx);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Barre de progression globale
+    let bar_width = 20usize;
+    let filled = (ratio * bar_width as f64).round() as usize;
+    let progress_bar = format!(
+        "[{}{}] {}/{}",
+        "█".repeat(filled),
+        "░".repeat(bar_width - filled),
+        done,
+        total
+    );
+    lines.push(Line::from(Span::styled(
+        progress_bar,
+        Style::default().fg(Color::Green),
+    )));
+    lines.push(Line::raw(""));
+
+    // Mini-map du chapitre courant
+    lines.push(Line::from(Span::styled(
+        map,
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::raw(""));
+
+    // Timer restant si timed
+    if let Some(deadline) = state.piscine_deadline {
+        let remaining = (deadline - std::time::Instant::now())
+            .as_secs_f64()
+            .max(0.0) as u64;
+        let timer_str = if remaining >= 60 {
+            format!("⏱ {}m{:02}s restant", remaining / 60, remaining % 60)
+        } else {
+            format!("⏱ {}s restant", remaining)
+        };
+        let color = if remaining > 300 {
+            Color::Green
+        } else if remaining > 60 {
+            Color::Yellow
+        } else {
+            Color::Red
+        };
+        lines.push(Line::from(Span::styled(
+            timer_str,
+            Style::default().fg(color),
+        )));
+        lines.push(Line::raw(""));
+    }
+
+    // Échecs cumulés
+    if state.piscine_fail_count > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("✗ {} échec(s)", state.piscine_fail_count),
+            Style::default().fg(Color::Red),
+        )));
+    }
+
+    let block = Block::bordered().title("Piscine");
+    f.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn render_run_result(
@@ -294,7 +443,7 @@ fn render_run_result(
             )));
         }
     } else if result.compile_error {
-        for line in result.stderr.lines().take(8) {
+        for line in result.stderr.lines().take(5) {
             lines.push(Line::from(Span::styled(
                 line,
                 Style::default().fg(Color::Red),
@@ -302,44 +451,41 @@ fn render_run_result(
         }
     } else if result.timeout {
         lines.push(Line::from("Dépassement de 10s — boucle infinie ?"));
-    } else {
-        // Diff expected/got
-        if let Some(expected) = &exercise.validation.expected_output {
-            let exp_lines: Vec<&str> = expected.trim().lines().collect();
-            let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
-            let max_len = exp_lines.len().max(got_lines.len());
-            for i in 0..max_len.min(6) {
-                match (exp_lines.get(i), got_lines.get(i)) {
-                    (Some(e), Some(g)) if *e == *g => {
-                        lines.push(Line::from(Span::styled(
-                            format!("  {}", e),
-                            Style::default().fg(Color::Green),
-                        )));
-                    }
-                    (Some(e), Some(g)) => {
-                        lines.push(Line::from(Span::styled(
-                            format!("- {}", e),
-                            Style::default().fg(Color::Red),
-                        )));
-                        lines.push(Line::from(Span::styled(
-                            format!("+ {}", g),
-                            Style::default().fg(Color::Yellow),
-                        )));
-                    }
-                    (Some(e), None) => {
-                        lines.push(Line::from(Span::styled(
-                            format!("- {}", e),
-                            Style::default().fg(Color::Red),
-                        )));
-                    }
-                    (None, Some(g)) => {
-                        lines.push(Line::from(Span::styled(
-                            format!("+ {}", g),
-                            Style::default().fg(Color::Yellow),
-                        )));
-                    }
-                    (None, None) => {}
+    } else if let Some(expected) = &exercise.validation.expected_output {
+        let exp_lines: Vec<&str> = expected.trim().lines().collect();
+        let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
+        let max_len = exp_lines.len().max(got_lines.len());
+        for i in 0..max_len.min(4) {
+            match (exp_lines.get(i), got_lines.get(i)) {
+                (Some(e), Some(g)) if *e == *g => {
+                    lines.push(Line::from(Span::styled(
+                        format!("  {}", e),
+                        Style::default().fg(Color::Green),
+                    )));
                 }
+                (Some(e), Some(g)) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("- {}", e),
+                        Style::default().fg(Color::Red),
+                    )));
+                    lines.push(Line::from(Span::styled(
+                        format!("+ {}", g),
+                        Style::default().fg(Color::Yellow),
+                    )));
+                }
+                (Some(e), None) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("- {}", e),
+                        Style::default().fg(Color::Red),
+                    )));
+                }
+                (None, Some(g)) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("+ {}", g),
+                        Style::default().fg(Color::Yellow),
+                    )));
+                }
+                (None, None) => {}
             }
         }
     }
@@ -364,17 +510,23 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
     let step_idx = state.vis_step.min(steps.len() - 1);
     let step = &steps[step_idx];
 
-    // Popup centré (80% largeur, 70% hauteur)
+    // Popup taille dynamique
+    let n_items = (step.stack.len() + step.heap.len()).max(3) as u16;
+    let h_pct = (n_items * 6).clamp(35, 60);
+    let w_pct = 65u16;
+    let margin_v = (100u16.saturating_sub(h_pct)) / 2;
+    let margin_h = (100u16.saturating_sub(w_pct)) / 2;
+
     let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(15),
-        Constraint::Percentage(70),
-        Constraint::Percentage(15),
+        Constraint::Percentage(margin_v),
+        Constraint::Percentage(h_pct),
+        Constraint::Percentage(margin_v),
     ])
     .areas(area);
     let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(10),
-        Constraint::Percentage(80),
-        Constraint::Percentage(10),
+        Constraint::Percentage(margin_h),
+        Constraint::Percentage(w_pct),
+        Constraint::Percentage(margin_h),
     ])
     .areas(popup_v);
 
@@ -382,7 +534,6 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Progress dots
     let dots: String = (0..steps.len())
         .map(|i| if i == step_idx { "●" } else { "○" })
         .collect::<Vec<_>>()
@@ -390,7 +541,6 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
     lines.push(Line::styled(dots, Style::default().fg(Color::Yellow)));
     lines.push(Line::raw(""));
 
-    // Label
     let label = if !step.step_label.is_empty() {
         &step.step_label
     } else {
@@ -402,7 +552,6 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
     ));
     lines.push(Line::raw(""));
 
-    // Stack/Heap headers
     lines.push(Line::from(vec![
         Span::styled(
             format!("{:<28}", "STACK"),
@@ -418,7 +567,6 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
         ),
     ]));
 
-    // Variables
     let max_rows = step.stack.len().max(step.heap.len()).max(1);
     for i in 0..max_rows {
         let left = step
@@ -445,7 +593,6 @@ fn render_piscine_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState
 
     lines.push(Line::raw(""));
 
-    // Explanation
     if !step.explanation.is_empty() {
         for part in step.explanation.split(". ") {
             lines.push(Line::styled(part, Style::default().fg(Color::DarkGray)));
@@ -475,7 +622,7 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
 
-    let msg = if let Some(status) = &state.status_msg {
+    let left_msg = if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
         let mut parts = vec![
@@ -485,14 +632,34 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             "[k] précédent".to_string(),
         ];
         if has_vis {
-            parts.push("[v] visualiser".to_string());
+            parts.push("[v] vis".to_string());
         }
         parts.push("[q] quitter".to_string());
         parts.join("  ")
     };
 
-    f.render_widget(
-        Paragraph::new(msg).style(Style::default().fg(Color::DarkGray)),
-        area,
-    );
+    // Droite : échecs cumulés
+    let right_msg = if state.piscine_fail_count > 0 {
+        format!("✗ {}", state.piscine_fail_count)
+    } else {
+        String::new()
+    };
+
+    if right_msg.is_empty() || area.width < 40 {
+        f.render_widget(
+            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
+            area,
+        );
+    } else {
+        let [left_area, right_area] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(10)]).areas(area);
+        f.render_widget(
+            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
+            left_area,
+        );
+        f.render_widget(
+            Paragraph::new(right_msg).style(Style::default().fg(Color::Red)),
+            right_area,
+        );
+    }
 }
