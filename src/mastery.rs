@@ -1,3 +1,9 @@
+//! SRS (Spaced Repetition System) mastery algorithm.
+//!
+//! Mastery score ranges from 0.0 to 5.0: success adds 1.0, failure subtracts 0.5.
+//! Difficulty levels unlock at thresholds: D2 at 2.0, D3 at 4.0, D4 at 4.5, D5 at 5.0.
+//! Scores decay after 14 days of inactivity. Review interval uses a 2.5× multiplier.
+
 use chrono::Utc;
 
 use crate::constants::{

@@ -1,3 +1,8 @@
+//! Optional tmux integration — opens the exercise file in a neovim split.
+//!
+//! Activates only when running inside a tmux session (`$TMUX` is set).
+//! Editor binary is validated before use. Falls back gracefully if tmux is unavailable.
+
 use std::path::Path;
 use std::process::{Command, Stdio};
 

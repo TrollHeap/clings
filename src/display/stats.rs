@@ -1,5 +1,6 @@
 use colored::Colorize;
 
+use crate::constants::STATS_TOP_SUBJECTS_COUNT;
 use crate::models::Subject;
 
 use super::{footer_box, header_box, hr, mastery_bar, show_banner};
@@ -151,12 +152,10 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     );
     println!("  {}", hr().dimmed());
 
-    const TOP_N: usize = 5;
-
     // Top subjects
-    if sorted.len() > TOP_N * 2 {
+    if sorted.len() > STATS_TOP_SUBJECTS_COUNT * 2 {
         println!("  {}", "── Top sujets ──".dimmed());
-        for sub in sorted.iter().take(TOP_N) {
+        for sub in sorted.iter().take(STATS_TOP_SUBJECTS_COUNT) {
             println!(
                 "  {:<22} {:<6.1}  {}",
                 sub.name,
@@ -165,7 +164,7 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
             );
         }
         println!("  {}", "── À renforcer ──".dimmed());
-        for sub in sorted.iter().rev().take(TOP_N) {
+        for sub in sorted.iter().rev().take(STATS_TOP_SUBJECTS_COUNT) {
             println!(
                 "  {:<22} {:<6.1}  {}",
                 sub.name,

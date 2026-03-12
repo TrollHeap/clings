@@ -34,6 +34,9 @@ pub const PROGRESS_HR_WIDTH: usize = 58;
 // === Display thresholds ===
 pub const MINIMAP_MAX_ITEMS: usize = 60;
 pub const CONSECUTIVE_FAILURE_THRESHOLD: usize = 3;
+pub const MASTERY_BAR_GREEN_THRESHOLD: f64 = 4.0;
+pub const MASTERY_BAR_YELLOW_THRESHOLD: f64 = 2.0;
+pub const STATS_TOP_SUBJECTS_COUNT: usize = 5;
 
 // === Limits ===
 pub const MAX_OUTPUT_BYTES: u64 = 1024 * 1024;

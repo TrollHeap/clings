@@ -409,25 +409,28 @@ pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
     Ok(names)
 }
 
-/// Retourne l'exercise_id raté le plus récemment pour un sujet donné.
-/// Utilisé par `clings review` pour cibler les exercices échoués.
-/// Retourne None si aucun échec n'est enregistré pour ce sujet.
-/// Retourne les exercices les plus faibles pour un sujet, triés par taux de succès croissant.
-pub fn get_weakest_exercises(
+/// Retourne l'exercice le plus faible (taux de succès le plus bas) par sujet, en une seule requête.
+/// Utilisé par `clings review` pour éviter N+1 requêtes par sujet.
+pub fn get_all_weakest_exercises(
     conn: &Connection,
-    subject: &str,
-    limit: usize,
-) -> Result<Vec<String>> {
+) -> Result<std::collections::HashMap<String, String>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT exercise_id
-         FROM exercise_scores
-         WHERE subject = ?1
-         ORDER BY CAST(successes AS REAL) / MAX(attempts, 1) ASC,
-                  attempts DESC
-         LIMIT ?2",
+        "SELECT subject, exercise_id
+         FROM (
+             SELECT subject, exercise_id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY subject
+                        ORDER BY CAST(successes AS REAL) / MAX(attempts, 1) ASC,
+                                 attempts DESC
+                    ) AS rn
+             FROM exercise_scores
+         )
+         WHERE rn = 1",
     )?;
-    let rows = stmt.query_map(params![subject, limit as i64], |row| row.get(0))?;
-    rows.collect::<rusqlite::Result<Vec<String>>>()
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    rows.collect::<rusqlite::Result<std::collections::HashMap<String, String>>>()
         .map_err(crate::error::KfError::from)
 }
 
@@ -1105,6 +1108,19 @@ mod tests {
         assert_eq!(id, "ptr-deref-01");
         assert_eq!(*attempts, 2);
         assert_eq!(*successes, 1);
+    }
+
+    #[test]
+    fn test_get_all_weakest_exercises() {
+        let conn = open_test_db().unwrap();
+        // Record attempts: subj A has ex_a1 (0/1) and ex_a2 (1/1)
+        record_attempt(&conn, "subj_a", "ex_a1", false).unwrap();
+        record_attempt(&conn, "subj_a", "ex_a2", true).unwrap();
+        record_attempt(&conn, "subj_b", "ex_b1", true).unwrap();
+        let map = get_all_weakest_exercises(&conn).unwrap();
+        // ex_a1 has lower success rate (0%) than ex_a2 (100%)
+        assert_eq!(map.get("subj_a").map(|s| s.as_str()), Some("ex_a1"));
+        assert_eq!(map.get("subj_b").map(|s| s.as_str()), Some("ex_b1"));
     }
 
     #[test]
