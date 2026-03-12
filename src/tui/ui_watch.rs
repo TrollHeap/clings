@@ -321,16 +321,17 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
 
-    // Collecte les sujets uniques depuis les exercices
-    let mut chapter_subjects: Vec<String> = Vec::new();
-    for ex in &state.exercises {
-        if !chapter_subjects.contains(&ex.subject) {
-            chapter_subjects.push(ex.subject.clone());
-        }
-    }
+    // Collecte les sujets uniques depuis les exercices — O(n) via HashSet
+    let mut seen = std::collections::HashSet::new();
+    let chapter_subjects: Vec<&String> = state
+        .exercises
+        .iter()
+        .map(|ex| &ex.subject)
+        .filter(|s| seen.insert(s.as_str()))
+        .collect();
     // Priorité au sujet courant puis les 7 premiers
     let top: Vec<&String> = {
-        let mut result: Vec<&String> = chapter_subjects.iter().take(8).collect();
+        let mut result: Vec<&String> = chapter_subjects.iter().copied().take(8).collect();
         if !result.contains(&&exercise.subject) {
             result.insert(0, &exercise.subject);
             result.truncate(8);
