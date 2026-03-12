@@ -1,0 +1,24 @@
+{
+  "id": "ptr-test-02",
+  "subject": "pointers",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "Pointeurs : swap et double indirection",
+  "description": "Implémentez deux fonctions :\n- `void swap_int(int *a, int *b)` — échange les valeurs pointées par `a` et `b`.\n- `void set_via_ptr(int **pp, int val)` — affecte `val` à la variable pointée par `*pp` (double indirection).",
+  "starter_code": "#include <stdio.h>\n\n/* Échange les valeurs pointées par a et b. */\nvoid swap_int(int *a, int *b) {\n    /* TODO */\n}\n\n/* Écrit val dans *(*pp) via double indirection. */\nvoid set_via_ptr(int **pp, int val) {\n    /* TODO */\n}\n",
+  "solution_code": "#include <stdio.h>\n\nvoid swap_int(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\n\nvoid set_via_ptr(int **pp, int val) {\n    **pp = val;\n}\n",
+  "hints": [
+    "Pour swap : utilisez une variable temporaire — `int tmp = *a; *a = *b; *b = tmp;`",
+    "Pour set_via_ptr : `*pp` est un `int*`, donc `**pp` est l'entier lui-même. Affectez directement : `**pp = val;`"
+  ],
+  "validation": {
+    "mode": "test",
+    "test_code": "void test_swap_basic(void) {\n    int x = 3, y = 7;\n    swap_int(&x, &y);\n    TEST_ASSERT_EQUAL_INT(7, x);\n    TEST_ASSERT_EQUAL_INT(3, y);\n}\n\nvoid test_swap_same_value(void) {\n    int x = 5, y = 5;\n    swap_int(&x, &y);\n    TEST_ASSERT_EQUAL_INT(5, x);\n    TEST_ASSERT_EQUAL_INT(5, y);\n}\n\nvoid test_swap_negative(void) {\n    int x = -10, y = 42;\n    swap_int(&x, &y);\n    TEST_ASSERT_EQUAL_INT(42, x);\n    TEST_ASSERT_EQUAL_INT(-10, y);\n}\n\nvoid test_set_via_ptr(void) {\n    int target = 0;\n    int *p = &target;\n    set_via_ptr(&p, 99);\n    TEST_ASSERT_EQUAL_INT(99, target);\n}\n\nvoid test_set_via_ptr_overwrite(void) {\n    int val = 1000;\n    int *p = &val;\n    set_via_ptr(&p, -1);\n    TEST_ASSERT_EQUAL_INT(-1, val);\n}\n\nint main(void) {\n    RUN_TEST(test_swap_basic);\n    RUN_TEST(test_swap_same_value);\n    RUN_TEST(test_swap_negative);\n    RUN_TEST(test_set_via_ptr);\n    RUN_TEST(test_set_via_ptr_overwrite);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+  },
+  "key_concept": "Passer un pointeur en argument permet de modifier la variable originale. La double indirection `int **pp` permet de modifier ce que pointe un pointeur.",
+  "common_mistake": "Oublier de déréférencer : écrire `a = b` au lieu de `*a = *b` ne modifie que la copie locale du pointeur.",
+  "exercise_type": "complete",
+  "prerequisites": ["ptr-test-01"],
+  "files": [],
+  "kc_ids": ["ptr-deref", "ptr-double-indir", "ptr-swap"]
+}
