@@ -58,7 +58,7 @@ pub fn cmd_reset(subject: Option<&str>) -> Result<()> {
             "Attention !".bold().red(),
             name
         );
-        let _ = io::stdout().flush();
+        let _ = io::stdout().flush(); // best-effort flush — non-critique
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         if input.trim() == "yes" {
@@ -73,7 +73,7 @@ pub fn cmd_reset(subject: Option<&str>) -> Result<()> {
             "  {} Ceci supprimera TOUTE la progression. Tapez 'yes' pour confirmer : ",
             "Attention !".bold().red()
         );
-        let _ = io::stdout().flush();
+        let _ = io::stdout().flush(); // best-effort flush — non-critique
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         if input.trim() == "yes" {
