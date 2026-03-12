@@ -277,6 +277,80 @@ Implémentation de F1 du roadmap v2.0 : support des exercices validés par harna
 
 ---
 
+---
+
+## Phase 6 — Full-audit remediation (2026-03-12)
+
+Source: `/full-audit [A]` — sécurité, perf, DRY, conventions.
+Priorité d'exécution : security → perf → DRY → conventions.
+
+### S1 — Fix `is_valid_executable()` injection PATH
+- **Fichier** : `src/tmux.rs:16-26`
+- **Problème** : `Command::new("which").arg(bin)` — `bin` depuis env var non validée
+- **Fix** :
+  1. Valider que `bin` ne contient que `[a-zA-Z0-9_.-]` si non absolu
+  2. Si absolu → `Path::new(bin).is_file()`
+  3. Si relatif → `Command::new("sh").args(["-c", &format!("command -v {bin}")])`
+- **Fichiers adjacents à lire** : `src/tmux.rs` complet
+- **Statut** : [ ] pending
+
+### S2 — Valider `editor_args`
+- **Fichier** : `src/tmux.rs:64-77`
+- **Problème** : args splittés depuis `EDITOR`/`VISUAL`, passés sans validation à tmux
+- **Fix** : filtrer chaque arg — rejeter args contenant des caractères dangereux (`'`, `"`, `;`, `|`, `&`, `` ` ``, `$`)
+- **Fichiers adjacents à lire** : `src/tmux.rs:55-99`
+- **Statut** : [ ] pending
+
+### P1 — `get_streak()` LIMIT manquant
+- **Fichier** : `src/progress.rs:243-247`
+- **Problème** : `SELECT DISTINCT date... ORDER BY day DESC` sans LIMIT — charge tout l'historique
+- **Fix** : ajouter `LIMIT 365` à la requête SQL
+- **Fichiers adjacents à lire** : `src/progress.rs:230-290`
+- **Statut** : [ ] pending
+
+### P2 — `test_code.clone()` inutile
+- **Fichier** : `src/runner.rs:276`
+- **Problème** : `Some(c) => c.clone()` — &String cloné inutilement
+- **Fix** : changer type local en `&str`, utiliser `c.as_str()`
+- **Fichiers adjacents à lire** : `src/runner.rs:265-295`
+- **Statut** : [ ] pending
+
+### P3 — `exercise_clone` inutile dans watch loop
+- **Fichier** : `src/main.rs:307`
+- **Problème** : `exercise_clone = exercise.clone()` — Exercise complet cloné à chaque itération
+- **Fix** : supprimer la variable, utiliser `exercise` (&Exercise) directement dans les closures
+- **Fichiers adjacents à lire** : `src/main.rs:295-350`
+- **Statut** : [ ] pending
+
+### D1 — Constante `SECS_PER_DAY`
+- **Fichiers à modifier** :
+  - `src/constants.rs` — ajouter `pub const SECS_PER_DAY: i64 = 86_400;`
+  - `src/progress.rs:470` — remplacer `86400`
+  - `src/progress.rs` lignes tests `782, 825, 843, 853, 867, 882` — remplacer `86_400`
+  - `src/main.rs:261` — remplacer `86_400`
+- **Import à ajouter** : `use crate::constants::SECS_PER_DAY;` dans progress.rs et main.rs
+- **Fichiers adjacents à lire** : `src/constants.rs`, `src/progress.rs:460-480`, `src/main.rs:255-265`
+- **Statut** : [ ] pending
+
+### D2 — `avg_mastery` dupliqué
+- **Fichier** : `src/display/stats.rs`
+- **Problème** : computation identique en lignes 61-62 et 130-131
+- **Fix** : extraire `fn avg_mastery(subjects: &[Subject]) -> f64` (pub(super)), appelée aux deux endroits
+- **Fichiers adjacents à lire** : `src/display/stats.rs` complet
+- **Statut** : [ ] pending
+
+### C1 — Stub ValidationMode::Test sans commentaire
+- **Statut** : [x] N/A — `ValidationMode::Test` et `Both` sont entièrement implémentés dans `runner.rs` depuis Phase 5. Aucun stub à documenter.
+
+### Vérification finale Phase 6
+
+```bash
+cargo clippy -- -D warnings
+cargo test
+```
+
+---
+
 ## Non-prioritaires (hors scope NSY103/UTC502)
 
 Ces sujets enrichiraient la plateforme mais ne sont pas dans les curricula:

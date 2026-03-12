@@ -1,3 +1,5 @@
+//! Progress and mastery visualization — progress bars, mini-map, and SRS status.
+
 use colored::Colorize;
 
 use crate::chapters::{ChapterContext, CHAPTERS};
@@ -5,7 +7,7 @@ use crate::constants::{MINIMAP_MAX_ITEMS, PROGRESS_BAR_WIDTH, PROGRESS_SUBJECT_W
 use crate::mastery::next_interval_days;
 use crate::models::Subject;
 
-use super::mastery_bar;
+use super::{color_pct, mastery_bar};
 
 /// Display chapter indicator.
 pub fn show_chapter(ctx: &ChapterContext) {
@@ -201,14 +203,7 @@ pub fn show_exercise_scores(subject: &str, scores: &[(String, u32, u32)]) {
         } else {
             0
         };
-        let pct_str = format!("{}%", pct);
-        let colored_pct = if pct >= 75 {
-            pct_str.green()
-        } else if pct >= 25 {
-            pct_str.yellow()
-        } else {
-            pct_str.red()
-        };
+        let colored_pct = color_pct(pct);
         println!(
             "  {:<32} {:>8}  {:>8}  {}",
             id.dimmed(),

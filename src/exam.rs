@@ -1,3 +1,5 @@
+//! Exam simulation — loads annales sessions and launches a timed piscine.
+
 use colored::Colorize;
 
 use crate::display;
@@ -147,9 +149,11 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
 
     // Filtrer dans l'ordre des IDs de la session
+    let ex_by_id: std::collections::HashMap<&str, &crate::models::Exercise> =
+        all_exercises.iter().map(|e| (e.id.as_str(), e)).collect();
     let exam_exercises: Vec<crate::models::Exercise> = exercise_ids
         .iter()
-        .filter_map(|id| all_exercises.iter().find(|e| e.id == *id).cloned())
+        .filter_map(|id| ex_by_id.get(id.as_str()).map(|e| (*e).clone()))
         .collect();
 
     if exam_exercises.is_empty() {

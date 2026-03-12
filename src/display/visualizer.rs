@@ -1,11 +1,13 @@
+//! Interactive memory visualizer — step-through stack/heap diagram for pointer exercises.
+
 use std::io::Write;
 
 use colored::Colorize;
 
-use crate::constants::HEADER_WIDTH;
+use crate::constants::{ANSI_ESC_BYTE, HEADER_WIDTH};
 use crate::models::{Exercise, VisVar};
 
-use super::{footer_box, header_box, wrap_text, INNER_W};
+use super::{footer_box, header_box, try_parse_arrow, wrap_text, ArrowKey, INNER_W};
 
 /// Handles accumulating ESC sequences and navigating visualizer steps.
 ///
@@ -30,14 +32,14 @@ pub(crate) fn handle_esc_sequence(
                 let seq = std::mem::take(escape_buf);
                 if vis_active {
                     let n = visualizer_steps_len;
-                    match seq.as_slice() {
-                        [0x1b, b'[', b'C'] => {
+                    match try_parse_arrow(seq.as_slice()) {
+                        Some(ArrowKey::Right) => {
                             *vis_step = (*vis_step + 1).min(n.saturating_sub(1));
                             print!("\x1b[{}A\x1b[J", *vis_lines);
                             let _ = std::io::stdout().flush();
                             *vis_lines = show_vis(*vis_step);
                         }
-                        [0x1b, b'[', b'D'] => {
+                        Some(ArrowKey::Left) => {
                             *vis_step = vis_step.saturating_sub(1);
                             print!("\x1b[{}A\x1b[J", *vis_lines);
                             let _ = std::io::stdout().flush();
@@ -50,7 +52,7 @@ pub(crate) fn handle_esc_sequence(
             return Some(());
         }
     }
-    if key == 0x1b {
+    if key == ANSI_ESC_BYTE {
         escape_buf.push(key);
         return Some(());
     }

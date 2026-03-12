@@ -203,8 +203,9 @@ mod tests {
 
     fn write_tmp(name: &str, content: &str) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(name);
-        let mut f = std::fs::File::create(&path).unwrap();
-        f.write_all(content.as_bytes()).unwrap();
+        let mut f = std::fs::File::create(&path).expect("failed to create temp file for test");
+        f.write_all(content.as_bytes())
+            .expect("failed to write temp file content for test");
         path
     }
 

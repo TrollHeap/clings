@@ -92,7 +92,10 @@ pub fn load() -> ClingConfig {
     }
 
     match std::fs::read_to_string(&path) {
-        Ok(content) => toml::from_str::<ClingConfig>(&content).unwrap_or_default(),
+        Ok(content) => toml::from_str::<ClingConfig>(&content).unwrap_or_else(|e| {
+            eprintln!("  [clings] erreur config TOML: {e}");
+            ClingConfig::default()
+        }),
         Err(_) => ClingConfig::default(),
     }
 }

@@ -1,3 +1,5 @@
+//! SQLite persistence layer — mastery tracking, SRS state, and practice history.
+
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -5,7 +7,7 @@ use serde::Deserialize;
 
 use crate::constants::{
     CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, DB_USER_VERSION_CURRENT, EXAM_CHECKPOINT_KEY,
-    LAST_EXAM_SESSION_KEY, PISCINE_CHECKPOINT_KEY,
+    LAST_EXAM_SESSION_KEY, PISCINE_CHECKPOINT_KEY, SECS_PER_DAY,
 };
 use crate::error::Result;
 use crate::mastery;
@@ -241,7 +243,8 @@ pub fn get_streak(conn: &Connection) -> Result<i64> {
     let mut stmt = conn.prepare_cached(
         "SELECT DISTINCT date(practiced_at, 'unixepoch') as day
          FROM practice_log
-         ORDER BY day DESC",
+         ORDER BY day DESC
+         LIMIT 365",
     )?;
 
     let days: Vec<String> = stmt
@@ -385,17 +388,6 @@ pub fn load_last_exam_session(conn: &Connection) -> Result<Option<String>> {
 }
 
 /// Get the number of days until the next SRS review for a subject.
-/// Returns Ok(None) if no review is scheduled. Returns Ok(Some(days)) where
-/// days may be negative if the review is already overdue.
-pub fn get_next_review_days(conn: &Connection, subject_name: &str) -> Result<Option<i64>> {
-    let mut stmt = conn.prepare_cached("SELECT next_review_at FROM subjects WHERE name = ?1")?;
-    let next_review_at: Option<i64> = stmt
-        .query_row(params![subject_name], |row| row.get(0))
-        .optional()?
-        .flatten();
-    Ok(next_review_at.map(|ts| (ts - Utc::now().timestamp()) / 86_400))
-}
-
 /// Get subjects whose SRS review is due (next_review_at <= now).
 pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
     let mut stmt = conn.prepare_cached(
@@ -476,7 +468,7 @@ pub fn get_subject_attempts(conn: &Connection) -> Result<Vec<(String, u32, u32)>
 
 /// Retourne (date_iso, count) pour les `days` derniers jours d'activité.
 pub fn get_daily_activity(conn: &Connection, days: u32) -> Result<Vec<(String, u32)>> {
-    let cutoff = chrono::Utc::now().timestamp() - (days as i64 * 86400);
+    let cutoff = chrono::Utc::now().timestamp() - (days as i64 * SECS_PER_DAY);
     let mut stmt = conn.prepare_cached(
         "SELECT date(practiced_at, 'unixepoch') AS day, COUNT(*)
          FROM practice_log
@@ -533,8 +525,12 @@ pub fn export_progress(conn: &Connection) -> Result<String> {
 /// Importe les sujets depuis un JSON exporté.
 /// Si `overwrite` est true, remplace les valeurs existantes.
 /// Si false, prend le max(mastery existant, mastery importé).
-/// Retourne le nombre de sujets importés/mis à jour.
-pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Result<usize> {
+/// Retourne `(count, warnings)` — le nombre de sujets importés et les avertissements de clamp.
+pub fn import_progress(
+    conn: &mut Connection,
+    json: &str,
+    overwrite: bool,
+) -> Result<(usize, Vec<String>)> {
     #[derive(Deserialize)]
     struct ImportData {
         subjects: Vec<Subject>,
@@ -545,6 +541,7 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
 
     let tx = conn.transaction()?;
     let mut count = 0usize;
+    let mut warnings: Vec<String> = Vec::new();
 
     for sub in &data.subjects {
         let clamped_score = sub.mastery_score.get();
@@ -555,6 +552,34 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
         );
         let clamped_total = sub.attempts_total.max(0);
         let clamped_success = sub.attempts_success.max(0).min(clamped_total);
+
+        if clamped_difficulty != sub.difficulty_unlocked {
+            warnings.push(format!(
+                "'{}': difficulty_unlocked {} → {} (clamped)",
+                sub.name, sub.difficulty_unlocked, clamped_difficulty
+            ));
+        }
+        if clamped_interval != sub.srs_interval_days.get() {
+            warnings.push(format!(
+                "'{}': srs_interval_days {} → {} (clamped)",
+                sub.name,
+                sub.srs_interval_days.get(),
+                clamped_interval
+            ));
+        }
+        if clamped_total != sub.attempts_total {
+            warnings.push(format!(
+                "'{}': attempts_total {} → {} (clamped)",
+                sub.name, sub.attempts_total, clamped_total
+            ));
+        }
+        if clamped_success != sub.attempts_success {
+            warnings.push(format!(
+                "'{}': attempts_success {} → {} (clamped)",
+                sub.name, sub.attempts_success, clamped_success
+            ));
+        }
+
         if overwrite {
             tx.execute(
                 "INSERT OR REPLACE INTO subjects
@@ -597,7 +622,7 @@ pub fn import_progress(conn: &mut Connection, json: &str, overwrite: bool) -> Re
     }
 
     tx.commit()?;
-    Ok(count)
+    Ok((count, warnings))
 }
 
 #[cfg(test)]
@@ -788,7 +813,7 @@ mod tests {
         let conn = open_test_db().unwrap();
         ensure_subject(&conn, "pointers").unwrap();
         // next_review_at dans le futur → sujet absent
-        let future = Utc::now().timestamp() + 86_400;
+        let future = Utc::now().timestamp() + SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET next_review_at = ?1 WHERE name = 'pointers'",
             params![future],
@@ -831,7 +856,7 @@ mod tests {
         ensure_subject(&conn, "pointers").unwrap();
         let now = Utc::now().timestamp();
         for (i, id) in ["c1", "c2", "c3"].iter().enumerate() {
-            let ts = now - (i as i64) * 86_400;
+            let ts = now - (i as i64) * SECS_PER_DAY;
             conn.execute(
                 "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
                 params![id, ts],
@@ -849,7 +874,7 @@ mod tests {
         for (id, offset) in [("b1", 0i64), ("b2", 3)] {
             conn.execute(
                 "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
-                params![id, now - offset * 86_400],
+                params![id, now - offset * SECS_PER_DAY],
             ).unwrap();
         }
         assert_eq!(get_streak(&conn).unwrap(), 1);
@@ -859,7 +884,7 @@ mod tests {
     fn test_apply_all_decay_updates_db() {
         let mut conn = open_test_db().unwrap();
         ensure_subject(&conn, "structs").unwrap();
-        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
             params![old_ts],
@@ -873,7 +898,7 @@ mod tests {
     fn test_apply_all_decay_no_change_when_recent() {
         let mut conn = open_test_db().unwrap();
         ensure_subject(&conn, "pipes").unwrap();
-        let recent_ts = Utc::now().timestamp() - 5 * 86_400;
+        let recent_ts = Utc::now().timestamp() - 5 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 3.0, last_practiced_at = ?1 WHERE name = 'pipes'",
             params![recent_ts],
@@ -888,7 +913,7 @@ mod tests {
     fn test_apply_all_decay_updates_last_practiced_at() {
         let mut conn = open_test_db().unwrap();
         ensure_subject(&conn, "structs").unwrap();
-        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
             params![old_ts],
@@ -908,7 +933,7 @@ mod tests {
     fn test_apply_all_decay_idempotent_in_db() {
         let mut conn = open_test_db().unwrap();
         ensure_subject(&conn, "pipes").unwrap();
-        let old_ts = Utc::now().timestamp() - 15 * 86_400;
+        let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'pipes'",
             params![old_ts],
@@ -962,7 +987,7 @@ mod tests {
         }
         "#;
 
-        let count = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
         assert_eq!(count, 1);
 
         // Verify the score was clamped to MASTERY_MAX (5.0)
@@ -993,7 +1018,7 @@ mod tests {
         }
         "#;
 
-        let count = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
         assert_eq!(count, 1);
 
         // Verify the score was clamped to MASTERY_MIN (0.0)
@@ -1024,7 +1049,7 @@ mod tests {
         }
         "#;
 
-        let count = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
         assert_eq!(count, 1);
 
         // Verify the score was preserved
@@ -1057,7 +1082,7 @@ mod tests {
         }
         "#;
 
-        let count = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
         assert_eq!(count, 1);
 
         let sub = get_subject(&conn, "signals").unwrap().unwrap();

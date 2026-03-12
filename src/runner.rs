@@ -12,7 +12,8 @@ use std::time::{Duration, Instant};
 
 use crate::constants::{
     CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
-    MAX_OUTPUT_BYTES, POLL_INTERVAL_MS, REGEX_PREFIX,
+    MAX_OUTPUT_BYTES, POLL_INTERVAL_MS, REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED,
+    TEST_SUMMARY_TESTS,
 };
 use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
@@ -272,7 +273,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
 /// Run test-harness mode: write test.h + test_current.c, compile, run, parse summary.
 fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let test_code = match &exercise.validation.test_code {
-        Some(c) => c.clone(),
+        Some(c) => c.as_str(),
         None => {
             return make_compile_error(
                 "Mode Test : champ 'test_code' manquant dans l'exercice".to_string(),
@@ -374,9 +375,9 @@ fn parse_test_summary(stdout: &str) -> (bool, usize) {
         let parts: Vec<&str> = line.split_whitespace().collect();
         // Format: "<N> Tests <M> Failures 0 Ignored"
         if parts.len() == 6
-            && parts[1] == "Tests"
-            && parts[3] == "Failures"
-            && parts[5] == "Ignored"
+            && parts[1] == TEST_SUMMARY_TESTS
+            && parts[3] == TEST_SUMMARY_FAILURES
+            && parts[5] == TEST_SUMMARY_IGNORED
         {
             let failures = parts[2].parse::<usize>().unwrap_or(1);
             return (true, failures);

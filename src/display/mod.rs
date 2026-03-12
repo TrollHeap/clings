@@ -1,3 +1,5 @@
+//! Display module — re-exports all TUI rendering functions.
+
 mod annales;
 mod exercise;
 mod keybinds;
@@ -20,7 +22,8 @@ use std::sync::OnceLock;
 use colored::{ColoredString, Colorize};
 
 use crate::constants::{
-    HEADER_WIDTH, MASTERY_BAR_GREEN_THRESHOLD, MASTERY_BAR_YELLOW_THRESHOLD, MASTERY_MAX,
+    ANSI_CLEAR_SCREEN, HEADER_WIDTH, MASTERY_BAR_GREEN_THRESHOLD, MASTERY_BAR_YELLOW_THRESHOLD,
+    MASTERY_MAX,
 };
 use crate::models::Difficulty;
 
@@ -63,7 +66,39 @@ pub fn mastery_bar(score: f64) -> String {
 
 /// Clear screen and move cursor to top.
 pub fn clear_screen() {
-    print!("\x1b[2J\x1b[H");
+    print!("{ANSI_CLEAR_SCREEN}");
+}
+
+/// Direction d'une touche fléchée ANSI (séquence ESC [ A/B/C/D).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ArrowKey {
+    Up,
+    Down,
+    Right,
+    Left,
+}
+
+/// Parse une séquence de 3 octets ESC-[ en `ArrowKey`, si reconnue.
+pub(super) fn try_parse_arrow(buf: &[u8]) -> Option<ArrowKey> {
+    match buf {
+        [0x1b, b'[', b'A'] => Some(ArrowKey::Up),
+        [0x1b, b'[', b'B'] => Some(ArrowKey::Down),
+        [0x1b, b'[', b'C'] => Some(ArrowKey::Right),
+        [0x1b, b'[', b'D'] => Some(ArrowKey::Left),
+        _ => None,
+    }
+}
+
+/// Colorise un pourcentage entier : vert ≥ 75, jaune ≥ 25, rouge < 25.
+pub(super) fn color_pct(pct: u32) -> ColoredString {
+    let s = format!("{}%", pct);
+    if pct >= 75 {
+        s.green()
+    } else if pct >= 25 {
+        s.yellow()
+    } else {
+        s.red()
+    }
 }
 
 /// Confirmation after `clings export`.
@@ -134,7 +169,7 @@ pub(super) fn wrap_text(text: &str, width: usize) -> Vec<String> {
             current.push(' ');
             current.push_str(word);
         } else {
-            lines.push(current.clone());
+            lines.push(std::mem::take(&mut current));
             current = word.to_string();
         }
     }

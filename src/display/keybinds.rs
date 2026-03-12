@@ -1,19 +1,6 @@
-use colored::Colorize;
+//! Keybind help display — renders a compact keybind reference table.
 
-/// Render a keybind table from a list of (key char, description) pairs.
-fn show_keybinds_list(binds: &[(char, &str)]) {
-    print!("  {} ", "Touches".bold().cyan());
-    let mut first = true;
-    for (key, desc) in binds {
-        if !first {
-            print!("  ");
-        }
-        print!("{} {}", format!("[{key}]").bold(), desc);
-        first = false;
-    }
-    println!();
-    println!();
-}
+use colored::Colorize;
 
 /// Show keybind hints.
 ///
@@ -36,5 +23,16 @@ pub fn show_keybinds_with_vis(has_visualizer: bool, has_nav: bool, has_list: boo
         binds.push(('v', "visualiser"));
     }
     binds.push(('q', "quit"));
-    show_keybinds_list(&binds);
+
+    print!("  {} ", "Touches".bold().cyan());
+    let mut first = true;
+    for (key, desc) in &binds {
+        if !first {
+            print!("  ");
+        }
+        print!("{} {}", format!("[{key}]").bold(), desc);
+        first = false;
+    }
+    println!();
+    println!();
 }

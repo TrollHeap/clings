@@ -1,3 +1,5 @@
+//! Exercise list display — grouped by NSY103 chapter.
+
 use colored::Colorize;
 
 use crate::chapters::CHAPTERS;
@@ -32,21 +34,14 @@ pub fn show_exercise_list(
     filter_subject: Option<&str>,
     filter_due: Option<&[String]>,
 ) {
-    let filtered: Vec<&Exercise> = if let Some(filter) = filter_subject {
-        exercises.iter().filter(|e| e.subject == filter).collect()
-    } else {
-        exercises.iter().collect()
-    };
-
-    // Filtre --due : garder uniquement les exercices des sujets dus
-    let filtered: Vec<&Exercise> = if let Some(due) = filter_due {
-        filtered
-            .into_iter()
-            .filter(|e| due.iter().any(|d| d == &e.subject))
-            .collect()
-    } else {
-        filtered
-    };
+    // Single-pass filter combining subject and due filters.
+    let filtered: Vec<&Exercise> = exercises
+        .iter()
+        .filter(|e| {
+            filter_subject.is_none_or(|f| e.subject == f)
+                && filter_due.is_none_or(|due| due.iter().any(|d| d == &e.subject))
+        })
+        .collect();
 
     if filtered.is_empty() {
         println!("{}", "  Aucun exercice trouvé.".dimmed());
@@ -56,6 +51,24 @@ pub fn show_exercise_list(
     let subject_map: std::collections::HashMap<&str, &Subject> =
         subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
+    // Pre-build subject → chapter index for O(1) grouping.
+    let subject_to_chapter: std::collections::HashMap<&str, usize> = CHAPTERS
+        .iter()
+        .enumerate()
+        .flat_map(|(i, ch)| ch.subjects.iter().copied().map(move |s| (s, i)))
+        .collect();
+
+    // Group exercises into chapter buckets in a single O(n) pass.
+    let mut by_chapter: Vec<Vec<&Exercise>> = vec![Vec::new(); CHAPTERS.len()];
+    let mut uncategorized: Vec<&Exercise> = Vec::new();
+    for ex in &filtered {
+        if let Some(&ch_idx) = subject_to_chapter.get(ex.subject.as_str()) {
+            by_chapter[ch_idx].push(ex);
+        } else {
+            uncategorized.push(ex);
+        }
+    }
+
     println!();
     show_banner();
 
@@ -64,14 +77,8 @@ pub fn show_exercise_list(
         println!();
     }
 
-    // Group by chapter
-    for chapter in CHAPTERS {
-        let chapter_exercises: Vec<&Exercise> = filtered
-            .iter()
-            .copied()
-            .filter(|e| chapter.subjects.iter().any(|&s| s == e.subject))
-            .collect();
-
+    // Render in chapter order.
+    for (chapter, chapter_exercises) in CHAPTERS.iter().zip(by_chapter.iter()) {
         if chapter_exercises.is_empty() {
             continue;
         }
@@ -92,18 +99,7 @@ pub fn show_exercise_list(
         println!();
     }
 
-    // Uncategorized
-    let known_subjects: std::collections::HashSet<&str> = CHAPTERS
-        .iter()
-        .flat_map(|ch| ch.subjects.iter().copied())
-        .collect();
-
-    let uncategorized: Vec<&Exercise> = filtered
-        .iter()
-        .copied()
-        .filter(|e| !known_subjects.contains(e.subject.as_str()))
-        .collect();
-
+    // Uncategorized exercises (subjects not in any chapter).
     if !uncategorized.is_empty() {
         println!("  {} {}", "▸".bold(), "Divers".bold());
         for ex in uncategorized {
