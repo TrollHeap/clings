@@ -8,9 +8,21 @@ pub fn is_tmux() -> bool {
     std::env::var("TMUX").is_ok()
 }
 
+fn is_valid_executable(bin: &str) -> bool {
+    let path = std::path::Path::new(bin);
+    if path.is_absolute() {
+        return path.is_file();
+    }
+    Command::new("which")
+        .arg(bin)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 /// Resolve the editor binary: $VISUAL → $EDITOR → config/TMUX_EDITOR fallback.
 fn resolve_editor() -> String {
-    std::env::var("VISUAL")
+    let editor = std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))
         .unwrap_or_else(|_| {
             let cfg_editor = &crate::config::get().ui.editor;
@@ -19,7 +31,18 @@ fn resolve_editor() -> String {
             } else {
                 cfg_editor.clone()
             }
-        })
+        });
+
+    let bin = editor.split_whitespace().next().unwrap_or("");
+    if is_valid_executable(bin) {
+        editor
+    } else {
+        eprintln!(
+            "  [clings] éditeur invalide '{}', fallback sur {}",
+            editor, TMUX_EDITOR
+        );
+        TMUX_EDITOR.to_owned()
+    }
 }
 
 /// Open a tmux pane on the right with the configured editor editing the given file.

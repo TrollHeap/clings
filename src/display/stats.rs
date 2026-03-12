@@ -12,7 +12,7 @@ pub fn sparkline(data: &[u32]) -> String {
     if data.is_empty() {
         return String::new();
     }
-    let max = *data.iter().max().unwrap();
+    let max = data.iter().copied().max().unwrap_or(0);
     data.iter()
         .map(|&v| {
             let idx = if max == 0 {
@@ -97,54 +97,6 @@ pub fn show_stats_detailed(
     println!();
     println!("  {}", footer_box().cyan());
     println!();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sparkline_empty() {
-        assert_eq!(sparkline(&[]), "");
-    }
-
-    #[test]
-    fn sparkline_uniform_data() {
-        let result = sparkline(&[5, 5, 5]);
-        // All same value → all same character (the max → last bar '█')
-        assert_eq!(result.chars().count(), 3);
-        assert!(result.chars().all(|c| c == result.chars().next().unwrap()));
-    }
-
-    #[test]
-    fn sparkline_ascending() {
-        let result = sparkline(&[0, 4, 8]);
-        let chars: Vec<char> = result.chars().collect();
-        assert_eq!(chars.len(), 3);
-        // Each char should be ≥ the previous (ascending values → ascending bars)
-        assert!(
-            chars[0] <= chars[1] && chars[1] <= chars[2],
-            "ascending data should produce non-decreasing sparkline: {result}"
-        );
-    }
-
-    #[test]
-    fn sparkline_all_zeros() {
-        let result = sparkline(&[0, 0, 0]);
-        // All zeros → all minimum bar
-        assert!(result.chars().all(|c| c == SPARK_BARS[0]));
-    }
-
-    #[test]
-    fn sparkline_single_value() {
-        let result = sparkline(&[42]);
-        assert_eq!(result.chars().count(), 1);
-        // Single value is maximum → should be '█'
-        assert_eq!(
-            result.chars().next().unwrap(),
-            SPARK_BARS[SPARK_BARS.len() - 1]
-        );
-    }
 }
 
 /// Show global statistics: streak, average mastery, top/bottom subjects.
@@ -238,4 +190,52 @@ pub fn show_stats(subjects: &[Subject], streak: u32) {
     println!();
     println!("  {}", footer_box().cyan());
     println!();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sparkline_empty() {
+        assert_eq!(sparkline(&[]), "");
+    }
+
+    #[test]
+    fn sparkline_uniform_data() {
+        let result = sparkline(&[5, 5, 5]);
+        // All same value → all same character (the max → last bar '█')
+        assert_eq!(result.chars().count(), 3);
+        assert!(result.chars().all(|c| c == result.chars().next().unwrap()));
+    }
+
+    #[test]
+    fn sparkline_ascending() {
+        let result = sparkline(&[0, 4, 8]);
+        let chars: Vec<char> = result.chars().collect();
+        assert_eq!(chars.len(), 3);
+        // Each char should be ≥ the previous (ascending values → ascending bars)
+        assert!(
+            chars[0] <= chars[1] && chars[1] <= chars[2],
+            "ascending data should produce non-decreasing sparkline: {result}"
+        );
+    }
+
+    #[test]
+    fn sparkline_all_zeros() {
+        let result = sparkline(&[0, 0, 0]);
+        // All zeros → all minimum bar
+        assert!(result.chars().all(|c| c == SPARK_BARS[0]));
+    }
+
+    #[test]
+    fn sparkline_single_value() {
+        let result = sparkline(&[42]);
+        assert_eq!(result.chars().count(), 1);
+        // Single value is maximum → should be '█'
+        assert_eq!(
+            result.chars().next().unwrap(),
+            SPARK_BARS[SPARK_BARS.len() - 1]
+        );
+    }
 }

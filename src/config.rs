@@ -110,6 +110,24 @@ pub fn get() -> &'static ClingConfig {
 /// Write a single `section.key = value` into `~/.clings/clings.toml`.
 /// Creates the file if it does not exist.
 pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
+    const ALLOWED: &[(&str, &str)] = &[
+        ("srs", "decay_days"),
+        ("srs", "base_interval_days"),
+        ("ui", "editor"),
+        ("tmux", "open_in_tmux"),
+        ("tmux", "pane_width"),
+    ];
+    if !ALLOWED.iter().any(|(s, k)| *s == section && *k == key) {
+        return Err(format!(
+            "clé inconnue '{section}.{key}' — valeurs autorisées : {}",
+            ALLOWED
+                .iter()
+                .map(|(s, k)| format!("{s}.{k}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
     let path = {
         let home = std::env::var_os("HOME").ok_or_else(|| "$HOME non définie".to_string())?;
         std::path::PathBuf::from(home)

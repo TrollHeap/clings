@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use crate::constants::{
     CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
-    POLL_INTERVAL_MS, REGEX_PREFIX,
+    MAX_OUTPUT_BYTES, POLL_INTERVAL_MS, REGEX_PREFIX,
 };
 use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
@@ -161,14 +161,8 @@ fn spawn_gcc_and_collect(
             Ok((stdout, stderr, status))
         }
         Ok(None) => {
-            kill_process_group(&child);
+            kill_and_drain(&child, stdout_thread, stderr_thread);
             let _ = child.wait(); // reap zombie; error already handled by timeout path
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
-            }
             let elapsed = start.elapsed();
             Err(KfError::Config(format!(
                 "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
@@ -176,14 +170,8 @@ fn spawn_gcc_and_collect(
             )))
         }
         Err(e) => {
-            kill_process_group(&child);
+            kill_and_drain(&child, stdout_thread, stderr_thread);
             let _ = child.wait(); // reap zombie; real error propagated below
-            if let Err(e) = stdout_thread.join() {
-                eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
-            }
-            if let Err(e) = stderr_thread.join() {
-                eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
-            }
             Err(KfError::Io(e))
         }
     }
@@ -561,7 +549,6 @@ fn spawn_drain_threads(
     std::thread::JoinHandle<String>,
     std::thread::JoinHandle<String>,
 ) {
-    const MAX_OUTPUT_BYTES: u64 = 1024 * 1024; // 1 MiB — protection contre les programmes bavards
     let stdout_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
         // .ok(): partial read is acceptable — we cap at MAX_OUTPUT_BYTES anyway
@@ -588,6 +575,22 @@ fn make_compile_error(stderr: String) -> RunResult {
         duration_ms: 0,
         compile_error: true,
         timeout: false,
+    }
+}
+
+/// Kill the process group and join drain threads, logging any thread panics.
+/// Used in error arms of `spawn_gcc_and_collect` where the collected output is discarded.
+fn kill_and_drain(
+    child: &std::process::Child,
+    stdout_thread: std::thread::JoinHandle<String>,
+    stderr_thread: std::thread::JoinHandle<String>,
+) {
+    kill_process_group(child);
+    if let Err(e) = stdout_thread.join() {
+        eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
+    }
+    if let Err(e) = stderr_thread.join() {
+        eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
     }
 }
 

@@ -209,6 +209,10 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         .iter()
         .map(|s| (s.name.as_str(), s.difficulty_unlocked))
         .collect();
+    let mastery_map: std::collections::HashMap<&str, f64> = subjects
+        .iter()
+        .map(|s| (s.name.as_str(), s.mastery_score.get()))
+        .collect();
     let gated_exercises: Vec<crate::models::Exercise> = all_exercises
         .iter()
         .filter(|ex| {
@@ -260,10 +264,7 @@ fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
                     .find(|e| &e.id == pid)?
                     .subject
                     .as_str();
-                let mastery = progress::get_subject(&conn, subj)
-                    .ok()??
-                    .mastery_score
-                    .get();
+                let mastery = *mastery_map.get(subj).unwrap_or(&0.0);
                 (mastery < 2.0).then(|| pid.clone())
             })
             .collect();
