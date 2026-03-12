@@ -5,6 +5,26 @@ use crate::models::{Exercise, Subject};
 
 use super::{difficulty_stars, show_banner};
 
+fn render_exercise_row(ex: &Exercise, subject: Option<&Subject>) -> String {
+    let diff = difficulty_stars(ex.difficulty);
+    let mastery_info = subject
+        .map(|s| format!(" [{:.1}]", s.mastery_score.get()))
+        .unwrap_or_default();
+    let kc_info = if !ex.kc_ids.is_empty() {
+        format!(" [{}]", ex.kc_ids.join(", "))
+    } else {
+        String::new()
+    };
+    format!(
+        "    {} {} {}{}{}",
+        diff,
+        ex.id.dimmed(),
+        ex.title,
+        mastery_info.dimmed(),
+        kc_info.dimmed()
+    )
+}
+
 /// Show exercise list grouped by chapter.
 pub fn show_exercise_list(
     exercises: &[Exercise],
@@ -64,24 +84,9 @@ pub fn show_exercise_list(
         );
 
         for ex in chapter_exercises {
-            let diff = difficulty_stars(ex.difficulty);
-            let mastery_info = subject_map
-                .get(ex.subject.as_str())
-                .map(|s| format!(" [{:.1}]", s.mastery_score.get()))
-                .unwrap_or_default();
-            let kc_info = if !ex.kc_ids.is_empty() {
-                format!(" [{}]", ex.kc_ids.join(", "))
-            } else {
-                String::new()
-            };
-
             println!(
-                "    {} {} {}{}{}",
-                diff,
-                ex.id.dimmed(),
-                ex.title,
-                mastery_info.dimmed(),
-                kc_info.dimmed()
+                "{}",
+                render_exercise_row(ex, subject_map.get(ex.subject.as_str()).copied())
             );
         }
         println!();
@@ -102,8 +107,7 @@ pub fn show_exercise_list(
     if !uncategorized.is_empty() {
         println!("  {} {}", "▸".bold(), "Divers".bold());
         for ex in uncategorized {
-            let diff = difficulty_stars(ex.difficulty);
-            println!("    {} {} {}", diff, ex.id.dimmed(), ex.title);
+            println!("{}", render_exercise_row(ex, None));
         }
         println!();
     }

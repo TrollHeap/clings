@@ -1,7 +1,7 @@
 use colored::Colorize;
 
 use crate::chapters::{ChapterContext, CHAPTERS};
-use crate::constants::{MINIMAP_MAX_ITEMS, PROGRESS_BAR_WIDTH};
+use crate::constants::{MINIMAP_MAX_ITEMS, PROGRESS_BAR_WIDTH, PROGRESS_SUBJECT_WIDTH};
 use crate::mastery::next_interval_days;
 use crate::models::Subject;
 
@@ -143,12 +143,13 @@ pub fn show_progress(subjects: &[Subject], streak: i64) {
                 "—".to_string()
             };
             println!(
-                "    {:<20} {} D{} │ {} │ SRS {}j",
+                "    {:<width$} {} D{} │ {} │ SRS {}j",
                 sub.name,
                 bar,
                 sub.difficulty_unlocked,
                 success_rate,
-                sub.srs_interval_days.get()
+                sub.srs_interval_days.get(),
+                width = PROGRESS_SUBJECT_WIDTH,
             );
         }
         println!();

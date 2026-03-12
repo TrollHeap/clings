@@ -80,27 +80,21 @@ fn vis_row_dim_right(left: &str, right: &str) {
     println!("  {} {} {}{}", "║".yellow(), lp, rp, "║".yellow());
 }
 
-/// Display a visualizer step for the given exercise.
-/// Returns the number of terminal lines printed, so the caller can erase them
-/// with `\x1b[{n}A\x1b[J` before redrawing on navigation.
-pub fn show_visualizer(exercise: &Exercise, step: usize) -> usize {
-    let steps = &exercise.visualizer.steps;
-    if steps.is_empty() {
-        return 0;
-    }
-    let step = step.min(steps.len() - 1);
-    let s = &steps[step];
-    let n = steps.len();
+/// Render one visualizer step to stdout and return the number of lines printed.
+///
+/// Caller uses the count to erase and redraw on navigation:
+/// `print!("\x1b[{n}A\x1b[J")`.
+fn render_step(step: usize, total: usize, s: &crate::models::VisStep) -> usize {
     let mut lines = 0usize;
 
-    let title = format!("Visualiseur — {}/{}", step + 1, n);
+    let title = format!("Visualiseur — {}/{}", step + 1, total);
     println!("  {}", header_box(&title).yellow());
     lines += 1;
 
     // Step progress dots — printed char-by-char to avoid ANSI padding issues
     print!("  {} ", "║".yellow());
     let mut visible_len = 0usize;
-    for i in 0..n {
+    for i in 0..total {
         if i > 0 {
             print!(" ");
             visible_len += 1;
@@ -112,7 +106,7 @@ pub fn show_visualizer(exercise: &Exercise, step: usize) -> usize {
         }
         visible_len += 1;
     }
-    let step_info = format!("  Etape {}/{}", step + 1, n);
+    let step_info = format!("  Etape {}/{}", step + 1, total);
     print!("{}", step_info);
     visible_len += step_info.len();
     let pad = INNER_W.saturating_sub(visible_len);
@@ -195,6 +189,18 @@ pub fn show_visualizer(exercise: &Exercise, step: usize) -> usize {
     lines += 1;
 
     lines
+}
+
+/// Display a visualizer step for the given exercise.
+/// Returns the number of terminal lines printed, so the caller can erase them
+/// with `\x1b[{n}A\x1b[J` before redrawing on navigation.
+pub fn show_visualizer(exercise: &Exercise, step: usize) -> usize {
+    let steps = &exercise.visualizer.steps;
+    if steps.is_empty() {
+        return 0;
+    }
+    let step = step.min(steps.len() - 1);
+    render_step(step, steps.len(), &steps[step])
 }
 
 #[cfg(test)]
