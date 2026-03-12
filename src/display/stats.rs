@@ -5,6 +5,7 @@ use colored::Colorize;
 use crate::constants::STATS_TOP_SUBJECTS_COUNT;
 use crate::models::Subject;
 
+#[allow(dead_code)]
 fn avg_mastery(subjects: &[Subject]) -> f64 {
     if subjects.is_empty() {
         return 0.0;
@@ -14,10 +15,12 @@ fn avg_mastery(subjects: &[Subject]) -> f64 {
 
 use super::{footer_box, header_box, hr, mastery_bar, show_banner};
 
+#[allow(dead_code)]
 const SPARK_BARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
 /// Build an ASCII sparkline from a slice of counts.
 /// Empty input returns an empty string. All-zero input returns `▁` repeated.
+#[allow(dead_code)]
 pub fn sparkline(data: &[u32]) -> String {
     if data.is_empty() {
         return String::new();
@@ -36,6 +39,7 @@ pub fn sparkline(data: &[u32]) -> String {
 }
 
 /// Show detailed statistics: per-subject attempt breakdown + 30-day activity sparkline.
+#[allow(dead_code)]
 pub fn show_stats_detailed(
     subjects: &[Subject],
     streak: u32,
@@ -109,6 +113,7 @@ pub fn show_stats_detailed(
 }
 
 /// Show global statistics: streak, average mastery, top/bottom subjects.
+#[allow(dead_code)]
 pub fn show_stats(subjects: &[Subject], streak: u32) {
     println!();
     show_banner();

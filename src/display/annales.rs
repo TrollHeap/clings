@@ -10,6 +10,7 @@ use crate::constants::ANSI_CLEAR_SCREEN;
 use super::{hr, show_banner, AnnaleSession};
 
 /// Affiche les annales NSY103 avec le mapping vers les exercices clings.
+#[allow(dead_code)]
 pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
     println!();
     show_banner();
