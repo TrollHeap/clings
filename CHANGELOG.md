@@ -1,5 +1,56 @@
 # Changelog
 
+## [2.7.0] — 2026-03-12
+
+### TUI — Migration Ratatui v3
+
+- Refonte complète de la couche d'affichage : module `src/display/` supprimé (~1 700 lignes), remplacé par `src/tui/` avec architecture TEA (The Elm Architecture)
+- `ui_watch.rs` : vue watch en Ratatui — layout 2 colonnes (≥90 cols), sidebar mastery/sujet, mastery bar colorée (vert/jaune/rouge), fond opaque, header L4
+- `ui_piscine.rs` : vue piscine en Ratatui — timer Gauge, progression en temps réel, fond opaque
+- `ui_run.rs` : vue résultat de compilation/exécution
+- `ui_exam_selector.rs` : sélecteur d'examens avec flèches/jk + Entrée
+- `ui_annales.rs`, `ui_list.rs`, `ui_stats.rs` : vues info (annales, liste exercices, statistiques)
+- `app.rs` + `events.rs` : AppState centralisé, event loop TEA, gestion crossterm 0.29
+
+### Mise à jour dépendances
+
+- `ratatui` 0.29 → **0.30**
+- `crossterm` 0.28 → **0.29**
+
+### Audit remediation v2.6.1
+
+- `progress.rs` : `apply_all_decay()` accepte `decay_days: i64` en paramètre — WHERE SQL direct plutôt que filtrage Rust
+- `progress.rs` : `get_streak()` `LIMIT 365` → `LIMIT 90` — évite de charger plus de 3 mois d'historique
+- `runner.rs` : `normalize()` réécrit avec `String::with_capacity` + boucle `lines()` — réduit les allocations
+- `piscine.rs` : import `crossterm::event` dédoublonné supprimé
+- `commands/data.rs`, `exam.rs` : commentaires `// best-effort flush — non-critique` ajoutés sur tous les sites de flush silencieux
+
+---
+
+## [2.6.0] — 2026-03-12
+
+### Fonctionnalités
+
+- **`clings search`** : recherche hybride BM25 + sémantique via `nucleo-matcher` — trouve les exercices par mot-clé
+- **Shell completions** : `clings completions <shell>` génère les complétions bash/zsh/fish via `clap_complete`
+- **Binaire autonome** : exercices embarqués via `rust-embed` — le binaire fonctionne sans répertoire `exercises/` adjacent
+
+### Architecture
+
+- `main.rs` (1 009 lignes) modularisé → `src/commands/` : `watch.rs`, `run.rs`, `info.rs`, `progress_cmds.rs`, `data.rs`
+- `runner.rs` : `Child::wait_timeout()` remplacé par polling `try_wait()` — supprime la dépendance `wait-timeout`
+
+### Audit remediation
+
+- `mastery.rs` / `models.rs` : `.chars().next().unwrap()` remplacé par `.chars().next().unwrap_or_default()` — supprime le panic sur slice vide
+- `constants.rs` : seuils `PCT_GREEN_THRESHOLD` / `PCT_YELLOW_THRESHOLD` centralisés
+- `exam.rs` : utilise `display::header_box()` — supprime l'affichage dupliqué
+- `search.rs` : buffer char réutilisé entre appels — 288 → 1 allocation par recherche
+- `progress.rs` : `trim_practice_log()` — rétention limitée à 10 000 lignes dans `practice_log`
+- `progress.rs` : `get_streak()` plafonnée à `LIMIT 365`
+
+---
+
 ## [2.5.0] — 2026-03-12
 
 ### Sécurité
