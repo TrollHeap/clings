@@ -412,6 +412,7 @@ pub struct AnnaleQuestion {
     pub points: f32,
     pub title: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub summary: String,
     #[serde(default)]
     pub subjects: Vec<String>,
@@ -427,6 +428,7 @@ pub struct AnnaleSession {
     pub id: String,
     pub title: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub date: String,
     #[serde(default)]
     pub total_points: f32,

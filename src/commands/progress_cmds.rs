@@ -25,9 +25,8 @@ pub fn cmd_stats(detailed: bool) -> Result<()> {
     if detailed {
         let attempts = progress::get_subject_attempts(&conn)?;
         let daily = progress::get_daily_activity(&conn, 30)?;
-        display::show_stats_detailed(&subjects, streak as u32, &attempts, &daily);
+        crate::tui::ui_stats::run_stats(&subjects, streak as u32, Some(&attempts), Some(&daily))
     } else {
-        display::show_stats(&subjects, streak as u32);
+        crate::tui::ui_stats::run_stats(&subjects, streak as u32, None, None)
     }
-    Ok(())
 }

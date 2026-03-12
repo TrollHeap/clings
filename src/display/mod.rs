@@ -5,6 +5,7 @@ mod exercise;
 mod keybinds;
 mod list;
 mod progress;
+#[allow(dead_code)]
 mod stats;
 mod visualizer;
 
@@ -13,7 +14,6 @@ pub use exercise::*;
 pub use keybinds::*;
 pub use list::*;
 pub use progress::*;
-pub use stats::*;
 pub use visualizer::*;
 
 use std::sync::OnceLock;

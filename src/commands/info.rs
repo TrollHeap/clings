@@ -16,13 +16,12 @@ pub fn cmd_list(filter_subject: Option<&str>, filter_due: bool) -> Result<()> {
         None
     };
 
-    display::show_exercise_list(
+    crate::tui::ui_list::run_list(
         &all_exercises,
         &subjects,
         filter_subject,
         due_subjects.as_deref(),
-    );
-    Ok(())
+    )
 }
 
 pub fn cmd_hint(exercise_id: &str) -> Result<()> {
@@ -59,8 +58,7 @@ pub fn cmd_solution(exercise_id: &str) -> Result<()> {
 pub fn cmd_annales() -> Result<()> {
     let annales = exercises::load_annales_map()?;
     let (all_exercises, _) = exercises::load_all_exercises()?;
-    display::show_annales(&annales, &all_exercises);
-    Ok(())
+    crate::tui::ui_annales::run_annales(&annales, &all_exercises)
 }
 
 pub fn cmd_search(query: &str, filter_subject: Option<&str>) -> Result<()> {
