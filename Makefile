@@ -1,4 +1,4 @@
-.PHONY: build release install watch list progress review stats test lint fmt clean help
+.PHONY: build release dev install-release install dev-link watch list progress review stats test lint fmt clean help
 
 CARGO_RUN = cargo run --
 
@@ -8,8 +8,18 @@ build:
 release:
 	cargo build --release
 
-install:
+dev: build dev-link
+
+install-release:
+	cargo build --release
 	cargo install --path .
+
+install: install-release
+
+dev-link:
+	mkdir -p ~/.local/bin
+	ln -sf $(CURDIR)/target/debug/clings ~/.local/bin/clings-dev
+	@echo "clings-dev → $(CURDIR)/target/debug/clings"
 
 # Sous-commandes kf
 watch:
@@ -42,9 +52,12 @@ clean:
 
 help:
 	@echo "Cibles disponibles:"
-	@echo "  build     — cargo build (debug)"
-	@echo "  release   — cargo build --release"
-	@echo "  install   — installe kf dans ~/.cargo/bin/"
+	@echo "  build           — cargo build (debug)"
+	@echo "  release         — cargo build --release"
+	@echo "  dev             — build debug + symlink clings-dev"
+	@echo "  install-release — build release + installe dans ~/.cargo/bin/"
+	@echo "  install         — alias → install-release"
+	@echo "  dev-link        — symlink clings-dev → target/debug/clings"
 	@echo "  watch     — kf watch (mode exercice par défaut)"
 	@echo "  list      — kf list"
 	@echo "  progress  — kf progress"

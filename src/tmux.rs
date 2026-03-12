@@ -73,6 +73,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
     let editor_parts: Vec<&str> = editor.split_whitespace().collect();
     let (editor_bin, editor_args) = editor_parts.split_first()?;
     // Reject any arg that contains shell-special characters to prevent injection.
+    // '/' is allowed for absolute editor paths (e.g. /usr/bin/nvim) and path flags (e.g. --cmd /path).
     let safe_chars = |c: char| c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '=');
     if editor_args.iter().any(|a| !a.chars().all(safe_chars)) {
         return None;
