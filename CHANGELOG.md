@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.4.0] — 2026-03-12
+
+### Fonctionnalités
+
+- **`clings exam` sans argument** : sélecteur TUI interactif (flèches/jk + Entrée) avec mémorisation de la dernière session choisie
+- **`clings new`** : générateur d'exercices assisté (`--subject`, `--difficulty`, `--mode`, `--output`) et validateur (`--validate-only`)
+- **Capstone `mode: "both"`** : capstone_allocator_01, capstone_prodcons_01, capstone_shell_01 convertis vers validation combinée output + tests unitaires
+
+### Base de données
+
+- Nouvelle table `exercise_scores` : suivi des tentatives et succès par exercice (migration additive v1, non-breaking)
+- `clings review` utilise désormais les scores par exercice pour prioriser les exercices les plus faibles
+
+### Performance
+
+- `cmd_review` : une requête SQL batch (window function `ROW_NUMBER OVER PARTITION BY`) remplace N+1 requêtes par sujet
+- Constantes nommées pour les seuils de mastery bar et le comptage top-N
+
+### Qualité
+
+- Module `config.rs` : gestion centralisée de la configuration utilisateur (`~/.clings/clings.toml`)
+- Documentation `//!` ajoutée sur les modules `runner`, `mastery`, `exercises`, `watcher`, `tmux`
+
+### Corrections
+
+- `config.rs` : clés ALLOWED corrigées (`tmux.enabled`, `ui.tmux_pane_width`)
+
 ## [1.0.1] — 2026-03-11
 
 ### Refactoring
