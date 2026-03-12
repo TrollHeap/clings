@@ -33,6 +33,7 @@ thread_local! {
 }
 
 /// Résultat de la compilation et de l'exécution d'un exercice C.
+#[derive(Clone)]
 pub struct RunResult {
     /// `true` si la compilation a réussi, l'exécution s'est terminée et la sortie est valide
     pub success: bool,

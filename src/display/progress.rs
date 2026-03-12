@@ -23,6 +23,7 @@ pub fn show_chapter(ctx: &ChapterContext) {
 }
 
 /// Display the progress bar with block characters.
+#[allow(dead_code)]
 pub fn show_progress_bar(current: usize, total: usize, completed: &[bool]) {
     let done = completed.iter().filter(|&&c| c).count();
     let pct = if total > 0 { done * 100 / total } else { 0 };

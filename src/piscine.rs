@@ -23,10 +23,6 @@ fn log_checkpoint_err(label: &str, result: Result<()>) {
     }
 }
 
-fn save_checkpoint(conn: &rusqlite::Connection, index: usize) {
-    log_checkpoint_err("", progress::save_piscine_checkpoint(conn, index));
-}
-
 fn save_exam_checkpoint(conn: &rusqlite::Connection, session_id: Option<&str>, index: usize) {
     if let Some(sid) = session_id {
         log_checkpoint_err("exam ", progress::save_exam_checkpoint(conn, sid, index));
@@ -93,6 +89,8 @@ fn redisplay_piscine_exercise(
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
+    use crate::tui::app::{App, AppMode};
+
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let mut conn = progress::open_db()?;
 
@@ -119,248 +117,43 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     }
 
     let total = exercise_order.len();
-    let mut completed = vec![false; total];
-    let mut editor_pane: Option<String> = None;
-    let start_time = Instant::now();
-    let deadline: Option<std::time::Instant> =
+    let deadline =
         timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
+    let timer_total = timed_minutes.map(|m| m * 60).unwrap_or(0);
 
-    if let Some(mins) = timed_minutes {
-        println!(
-            "  {} Mode exam — {} minutes. Bonne chance !",
-            "⏰".bold().yellow(),
-            mins
-        );
-        println!();
-    }
-
-    let _raw_guard = crate::enable_raw_mode();
-
-    // Restore checkpoint if available (clamped to valid range)
-    let mut index = progress::load_piscine_checkpoint(&conn)?
+    // Restore checkpoint
+    let start_index = progress::load_piscine_checkpoint(&conn)?
         .map(|i| i.min(total.saturating_sub(1)))
         .unwrap_or(0);
-    if index > 0 {
-        println!(
-            "  {} Reprise depuis l'exercice {}/{}",
-            "⏩".dimmed(),
-            index + 1,
-            total
-        );
-    }
-    while index < total {
-        if let Some(dl) = deadline {
-            if std::time::Instant::now() >= dl {
-                println!();
-                println!(
-                    "  {} Temps écoulé ! Session exam terminée.",
-                    "⏰".bold().red()
-                );
-                log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
-                break;
-            }
-        }
 
-        let exercise = exercise_order[index];
-        let ex_start = Instant::now();
+    let mut app = App::new(AppMode::Piscine {
+        chapter: filter_chapter,
+        timed: timed_minutes,
+    });
+    app.state.exercises = exercise_order.iter().map(|e| (*e).clone()).collect();
+    app.state.completed = vec![false; total];
+    app.state.current_index = start_index;
+    app.state.piscine_deadline = deadline;
+    app.state.piscine_timer_total = timer_total;
+    app.state.piscine_start = Some(std::time::Instant::now());
 
-        let (source_path, current_stage) = runner::prepare_exercise_source(&conn, exercise)?;
+    let mut terminal = ratatui::init();
+    let result = app.run_piscine(&mut terminal, &conn, None);
+    ratatui::restore();
 
-        let ch_ctx = chapters::chapter_context_at(&chapter_blocks, index);
-        redisplay_piscine_exercise(
-            index,
-            total,
-            &start_time,
-            deadline,
-            Some(&ch_ctx),
-            exercise,
-            current_stage,
-            &source_path,
-        );
-
-        editor_pane = tmux::update_editor_pane(editor_pane.as_deref(), &source_path);
-
-        let mut hint_shown = false;
-        let mut already_recorded = false;
-        let mut vis_active = false;
-        let mut vis_step: usize = 0;
-        let mut vis_lines: usize = 0;
-        let mut fail_count: u32 = 0;
-
-        let action = crate::watcher::watch_file_interactive(
-            &source_path,
-            || {
-                display::show_file_saved();
-                display::show_keybinds_with_vis(!exercise.visualizer.steps.is_empty(), true, true);
-                WatchAction::Continue
-            },
-            |key_event| {
-                if key_event.kind != KeyEventKind::Press {
-                    return None;
-                }
-
-                let ch_ctx_inner = chapters::chapter_context_at(&chapter_blocks, index);
-
-                if vis_active {
-                    match key_event.code {
-                        KeyCode::Right => {
-                            vis_step = display::vis_step_forward(
-                                vis_step,
-                                exercise.visualizer.steps.len(),
-                            );
-                            print!("\x1b[{}A\x1b[J", vis_lines);
-                            let _ = std::io::stdout().flush(); // best-effort flush
-                            vis_lines = display::show_visualizer(exercise, vis_step);
-                            return None;
-                        }
-                        KeyCode::Left => {
-                            vis_step = display::vis_step_back(vis_step);
-                            print!("\x1b[{}A\x1b[J", vis_lines);
-                            let _ = std::io::stdout().flush(); // best-effort flush
-                            vis_lines = display::show_visualizer(exercise, vis_step);
-                            return None;
-                        }
-                        _ => {
-                            vis_active = false;
-                            redisplay_piscine_exercise(
-                                index,
-                                total,
-                                &start_time,
-                                deadline,
-                                Some(&ch_ctx_inner),
-                                exercise,
-                                current_stage,
-                                &source_path,
-                            );
-                            return None;
-                        }
-                    }
-                }
-
-                match key_event.code {
-                    KeyCode::Char('v') | KeyCode::Char('V') => {
-                        if !exercise.visualizer.steps.is_empty() {
-                            vis_step = 0;
-                            vis_active = true;
-                            vis_lines = display::show_visualizer(exercise, vis_step);
-                        }
-                        None
-                    }
-                    KeyCode::Char('h') | KeyCode::Char('H') => {
-                        if !hint_shown {
-                            println!();
-                            display::show_hints(exercise);
-                            hint_shown = true;
-                        }
-                        None
-                    }
-                    KeyCode::Char('l') | KeyCode::Char('L') => {
-                        match progress::get_all_subjects(&conn) {
-                            Ok(subjects) => {
-                                display::show_exercise_list(&all_exercises, &subjects, None, None)
-                            }
-                            Err(e) => eprintln!("  {} {e}", "Erreur:".red()),
-                        }
-                        println!("  {}", MSG_PRESS_KEY_RETURN.dimmed());
-                        None
-                    }
-                    KeyCode::Char('n')
-                    | KeyCode::Char('N')
-                    | KeyCode::Char('j')
-                    | KeyCode::Char('J') => Some(WatchAction::Next),
-                    KeyCode::Char('k') | KeyCode::Char('K') => Some(WatchAction::Prev),
-                    KeyCode::Char('q') | KeyCode::Char('Q') => Some(WatchAction::Quit),
-                    KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                        Some(WatchAction::Quit)
-                    }
-                    KeyCode::Char('z') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                        Some(WatchAction::Quit)
-                    }
-                    KeyCode::Char('r') | KeyCode::Char('R') => {
-                        let result = runner::compile_and_run(&source_path, exercise);
-                        display::show_result(&result, exercise);
-                        if result.success {
-                            fail_count = 0;
-                            if !already_recorded {
-                                already_recorded = true;
-                                crate::record_and_show(
-                                    &conn,
-                                    &exercise.subject,
-                                    &exercise.id,
-                                    true,
-                                );
-                            }
-                            println!("  {}", MSG_EXERCISE_SOLVED_ADVANCING.bold().green());
-                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
-                            return Some(WatchAction::Advance);
-                        }
-                        if !result.compile_error {
-                            fail_count += 1;
-                            if fail_count >= PISCINE_FAILURE_THRESHOLD {
-                                if let Some(cm) = &exercise.common_mistake {
-                                    println!(
-                                        "  {} {}",
-                                        "⚠ Piège fréquent:".bold().red(),
-                                        cm.yellow()
-                                    );
-                                }
-                            }
-                        }
-                        display::show_keybinds_with_vis(
-                            !exercise.visualizer.steps.is_empty(),
-                            true,
-                            true,
-                        );
-                        None
-                    }
-                    _ => None,
-                }
-            },
-        )?;
-
-        match action {
-            WatchAction::Advance => {
-                completed[index] = true;
-                let ex_elapsed = ex_start.elapsed();
-                let ex_secs = ex_elapsed.as_secs();
-                println!(
-                    "  {} Résolu en {}m{:02}s",
-                    "⏱".dimmed(),
-                    ex_secs / 60,
-                    ex_secs % 60,
-                );
-                index += 1;
-                save_checkpoint(&conn, index);
-            }
-            WatchAction::Skip | WatchAction::Next => {
-                index += 1;
-                save_checkpoint(&conn, index);
-            }
-            WatchAction::Prev => {
-                index = index.saturating_sub(1);
-                save_checkpoint(&conn, index);
-            }
-            WatchAction::Quit => {
-                save_checkpoint(&conn, index);
-                break;
-            }
-            WatchAction::Continue => {}
-        }
-    }
-
-    drop(_raw_guard);
-    if let Some(pane) = &editor_pane {
-        tmux::kill_pane(pane);
-    }
-
-    let done = completed.iter().filter(|&&c| c).count();
-    let elapsed = start_time.elapsed();
+    // Post-run stats
+    let done = app.state.completed.iter().filter(|&&c| c).count();
+    let elapsed = app
+        .state
+        .piscine_start
+        .unwrap_or(std::time::Instant::now())
+        .elapsed();
     let hours = elapsed.as_secs() / 3600;
     let mins = (elapsed.as_secs() % 3600) / 60;
     let secs = elapsed.as_secs() % 60;
 
     if done == total {
-        log_checkpoint_err("piscine ", progress::clear_piscine_checkpoint(&conn));
+        let _ = progress::clear_piscine_checkpoint(&conn);
     }
 
     println!();
@@ -396,7 +189,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         );
     }
 
-    Ok(())
+    result
 }
 
 /// Lancer une session piscine avec une liste d'exercices préfiltrée (mode exam).

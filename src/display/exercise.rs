@@ -7,6 +7,7 @@ use crate::models::{Exercise, ValidationMode};
 use crate::runner::RunResult;
 
 /// Per-exercise SRS and scaffolding hints for the watch mode header.
+#[allow(dead_code)]
 pub struct WatchMeta {
     pub stage: Option<u8>,
     pub next_review_days: Option<i64>,
@@ -48,6 +49,7 @@ fn render_exercise_body(exercise: &Exercise) {
 }
 
 /// Display exercise info in watch mode (rustlings-style).
+#[allow(dead_code)]
 pub fn show_exercise_watch(
     exercise: &Exercise,
     index: usize,

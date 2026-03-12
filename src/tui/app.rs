@@ -52,6 +52,9 @@ pub struct AppState {
     pub review_map: HashMap<String, Option<i64>>,
     pub mastery_map: HashMap<String, f64>,
     pub piscine_deadline: Option<Instant>,
+    pub piscine_start: Option<Instant>,
+    pub piscine_timer_total: u64,
+    pub piscine_fail_count: u32,
     // Status message (file saved, etc.)
     pub status_msg: Option<String>,
 }
@@ -76,6 +79,9 @@ impl AppState {
             review_map: HashMap::new(),
             mastery_map: HashMap::new(),
             piscine_deadline: None,
+            piscine_start: None,
+            piscine_timer_total: 0,
+            piscine_fail_count: 0,
             status_msg: None,
         }
     }
@@ -286,6 +292,251 @@ impl App {
                 // Clear status message after a while (optionnel)
             }
             Msg::Quit => {
+                self.state.should_quit = true;
+            }
+        }
+    }
+
+    /// Boucle principale piscine avec Ratatui.
+    ///
+    /// Paramètres :
+    /// - `terminal` : terminal Ratatui initialisé
+    /// - `conn` : connexion SQLite (pour compile_and_run + record_attempt)
+    /// - `session_id` : optional exam session ID (for exam checkpoints)
+    pub fn run_piscine(
+        &mut self,
+        terminal: &mut ratatui::DefaultTerminal,
+        conn: &rusqlite::Connection,
+        session_id: Option<&str>,
+    ) -> Result<()> {
+        use std::time::Duration;
+
+        // Prépare le premier exercice
+        self.load_current_exercise(conn)?;
+
+        let rx = match &self.state.source_path {
+            Some(p) => crate::tui::events::spawn_event_reader(p.clone()),
+            None => return Ok(()),
+        };
+
+        // Boucle TEA
+        loop {
+            terminal.draw(|f| crate::tui::ui_piscine::view(f, &self.state))?;
+
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(msg) => self.update_piscine(msg, conn, session_id),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    // Check deadline on timeout
+                    if let Some(deadline) = self.state.piscine_deadline {
+                        if std::time::Instant::now() >= deadline {
+                            self.state.should_quit = true;
+                        }
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+
+            if self.state.should_quit {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// Dispatch Piscine messages → état
+    pub fn update_piscine(
+        &mut self,
+        msg: Msg,
+        conn: &rusqlite::Connection,
+        session_id: Option<&str>,
+    ) {
+        use crate::constants::PISCINE_FAILURE_THRESHOLD;
+        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+
+        match msg {
+            Msg::Key(key) => {
+                // Visualizer mode — arrow keys / any key to close
+                if self.state.vis_active {
+                    match key.code {
+                        KeyCode::Right => {
+                            let total = self.state.exercises[self.state.current_index]
+                                .visualizer
+                                .steps
+                                .len();
+                            self.state.vis_step =
+                                (self.state.vis_step + 1).min(total.saturating_sub(1));
+                        }
+                        KeyCode::Left => {
+                            self.state.vis_step = self.state.vis_step.saturating_sub(1);
+                        }
+                        _ => {
+                            self.state.vis_active = false;
+                        }
+                    }
+                    return;
+                }
+
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        let idx = self.state.current_index;
+                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                        if let Some(sid) = session_id {
+                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                        }
+                        self.state.should_quit = true;
+                    }
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
+                        self.state.hint_shown = true;
+                    }
+                    KeyCode::Char('v') | KeyCode::Char('V') => {
+                        if !self.state.exercises[self.state.current_index]
+                            .visualizer
+                            .steps
+                            .is_empty()
+                        {
+                            self.state.vis_active = true;
+                            self.state.vis_step = 0;
+                        }
+                    }
+                    KeyCode::Char('n')
+                    | KeyCode::Char('N')
+                    | KeyCode::Char('j')
+                    | KeyCode::Char('J') => {
+                        let next = self.state.current_index + 1;
+                        if next < self.state.exercises.len() {
+                            self.state.current_index = next;
+                            let _ = self.load_current_exercise(conn);
+                            let idx = self.state.current_index;
+                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                            if let Some(sid) = session_id {
+                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                            }
+                        } else {
+                            // Reached end
+                            let idx = self.state.current_index;
+                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                            if let Some(sid) = session_id {
+                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                            }
+                            self.state.should_quit = true;
+                        }
+                    }
+                    KeyCode::Char('k') | KeyCode::Char('K') => {
+                        if self.state.current_index > 0 {
+                            self.state.current_index -= 1;
+                            let _ = self.load_current_exercise(conn);
+                            let idx = self.state.current_index;
+                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                            if let Some(sid) = session_id {
+                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                            }
+                        }
+                    }
+                    KeyCode::Char('r') | KeyCode::Char('R') => {
+                        if let Some(path) = &self.state.source_path.clone() {
+                            let exercise = &self.state.exercises[self.state.current_index];
+                            let result = crate::runner::compile_and_run(path, exercise);
+                            let success = result.success;
+                            let compile_error = result.compile_error;
+                            self.state.run_result = Some(result);
+
+                            if success {
+                                self.state.piscine_fail_count = 0;
+                                if !self.state.already_recorded {
+                                    self.state.already_recorded = true;
+                                    let _ = crate::progress::record_attempt(
+                                        conn,
+                                        &exercise.subject.clone(),
+                                        &exercise.id.clone(),
+                                        true,
+                                    );
+                                }
+                                // Advance after short delay
+                                std::thread::sleep(std::time::Duration::from_secs(
+                                    crate::constants::SUCCESS_PAUSE_SECS,
+                                ));
+                                self.state.completed[self.state.current_index] = true;
+                                let next = self.state.current_index + 1;
+                                if next < self.state.exercises.len() {
+                                    self.state.current_index = next;
+                                    let _ = self.load_current_exercise(conn);
+                                    let idx = self.state.current_index;
+                                    let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                                    if let Some(sid) = session_id {
+                                        let _ =
+                                            crate::progress::save_exam_checkpoint(conn, sid, idx);
+                                    }
+                                } else {
+                                    // Reached end
+                                    let idx = self.state.current_index;
+                                    let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                                    if let Some(sid) = session_id {
+                                        let _ =
+                                            crate::progress::save_exam_checkpoint(conn, sid, idx);
+                                    }
+                                    self.state.should_quit = true;
+                                }
+                            } else {
+                                if !compile_error {
+                                    self.state.piscine_fail_count =
+                                        self.state.piscine_fail_count.saturating_add(1);
+                                    if self.state.piscine_fail_count >= PISCINE_FAILURE_THRESHOLD {
+                                        if let Some(cm) = &exercise.common_mistake {
+                                            self.state.status_msg =
+                                                Some(format!("⚠ Piège : {}", cm));
+                                        }
+                                    }
+                                }
+                                let _ = crate::progress::record_attempt(
+                                    conn,
+                                    &exercise.subject.clone(),
+                                    &exercise.id.clone(),
+                                    false,
+                                );
+                            }
+                        }
+                    }
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        let idx = self.state.current_index;
+                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                        if let Some(sid) = session_id {
+                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                        }
+                        self.state.should_quit = true;
+                    }
+                    KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        let idx = self.state.current_index;
+                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                        if let Some(sid) = session_id {
+                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                        }
+                        self.state.should_quit = true;
+                    }
+                    _ => {}
+                }
+            }
+            Msg::FileChanged(_) => {
+                self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
+            }
+            Msg::Tick => {
+                // Check deadline on tick
+                if let Some(deadline) = self.state.piscine_deadline {
+                    if std::time::Instant::now() >= deadline {
+                        let idx = self.state.current_index;
+                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                        if let Some(sid) = session_id {
+                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                        }
+                        self.state.should_quit = true;
+                    }
+                }
+            }
+            Msg::Quit => {
+                let idx = self.state.current_index;
+                let _ = crate::progress::save_piscine_checkpoint(conn, idx);
+                if let Some(sid) = session_id {
+                    let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
+                }
                 self.state.should_quit = true;
             }
         }
