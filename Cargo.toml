@@ -26,11 +26,11 @@ libc = "0.2"
 thiserror = "2"
 regex = "1"
 toml = "1"
-crossterm = "0.28"
+crossterm = "0.29"
 textwrap = "0.16"
 rust-embed = { version = "8", features = ["include-exclude"] }
 nucleo-matcher = "0.3"
-ratatui = "0.29"
+ratatui = "0.30"
 
 [profile.release]
 lto = "thin"          # Link-time optimization (thin = bon compromis vitesse/taille)

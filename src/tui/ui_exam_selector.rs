@@ -1,7 +1,8 @@
 //! Ratatui TUI exam session selector.
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Constraint, Direction, HorizontalAlignment, Layout},
+    style::{Color, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
@@ -87,6 +88,12 @@ mod tests {
 }
 
 fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
+    // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
+    f.render_widget(
+        Block::default().style(Style::default().bg(Color::Black)),
+        f.area(),
+    );
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -98,7 +105,7 @@ fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
 
     // Header
     let header = Paragraph::new("Sélectionner une session d'exam")
-        .alignment(Alignment::Left)
+        .alignment(HorizontalAlignment::Left)
         .block(Block::default().borders(Borders::BOTTOM));
     f.render_widget(header, chunks[0]);
 
@@ -126,7 +133,7 @@ fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
     f.render_widget(list, chunks[1]);
 
     // Footer
-    let footer =
-        Paragraph::new("[↑↓/jk] naviguer  [Entrée] lancer  [q] annuler").alignment(Alignment::Left);
+    let footer = Paragraph::new("[↑↓/jk] naviguer  [Entrée] lancer  [q] annuler")
+        .alignment(HorizontalAlignment::Left);
     f.render_widget(footer, chunks[2]);
 }
