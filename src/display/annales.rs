@@ -89,6 +89,8 @@ pub fn show_annales(annales: &[AnnaleSession], exercises: &[Exercise]) {
 
 /// Sélecteur interactif TUI pour choisir une session d'exam (flèches + Entrée, q pour quitter).
 /// Retourne l'ID de la session choisie, ou None si annulé.
+/// DEPRECATED: Use crate::tui::ui_exam_selector::select_exam_session instead.
+#[allow(dead_code)]
 pub fn select_exam_session(
     sessions: &[AnnaleSession],
     last_session_id: Option<&str>,

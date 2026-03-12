@@ -62,7 +62,7 @@ pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     } else {
         let conn = progress::open_db()?;
         let last = progress::load_last_exam_session(&conn)?;
-        let chosen = display::select_exam_session(&sessions, last.as_deref());
+        let chosen = crate::tui::ui_exam_selector::select_exam_session(&sessions, last.as_deref());
         match chosen {
             Some(id) => {
                 progress::save_last_exam_session(&conn, &id)?;

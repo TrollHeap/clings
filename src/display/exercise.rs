@@ -155,6 +155,7 @@ pub fn show_exercise(exercise: &Exercise, index: usize, total: usize) {
 }
 
 /// Show the "waiting for changes" status.
+#[allow(dead_code)]
 pub fn show_watching(source_path: &std::path::Path) {
     println!(
         "  {} {}",
@@ -169,6 +170,7 @@ pub fn show_watching(source_path: &std::path::Path) {
 }
 
 /// Show notification when a file save is detected (no auto-compile).
+#[allow(dead_code)]
 pub fn show_file_saved() {
     println!("  {}", "fichier sauvegardé — [r] pour compiler".dimmed());
 }

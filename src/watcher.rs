@@ -25,8 +25,10 @@ pub enum WatchAction {
     /// User wants to quit
     Quit,
     /// Navigate to next exercise (j)
+    #[allow(dead_code)]
     Next,
     /// Navigate to previous exercise (k)
+    #[allow(dead_code)]
     Prev,
 }
 
