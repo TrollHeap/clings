@@ -524,8 +524,7 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
 /// Écrit le code source de l'exercice dans `~/.clings/current.c` via temp-file+rename atomique.
 ///
 /// # Errors
-/// - `std::io::Error` si `$HOME` n'est pas défini ou défini incorrectement
-/// - `std::io::Error` si l'écriture ou le rename échoue
+/// `std::io::Error` if `$HOME` is not set or if the write/rename operation fails.
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
     let dir = work_dir().map_err(|e| match e {
         KfError::Io(io) => io,
@@ -554,7 +553,8 @@ pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io:
 /// n'a pas de staged_code.
 ///
 /// # Errors
-/// Propage les erreurs de `write_starter_code` et de la DB.
+/// - `KfError::Database` if database query fails.
+/// - `KfError::Io` if `write_starter_code` encounters an I/O error (auto-converted via `#[from]`).
 pub fn prepare_exercise_source(
     conn: &rusqlite::Connection,
     exercise: &crate::models::Exercise,

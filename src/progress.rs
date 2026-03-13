@@ -505,7 +505,7 @@ pub fn get_daily_activity(conn: &Connection, days: u32) -> Result<Vec<(String, u
 /// elapsed time — skipping the rest entirely instead of loading the full table.
 ///
 /// # Errors
-/// `KfError::Database` si la transaction échoue.
+/// `KfError::Database` if the transaction or query fails (auto-converted via `#[from]`).
 pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
     let decay_days = crate::config::get().srs.decay_days;
     let mut stmt = conn.prepare_cached(
