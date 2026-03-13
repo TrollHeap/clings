@@ -69,8 +69,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
     // chars().count() pour la largeur d'affichage (●◉○ = 3 octets mais 1 col)
-    let right1_display =
-        state.cached_mini_map.chars().count() + 2 + exercise.subject.chars().count();
+    let right1_display = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
     let pad1 = width.saturating_sub(state.cached_header_left_len + right1_display + 4);
     let line1 = Line::from(vec![
         Span::styled(

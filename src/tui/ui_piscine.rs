@@ -70,8 +70,7 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     // Ligne 1 : [idx/total] titre + droit: mini-map
     let pad1 = {
         // chars().count() pour ●◉○ (3 octets chacun, 1 col d'affichage)
-        let right_len =
-            state.cached_mini_map.chars().count() + exercise.subject.chars().count() + 2;
+        let right_len = state.cached_mini_map_len + exercise.subject.chars().count() + 2;
         width.saturating_sub(state.cached_header_left_len + right_len + 4)
     };
     let line1 = Line::from(vec![

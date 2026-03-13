@@ -61,6 +61,7 @@ pub struct AppState {
     pub cached_exercise_counter: String, // "[N/total] "
     pub cached_mastery_display: String,  // "mastery: X.X  "
     pub cached_header_left_len: usize,   // Width of "[N/total] " + title in chars
+    pub cached_mini_map_len: usize,      // Display width of cached_mini_map (chars count)
 }
 
 impl AppState {
@@ -101,6 +102,7 @@ impl AppState {
             cached_exercise_counter: String::new(),
             cached_mastery_display: String::new(),
             cached_header_left_len: 0,
+            cached_mini_map_len: 0,
         }
     }
 
@@ -142,6 +144,7 @@ impl App {
             .unwrap_or(0.0);
         state.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
         state.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
+        state.cached_mini_map_len = state.cached_mini_map.chars().count();
 
         // Cache the left header width: "[N/total] " + title chars count
         let title = state
