@@ -1,5 +1,7 @@
 //! Vue watch — rendu Ratatui pour le mode progression SRS.
 
+use std::borrow::Cow;
+
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
@@ -230,26 +232,30 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     } else if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
-        let mut parts = vec![
-            "[j] suiv".to_string(),
-            "[k] préc".to_string(),
-            "[n] skip".to_string(),
-            "[r] run".to_string(),
+        let mut parts: Vec<Cow<'static, str>> = vec![
+            Cow::Borrowed("[j] suiv"),
+            Cow::Borrowed("[k] préc"),
+            Cow::Borrowed("[n] skip"),
+            Cow::Borrowed("[r] run"),
         ];
         if has_hints {
-            let hint_label = if state.hint_index == 0 {
-                "[h] hint".to_string()
+            let hint_label: Cow<'static, str> = if state.hint_index == 0 {
+                Cow::Borrowed("[h] hint")
             } else {
-                format!("[h] hint ({}/{})", state.hint_index, exercise.hints.len())
+                Cow::Owned(format!(
+                    "[h] hint ({}/{})",
+                    state.hint_index,
+                    exercise.hints.len()
+                ))
             };
             parts.insert(0, hint_label);
         }
         if has_vis {
-            parts.push("[v] vis".to_string());
+            parts.push(Cow::Borrowed("[v] vis"));
         }
-        parts.push("[/] search".to_string());
-        parts.push("[?] aide".to_string());
-        parts.push("[q] quit".to_string());
+        parts.push(Cow::Borrowed("[/] search"));
+        parts.push(Cow::Borrowed("[?] aide"));
+        parts.push(Cow::Borrowed("[q] quit"));
         parts.join("  ")
     };
 

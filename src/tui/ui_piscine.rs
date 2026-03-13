@@ -1,5 +1,7 @@
 //! Vue piscine — rendu Ratatui pour le mode progression linéaire.
 
+use std::borrow::Cow;
+
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
@@ -266,24 +268,28 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     } else if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
-        let mut parts = vec![
-            "[r] compiler".to_string(),
-            "[n] suivant".to_string(),
-            "[k] précédent".to_string(),
+        let mut parts: Vec<Cow<'static, str>> = vec![
+            Cow::Borrowed("[r] compiler"),
+            Cow::Borrowed("[n] suivant"),
+            Cow::Borrowed("[k] précédent"),
         ];
         if has_hints {
-            let hint_label = if state.hint_index == 0 {
-                "[h] indice".to_string()
+            let hint_label: Cow<'static, str> = if state.hint_index == 0 {
+                Cow::Borrowed("[h] indice")
             } else {
-                format!("[h] indice ({}/{})", state.hint_index, exercise.hints.len())
+                Cow::Owned(format!(
+                    "[h] indice ({}/{})",
+                    state.hint_index,
+                    exercise.hints.len()
+                ))
             };
             parts.insert(1, hint_label);
         }
         if has_vis {
-            parts.push("[v] vis".to_string());
+            parts.push(Cow::Borrowed("[v] vis"));
         }
-        parts.push("[/] search".to_string());
-        parts.push("[q] quitter".to_string());
+        parts.push(Cow::Borrowed("[/] search"));
+        parts.push(Cow::Borrowed("[q] quitter"));
         parts.join("  ")
     };
 
