@@ -45,7 +45,9 @@ pub struct AppState {
     pub source_path: Option<PathBuf>,
     pub current_stage: Option<u8>,
     pub editor_pane: Option<String>,
-    pub hint_shown: bool,
+    pub hint_index: usize,
+    pub solution_active: bool,
+    pub compile_pending: bool,
     pub vis_active: bool,
     pub vis_step: usize,
     pub consecutive_failures: u8,
@@ -85,7 +87,9 @@ impl AppState {
             source_path: None,
             current_stage: None,
             editor_pane: None,
-            hint_shown: false,
+            hint_index: 0,
+            solution_active: false,
+            compile_pending: false,
             vis_active: false,
             vis_step: 0,
             consecutive_failures: 0,
@@ -107,6 +111,14 @@ impl AppState {
             help_active: false,
             search_g_pending: false,
         }
+    }
+
+    /// Nombre de sujets dont la révision est due (days_until_due ≤ 0).
+    pub fn due_count(&self) -> usize {
+        self.review_map
+            .values()
+            .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
+            .count()
     }
 }
 
@@ -172,7 +184,9 @@ impl App {
         self.state.source_path = Some(source_path);
         self.state.current_stage = stage;
         self.state.run_result = None;
-        self.state.hint_shown = false;
+        self.state.hint_index = 0;
+        self.state.solution_active = false;
+        self.state.compile_pending = false;
         self.state.vis_active = false;
         self.state.vis_step = 0;
         self.state.already_recorded = false;
@@ -227,6 +241,107 @@ impl App {
         state.search_selected = 0;
     }
 
+    /// Gère les touches de l'overlay de recherche.
+    /// Retourne `true` si Enter a été pressé avec un résultat sélectionné
+    /// (l'appelant doit alors charger l'exercice et/ou sauvegarder le checkpoint).
+    fn handle_search_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) -> bool {
+        use ratatui::crossterm::event::KeyCode;
+        match key.code {
+            KeyCode::Esc => {
+                state.search_active = false;
+                state.search_query.clear();
+                state.search_results.clear();
+            }
+            KeyCode::Tab => {
+                state.search_subject_filter = !state.search_subject_filter;
+                Self::rebuild_search(state);
+            }
+            KeyCode::Enter => {
+                if !state.search_results.is_empty() {
+                    let idx = state.search_results[state.search_selected];
+                    state.current_index = idx;
+                    state.search_active = false;
+                    state.search_query.clear();
+                    state.search_results.clear();
+                    return true;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                let len = state.search_results.len();
+                if len > 0 {
+                    state.search_selected = (state.search_selected + 1) % len;
+                }
+                state.search_g_pending = false;
+            }
+            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                let len = state.search_results.len();
+                if len > 0 {
+                    state.search_selected = state.search_selected.checked_sub(1).unwrap_or(len - 1);
+                }
+                state.search_g_pending = false;
+            }
+            KeyCode::Char('G') => {
+                let len = state.search_results.len();
+                if len > 0 {
+                    state.search_selected = len - 1;
+                }
+                state.search_g_pending = false;
+            }
+            KeyCode::Char('g') => {
+                if state.search_g_pending {
+                    state.search_selected = 0;
+                    state.search_g_pending = false;
+                } else {
+                    state.search_g_pending = true;
+                }
+            }
+            KeyCode::Backspace => {
+                state.search_query.pop();
+                Self::rebuild_search(state);
+                state.search_g_pending = false;
+            }
+            KeyCode::Char(c) => {
+                state.search_g_pending = false;
+                state.search_query.push(c);
+                Self::rebuild_search(state);
+            }
+            _ => {
+                state.search_g_pending = false;
+            }
+        }
+        false
+    }
+
+    /// Gère les touches de l'overlay visualiseur.
+    fn handle_vis_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) {
+        use ratatui::crossterm::event::KeyCode;
+        match key.code {
+            KeyCode::Right => {
+                let total = state.exercises[state.current_index].visualizer.steps.len();
+                state.vis_step = (state.vis_step + 1).min(total.saturating_sub(1));
+            }
+            KeyCode::Left => {
+                state.vis_step = state.vis_step.saturating_sub(1);
+            }
+            _ => {
+                state.vis_active = false;
+            }
+        }
+    }
+
+    /// Sauvegarde le checkpoint piscine et exam (si session_id présent).
+    /// Logue les erreurs sans les propager — contexte event loop.
+    fn save_checkpoint(&self, conn: &rusqlite::Connection, session_id: Option<&str>, idx: usize) {
+        if let Err(e) = crate::progress::save_piscine_checkpoint(conn, idx) {
+            eprintln!("[clings] erreur sauvegarde checkpoint piscine: {e}");
+        }
+        if let Some(sid) = session_id {
+            if let Err(e) = crate::progress::save_exam_checkpoint(conn, sid, idx) {
+                eprintln!("[clings] erreur sauvegarde checkpoint exam: {e}");
+            }
+        }
+    }
+
     /// Dispatch Watch messages → état
     pub fn update_watch(&mut self, msg: Msg, conn: &rusqlite::Connection) {
         use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
@@ -236,71 +351,23 @@ impl App {
             Msg::Key(key) => {
                 // Search overlay — capture all keys when active
                 if self.state.search_active {
-                    match key.code {
-                        KeyCode::Esc => {
-                            self.state.search_active = false;
-                            self.state.search_query.clear();
-                            self.state.search_results.clear();
+                    if Self::handle_search_key(&mut self.state, key) {
+                        if let Err(e) = self.load_current_exercise(conn) {
+                            eprintln!("[clings] erreur chargement exercice: {e}");
                         }
-                        KeyCode::Tab => {
-                            self.state.search_subject_filter = !self.state.search_subject_filter;
-                            Self::rebuild_search(&mut self.state);
-                        }
-                        KeyCode::Enter => {
-                            if !self.state.search_results.is_empty() {
-                                let idx = self.state.search_results[self.state.search_selected];
-                                self.state.current_index = idx;
-                                self.state.search_active = false;
-                                self.state.search_query.clear();
-                                self.state.search_results.clear();
-                                if let Err(e) = self.load_current_exercise(conn) {
-                                    eprintln!("[clings] erreur chargement exercice: {e}");
-                                }
-                            }
-                        }
-                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected = (self.state.search_selected + 1) % len;
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected =
-                                    self.state.search_selected.checked_sub(1).unwrap_or(len - 1);
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char('G') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected = len - 1;
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char('g') => {
-                            if self.state.search_g_pending {
-                                self.state.search_selected = 0;
-                                self.state.search_g_pending = false;
-                            } else {
-                                self.state.search_g_pending = true;
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            self.state.search_query.pop();
-                            Self::rebuild_search(&mut self.state);
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char(c) => {
-                            self.state.search_g_pending = false;
-                            self.state.search_query.push(c);
-                            Self::rebuild_search(&mut self.state);
-                        }
-                        _ => {
-                            self.state.search_g_pending = false;
-                        }
+                    }
+                    return;
+                }
+
+                // Solution overlay — Esc or [s] closes
+                if self.state.solution_active {
+                    if matches!(
+                        key.code,
+                        ratatui::crossterm::event::KeyCode::Esc
+                            | ratatui::crossterm::event::KeyCode::Char('s')
+                            | ratatui::crossterm::event::KeyCode::Char('S')
+                    ) {
+                        self.state.solution_active = false;
                     }
                     return;
                 }
@@ -313,22 +380,7 @@ impl App {
 
                 // Visualizer mode — arrow keys / any key to close
                 if self.state.vis_active {
-                    match key.code {
-                        KeyCode::Right => {
-                            let total = self.state.exercises[self.state.current_index]
-                                .visualizer
-                                .steps
-                                .len();
-                            self.state.vis_step =
-                                (self.state.vis_step + 1).min(total.saturating_sub(1));
-                        }
-                        KeyCode::Left => {
-                            self.state.vis_step = self.state.vis_step.saturating_sub(1);
-                        }
-                        _ => {
-                            self.state.vis_active = false;
-                        }
-                    }
+                    Self::handle_vis_key(&mut self.state, key);
                     return;
                 }
 
@@ -337,7 +389,18 @@ impl App {
                         self.state.should_quit = true;
                     }
                     KeyCode::Char('h') | KeyCode::Char('H') => {
-                        self.state.hint_shown = true;
+                        let hints_len = self.state.exercises[self.state.current_index].hints.len();
+                        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
+                    }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        let exercise = &self.state.exercises[self.state.current_index];
+                        let all_shown = exercise.hints.is_empty()
+                            || self.state.hint_index >= exercise.hints.len();
+                        let enough_failures = self.state.consecutive_failures as usize
+                            >= CONSECUTIVE_FAILURE_THRESHOLD;
+                        if all_shown || enough_failures {
+                            self.state.solution_active = !self.state.solution_active;
+                        }
                     }
                     KeyCode::Char('v') | KeyCode::Char('V') => {
                         if !self.state.exercises[self.state.current_index]
@@ -379,9 +442,11 @@ impl App {
                         }
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
-                        if let Some(path) = &self.state.source_path.clone() {
+                        if let Some(path) = self.state.source_path.as_deref() {
+                            self.state.compile_pending = true;
                             let exercise = &self.state.exercises[self.state.current_index];
                             let result = crate::runner::compile_and_run(path, exercise);
+                            self.state.compile_pending = false;
                             let success = result.success;
                             self.state.run_result = Some(result);
 
@@ -418,15 +483,24 @@ impl App {
                                 if (self.state.consecutive_failures as usize)
                                     >= CONSECUTIVE_FAILURE_THRESHOLD
                                 {
-                                    self.state.hint_shown = true;
+                                    // Reveal first hint automatically if none shown yet
+                                    if self.state.hint_index == 0 {
+                                        let hints_len = self.state.exercises
+                                            [self.state.current_index]
+                                            .hints
+                                            .len();
+                                        if hints_len > 0 {
+                                            self.state.hint_index = 1;
+                                        }
+                                    }
                                 }
-                                let subj = self.state.exercises[self.state.current_index]
-                                    .subject
-                                    .clone();
-                                let id = self.state.exercises[self.state.current_index].id.clone();
-                                if let Err(e) =
-                                    crate::progress::record_attempt(conn, &subj, &id, false)
-                                {
+                                let exercise = &self.state.exercises[self.state.current_index];
+                                if let Err(e) = crate::progress::record_attempt(
+                                    conn,
+                                    &exercise.subject,
+                                    &exercise.id,
+                                    false,
+                                ) {
                                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                                 }
                             }
@@ -519,112 +593,54 @@ impl App {
             Msg::Key(key) => {
                 // Search overlay — capture all keys when active
                 if self.state.search_active {
-                    match key.code {
-                        KeyCode::Esc => {
-                            self.state.search_active = false;
-                            self.state.search_query.clear();
-                            self.state.search_results.clear();
+                    if Self::handle_search_key(&mut self.state, key) {
+                        if let Err(e) = self.load_current_exercise(conn) {
+                            eprintln!("[clings] erreur chargement exercice: {e}");
                         }
-                        KeyCode::Tab => {
-                            self.state.search_subject_filter = !self.state.search_subject_filter;
-                            Self::rebuild_search(&mut self.state);
-                        }
-                        KeyCode::Enter => {
-                            if !self.state.search_results.is_empty() {
-                                let idx = self.state.search_results[self.state.search_selected];
-                                self.state.current_index = idx;
-                                self.state.search_active = false;
-                                self.state.search_query.clear();
-                                self.state.search_results.clear();
-                                if let Err(e) = self.load_current_exercise(conn) {
-                                    eprintln!("[clings] erreur chargement exercice: {e}");
-                                }
-                                let cidx = self.state.current_index;
-                                let _ = crate::progress::save_piscine_checkpoint(conn, cidx);
-                                if let Some(sid) = session_id {
-                                    let _ = crate::progress::save_exam_checkpoint(conn, sid, cidx);
-                                }
-                            }
-                        }
-                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected = (self.state.search_selected + 1) % len;
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected =
-                                    self.state.search_selected.checked_sub(1).unwrap_or(len - 1);
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char('G') => {
-                            let len = self.state.search_results.len();
-                            if len > 0 {
-                                self.state.search_selected = len - 1;
-                            }
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char('g') => {
-                            if self.state.search_g_pending {
-                                self.state.search_selected = 0;
-                                self.state.search_g_pending = false;
-                            } else {
-                                self.state.search_g_pending = true;
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            self.state.search_query.pop();
-                            Self::rebuild_search(&mut self.state);
-                            self.state.search_g_pending = false;
-                        }
-                        KeyCode::Char(c) => {
-                            self.state.search_g_pending = false;
-                            self.state.search_query.push(c);
-                            Self::rebuild_search(&mut self.state);
-                        }
-                        _ => {
-                            self.state.search_g_pending = false;
-                        }
+                        let cidx = self.state.current_index;
+                        self.save_checkpoint(conn, session_id, cidx);
+                    }
+                    return;
+                }
+
+                // Solution overlay — Esc or [s] closes
+                if self.state.solution_active {
+                    if matches!(
+                        key.code,
+                        ratatui::crossterm::event::KeyCode::Esc
+                            | ratatui::crossterm::event::KeyCode::Char('s')
+                            | ratatui::crossterm::event::KeyCode::Char('S')
+                    ) {
+                        self.state.solution_active = false;
                     }
                     return;
                 }
 
                 // Visualizer mode — arrow keys / any key to close
                 if self.state.vis_active {
-                    match key.code {
-                        KeyCode::Right => {
-                            let total = self.state.exercises[self.state.current_index]
-                                .visualizer
-                                .steps
-                                .len();
-                            self.state.vis_step =
-                                (self.state.vis_step + 1).min(total.saturating_sub(1));
-                        }
-                        KeyCode::Left => {
-                            self.state.vis_step = self.state.vis_step.saturating_sub(1);
-                        }
-                        _ => {
-                            self.state.vis_active = false;
-                        }
-                    }
+                    Self::handle_vis_key(&mut self.state, key);
                     return;
                 }
 
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         let idx = self.state.current_index;
-                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                        if let Some(sid) = session_id {
-                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                        }
+                        self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
                     KeyCode::Char('h') | KeyCode::Char('H') => {
-                        self.state.hint_shown = true;
+                        let hints_len = self.state.exercises[self.state.current_index].hints.len();
+                        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
+                    }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        let exercise = &self.state.exercises[self.state.current_index];
+                        let all_shown = exercise.hints.is_empty()
+                            || self.state.hint_index >= exercise.hints.len();
+                        let enough_failures =
+                            self.state.piscine_fail_count >= PISCINE_FAILURE_THRESHOLD;
+                        if all_shown || enough_failures {
+                            self.state.solution_active = !self.state.solution_active;
+                        }
                     }
                     KeyCode::Char('v') | KeyCode::Char('V') => {
                         if !self.state.exercises[self.state.current_index]
@@ -647,17 +663,11 @@ impl App {
                                 eprintln!("[clings] erreur chargement exercice: {e}");
                             }
                             let idx = self.state.current_index;
-                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                            if let Some(sid) = session_id {
-                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                            }
+                            self.save_checkpoint(conn, session_id, idx);
                         } else {
                             // Reached end
                             let idx = self.state.current_index;
-                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                            if let Some(sid) = session_id {
-                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                            }
+                            self.save_checkpoint(conn, session_id, idx);
                             self.state.should_quit = true;
                         }
                     }
@@ -668,16 +678,15 @@ impl App {
                                 eprintln!("[clings] erreur chargement exercice: {e}");
                             }
                             let idx = self.state.current_index;
-                            let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                            if let Some(sid) = session_id {
-                                let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                            }
+                            self.save_checkpoint(conn, session_id, idx);
                         }
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
-                        if let Some(path) = &self.state.source_path.clone() {
+                        if let Some(path) = self.state.source_path.as_deref() {
+                            self.state.compile_pending = true;
                             let exercise = &self.state.exercises[self.state.current_index];
                             let result = crate::runner::compile_and_run(path, exercise);
+                            self.state.compile_pending = false;
                             let success = result.success;
                             let compile_error = result.compile_error;
                             self.state.run_result = Some(result);
@@ -707,19 +716,11 @@ impl App {
                                         eprintln!("[clings] erreur chargement exercice: {e}");
                                     }
                                     let idx = self.state.current_index;
-                                    let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                                    if let Some(sid) = session_id {
-                                        let _ =
-                                            crate::progress::save_exam_checkpoint(conn, sid, idx);
-                                    }
+                                    self.save_checkpoint(conn, session_id, idx);
                                 } else {
                                     // Reached end
                                     let idx = self.state.current_index;
-                                    let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                                    if let Some(sid) = session_id {
-                                        let _ =
-                                            crate::progress::save_exam_checkpoint(conn, sid, idx);
-                                    }
+                                    self.save_checkpoint(conn, session_id, idx);
                                     self.state.should_quit = true;
                                 }
                             } else {
@@ -751,18 +752,12 @@ impl App {
                     }
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         let idx = self.state.current_index;
-                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                        if let Some(sid) = session_id {
-                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                        }
+                        self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
                     KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         let idx = self.state.current_index;
-                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                        if let Some(sid) = session_id {
-                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                        }
+                        self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
                     _ => {}
@@ -783,20 +778,14 @@ impl App {
                 if let Some(deadline) = self.state.piscine_deadline {
                     if std::time::Instant::now() >= deadline {
                         let idx = self.state.current_index;
-                        let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                        if let Some(sid) = session_id {
-                            let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                        }
+                        self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
                 }
             }
             Msg::Quit => {
                 let idx = self.state.current_index;
-                let _ = crate::progress::save_piscine_checkpoint(conn, idx);
-                if let Some(sid) = session_id {
-                    let _ = crate::progress::save_exam_checkpoint(conn, sid, idx);
-                }
+                self.save_checkpoint(conn, session_id, idx);
                 self.state.should_quit = true;
             }
         }

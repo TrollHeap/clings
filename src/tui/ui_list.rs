@@ -137,9 +137,9 @@ fn draw_list(
             let content = Line::from(vec![
                 Span::styled(diff, Style::default().fg(diff_color)),
                 Span::raw("  "),
-                Span::styled(ex.id.clone(), Style::default().fg(Color::DarkGray)),
+                Span::styled(ex.id.as_str(), Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
-                Span::raw(ex.title.clone()),
+                Span::raw(ex.title.as_str()),
                 Span::styled(mastery_info, Style::default().fg(Color::DarkGray)),
             ]);
             ListItem::new(content)

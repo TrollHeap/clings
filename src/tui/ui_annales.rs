@@ -21,16 +21,24 @@ pub fn run_annales(annales: &[AnnaleSession], exercises: &[Exercise]) -> Result<
         .flat_map(|session| {
             session.questions.iter().map(move |q| {
                 let subjects = q.subjects.join(", ");
-                let exercises_str = {
-                    let ids: Vec<String> = if !q.exercises.is_empty() {
-                        q.exercises.clone()
+                let exercises_str = if !q.exercises.is_empty() {
+                    // Reference existing exercises list—no clone needed
+                    if q.exercises.len() > 5 {
+                        format!(
+                            "{}  +{}",
+                            q.exercises[..5].join(", "),
+                            q.exercises.len() - 5
+                        )
                     } else {
-                        exercises
-                            .iter()
-                            .filter(|e| q.subjects.iter().any(|s| s == &e.subject))
-                            .map(|e| e.id.clone())
-                            .collect()
-                    };
+                        q.exercises.join(", ")
+                    }
+                } else {
+                    // Build exercise IDs from filtered exercises
+                    let ids: Vec<String> = exercises
+                        .iter()
+                        .filter(|e| q.subjects.iter().any(|s| s == &e.subject))
+                        .map(|e| e.id.clone())
+                        .collect();
                     if ids.len() > 5 {
                         format!("{}  +{}", ids[..5].join(", "), ids.len() - 5)
                     } else {
