@@ -55,7 +55,7 @@ pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
                     EventKind::Modify(_) | EventKind::Create(_) => {
                         if last.elapsed() >= debounce {
                             last = std::time::Instant::now();
-                            if tx_file.send(Msg::FileChanged(watch_path.clone())).is_err() {
+                            if tx_file.send(Msg::FileChanged).is_err() {
                                 break;
                             }
                         }

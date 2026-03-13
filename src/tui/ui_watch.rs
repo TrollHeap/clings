@@ -41,6 +41,8 @@ pub fn view(f: &mut Frame, state: &AppState) {
         common::render_help_overlay(f, body_area);
     } else if state.vis_active {
         common::render_visualizer_overlay(f, body_area, state);
+    } else if state.solution_active {
+        common::render_solution_overlay(f, body_area, &state.exercises[state.current_index]);
     } else if state.search_active {
         common::render_search_overlay(f, body_area, state);
     } else {
@@ -108,15 +110,11 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         ),
     ];
     if let Some(stage) = state.current_stage {
-        let stage_label = match stage {
-            0 => "S0",
-            1 => "S1",
-            2 => "S2",
-            3 => "S3",
-            _ => "S4",
-        };
         meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(stage_label, Style::default().fg(Color::Gray)));
+        meta_spans.push(Span::styled(
+            common::stage_label(stage),
+            Style::default().fg(Color::Gray),
+        ));
     }
 
     // "mastery: X.X  " + 10 chars de barre
@@ -135,11 +133,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let line2 = Line::from(meta_spans);
 
     // ── Ligne 3 : révision due (optionnelle) ──────────────────────────
-    let due_count = state
-        .review_map
-        .values()
-        .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
-        .count();
+    let due_count = state.due_count();
     let line3 = if due_count > 0 {
         Line::from(Span::styled(
             format!("↻ {} révision(s) due(s)", due_count),
@@ -178,7 +172,7 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── Description / hints ──────────────────────────────────────────────
     let desc_area = body_areas[0];
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line> = Vec::with_capacity(16);
 
     for line in exercise.description.lines() {
         lines.push(Line::from(line));
@@ -215,13 +209,13 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
         ]));
     }
 
-    if state.hint_shown && !exercise.hints.is_empty() {
+    if state.hint_index > 0 && !exercise.hints.is_empty() {
         lines.push(Line::raw(""));
         lines.push(Line::styled(
             "── Indices ──",
             Style::default().fg(Color::Cyan),
         ));
-        for (i, hint) in exercise.hints.iter().enumerate() {
+        for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
             lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
         }
     }
@@ -313,11 +307,7 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     }
 
     // Révisions dues
-    let due_count = state
-        .review_map
-        .values()
-        .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
-        .count();
+    let due_count = state.due_count();
     if due_count > 0 {
         lines.push(Line::from(Span::styled(
             format!("↻ {} révision(s)", due_count),
@@ -334,8 +324,12 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let has_vis = !exercise.visualizer.steps.is_empty();
 
     let has_hints = !exercise.hints.is_empty();
-    let left_msg = if state.help_active {
+    let left_msg = if state.compile_pending {
+        "⏳ Compilation en cours…".to_string()
+    } else if state.help_active {
         "[Esc/?] fermer".to_string()
+    } else if state.solution_active {
+        "[Esc/s] fermer solution".to_string()
     } else if state.search_active {
         "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer".to_string()
     } else if let Some(status) = &state.status_msg {
@@ -348,7 +342,12 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             "[r] run".to_string(),
         ];
         if has_hints {
-            parts.insert(0, "[h] hint".to_string());
+            let hint_label = if state.hint_index == 0 {
+                "[h] hint".to_string()
+            } else {
+                format!("[h] hint ({}/{})", state.hint_index, exercise.hints.len())
+            };
+            parts.insert(0, hint_label);
         }
         if has_vis {
             parts.push("[v] vis".to_string());
@@ -363,11 +362,7 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let right_msg = if state.consecutive_failures > 0 {
         format!("✗ {}", state.consecutive_failures)
     } else {
-        let due = state
-            .review_map
-            .values()
-            .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
-            .count();
+        let due = state.due_count();
         if due > 0 {
             format!("révision: {}j", due)
         } else {

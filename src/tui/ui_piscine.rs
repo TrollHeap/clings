@@ -50,6 +50,10 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
     if state.vis_active {
         common::render_visualizer_overlay(f, body_rest, state);
+    } else if state.solution_active {
+        common::render_solution_overlay(f, body_rest, &state.exercises[state.current_index]);
+    } else if state.search_active {
+        common::render_search_overlay(f, body_rest, state);
     } else {
         render_piscine_body(f, body_rest, state);
     }
@@ -101,15 +105,11 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     ];
 
     if let Some(stage) = state.current_stage {
-        let stage_label = match stage {
-            0 => "S0",
-            1 => "S1",
-            2 => "S2",
-            3 => "S3",
-            _ => "S4",
-        };
         meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(stage_label, Style::default().fg(Color::Gray)));
+        meta_spans.push(Span::styled(
+            common::stage_label(stage),
+            Style::default().fg(Color::Gray),
+        ));
     }
 
     if let Some(start) = state.piscine_start {
@@ -201,7 +201,7 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── Description / hints ──────────────────────────────────────────────
     let desc_area = body_areas[0];
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line> = Vec::with_capacity(16);
 
     for line in exercise.description.lines() {
         lines.push(Line::from(line));
@@ -238,13 +238,13 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
         ]));
     }
 
-    if state.hint_shown && !exercise.hints.is_empty() {
+    if state.hint_index > 0 && !exercise.hints.is_empty() {
         lines.push(Line::raw(""));
         lines.push(Line::styled(
             "── Indices ──",
             Style::default().fg(Color::Cyan),
         ));
-        for (i, hint) in exercise.hints.iter().enumerate() {
+        for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
             lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
         }
     }
@@ -357,7 +357,13 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let has_vis = !exercise.visualizer.steps.is_empty();
 
     let has_hints = !exercise.hints.is_empty();
-    let left_msg = if let Some(status) = &state.status_msg {
+    let left_msg = if state.compile_pending {
+        "⏳ Compilation en cours…".to_string()
+    } else if state.solution_active {
+        "[Esc/s] fermer solution".to_string()
+    } else if state.search_active {
+        "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer".to_string()
+    } else if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
         let mut parts = vec![
@@ -366,11 +372,17 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             "[k] précédent".to_string(),
         ];
         if has_hints {
-            parts.insert(1, "[h] indice".to_string());
+            let hint_label = if state.hint_index == 0 {
+                "[h] indice".to_string()
+            } else {
+                format!("[h] indice ({}/{})", state.hint_index, exercise.hints.len())
+            };
+            parts.insert(1, hint_label);
         }
         if has_vis {
             parts.push("[v] vis".to_string());
         }
+        parts.push("[/] search".to_string());
         parts.push("[q] quitter".to_string());
         parts.join("  ")
     };

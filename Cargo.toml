@@ -1,6 +1,6 @@
 [package]
 name = "clings"
-version = "2.9.9"
+version = "3.0.0"
 edition = "2021"
 description = "NSY103 C systems programming trainer — rustlings-style TUI"
 license = "MIT"
@@ -27,7 +27,6 @@ thiserror = "2"
 regex = "1"
 toml = "1"
 crossterm = "0.29"
-textwrap = "0.16"
 rust-embed = { version = "8", features = ["include-exclude"] }
 nucleo-matcher = "0.3"
 ratatui = "0.30"

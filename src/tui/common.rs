@@ -10,6 +10,36 @@ use crate::models::{Difficulty, ValidationMode};
 use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
+/// Étiquette de stage d'échafaudage (S0–S4).
+pub fn stage_label(stage: u8) -> &'static str {
+    match stage {
+        0 => "S0",
+        1 => "S1",
+        2 => "S2",
+        3 => "S3",
+        _ => "S4",
+    }
+}
+
+/// Calcule la zone d'un popup centré avec des marges en pourcentage.
+fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
+    let content_v = 100u16.saturating_sub(margin_v_pct * 2);
+    let content_h = 100u16.saturating_sub(margin_h_pct * 2);
+    let [_, popup_v, _] = Layout::vertical([
+        Constraint::Percentage(margin_v_pct),
+        Constraint::Percentage(content_v),
+        Constraint::Percentage(margin_v_pct),
+    ])
+    .areas(area);
+    let [_, popup, _] = Layout::horizontal([
+        Constraint::Percentage(margin_h_pct),
+        Constraint::Percentage(content_h),
+        Constraint::Percentage(margin_h_pct),
+    ])
+    .areas(popup_v);
+    popup
+}
+
 /// Couleur associée à un niveau de difficulté.
 pub fn difficulty_color(d: Difficulty) -> Color {
     match d {
@@ -56,18 +86,18 @@ pub fn mini_map(completed: &[bool], current: usize) -> String {
     let end = (start + 9).min(total);
     let start = end.saturating_sub(9).min(start);
 
-    (start..end)
-        .map(|i| {
-            if i == current {
-                "●"
-            } else if completed.get(i).copied().unwrap_or(false) {
-                "◉"
-            } else {
-                "○"
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("")
+    // ●/◉/○ = 3 bytes UTF-8 chacun — allocation exacte, zéro Vec intermédiaire
+    let mut map = String::with_capacity((end - start) * 3);
+    for i in start..end {
+        map.push_str(if i == current {
+            "●"
+        } else if completed.get(i).copied().unwrap_or(false) {
+            "◉"
+        } else {
+            "○"
+        });
+    }
+    map
 }
 
 /// Hauteur dynamique du panneau run_result.
@@ -196,28 +226,20 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     let (w_pct, h_pct) = popup_size_for_vis(step);
     let margin_v = (100u16.saturating_sub(h_pct)) / 2;
     let margin_h = (100u16.saturating_sub(w_pct)) / 2;
-
-    let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(margin_v),
-        Constraint::Percentage(h_pct),
-        Constraint::Percentage(margin_v),
-    ])
-    .areas(area);
-    let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(margin_h),
-        Constraint::Percentage(w_pct),
-        Constraint::Percentage(margin_h),
-    ])
-    .areas(popup_v);
+    let popup = centered_popup(area, margin_v, margin_h);
 
     f.render_widget(Clear, popup);
 
     let mut lines: Vec<Line> = Vec::new();
 
-    let dots: String = (0..steps.len())
-        .map(|i| if i == step_idx { "●" } else { "○" })
-        .collect::<Vec<_>>()
-        .join(" ");
+    // "● " = 4 bytes max — allocation exacte, zéro Vec intermédiaire
+    let mut dots = String::with_capacity(steps.len() * 4);
+    for i in 0..steps.len() {
+        if i > 0 {
+            dots.push(' ');
+        }
+        dots.push_str(if i == step_idx { "●" } else { "○" });
+    }
     lines.push(Line::styled(dots, Style::default().fg(Color::Yellow)));
     lines.push(Line::raw(""));
 
@@ -303,19 +325,7 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
 
 /// Overlay de recherche fuzzy (touche `/` depuis watch).
 pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
-    let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(15),
-        Constraint::Percentage(70),
-        Constraint::Percentage(15),
-    ])
-    .areas(area);
-    let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(10),
-        Constraint::Percentage(80),
-        Constraint::Percentage(10),
-    ])
-    .areas(popup_v);
-
+    let popup = centered_popup(area, 15, 10);
     f.render_widget(Clear, popup);
 
     // Split: query input (3 lines) | results list (fill) | hint bar (1 line)
@@ -427,22 +437,29 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     );
 }
 
+/// Overlay solution — affiche le code solution de l'exercice courant.
+pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::models::Exercise) {
+    let popup = centered_popup(area, 10, 10);
+    f.render_widget(Clear, popup);
+
+    let lines: Vec<Line> = exercise.solution_code.lines().map(Line::raw).collect();
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(
+                Block::bordered()
+                    .title("Solution — [Esc/s] fermer")
+                    .style(Style::default().bg(Color::Black))
+                    .border_style(Style::default().fg(Color::Yellow)),
+            )
+            .wrap(Wrap { trim: false }),
+        popup,
+    );
+}
+
 /// Overlay d'aide — raccourcis clavier du mode watch.
 pub fn render_help_overlay(f: &mut Frame, area: Rect) {
-    let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(15),
-        Constraint::Percentage(70),
-        Constraint::Percentage(15),
-    ])
-    .areas(area);
-    let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(20),
-        Constraint::Percentage(60),
-        Constraint::Percentage(20),
-    ])
-    .areas(popup_v);
-
-    f.render_widget(ratatui::widgets::Clear, popup);
+    let popup = centered_popup(area, 15, 20);
+    f.render_widget(Clear, popup);
 
     let bindings: &[(&str, &str)] = &[
         ("[j] / [n]", "Exercice suivant"),

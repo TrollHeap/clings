@@ -11,30 +11,32 @@ use crate::search;
 
 /// Mode d'affichage de l'application
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum AppMode {
     Watch {
+        #[allow(dead_code)]
         chapter: Option<u8>,
     },
     Piscine {
+        #[allow(dead_code)]
         chapter: Option<u8>,
+        #[allow(dead_code)]
         timed: Option<u64>,
     },
 }
 
 /// Messages traités par App::update_watch()
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum Msg {
     Key(ratatui::crossterm::event::KeyEvent),
-    FileChanged(PathBuf),
+    FileChanged,
     Tick,
+    #[allow(dead_code)]
     Quit,
 }
 
 /// État centralisé — mode watch
-#[allow(dead_code)]
 pub struct AppState {
+    #[allow(dead_code)]
     pub mode: AppMode,
     pub should_quit: bool,
     // Watch data
@@ -515,7 +517,7 @@ impl App {
                     _ => {}
                 }
             }
-            Msg::FileChanged(_) => {
+            Msg::FileChanged => {
                 self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
                 self.state.status_msg_at = Some(Instant::now());
             }
@@ -763,7 +765,7 @@ impl App {
                     _ => {}
                 }
             }
-            Msg::FileChanged(_) => {
+            Msg::FileChanged => {
                 self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
                 self.state.status_msg_at = Some(Instant::now());
             }

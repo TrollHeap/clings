@@ -12,14 +12,19 @@ fn score_exercise(
     ex: &Exercise,
     buf: &mut Vec<char>,
 ) -> Option<u32> {
-    let desc_preview: String = ex.description.chars().take(120).collect();
+    let desc_end = ex
+        .description
+        .char_indices()
+        .nth(120)
+        .map(|(i, _)| i)
+        .unwrap_or(ex.description.len());
     let haystack = format!(
         "{} {} {} {} {}",
         ex.id,
         ex.title,
         ex.subject,
         ex.key_concept.as_deref().unwrap_or(""),
-        desc_preview,
+        &ex.description[..desc_end],
     );
     buf.clear();
     matcher

@@ -140,11 +140,11 @@ fn draw_annales(
         .iter()
         .map(|(session, q_num, title, subjects, exercises)| {
             Row::new(vec![
-                session.clone(),
-                q_num.clone(),
-                title.clone(),
-                subjects.clone(),
-                exercises.clone(),
+                session.as_str(),
+                q_num.as_str(),
+                title.as_str(),
+                subjects.as_str(),
+                exercises.as_str(),
             ])
         })
         .collect();
