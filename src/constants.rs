@@ -7,6 +7,8 @@ pub const DEBOUNCE_INTERVAL_MS: u64 = 200;
 pub const KEY_CHECK_TIMEOUT_MS: u64 = 50;
 pub const DB_BUSY_TIMEOUT_MS: i32 = 5000;
 pub const SUCCESS_PAUSE_SECS: u64 = 2;
+pub const STATUS_MSG_TIMEOUT_SECS: u64 = 3;
+pub const EVENT_POLL_MS: u64 = 100;
 
 // === Mastery thresholds (from mastery.rs) ===
 pub const MASTERY_MAX: f64 = 5.0;
@@ -25,6 +27,8 @@ pub const DIFFICULTY_5_UNLOCK: f64 = 5.0;
 // === UI dimensions ===
 pub const HEADER_WIDTH: usize = 56;
 pub const PROGRESS_BAR_WIDTH: usize = 30;
+pub const MASTERY_BAR_WIDTH: usize = 10;
+pub const PISCINE_PROGRESS_BAR_WIDTH: usize = 20;
 pub const TEXT_WRAP_WIDTH: usize = 72;
 pub const STATS_NAME_WIDTH: usize = 22;
 pub const SCORES_EXERCISE_WIDTH: usize = 32;

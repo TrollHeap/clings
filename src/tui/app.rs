@@ -547,7 +547,9 @@ impl App {
             }
             Msg::Tick => {
                 if let Some(at) = self.state.status_msg_at {
-                    if at.elapsed() > std::time::Duration::from_secs(3) {
+                    if at.elapsed()
+                        > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
+                    {
                         self.state.status_msg = None;
                         self.state.status_msg_at = None;
                     }
@@ -786,7 +788,9 @@ impl App {
             }
             Msg::Tick => {
                 if let Some(at) = self.state.status_msg_at {
-                    if at.elapsed() > std::time::Duration::from_secs(3) {
+                    if at.elapsed()
+                        > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
+                    {
                         self.state.status_msg = None;
                         self.state.status_msg_at = None;
                     }

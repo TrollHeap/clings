@@ -47,7 +47,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         .unwrap_or(0);
 
     let mut app = App::new();
-    app.state.exercises = exercise_order.iter().map(|e| (*e).clone()).collect();
+    app.state.exercises = exercise_order.into_iter().cloned().collect();
     app.state.completed = vec![false; total];
     app.state.current_index = start_index;
     app.state.piscine_deadline = deadline;
