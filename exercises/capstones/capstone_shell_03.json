@@ -13,9 +13,10 @@
     "fg = SIGCONT + waitpid en premier plan, bg = SIGCONT sans attendre"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "--- jobs ---\n[1] Running  worker1\n[2] Running  worker2\n--- stop worker1 ---\n[1] Stopped  worker1\n[2] Running  worker2\n--- fg worker1 ---\n[1] Stopped worker1\n--- bg worker1 ---\nbg: reprendre 'worker1' en arriere-plan\n--- final ---\n[1] Done     worker1\n[2] Done     worker2\n",
-    "test_code": null
+    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <signal.h>\n#include <string.h>\n\n#define MAX_JOBS 4\n\ntypedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;\n\ntypedef struct {\n    pid_t pid;\n    JobState state;\n    char name[32];\n} Job;\n\nint add_job(pid_t pid, const char *name);\nvoid print_jobs(void);\nvoid job_bg(int idx);\n\nJob jobs[MAX_JOBS];\nint njobs = 0;\n\nvoid test_add_job(void) {\n    njobs = 0;\n    int idx = add_job(getpid(), \"test_job\");\n    TEST_ASSERT_EQUAL_INT(0, idx);\n    TEST_ASSERT_EQUAL_INT(1, njobs);\n    TEST_ASSERT_EQUAL_STRING(\"test_job\", jobs[0].name);\n}\n\nvoid test_job_state_running(void) {\n    njobs = 0;\n    add_job(getpid(), \"worker\");\n    TEST_ASSERT_EQUAL_INT(JOB_RUNNING, jobs[0].state);\n}\n\nvoid test_job_state_transition(void) {\n    njobs = 0;\n    add_job(getpid(), \"worker\");\n    jobs[0].state = JOB_STOPPED;\n    TEST_ASSERT_EQUAL_INT(JOB_STOPPED, jobs[0].state);\n    jobs[0].state = JOB_DONE;\n    TEST_ASSERT_EQUAL_INT(JOB_DONE, jobs[0].state);\n}\n\nint main(void) {\n    RUN_TEST(test_add_job);\n    RUN_TEST(test_job_state_running);\n    RUN_TEST(test_job_state_transition);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

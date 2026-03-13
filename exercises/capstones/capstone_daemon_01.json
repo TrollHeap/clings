@@ -13,9 +13,10 @@
     "strerror(errno) convertit le code d'erreur en chaîne lisible — utile pour les messages d'erreur dans les logs"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "[daemon] demarrage\n[daemon] pid enregistre\n[daemon] simulation: SIGHUP\n[daemon] rechargement config\n[daemon] tick\n[daemon] simulation: SIGTERM\n[daemon] arret propre\n[daemon] termine\n",
-    "test_code": null
+    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <signal.h>\n#include <fcntl.h>\n#include <errno.h>\n#include <time.h>\n\nvolatile sig_atomic_t reload_config = 0;\nvolatile sig_atomic_t shutdown_requested = 0;\n\nvoid handle_sighup(int sig);\nvoid handle_sigterm(int sig);\nint write_pidfile(const char *path, pid_t pid);\nvoid log_message(int log_fd, const char *msg);\n\nvoid test_signal_handlers(void) {\n    reload_config = 0;\n    shutdown_requested = 0;\n    struct sigaction sa;\n    sa.sa_handler = handle_sighup;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = 0;\n    sigaction(SIGHUP, &sa, NULL);\n    kill(getpid(), SIGHUP);\n    TEST_ASSERT_EQUAL_INT(1, reload_config);\n}\n\nvoid test_sigterm_handler(void) {\n    shutdown_requested = 0;\n    struct sigaction sa;\n    sa.sa_handler = handle_sigterm;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = 0;\n    sigaction(SIGTERM, &sa, NULL);\n    kill(getpid(), SIGTERM);\n    TEST_ASSERT_EQUAL_INT(1, shutdown_requested);\n}\n\nvoid test_write_pidfile(void) {\n    const char *tmpfile = \"/tmp/kf_test_pidfile.pid\";\n    pid_t pid = getpid();\n    int ret = write_pidfile(tmpfile, pid);\n    TEST_ASSERT_EQUAL_INT(0, ret);\n    unlink(tmpfile);\n}\n\nint main(void) {\n    RUN_TEST(test_signal_handlers);\n    RUN_TEST(test_sigterm_handler);\n    RUN_TEST(test_write_pidfile);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

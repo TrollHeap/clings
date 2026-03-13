@@ -13,9 +13,10 @@
     "events[j].data.fd contient le descripteur qui a déclenché l'événement — comparez avec pipes[k][0] pour identifier le client"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "[epoll] serveur demarre, 3 clients\n[epoll] client Alice: Salut de Alice\n[epoll] client Bob: Salut de Bob\n[epoll] client Charlie: Salut de Charlie\n[epoll] client Alice: Bye Alice\n[epoll] client Bob: Bye Bob\n[epoll] client Charlie: Bye Charlie\n[epoll] serveur arrete\n",
-    "test_code": null
+    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/epoll.h>\n#include <fcntl.h>\n\nvoid set_nonblocking(int fd);\n\nvoid test_epoll_create(void) {\n    int epfd = epoll_create1(0);\n    TEST_ASSERT_TRUE(epfd > 0);\n    close(epfd);\n}\n\nvoid test_set_nonblocking(void) {\n    int p[2];\n    pipe(p);\n    set_nonblocking(p[0]);\n    int flags = fcntl(p[0], F_GETFL, 0);\n    TEST_ASSERT_TRUE(flags & O_NONBLOCK);\n    close(p[0]);\n    close(p[1]);\n}\n\nvoid test_epoll_ctl_add(void) {\n    int p[2];\n    pipe(p);\n    set_nonblocking(p[0]);\n    int epfd = epoll_create1(0);\n    struct epoll_event ev;\n    ev.events = EPOLLIN;\n    ev.data.fd = p[0];\n    int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, p[0], &ev);\n    TEST_ASSERT_EQUAL_INT(0, ret);\n    close(p[0]);\n    close(p[1]);\n    close(epfd);\n}\n\nint main(void) {\n    RUN_TEST(test_epoll_create);\n    RUN_TEST(test_set_nonblocking);\n    RUN_TEST(test_epoll_ctl_add);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

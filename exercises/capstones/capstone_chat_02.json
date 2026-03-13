@@ -13,9 +13,10 @@
     "shm_unlink supprime le segment nommé — appelez-le en dernier pour nettoyer"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "[serveur] recu: Alice: Salut!\n[serveur] recu: Bob: Hello!\n[serveur] recu: Alice: Ca va?\n[serveur] fin de reception\n=== Historique (3 messages) ===\n  [0] Alice: Salut!\n  [1] Bob: Hello!\n  [2] Alice: Ca va?\n[main] termine\n",
-    "test_code": null
+    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <sys/mman.h>\n#include <fcntl.h>\n\n#define MAX_MESSAGES 8\n#define MSG_LEN 64\n#define SHM_NAME \"/kf_chat_history_test\"\n\ntypedef struct {\n    pthread_mutex_t mutex;\n    int count;\n    char messages[MAX_MESSAGES][MSG_LEN];\n} ChatHistory;\n\nChatHistory *create_shared_history(void);\nvoid add_message(ChatHistory *h, const char *msg);\nvoid print_history(ChatHistory *h);\n\nvoid test_create_shared_history(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    TEST_ASSERT_NOT_NULL(h);\n    TEST_ASSERT_EQUAL_INT(0, h->count);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nvoid test_add_message(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    add_message(h, \"test msg\");\n    TEST_ASSERT_EQUAL_INT(1, h->count);\n    TEST_ASSERT_EQUAL_STRING(\"test msg\", h->messages[0]);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nvoid test_multiple_messages(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    add_message(h, \"msg1\");\n    add_message(h, \"msg2\");\n    add_message(h, \"msg3\");\n    TEST_ASSERT_EQUAL_INT(3, h->count);\n    TEST_ASSERT_EQUAL_STRING(\"msg2\", h->messages[1]);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nint main(void) {\n    RUN_TEST(test_create_shared_history);\n    RUN_TEST(test_add_message);\n    RUN_TEST(test_multiple_messages);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

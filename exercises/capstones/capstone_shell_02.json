@@ -13,9 +13,10 @@
     "Après dup2(fd, STDIN_FILENO), fermez l'ancien fd pour éviter les fuites de descripteurs"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "REGEX:(?s)CMD: cat\\nREDIR: stdin < input\\.txt\\n.*EXIT: 0\\nCMD: echo hello\\nREDIR: stdout > output\\.txt\\nEXIT: 0\\nCMD: logger msg\\nREDIR: stdout >> log\\.txt\\nEXIT: 0",
-    "test_code": null
+    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <fcntl.h>\n\ntypedef struct {\n    char *cmd;\n    char *infile;\n    char *outfile;\n    int append;\n} Command;\n\nCommand parse_redirections(char *line);\n\nvoid test_parse_stdin_redirection(void) {\n    char line[] = \"cat < input.txt\";\n    Command c = parse_redirections(line);\n    TEST_ASSERT_EQUAL_STRING(\"cat\", c.cmd);\n    TEST_ASSERT_EQUAL_STRING(\"input.txt\", c.infile);\n    TEST_ASSERT_NULL(c.outfile);\n    TEST_ASSERT_EQUAL_INT(0, c.append);\n    free(c.cmd);\n}\n\nvoid test_parse_stdout_redirection(void) {\n    char line[] = \"echo hello > output.txt\";\n    Command c = parse_redirections(line);\n    TEST_ASSERT_EQUAL_STRING(\"echo hello\", c.cmd);\n    TEST_ASSERT_NULL(c.infile);\n    TEST_ASSERT_EQUAL_STRING(\"output.txt\", c.outfile);\n    TEST_ASSERT_EQUAL_INT(0, c.append);\n    free(c.cmd);\n}\n\nvoid test_parse_append_redirection(void) {\n    char line[] = \"logger msg >> log.txt\";\n    Command c = parse_redirections(line);\n    TEST_ASSERT_EQUAL_STRING(\"logger msg\", c.cmd);\n    TEST_ASSERT_NULL(c.infile);\n    TEST_ASSERT_EQUAL_STRING(\"log.txt\", c.outfile);\n    TEST_ASSERT_EQUAL_INT(1, c.append);\n    free(c.cmd);\n}\n\nint main(void) {\n    RUN_TEST(test_parse_stdin_redirection);\n    RUN_TEST(test_parse_stdout_redirection);\n    RUN_TEST(test_parse_append_redirection);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",

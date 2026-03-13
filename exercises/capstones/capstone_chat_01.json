@@ -13,9 +13,10 @@
     "pthread_join(cli) avant pthread_join(srv) garantit que le client finit d'écrire avant qu'on attende le serveur"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "[client] envoye: Bonjour\n[serveur] recu: Bonjour\n[client] envoye: Comment ca va?\n[serveur] recu: Comment ca va?\n[client] envoye: Au revoir\n[serveur] recu: Au revoir\n[serveur] client deconnecte\n[main] chat termine\n",
-    "test_code": null
+    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct { int read_fd; int write_fd; } ChatChannel;\n\nvoid *server_thread(void *arg);\nvoid *client_thread(void *arg);\n\nvoid test_chat_channel_init(void) {\n    ChatChannel ch = {.read_fd = 3, .write_fd = 4};\n    TEST_ASSERT_EQUAL_INT(3, ch.read_fd);\n    TEST_ASSERT_EQUAL_INT(4, ch.write_fd);\n}\n\nvoid test_pipe_write_read(void) {\n    int pipefd[2];\n    pipe(pipefd);\n    const char *msg = \"test\";\n    write(pipefd[1], msg, strlen(msg));\n    char buf[32];\n    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    TEST_ASSERT_EQUAL_STRING(\"test\", buf);\n    close(pipefd[0]);\n    close(pipefd[1]);\n}\n\nvoid test_messages_array(void) {\n    const char *messages[] = {\"Bonjour\", \"Comment ca va?\", \"Au revoir\"};\n    TEST_ASSERT_EQUAL_STRING(\"Bonjour\", messages[0]);\n    TEST_ASSERT_EQUAL_STRING(\"Comment ca va?\", messages[1]);\n    TEST_ASSERT_EQUAL_STRING(\"Au revoir\", messages[2]);\n}\n\nint main(void) {\n    RUN_TEST(test_chat_channel_init);\n    RUN_TEST(test_pipe_write_read);\n    RUN_TEST(test_messages_array);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",
