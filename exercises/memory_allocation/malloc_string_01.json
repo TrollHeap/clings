@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "strdup maison : malloc + strcpy",
   "description": "NSY103 — `strdup` alloue de la m\u00e9moire avec `malloc` et y copie une cha\u00eene. Bien que POSIX, elle n'est pas dans le standard C. Impl\u00e9menter sa propre version enseigne le calcul de taille (`strlen+1` pour le '\\0') et le pattern allocation+copie.\n\nImpl\u00e9mentez `my_strdup` et d\u00e9montrez que la copie est ind\u00e9pendante de l'original.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + ____);\n    if (!dst) return NULL;\n    ____(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(____);\n    if (!copie) return 1;\n\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n\n    ____;\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}\n\nint main(void) {\n    const char *original = \"Bonjour\";\n    char *copie = my_strdup(original);\n    if (!copie) return 1;\n\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n\n    copie[0] = 'b';\n    printf(\"Apres modif copie :\\n\");\n    printf(\"original : %s\\n\", original);\n    printf(\"copie    : %s\\n\", copie);\n    printf(\"len = %zu\\n\", strlen(copie));\n\n    free(copie);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    /* TODO: malloc(strlen(src)+1), strcpy, return */\n    return NULL;\n}"
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}"
   "hints": [
     "`malloc(len + 1)` : le +1 est pour le terminateur '\\0'",
     "`strcpy(dst, src)` copie la cha\u00eene y compris le '\\0'",
     "La copie est ind\u00e9pendante : modifier copie[0] ne change pas original"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "original : Bonjour\ncopie    : Bonjour\nApres modif copie :\noriginal : Bonjour\ncopie    : bonjour\nlen = 7\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "char *my_strdup(const char *src);\n\nvoid test_strdup_basic(void) {\n    char *s = my_strdup(\"hello\");\n    TEST_ASSERT_NOT_NULL(s);\n    TEST_ASSERT_EQUAL_STRING(\"hello\", s);\n    free(s);\n}\n\nvoid test_strdup_independent(void) {\n    char *s = my_strdup(\"test\");\n    TEST_ASSERT_NOT_NULL(s);\n    s[0] = 'T';\n    TEST_ASSERT_EQUAL_STRING(\"Test\", s);\n    free(s);\n}\n\nvoid test_strdup_empty(void) {\n    char *s = my_strdup(\"\");\n    TEST_ASSERT_NOT_NULL(s);\n    TEST_ASSERT_EQUAL_STRING(\"\", s);\n    free(s);\n}\n\nvoid test_strdup_long_string(void) {\n    const char *original = \"This is a longer string for testing\";\n    char *copy = my_strdup(original);\n    TEST_ASSERT_NOT_NULL(copy);\n    TEST_ASSERT_EQUAL_STRING(original, copy);\n    free(copy);\n}\n\nint main(void) {\n    RUN_TEST(test_strdup_basic);\n    RUN_TEST(test_strdup_independent);\n    RUN_TEST(test_strdup_empty);\n    RUN_TEST(test_strdup_long_string);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",

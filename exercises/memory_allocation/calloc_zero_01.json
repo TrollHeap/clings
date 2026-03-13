@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "calloc vs malloc : z\u00e9ro-initialisation",
   "description": "NSY103 — `calloc(n, size)` alloue `n * size` octets et les initialise \u00e0 z\u00e9ro, contrairement \u00e0 `malloc` qui laisse la m\u00e9moire non initialis\u00e9e. calloc v\u00e9rifie aussi le d\u00e9bordement de `n * size`.\n\nComparez le comportement de malloc et calloc sur un tableau d'entiers.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void) {\n    int n = 5;\n\n    int *a = malloc(n * sizeof(int));\n    if (!a) return 1;\n    memset(a, 0, n * sizeof(int));\n\n    int *b = ____(n, sizeof(int));\n    if (!b) { free(a); return 1; }\n\n    printf(\"malloc+memset :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", a[i]);\n    printf(\"\\n\");\n\n    printf(\"calloc       :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", ____[i]);\n    printf(\"\\n\");\n\n    for (int i = 0; i < n; i++) { a[i] = i * 10; b[i] = i * 10; }\n    printf(\"Remplis      :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", a[i]);\n    printf(\"\\n\");\n\n    printf(\"Egaux        : %d\\n\", memcmp(a, b, n * sizeof(int)) == 0);\n\n    ____;\n    free(b);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void) {\n    int n = 5;\n\n    int *a = malloc(n * sizeof(int));\n    if (!a) return 1;\n    memset(a, 0, n * sizeof(int));\n\n    int *b = calloc(n, sizeof(int));\n    if (!b) { free(a); return 1; }\n\n    printf(\"malloc+memset :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", a[i]);\n    printf(\"\\n\");\n\n    printf(\"calloc       :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", b[i]);\n    printf(\"\\n\");\n\n    for (int i = 0; i < n; i++) { a[i] = i * 10; b[i] = i * 10; }\n    printf(\"Remplis      :\");\n    for (int i = 0; i < n; i++) printf(\" %d\", a[i]);\n    printf(\"\\n\");\n\n    printf(\"Egaux        : %d\\n\", memcmp(a, b, n * sizeof(int)) == 0);\n\n    free(a);\n    free(b);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    /* TODO: return calloc(n, sizeof(int)) */\n    return NULL;\n}"
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    return (int *)calloc(n, sizeof(int));\n}"
   "hints": [
     "`calloc(n, sizeof(int))` \u00e9quivaut \u00e0 `malloc(n * sizeof(int))` + `memset(ptr, 0, n * sizeof(int))`",
     "calloc prot\u00e8ge contre le d\u00e9bordement de `n * size` (retourne NULL si overflow)",
     "Toujours free() chaque allocation, dans l'ordre inverse si possible"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "malloc+memset : 0 0 0 0 0\ncalloc       : 0 0 0 0 0\nRemplis      : 0 10 20 30 40\nEgaux        : 1\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "int *alloc_zeros(int n);\n\nvoid test_alloc_zeros_not_null(void) {\n    int *arr = alloc_zeros(5);\n    TEST_ASSERT_NOT_NULL(arr);\n    free(arr);\n}\n\nvoid test_alloc_zeros_initialized(void) {\n    int *arr = alloc_zeros(4);\n    TEST_ASSERT_NOT_NULL(arr);\n    TEST_ASSERT_EQUAL_INT(0, arr[0]);\n    TEST_ASSERT_EQUAL_INT(0, arr[1]);\n    TEST_ASSERT_EQUAL_INT(0, arr[3]);\n    free(arr);\n}\n\nvoid test_alloc_zeros_can_write(void) {\n    int *arr = alloc_zeros(3);\n    TEST_ASSERT_NOT_NULL(arr);\n    arr[0] = 10; arr[1] = 20; arr[2] = 30;\n    TEST_ASSERT_EQUAL_INT(10, arr[0]);\n    TEST_ASSERT_EQUAL_INT(20, arr[1]);\n    TEST_ASSERT_EQUAL_INT(30, arr[2]);\n    free(arr);\n}\n\nvoid test_alloc_zeros_large(void) {\n    int *arr = alloc_zeros(100);\n    TEST_ASSERT_NOT_NULL(arr);\n    TEST_ASSERT_EQUAL_INT(0, arr[50]);\n    TEST_ASSERT_EQUAL_INT(0, arr[99]);\n    free(arr);\n}\n\nint main(void) {\n    RUN_TEST(test_alloc_zeros_not_null);\n    RUN_TEST(test_alloc_zeros_initialized);\n    RUN_TEST(test_alloc_zeros_can_write);\n    RUN_TEST(test_alloc_zeros_large);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",
