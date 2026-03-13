@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.9.1] — 2026-03-13
+
+### Cohérence — documentation et tests search
+
+- CLAUDE.md : `[/]` ajouté dans la liste des keybinds watch-mode ; note tests mise à jour (`search.rs` inclus)
+- `src/search.rs` : 4 tests smoke — query vide (match universel), query connue, filtre sujet, tri par score décroissant
+- Découverte : nucleo matche tout avec query vide (bypass dans `rebuild_search` reste pour la perf)
+
+---
+
 ## [2.9.0] — 2026-03-13
 
 ### TUI — Recherche fuzzy `[/]`

@@ -47,3 +47,61 @@ pub fn search_exercises<'a>(
     results.sort_unstable_by(|a, b| b.1.cmp(&a.1));
     results
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::exercises::load_all_exercises;
+
+    #[test]
+    fn test_search_empty_query_matches_all() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        // query vide → nucleo matche tout (pattern vide = match universel)
+        let results = search_exercises(&exercises, "", None);
+        assert_eq!(
+            results.len(),
+            exercises.len(),
+            "query vide doit matcher tous les exercices"
+        );
+    }
+
+    #[test]
+    fn test_search_known_subject_returns_results() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        let results = search_exercises(&exercises, "pointer", None);
+        assert!(
+            !results.is_empty(),
+            "\"pointer\" doit trouver au moins un exercice"
+        );
+    }
+
+    #[test]
+    fn test_search_filter_subject_limits_results() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        let all = search_exercises(&exercises, "malloc", None);
+        let first_subject = exercises[0].subject.as_str();
+        let filtered = search_exercises(&exercises, "malloc", Some(first_subject));
+        assert!(
+            filtered.len() <= all.len(),
+            "filtrage par sujet ne doit pas augmenter le nombre de résultats"
+        );
+        for (ex, _) in &filtered {
+            assert_eq!(
+                ex.subject, first_subject,
+                "tous les résultats doivent appartenir au sujet filtré"
+            );
+        }
+    }
+
+    #[test]
+    fn test_search_results_sorted_by_score_descending() {
+        let (exercises, _) = load_all_exercises().unwrap();
+        let results = search_exercises(&exercises, "fork", None);
+        for window in results.windows(2) {
+            assert!(
+                window[0].1 >= window[1].1,
+                "résultats doivent être triés par score décroissant"
+            );
+        }
+    }
+}
