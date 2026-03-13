@@ -1,4 +1,19 @@
-# task_plan.md — Full Audit Remediation v2.6.1
+# task_plan.md — v2.8.1 (cohérence Test/Both)
+
+## T1 — Corriger CLAUDE.md [ ] pending
+- **Fichier** : `CLAUDE.md`
+- **Ligne** : supprimer/corriger "ValidationMode::Test and Both are stubbed — exercises with these modes are skipped silently in watch and piscine. Only Output validation works."
+- **Nouveau texte** : refléter que Test/Both sont opérationnels dans runner.rs
+
+## T2 — Ajouter test de non-filtrage [ ] pending
+- **Fichier** : `src/exercises.rs` (bloc `#[cfg(test)]`, après `test_output_validation_has_expected`)
+- **Fonction à réutiliser** : `load_all_exercises()` ligne 117, `ValidationMode` import existant
+- **Pattern** : identique aux autres tests du fichier (voir `test_load_all_exercises_finds_files`)
+- **Test** : vérifier que la liste chargée contient des exercices avec `ValidationMode::Test` et `ValidationMode::Both`
+
+---
+
+# task_plan.md — Full Audit Remediation v2.6.1 (archivé)
 
 ## T1 — Visualizer nav DRY [x] skipped
 - Helpers `step_forward`/`step_back` jugés non nécessaires (inline lisible, 2 sites seulement)

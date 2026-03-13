@@ -340,4 +340,26 @@ mod tests {
             );
         }
     }
+
+    /// Vérifie que les exercices Test et Both sont présents dans la liste chargée
+    /// (garantit qu'aucun filtre silencieux ne les exclut de la navigation).
+    #[test]
+    fn test_test_and_both_exercises_are_loaded() {
+        use crate::models::ValidationMode;
+        let (exercises, _) = load_all_exercises().unwrap();
+        let has_test = exercises
+            .iter()
+            .any(|ex| matches!(ex.validation.mode, ValidationMode::Test));
+        let has_both = exercises
+            .iter()
+            .any(|ex| matches!(ex.validation.mode, ValidationMode::Both));
+        assert!(
+            has_test,
+            "Aucun exercice ValidationMode::Test dans la liste chargée"
+        );
+        assert!(
+            has_both,
+            "Aucun exercice ValidationMode::Both dans la liste chargée"
+        );
+    }
 }
