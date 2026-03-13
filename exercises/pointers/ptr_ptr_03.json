@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Allocation dynamique via double pointeur",
   "description": "NSY103 — Un double pointeur `int **pp` permet à une fonction d'allouer de la mémoire et de renvoyer le résultat via un paramètre de sortie. C'est un pattern courant dans les API C (ex: `getline`).\n\nImplémentez `alloc_sequence(int **out, int n)` qui alloue un tableau de n entiers et le remplit avec la séquence 0, 1, 4, 9, ... (carrés).",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(____ **out, int n) {\n    *out = ____;\n    if (!____) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = ____;\n    }\n    return 0;\n}\n\nint main(void) {\n    int *data = NULL;\n    int n = 6;\n    if (alloc_sequence(____, n) != 0) {\n        fprintf(stderr, \"Erreur allocation\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", data[i]);\n    }\n    printf(\"\\n\");\n    free(data);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    *out = malloc(n * sizeof(int));\n    if (!*out) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = i * i;\n    }\n    return 0;\n}\n\nint main(void) {\n    int *data = NULL;\n    int n = 6;\n    if (alloc_sequence(&data, n) != 0) {\n        fprintf(stderr, \"Erreur allocation\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", data[i]);\n    }\n    printf(\"\\n\");\n    free(data);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    return -1;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    *out = malloc(n * sizeof(int));\n    if (!*out) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = i * i;\n    }\n    return 0;\n}\n",
   "hints": [
     "Le double pointeur permet de modifier data dans main : `*out = malloc(...)`",
     "Pour accéder aux éléments : `(*out)[i]` — les parenthèses sont obligatoires",
     "Appeler avec `alloc_sequence(&data, n)` — passer l'adresse du pointeur"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "0 1 4 9 16 25 \n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_alloc_sequence_basic(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 3));\n    TEST_ASSERT_NOT_NULL(seq);\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    TEST_ASSERT_EQUAL_INT(1, seq[1]);\n    TEST_ASSERT_EQUAL_INT(4, seq[2]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_larger(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 5));\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    TEST_ASSERT_EQUAL_INT(9, seq[3]);\n    TEST_ASSERT_EQUAL_INT(16, seq[4]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_single(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 1));\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_zero(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 0));\n    free(seq);\n}\n\nint main(void) {\n    RUN_TEST(test_alloc_sequence_basic);\n    RUN_TEST(test_alloc_sequence_larger);\n    RUN_TEST(test_alloc_sequence_single);\n    RUN_TEST(test_alloc_sequence_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,13 +23,23 @@
       {
         "label": "Avant alloc_sequence — data = NULL",
         "stack": [
-          {"name": "data", "value": "NULL"},
-          {"name": "n", "value": "6"}
+          {
+            "name": "data",
+            "value": "NULL"
+          },
+          {
+            "name": "n",
+            "value": "6"
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "data est un pointeur initialisé à NULL. Pour que alloc_sequence puisse modifier data, on passe &data (l'adresse du pointeur).",
         "step_label": "data = NULL — avant allocation"
@@ -37,24 +47,64 @@
       {
         "label": "Dans alloc_sequence — *out = malloc(...)",
         "stack": [
-          {"name": "data", "value": "→heap"},
-          {"name": "out", "value": "→data"}
+          {
+            "name": "data",
+            "value": "→heap"
+          },
+          {
+            "name": "out",
+            "value": "→data"
+          }
         ],
         "heap": [
-          {"address": "[0]", "value": "0"},
-          {"address": "[1]", "value": "1"},
-          {"address": "[2]", "value": "4"},
-          {"address": "[3]", "value": "9"},
-          {"address": "[4]", "value": "16"},
-          {"address": "[5]", "value": "25"}
+          {
+            "address": "[0]",
+            "value": "0"
+          },
+          {
+            "address": "[1]",
+            "value": "1"
+          },
+          {
+            "address": "[2]",
+            "value": "4"
+          },
+          {
+            "address": "[3]",
+            "value": "9"
+          },
+          {
+            "address": "[4]",
+            "value": "16"
+          },
+          {
+            "address": "[5]",
+            "value": "25"
+          }
         ],
         "arrows": [
-          {"from": "out", "to": "data", "label": "*out"},
-          {"from": "data", "to": "[0]", "label": "data[i]"}
+          {
+            "from": "out",
+            "to": "data",
+            "label": "*out"
+          },
+          {
+            "from": "data",
+            "to": "[0]",
+            "label": "data[i]"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": false},
-          {"function_name": "alloc_sequence", "args": "&data, 6", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": false
+          },
+          {
+            "function_name": "alloc_sequence",
+            "args": "&data, 6",
+            "is_active": true
+          }
         ],
         "explanation": "out pointe vers data (dans main). *out = malloc(...) modifie directement data. (*out)[i] = i*i remplit le tableau via double déréférencement.",
         "step_label": "*out = malloc — data modifié via double pointeur"
@@ -62,32 +112,64 @@
       {
         "label": "Retour dans main — data pointe vers le heap",
         "stack": [
-          {"name": "data", "value": "→heap"}
+          {
+            "name": "data",
+            "value": "→heap"
+          }
         ],
         "heap": [
-          {"address": "[0]", "value": "0"},
-          {"address": "[1]", "value": "1"},
-          {"address": "[2]", "value": "4"},
-          {"address": "[3]", "value": "9"},
-          {"address": "[4]", "value": "16"},
-          {"address": "[5]", "value": "25"}
+          {
+            "address": "[0]",
+            "value": "0"
+          },
+          {
+            "address": "[1]",
+            "value": "1"
+          },
+          {
+            "address": "[2]",
+            "value": "4"
+          },
+          {
+            "address": "[3]",
+            "value": "9"
+          },
+          {
+            "address": "[4]",
+            "value": "16"
+          },
+          {
+            "address": "[5]",
+            "value": "25"
+          }
         ],
         "arrows": [
-          {"from": "data", "to": "[0]"}
+          {
+            "from": "data",
+            "to": "[0]"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "data pointe maintenant vers le bloc alloué par alloc_sequence. main peut utiliser data[i] et doit appeler free(data) quand c'est terminé.",
         "step_label": "Retour — data prêt à utiliser"
       }
     ]
   },
-  "prerequisites": ["ptr-ptr-02"],
+  "prerequisites": [
+    "ptr-ptr-02"
+  ],
   "exercise_type": "complete",
   "key_concept": "int **out permet à une fonction d'allouer et retourner un pointeur via paramètre de sortie",
   "common_mistake": "Oublier les parenthèses dans (*out)[i] — sans elles, *out[i] déréférence out[i] (mauvais)",
-  "kc_ids": ["KC-C01"],
+  "kc_ids": [
+    "KC-C01"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n\n/* == EXEMPLE ================================================\n * Allocation d'un buffer de chars via double pointeur\n * La fonction alloue et remplit, l'appelant libere.\n * =========================================================== */\nint example_alloc_greeting(char **out, const char *name) {\n    int len = 7 + (int)strlen(name) + 1;\n    *out = malloc(len);\n    if (!*out) return -1;\n    snprintf(*out, len, \"Bonjour %s\", name);\n    return 0;\n}\nvoid example_demo(void) {\n    char *msg = NULL;\n    if (example_alloc_greeting(&msg, \"Alice\") == 0) {\n        printf(\"%s\\n\", msg);\n        free(msg);\n    }\n}\n/* Resultat: Bonjour Alice */\n\n/* == VOTRE EXERCICE =========================================\n * Allocation d'un tableau de carres via double pointeur\n * Inspirez-vous de example_alloc_greeting ci-dessus.\n * alloc_sequence(&data, n) remplit avec i*i.\n * =========================================================== */\n#include <string.h>\n\nint alloc_sequence(int **out, int n) {\n    (void)out; (void)n;\n    return -1; /* TODO */\n}\n\nint main(void) {\n    int *data = NULL;\n    int n = 6;\n    if (alloc_sequence(&data, n) != 0) {\n        fprintf(stderr, \"Erreur allocation\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) printf(\"%d \", data[i]);\n    printf(\"\\n\");\n    free(data);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    *out = malloc(n * sizeof(int));\n    if (!*out) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = ____; // carré de i\n    }\n    return 0;\n}\n\nint main(void) {\n    int *data = NULL;\n    int n = 6;\n    if (alloc_sequence(&data, n) != 0) {\n        fprintf(stderr, \"Erreur allocation\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) printf(\"%d \", ____);\n    printf(\"\\n\");\n    free(data);\n    return 0;\n}",

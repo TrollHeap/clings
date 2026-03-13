@@ -5,17 +5,18 @@
   "difficulty": 1,
   "title": "Initialisation désignée et compound literals",
   "description": "NSY103 — L'initialisation désignée (`{.champ = val}`) permet d'initialiser les champs d'une struct par nom plutôt que par position. Les compound literals `(Type){...}` créent des objets temporaires directement dans une expression.\n\nUtilisez ces deux mécanismes pour initialiser et modifier des structs `Color`.",
-  "starter_code": "#include <stdio.h>\n\ntypedef struct { int r, g, b; } Color;\n\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\n\nint main(void) {\n    Color red = {.r = ____, .g = ____, .b = ____};\n    print_color(\"red\", red);\n\n    Color blue = {____ = 255};\n    print_color(\"blue\", blue);\n\n    Color *ptr = &(____){128, 0, 128};\n    print_color(\"purple\", *ptr);\n\n    Color colors[] = {\n        {.r = 255, .g = 255, .b = 0},\n        {.r = 0, .g = 255, .b = 255}\n    };\n    printf(\"colors[0] = (%d, %d, %d)\\n\", colors[0].r, colors[0].g, colors[0].b);\n    printf(\"colors[1] = (%d, %d, %d)\\n\", colors[1].r, colors[1].g, colors[1].b);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\ntypedef struct { int r, g, b; } Color;\n\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\n\nint main(void) {\n    Color red = {.r = 255, .g = 0, .b = 0};\n    print_color(\"red\", red);\n\n    Color blue = {.b = 255};\n    print_color(\"blue\", blue);\n\n    Color *ptr = &(Color){128, 0, 128};\n    print_color(\"purple\", *ptr);\n\n    Color colors[] = {\n        {.r = 255, .g = 255, .b = 0},\n        {.r = 0, .g = 255, .b = 255}\n    };\n    printf(\"colors[0] = (%d, %d, %d)\\n\", colors[0].r, colors[0].g, colors[0].b);\n    printf(\"colors[1] = (%d, %d, %d)\\n\", colors[1].r, colors[1].g, colors[1].b);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) {\n    return (Color){____};\n}\nColor make_blue(void) {\n    return (Color){____};\n}\nColor make_color(int r, int g, int b) {\n    return (Color){____};\n}",
+  "solution_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) {\n    return (Color){.r = 255, .g = 0, .b = 0};\n}\nColor make_blue(void) {\n    return (Color){.r = 0, .g = 0, .b = 255};\n}\nColor make_color(int r, int g, int b) {\n    return (Color){.r = r, .g = g, .b = b};\n}",
   "hints": [
     "Initialisation désignée : `{.r = 255, .g = 0, .b = 0}` — les champs non mentionnés sont mis à 0",
     "`{.b = 255}` initialise seulement b, r et g sont automatiquement 0",
     "Compound literal : `(Color){128, 0, 128}` crée un objet Color temporaire"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "red = (255, 0, 0)\nblue = (0, 0, 255)\npurple = (128, 0, 128)\ncolors[0] = (255, 255, 0)\ncolors[1] = (0, 255, 255)\n",
-    "test_code": null
+    "test_code": "void test_make_red(void) {\n    Color c = make_red();\n    TEST_ASSERT_EQUAL_INT(255, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(0, c.b);\n}\n\nvoid test_make_blue(void) {\n    Color c = make_blue();\n    TEST_ASSERT_EQUAL_INT(0, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(255, c.b);\n}\n\nvoid test_make_color(void) {\n    Color c = make_color(128, 64, 32);\n    TEST_ASSERT_EQUAL_INT(128, c.r);\n    TEST_ASSERT_EQUAL_INT(64, c.g);\n    TEST_ASSERT_EQUAL_INT(32, c.b);\n}\n\nvoid test_make_color_zero(void) {\n    Color c = make_color(0, 0, 0);\n    TEST_ASSERT_EQUAL_INT(0, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(0, c.b);\n}\n\nint main(void) {\n    RUN_TEST(test_make_red);\n    RUN_TEST(test_make_blue);\n    RUN_TEST(test_make_color);\n    RUN_TEST(test_make_color_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

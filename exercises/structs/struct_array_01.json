@@ -13,9 +13,10 @@
     "`sizeof(classe) / sizeof(classe[0])` donne le nombre d'éléments"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "1. Bob : 18\n2. Diana : 17\n3. Alice : 15\n4. Charlie : 12\n",
-    "test_code": null
+    "test_code": "void test_qsort_descending(void) {\n    Etudiant classe[] = {\n        {\"Alice\", 15},\n        {\"Bob\", 18},\n        {\"Charlie\", 12},\n        {\"Diana\", 17}\n    };\n    int n = sizeof(classe) / sizeof(classe[0]);\n    qsort(classe, n, sizeof(Etudiant), cmp_note_desc);\n    TEST_ASSERT_EQUAL_INT(18, classe[0].note);\n    TEST_ASSERT_EQUAL_INT(17, classe[1].note);\n    TEST_ASSERT_EQUAL_INT(15, classe[2].note);\n    TEST_ASSERT_EQUAL_INT(12, classe[3].note);\n}\n\nvoid test_comparator_basic(void) {\n    Etudiant ea = {\"Alice\", 15};\n    Etudiant eb = {\"Bob\", 18};\n    int result = cmp_note_desc(&ea, &eb);\n    TEST_ASSERT_TRUE(result > 0);\n}\n\nvoid test_comparator_equal(void) {\n    Etudiant ea = {\"Alice\", 15};\n    Etudiant eb = {\"Bob\", 15};\n    int result = cmp_note_desc(&ea, &eb);\n    TEST_ASSERT_EQUAL_INT(0, result);\n}\n\nvoid test_array_size_computation(void) {\n    Etudiant classe[] = {\n        {\"A\", 10},\n        {\"B\", 20},\n        {\"C\", 30}\n    };\n    int n = sizeof(classe) / sizeof(classe[0]);\n    TEST_ASSERT_EQUAL_INT(3, n);\n}\n\nint main(void) {\n    RUN_TEST(test_qsort_descending);\n    RUN_TEST(test_comparator_basic);\n    RUN_TEST(test_comparator_equal);\n    RUN_TEST(test_array_size_computation);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

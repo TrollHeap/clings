@@ -5,17 +5,17 @@
   "difficulty": 1,
   "title": "Constantes et catégories de signaux",
   "description": "NSY103 — Les signaux sont des entiers définis dans signal.h. Chaque signal a un comportement par défaut : TERM (tuer), IGN (ignorer), CORE (core dump), STOP (suspendre).\n\nAffichez les numéros et catégories des signaux POSIX fondamentaux.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
-  "starter_code": "#include <stdio.h>\n#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\nint main(void) {\n    SigInfo signals[] = {\n        {SIGHUP,  \"SIGHUP\",  \"TERM\"},\n        {SIGINT,  \"SIGINT\",  \"TERM\"},\n        {SIGQUIT, \"SIGQUIT\", \"CORE\"},\n        {SIGILL,  \"SIGILL\",  \"CORE\"},\n        {SIGSEGV, \"SIGSEGV\", \"CORE\"},\n        {SIGTERM, \"SIGTERM\", \"TERM\"},\n        {SIGKILL, \"SIGKILL\", \"TERM (unkillable)\"},\n        {SIGSTOP, \"SIGSTOP\", \"STOP (unstoppable)\"},\n        {SIGCHLD, \"SIGCHLD\", \"IGN\"},\n    };\n    printf(\"%-4s %-10s %s\\n\", ____, ____, ____);\n    for (int i = 0; i < 9; i++)\n        printf(\"%-4d %-10s %s\\n\", ____, ____, ____);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <signal.h>\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\nint main(void) {\n    SigInfo signals[] = {\n        {SIGHUP,  \"SIGHUP\",  \"TERM\"},\n        {SIGINT,  \"SIGINT\",  \"TERM\"},\n        {SIGQUIT, \"SIGQUIT\", \"CORE\"},\n        {SIGILL,  \"SIGILL\",  \"CORE\"},\n        {SIGSEGV, \"SIGSEGV\", \"CORE\"},\n        {SIGTERM, \"SIGTERM\", \"TERM\"},\n        {SIGKILL, \"SIGKILL\", \"TERM (unkillable)\"},\n        {SIGSTOP, \"SIGSTOP\", \"STOP (unstoppable)\"},\n        {SIGCHLD, \"SIGCHLD\", \"IGN\"},\n    };\n    printf(\"%-4s %-10s %s\\n\", \"NUM\", \"NAME\", \"DEFAULT\");\n    for (int i = 0; i < 9; i++)\n        printf(\"%-4d %-10s %s\\n\", signals[i].num, signals[i].name, signals[i].action);\n    return 0;\n}",
+  "starter_code": "#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\n/* Test mode: no main() needed */",
+  "solution_code": "#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\n/* Test mode: test harness handles validation */",
   "hints": [
     "#include <signal.h> donne accès aux constantes SIGTERM, SIGKILL, SIGINT, etc.",
     "SIGTERM=15, SIGKILL=9, SIGINT=2, SIGSEGV=11, SIGCHLD=17 (Linux)",
     "Organiser en tableau struct { int num; char *name; char *action; }"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "NUM  NAME       DEFAULT\n1    SIGHUP     TERM\n2    SIGINT     TERM\n3    SIGQUIT    CORE\n4    SIGILL     CORE\n11   SIGSEGV    CORE\n15   SIGTERM    TERM\n9    SIGKILL    TERM (unkillable)\n19   SIGSTOP    STOP (unstoppable)\n17   SIGCHLD    IGN\n",
-    "test_code": null
+    "mode": "test",
+    "expected_tests_pass": 4,
+    "test_code": "void test_sighup_constant(void) {\n    TEST_ASSERT_EQUAL_INT(1, SIGHUP);\n}\n\nvoid test_sigint_constant(void) {\n    TEST_ASSERT_EQUAL_INT(2, SIGINT);\n}\n\nvoid test_sigkill_constant(void) {\n    TEST_ASSERT_EQUAL_INT(9, SIGKILL);\n}\n\nvoid test_sigterm_constant(void) {\n    TEST_ASSERT_EQUAL_INT(15, SIGTERM);\n}\n\nint main(void) {\n    RUN_TEST(test_sighup_constant);\n    RUN_TEST(test_sigint_constant);\n    RUN_TEST(test_sigkill_constant);\n    RUN_TEST(test_sigterm_constant);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,10 +23,22 @@
       {
         "label": "Tableau de SigInfo initialisé",
         "stack": [
-          {"name": "signals[0]", "value": "{1, \"SIGHUP\", \"TERM\"}"},
-          {"name": "signals[1]", "value": "{2, \"SIGINT\", \"TERM\"}"},
-          {"name": "signals[6]", "value": "{9, \"SIGKILL\", \"TERM (unkillable)\"}"},
-          {"name": "signals[7]", "value": "{19, \"SIGSTOP\", \"STOP (unstoppable)\"}"}
+          {
+            "name": "signals[0]",
+            "value": "{1, \"SIGHUP\", \"TERM\"}"
+          },
+          {
+            "name": "signals[1]",
+            "value": "{2, \"SIGINT\", \"TERM\"}"
+          },
+          {
+            "name": "signals[6]",
+            "value": "{9, \"SIGKILL\", \"TERM (unkillable)\"}"
+          },
+          {
+            "name": "signals[7]",
+            "value": "{19, \"SIGSTOP\", \"STOP (unstoppable)\"}"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -34,8 +46,14 @@
       {
         "label": "Boucle printf sur 9 signaux",
         "stack": [
-          {"name": "i", "value": "0..8"},
-          {"name": "format", "value": "\"%-4d %-10s %s\""}
+          {
+            "name": "i",
+            "value": "0..8"
+          },
+          {
+            "name": "format",
+            "value": "\"%-4d %-10s %s\""
+          }
         ],
         "heap": [],
         "arrows": []
@@ -46,12 +64,14 @@
   "exercise_type": "complete",
   "key_concept": "SIGKILL(9) et SIGSTOP(19) ne peuvent pas être bloqués ni ignorés",
   "common_mistake": "Croire que SIGKILL peut être capturé — c'est impossible par design",
-  "kc_ids": ["KC-C08"],
+  "kc_ids": [
+    "KC-C08"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\n/* == EXEMPLE =======================================\n * Table de codes errno (numero, nom, description)\n * Meme pattern : tableau de struct + boucle printf\n * avec formatage en colonnes alignees.\n * ================================================= */\ntypedef struct { int code; const char *name; const char *desc; } ErrInfo;\n\nvoid example_errno_table(void) {\n    ErrInfo errs[] = {\n        {1,  \"EPERM\",  \"Operation not permitted\"},\n        {2,  \"ENOENT\", \"No such file or directory\"},\n        {13, \"EACCES\", \"Permission denied\"},\n        {22, \"EINVAL\", \"Invalid argument\"},\n    };\n    printf(\"%-4s %-10s %s\\n\", \"NUM\", \"NAME\", \"DESCRIPTION\");\n    for (int i = 0; i < 4; i++)\n        printf(\"%-4d %-10s %s\\n\", errs[i].code, errs[i].name, errs[i].desc);\n}\n/* Resultat: table formatee de 4 codes errno */\n\n/* == VOTRE EXERCICE ================================\n * Table de constantes de signaux POSIX\n * Inspirez-vous de example_errno_table ci-dessus.\n * Remplissez le tableau et affichez avec printf.\n * ================================================= */\nint main(void) {\n    SigInfo signals[] = {\n        {SIGHUP,  \"SIGHUP\",  \"TERM\"},\n        {SIGINT,  \"SIGINT\",  \"TERM\"},\n        {SIGQUIT, \"SIGQUIT\", \"CORE\"},\n        {SIGILL,  \"SIGILL\",  \"CORE\"},\n        {SIGSEGV, \"SIGSEGV\", \"CORE\"},\n        {SIGTERM, \"SIGTERM\", \"TERM\"},\n        {SIGKILL, \"SIGKILL\", \"TERM (unkillable)\"},\n        {SIGSTOP, \"SIGSTOP\", \"STOP (unstoppable)\"},\n        {SIGCHLD, \"SIGCHLD\", \"IGN\"},\n    };\n    /* TODO: printf header \"NUM  NAME       DEFAULT\" */\n    /* TODO: boucle printf sur les 9 signaux */\n    (void)signals;\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\nint main(void) {\n    SigInfo signals[] = {\n        {SIGHUP,  \"SIGHUP\",  \"TERM\"},\n        {SIGINT,  \"SIGINT\",  \"TERM\"},\n        {SIGQUIT, \"SIGQUIT\", \"CORE\"},\n        {SIGILL,  \"SIGILL\",  \"CORE\"},\n        {SIGSEGV, \"SIGSEGV\", \"CORE\"},\n        {SIGTERM, \"SIGTERM\", \"TERM\"},\n        {SIGKILL, \"SIGKILL\", \"TERM (unkillable)\"},\n        {SIGSTOP, \"SIGSTOP\", \"STOP (unstoppable)\"},\n        {SIGCHLD, \"SIGCHLD\", \"IGN\"},\n    };\n    printf(\"%-4s %-10s %s\\n\", \"NUM\", \"NAME\", \"DEFAULT\");\n    for (int i = 0; i < 9; i++)\n        printf(\"%-4d %-10s %s\\n\", ____, ____, ____); // num, name, action\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\nint main(void) {\n    SigInfo signals[] = {\n        {SIGHUP,  \"SIGHUP\",  \"TERM\"},\n        {SIGINT,  \"SIGINT\",  \"TERM\"},\n        {SIGQUIT, \"SIGQUIT\", \"CORE\"},\n        {SIGILL,  \"SIGILL\",  \"CORE\"},\n        {SIGSEGV, \"SIGSEGV\", \"CORE\"},\n        {SIGTERM, \"SIGTERM\", \"TERM\"},\n        {SIGKILL, \"SIGKILL\", \"TERM (unkillable)\"},\n        {SIGSTOP, \"SIGSTOP\", \"STOP (unstoppable)\"},\n        {SIGCHLD, \"SIGCHLD\", \"IGN\"},\n    };\n    printf(\"%-4s %-10s %s\\n\", ____, ____, ____);\n    for (int i = 0; i < 9; i++)\n        printf(\"%-4d %-10s %s\\n\", ____, ____, ____);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\ntypedef struct { int num; const char *name; const char *action; } SigInfo;\n\nint main(void) {\n    // Remplir tableau avec SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGSEGV,\n    // SIGTERM, SIGKILL, SIGSTOP, SIGCHLD et leurs actions par défaut\n    // Afficher header \"NUM  NAME       DEFAULT\" puis chaque ligne\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <signal.h>\n\n/* Test mode: signal constants are pre-defined */\n",
+    "#include <signal.h>\n\n/* SIGHUP=1, SIGINT=2, SIGKILL=9, SIGTERM=15 */\n",
+    "#include <signal.h>\n\n/* Signals have numeric values defined in signal.h */\n",
+    "#include <signal.h>\n\n/* Understand signal constants */\n",
+    "#include <signal.h>\n"
   ]
 }

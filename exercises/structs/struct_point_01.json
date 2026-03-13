@@ -5,17 +5,18 @@
   "difficulty": 1,
   "title": "Définir et accéder à une struct",
   "description": "NSY103 — Une `struct` groupe des champs de types différents. L'accès aux champs d'une variable struct utilise le point `.`, l'accès via pointeur utilise `->`.\n\nDéfinissez `Point2D {float x, y}`, initialisez deux points, calculez la distance Manhattan.",
-  "starter_code": "#include <stdio.h>\n\ntypedef struct { float x; float y; } Point2D;\n\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = ____;\n    float dy = ____;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return ____;\n}\n\nint main(void) {\n    Point2D p1 = {____, ____};\n    Point2D p2 = {____, ____};\n    printf(\"p1 = (%.1f, %.1f)\\n\", ____, ____);\n    printf(\"p2 = (%.1f, %.1f)\\n\", ____, ____);\n    printf(\"Distance Manhattan : %.1f\\n\", manhattan(p1, p2));\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = a.x - b.x;\n    float dy = a.y - b.y;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return dx + dy;\n}\nint main(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    printf(\"p1 = (%.1f, %.1f)\\n\", p1.x, p1.y);\n    printf(\"p2 = (%.1f, %.1f)\\n\", p2.x, p2.y);\n    printf(\"Distance Manhattan : %.1f\\n\", manhattan(p1, p2));\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = ____;\n    float dy = ____;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return ____;\n}",
+  "solution_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = a.x - b.x;\n    float dy = a.y - b.y;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return dx + dy;\n}",
   "hints": [
     "`typedef struct { float x; float y; } Point2D;`",
     "Distance Manhattan : |p1.x - p2.x| + |p1.y - p2.y| = |1-4| + |2-6| = 3 + 4 = 7",
     "Accès aux champs d'une struct par valeur : `a.x`, `a.y`"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "both",
     "expected_output": "p1 = (1.0, 2.0)\np2 = (4.0, 6.0)\nDistance Manhattan : 7.0\n",
-    "test_code": null
+    "test_code": "void test_manhattan_basic(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(7, (int)d);\n}\n\nvoid test_manhattan_zero(void) {\n    Point2D p1 = {0.0f, 0.0f};\n    Point2D p2 = {0.0f, 0.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(0, (int)d);\n}\n\nvoid test_manhattan_negative(void) {\n    Point2D p1 = {10.0f, 10.0f};\n    Point2D p2 = {2.0f, 3.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(15, (int)d);\n}\n\nvoid test_manhattan_symmetric(void) {\n    Point2D p1 = {5.0f, 7.0f};\n    Point2D p2 = {2.0f, 3.0f};\n    float d1 = manhattan(p1, p2);\n    float d2 = manhattan(p2, p1);\n    TEST_ASSERT_EQUAL_INT((int)d1, (int)d2);\n}\n\nint main(void) {\n    RUN_TEST(test_manhattan_basic);\n    RUN_TEST(test_manhattan_zero);\n    RUN_TEST(test_manhattan_negative);\n    RUN_TEST(test_manhattan_symmetric);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

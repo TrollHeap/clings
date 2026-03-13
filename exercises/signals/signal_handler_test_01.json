@@ -1,0 +1,26 @@
+{
+  "id": "signal-handler-test-01",
+  "subject": "signals",
+  "lang": "c",
+  "difficulty": 2,
+  "title": "sigaction — installer un handler SIGUSR1",
+  "description": "Implémentez deux fonctions :\n- `void handler_sigusr1(int sig)` — handler qui incrémente un compteur global `volatile sig_atomic_t g_count`.\n- `int install_handler(void)` — installe `handler_sigusr1` pour SIGUSR1 via `sigaction` (SA_RESTART, sans SA_SIGINFO), retourne 0 en cas de succès ou -1 sinon.\n\nDéclarez `volatile sig_atomic_t g_count = 0;` en global.",
+  "starter_code": "#include <stdio.h>\n#include <signal.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t g_count = 0;\n\n/* Handler : incrémente g_count. */\nvoid handler_sigusr1(int sig) {\n    /* TODO */\n    (void)sig;\n}\n\n/* Installe handler_sigusr1 pour SIGUSR1 via sigaction.\n * Retourne 0 si succès, -1 sinon. */\nint install_handler(void) {\n    /* TODO */\n    return -1;\n}\n\nint main(void) {\n    if (install_handler() != 0) return 1;\n    kill(getpid(), SIGUSR1);\n    printf(\"count=%d\\n\", (int)g_count);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <signal.h>\n#include <unistd.h>\n\nvolatile sig_atomic_t g_count = 0;\n\nvoid handler_sigusr1(int sig) {\n    (void)sig;\n    g_count++;\n}\n\nint install_handler(void) {\n    struct sigaction sa;\n    sa.sa_handler = handler_sigusr1;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = SA_RESTART;\n    return sigaction(SIGUSR1, &sa, NULL) == 0 ? 0 : -1;\n}\n\nint main(void) {\n    if (install_handler() != 0) return 1;\n    kill(getpid(), SIGUSR1);\n    printf(\"count=%d\\n\", (int)g_count);\n    return 0;\n}\n",
+  "hints": [
+    "Initialisez `struct sigaction sa` : `sa.sa_handler = handler_sigusr1; sigemptyset(&sa.sa_mask); sa.sa_flags = SA_RESTART;`",
+    "Appelez `sigaction(SIGUSR1, &sa, NULL)` et vérifiez que la valeur retournée est 0 (succès).",
+    "Dans le handler, `g_count++` suffit — les opérations sur `sig_atomic_t` sont atomiques par rapport aux signaux."
+  ],
+  "validation": {
+    "mode": "test",
+    "expected_tests_pass": 4,
+    "test_code": "void test_install_handler_returns_zero(void) {\n    int rc = install_handler();\n    TEST_ASSERT_EQUAL_INT(0, rc);\n}\n\nvoid test_handler_increments_count_once(void) {\n    g_count = 0;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(1, (int)g_count);\n}\n\nvoid test_handler_increments_count_multiple(void) {\n    g_count = 0;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    kill(getpid(), SIGUSR1);\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(3, (int)g_count);\n}\n\nvoid test_handler_does_not_reset_count(void) {\n    g_count = 10;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(11, (int)g_count);\n}\n\nint main(void) {\n    RUN_TEST(test_install_handler_returns_zero);\n    RUN_TEST(test_handler_increments_count_once);\n    RUN_TEST(test_handler_increments_count_multiple);\n    RUN_TEST(test_handler_does_not_reset_count);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+  },
+  "key_concept": "`sigaction` est la méthode POSIX recommandée pour installer des handlers de signaux. `volatile sig_atomic_t` garantit un accès sûr depuis le handler. `SA_RESTART` relance automatiquement les appels système interrompus.",
+  "common_mistake": "Utiliser `signal()` au lieu de `sigaction()` (comportement non portable). Oublier `sigemptyset(&sa.sa_mask)` — sans cela, `sa_mask` contient des valeurs indéterminées.",
+  "exercise_type": "complete",
+  "prerequisites": [],
+  "files": [],
+  "kc_ids": ["sigaction", "SIGUSR1", "sig_atomic_t", "SA_RESTART"]
+}

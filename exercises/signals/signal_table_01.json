@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Table de disposition des signaux",
   "description": "NSY103 — Chaque signal a une disposition par défaut : DFL (défaut), IGN (ignoré), ou un handler custom. Un processus peut modifier la disposition avec signal()/sigaction(), sauf SIGKILL et SIGSTOP.\n\nImplémentez une table de disposition avec struct, recherche par numéro/nom, et affichage.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
-  "starter_code": "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\nstatic SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGILL,  \"SIGILL\",  \"CORE\", 1},\n    {SIGSEGV, \"SIGSEGV\", \"CORE\", 1},\n    {SIGTERM, \"SIGTERM\", \"TERM\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", ____},  // non catchable\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", ____},  // non catchable\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n    {SIGCONT, \"SIGCONT\", \"CONT\", 1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nint main(void) {\n    printf(\"%-4s %-10s %-6s %s\\n\", \"NUM\", \"NAME\", \"DISP\", \"CATCHABLE\");\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        printf(\"%-4d %-10s %-6s %s\\n\",\n            table[i].num, table[i].name, table[i].disp,\n            table[i].catchable ? \"oui\" : \"NON\");\n    const SigEntry *e = find_by_num(____);\n    if (e)\n        printf(\"\\n%s (signal %d): catchable=%s\\n\", e->name, e->num, e->catchable ? \"oui\" : \"NON\");\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\nstatic SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGILL,  \"SIGILL\",  \"CORE\", 1},\n    {SIGSEGV, \"SIGSEGV\", \"CORE\", 1},\n    {SIGTERM, \"SIGTERM\", \"TERM\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n    {SIGCONT, \"SIGCONT\", \"CONT\", 1},\n};\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\nint main(void) {\n    printf(\"%-4s %-10s %-6s %s\\n\", \"NUM\", \"NAME\", \"DISP\", \"CATCHABLE\");\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        printf(\"%-4d %-10s %-6s %s\\n\",\n            table[i].num, table[i].name, table[i].disp,\n            table[i].catchable ? \"oui\" : \"NON\");\n    const SigEntry *e = find_by_num(SIGKILL);\n    if (e)\n        printf(\"\\n%s (signal %d): catchable=%s\\n\", e->name, e->num, e->catchable ? \"oui\" : \"NON\");\n    return 0;\n}",
+  "starter_code": "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: no main() needed */",
+  "solution_code": "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: test harness validates directly */",
   "hints": [
     "struct SigEntry { int num; char name[12]; char disp[8]; int catchable; }",
     "catchable=0 pour SIGKILL(9) et SIGSTOP(19)",
     "Recherche linéaire dans tableau de N éléments"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "NUM  NAME       DISP   CATCHABLE\n2    SIGINT     TERM   oui\n3    SIGQUIT    CORE   oui\n4    SIGILL     CORE   oui\n11   SIGSEGV    CORE   oui\n15   SIGTERM    TERM   oui\n9    SIGKILL    TERM   NON\n19   SIGSTOP    STOP   NON\n17   SIGCHLD    IGN    oui\n18   SIGCONT    CONT   oui\n\nSIGKILL (signal 9): catchable=NON\n",
-    "test_code": null
+    "mode": "test",
+    "expected_tests_pass": 4,
+    "test_code": "static SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nvoid test_find_by_num_sigint(void) {\n    const SigEntry *e = find_by_num(SIGINT);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGINT, e->num);\n    TEST_ASSERT_EQUAL_INT(1, e->catchable);\n}\n\nvoid test_find_by_num_sigkill(void) {\n    const SigEntry *e = find_by_num(SIGKILL);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGKILL, e->num);\n    TEST_ASSERT_EQUAL_INT(0, e->catchable);\n}\n\nvoid test_find_by_num_sigstop(void) {\n    const SigEntry *e = find_by_num(SIGSTOP);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGSTOP, e->num);\n    TEST_ASSERT_EQUAL_INT(0, e->catchable);\n}\n\nvoid test_find_by_num_not_found(void) {\n    const SigEntry *e = find_by_num(99999);\n    TEST_ASSERT_NULL(e);\n}\n\nint main(void) {\n    RUN_TEST(test_find_by_num_sigint);\n    RUN_TEST(test_find_by_num_sigkill);\n    RUN_TEST(test_find_by_num_sigstop);\n    RUN_TEST(test_find_by_num_not_found);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,9 +23,18 @@
       {
         "label": "Table initialisée (9 entrées)",
         "stack": [
-          {"name": "table[0]", "value": "{2, \"SIGINT\", \"TERM\", 1}"},
-          {"name": "table[5]", "value": "{9, \"SIGKILL\", \"TERM\", 0}"},
-          {"name": "table[6]", "value": "{19, \"SIGSTOP\", \"STOP\", 0}"}
+          {
+            "name": "table[0]",
+            "value": "{2, \"SIGINT\", \"TERM\", 1}"
+          },
+          {
+            "name": "table[5]",
+            "value": "{9, \"SIGKILL\", \"TERM\", 0}"
+          },
+          {
+            "name": "table[6]",
+            "value": "{19, \"SIGSTOP\", \"STOP\", 0}"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -33,25 +42,38 @@
       {
         "label": "find_by_num(SIGKILL=9)",
         "stack": [
-          {"name": "num", "value": "9"},
-          {"name": "i", "value": "0..5 → match à i=5"},
-          {"name": "retour", "value": "&table[5]"}
+          {
+            "name": "num",
+            "value": "9"
+          },
+          {
+            "name": "i",
+            "value": "0..5 → match à i=5"
+          },
+          {
+            "name": "retour",
+            "value": "&table[5]"
+          }
         ],
         "heap": [],
         "arrows": []
       }
     ]
   },
-  "prerequisites": ["sigset-ops-01"],
+  "prerequisites": [
+    "sigset-ops-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "SIGKILL et SIGSTOP ne peuvent JAMAIS être modifiés par un processus",
   "common_mistake": "Croire que signal(SIGKILL, handler) fonctionne — retourne SIG_ERR sur Linux",
-  "kc_ids": ["KC-C08"],
+  "kc_ids": [
+    "KC-C08"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* == EXEMPLE =======================================\n * Table de permissions fichier avec flags\n * Meme pattern : tableau de struct avec flag booleen,\n * recherche lineaire par numero, affichage formate.\n * ================================================= */\ntypedef struct { int mode; char label[12]; char scope[8]; int writable; } PermEntry;\n\nstatic PermEntry example_perms[] = {\n    {4, \"r--\", \"owner\", 0},\n    {6, \"rw-\", \"owner\", 1},\n    {5, \"r-x\", \"group\", 0},\n    {7, \"rwx\", \"group\", 1},\n};\n#define PERM_SIZE (sizeof(example_perms)/sizeof(example_perms[0]))\n\nconst PermEntry *example_find_mode(int mode) {\n    for (size_t i = 0; i < PERM_SIZE; i++)\n        if (example_perms[i].mode == mode) return &example_perms[i];\n    return NULL;\n}\n/* Resultat: table de 4 permissions + lookup par mode */\n\n/* == VOTRE EXERCICE ================================\n * Table de disposition des signaux\n * Inspirez-vous de example_find_mode ci-dessus.\n * Remplissez catchable (0 pour SIGKILL/SIGSTOP),\n * implementez find_by_num, affichez la table.\n * ================================================= */\nstatic SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGILL,  \"SIGILL\",  \"CORE\", 1},\n    {SIGSEGV, \"SIGSEGV\", \"CORE\", 1},\n    {SIGTERM, \"SIGTERM\", \"TERM\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n    {SIGCONT, \"SIGCONT\", \"CONT\", 1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    /* TODO: recherche lineaire comme example_find_mode */\n    (void)num;\n    return NULL;\n}\n\nint main(void) {\n    printf(\"%-4s %-10s %-6s %s\\n\", \"NUM\", \"NAME\", \"DISP\", \"CATCHABLE\");\n    /* TODO: boucle sur table[], printf chaque entree */\n    /* TODO: catchable ? \"oui\" : \"NON\" */\n    const SigEntry *e = find_by_num(SIGKILL);\n    if (e)\n        printf(\"\\n%s (signal %d): catchable=%s\\n\", e->name, e->num, e->catchable ? \"oui\" : \"NON\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\nstatic SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGILL,  \"SIGILL\",  \"CORE\", 1},\n    {SIGSEGV, \"SIGSEGV\", \"CORE\", 1},\n    {SIGTERM, \"SIGTERM\", \"TERM\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n    {SIGCONT, \"SIGCONT\", \"CONT\", 1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nint main(void) {\n    printf(\"%-4s %-10s %-6s %s\\n\", \"NUM\", \"NAME\", \"DISP\", \"CATCHABLE\");\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        printf(\"%-4d %-10s %-6s %s\\n\",\n            table[i].num, table[i].name, table[i].disp,\n            table[i].catchable ? \"oui\" : \"NON\");\n    const SigEntry *e = find_by_num(____);\n    if (e)\n        printf(\"\\n%s (signal %d): catchable=%s\\n\", e->name, e->num, e->catchable ? \"oui\" : \"NON\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\nstatic SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGILL,  \"SIGILL\",  \"CORE\", 1},\n    {SIGSEGV, \"SIGSEGV\", \"CORE\", 1},\n    {SIGTERM, \"SIGTERM\", \"TERM\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", ____},  // non catchable\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", ____},  // non catchable\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n    {SIGCONT, \"SIGCONT\", \"CONT\", 1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nint main(void) {\n    printf(\"%-4s %-10s %-6s %s\\n\", \"NUM\", \"NAME\", \"DISP\", \"CATCHABLE\");\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        printf(\"%-4d %-10s %-6s %s\\n\",\n            table[i].num, table[i].name, table[i].disp,\n            table[i].catchable ? \"oui\" : \"NON\");\n    const SigEntry *e = find_by_num(____);\n    if (e)\n        printf(\"\\n%s (signal %d): catchable=%s\\n\", e->name, e->num, e->catchable ? \"oui\" : \"NON\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n// Remplir table avec 9 signaux (SIGINT, SIGQUIT, SIGILL, SIGSEGV, SIGTERM,\n// SIGKILL(catchable=0), SIGSTOP(catchable=0), SIGCHLD, SIGCONT)\n// Implémenter find_by_num()\n// Afficher header + table + recherche SIGKILL\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: understand table lookup pattern */\n",
+    "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Implement find_by_num linear search */\n",
+    "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Handle SIGKILL/SIGSTOP: catchable=0 */\n",
+    "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Implement lookup table */\n",
+    "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n"
   ]
 }

@@ -6,7 +6,7 @@
   "title": "Tableau dynamique avec malloc",
   "description": "NSY103 — `malloc(n * sizeof(type))` alloue `n` éléments sur le tas. Toujours vérifier le retour (NULL si échec) et libérer avec `free()` en fin d'usage.\n\nImplémentez `alloc_array(n)` qui retourne un tableau dynamique de `n` entiers, et `free_array(arr)` qui le libère.",
   "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *alloc_array(int n) {\n    /* TODO: allouer un tableau de n entiers */\n    /* Retourner NULL si n <= 0 */\n    return NULL;\n}\n\nvoid free_array(int *arr) {\n    /* TODO: libérer le tableau */\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *alloc_array(int n) {\n    if (n <= 0) return NULL;\n    return malloc((size_t)n * sizeof(int));\n}\n\nvoid free_array(int *arr) {\n    free(arr);\n}"
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *alloc_array(int n) {\n    if (n <= 0) return NULL;\n    return malloc((size_t)n * sizeof(int));\n}\n\nvoid free_array(int *arr) {\n    free(arr);\n}",
   "hints": [
     "`int *arr = malloc(5 * sizeof(int));` puis vérifier `if (!arr) { ... }`",
     "Remplir avec `arr[i] = i + 1;` dans une boucle",

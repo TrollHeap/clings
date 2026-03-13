@@ -13,9 +13,10 @@
     "sizeof(Value) = sizeof(tag) + sizeof(union) + padding \u2014 l'union prend la taille du plus grand membre"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "sizeof(Value) = 36\nint: 42\nfloat: 3.1\nstr: hello\n",
-    "test_code": null
+    "test_code": "void test_union_int_value(void) {\n    Value v;\n    v.type = VAL_INT;\n    v.data.i = 42;\n    TEST_ASSERT_EQUAL_INT(VAL_INT, v.type);\n    TEST_ASSERT_EQUAL_INT(42, v.data.i);\n}\n\nvoid test_union_float_value(void) {\n    Value v;\n    v.type = VAL_FLOAT;\n    v.data.f = 3.14f;\n    TEST_ASSERT_EQUAL_INT(VAL_FLOAT, v.type);\n    TEST_ASSERT_EQUAL_INT(3, (int)v.data.f);\n}\n\nvoid test_union_string_value(void) {\n    Value v;\n    v.type = VAL_STR;\n    snprintf(v.data.s, sizeof(v.data.s), \"hello\");\n    TEST_ASSERT_EQUAL_INT(VAL_STR, v.type);\n    TEST_ASSERT_EQUAL_STRING(\"hello\", v.data.s);\n}\n\nvoid test_union_tag_dispatch(void) {\n    Value vals[3];\n    vals[0].type = VAL_INT;\n    vals[0].data.i = 99;\n    vals[1].type = VAL_FLOAT;\n    vals[1].data.f = 2.71f;\n    vals[2].type = VAL_STR;\n    snprintf(vals[2].data.s, sizeof(vals[2].data.s), \"world\");\n    TEST_ASSERT_EQUAL_INT(99, vals[0].data.i);\n    TEST_ASSERT_EQUAL_INT(2, (int)vals[1].data.f);\n    TEST_ASSERT_EQUAL_STRING(\"world\", vals[2].data.s);\n}\n\nint main(void) {\n    RUN_TEST(test_union_int_value);\n    RUN_TEST(test_union_float_value);\n    RUN_TEST(test_union_string_value);\n    RUN_TEST(test_union_tag_dispatch);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

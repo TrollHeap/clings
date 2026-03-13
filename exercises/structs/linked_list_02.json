@@ -13,9 +13,10 @@
     "print_backward : partir de tail, suivre prev jusqu'à NULL"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "Forward  : 0 1 2 3 \nBackward : 3 2 1 0 \n",
-    "test_code": null
+    "test_code": "void test_insert_back(void) {\n    DList list = {NULL, NULL};\n    insert_back(&list, 1);\n    insert_back(&list, 2);\n    insert_back(&list, 3);\n    TEST_ASSERT_NOT_NULL(list.head);\n    TEST_ASSERT_NOT_NULL(list.tail);\n    TEST_ASSERT_EQUAL_INT(1, list.head->val);\n    TEST_ASSERT_EQUAL_INT(3, list.tail->val);\n    free_list(&list);\n}\n\nvoid test_insert_front(void) {\n    DList list = {NULL, NULL};\n    insert_back(&list, 1);\n    insert_back(&list, 2);\n    insert_front(&list, 0);\n    TEST_ASSERT_EQUAL_INT(0, list.head->val);\n    TEST_ASSERT_EQUAL_INT(2, list.tail->val);\n    TEST_ASSERT_NOT_NULL(list.head->next);\n    TEST_ASSERT_EQUAL_INT(1, list.head->next->val);\n    free_list(&list);\n}\n\nvoid test_forward_traversal(void) {\n    DList list = {NULL, NULL};\n    insert_back(&list, 10);\n    insert_back(&list, 20);\n    insert_back(&list, 30);\n    int vals[3] = {10, 20, 30};\n    int i = 0;\n    for (DNode *c = list.head; c; c = c->next) {\n        TEST_ASSERT_EQUAL_INT(vals[i], c->val);\n        i++;\n    }\n    TEST_ASSERT_EQUAL_INT(3, i);\n    free_list(&list);\n}\n\nvoid test_backward_traversal(void) {\n    DList list = {NULL, NULL};\n    insert_back(&list, 100);\n    insert_back(&list, 200);\n    insert_back(&list, 300);\n    int vals[3] = {300, 200, 100};\n    int i = 0;\n    for (DNode *c = list.tail; c; c = c->prev) {\n        TEST_ASSERT_EQUAL_INT(vals[i], c->val);\n        i++;\n    }\n    TEST_ASSERT_EQUAL_INT(3, i);\n    free_list(&list);\n}\n\nint main(void) {\n    RUN_TEST(test_insert_back);\n    RUN_TEST(test_insert_front);\n    RUN_TEST(test_forward_traversal);\n    RUN_TEST(test_backward_traversal);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

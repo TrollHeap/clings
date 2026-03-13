@@ -5,17 +5,17 @@
   "difficulty": 1,
   "title": "pthread_create et pthread_join",
   "description": "NSY103 — pthread_create() lance un thread d'exécution. pthread_join() attend sa terminaison et récupère sa valeur de retour. Le thread exécute une fonction de signature void *(*)(void *).\n\nCréez un thread qui affiche un message, puis attendez-le dans le main.",
-  "starter_code": "#include <stdio.h>\n#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    printf(\"Hello from thread!\\n\");\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tid;\n    pthread_create(&tid, NULL, ____, NULL);\n    ____(tid, NULL);\n    printf(\"Thread joined.\\n\");\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    printf(\"Hello from thread!\\n\");\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tid;\n    pthread_create(&tid, NULL, thread_func, NULL);\n    pthread_join(tid, NULL);\n    printf(\"Thread joined.\\n\");\n    return 0;\n}",
+  "starter_code": "#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    /* TODO: cast arg if needed and do something */\n    (void)arg;\n    return NULL;\n}",
+  "solution_code": "#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    return NULL;\n}",
   "hints": [
     "pthread_create prend 4 arguments : &tid, attributs (NULL), fonction, argument (NULL)",
     "La fonction thread doit avoir la signature void *(*)(void *)",
     "pthread_join(tid, NULL) bloque jusqu'à la fin du thread"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "Hello from thread!\nThread joined.\n",
-    "test_code": null
+    "mode": "test",
+    "expected_tests_pass": 3,
+    "test_code": "void test_thread_func_returns_null(void) {\n    void *result = thread_func(NULL);\n    TEST_ASSERT_NULL(result);\n}\n\nvoid test_create_and_join_success(void) {\n    pthread_t tid;\n    int rc = pthread_create(&tid, NULL, thread_func, NULL);\n    TEST_ASSERT_EQUAL_INT(0, rc);\n    int join_rc = pthread_join(tid, NULL);\n    TEST_ASSERT_EQUAL_INT(0, join_rc);\n}\n\nvoid test_join_after_create(void) {\n    pthread_t tid;\n    if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {\n        int result = pthread_join(tid, NULL);\n        TEST_ASSERT_EQUAL_INT(0, result);\n    }\n}\n\nint main(void) {\n    RUN_TEST(test_thread_func_returns_null);\n    RUN_TEST(test_create_and_join_success);\n    RUN_TEST(test_join_after_create);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -64,10 +64,10 @@
   "common_mistake": "Oublier pthread_join → le main peut se terminer avant le thread",
   "kc_ids": ["KC-C09"],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Lancer un thread qui calcule un carré\n * ========================================================= */\nvoid *example_square(void *arg) {\n    int val = *(int *)arg;\n    printf(\"Square: %d\\n\", val * val);\n    return NULL;\n}\nvoid example_demo(void) {\n    pthread_t t;\n    int num = 7;\n    pthread_create(&t, NULL, example_square, &num);\n    pthread_join(t, NULL);\n    printf(\"Done.\\n\");\n}\n/* Resultat: Square: 49 puis Done. */\n\n/* == VOTRE EXERCICE ========================================\n * Créez un thread qui affiche \"Hello from thread!\"\n * puis attendez-le et affichez \"Thread joined.\"\n * ========================================================= */\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    printf(\"Hello from thread!\\n\");\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tid;\n    /* TODO: pthread_create(&tid, NULL, thread_func, NULL); */\n    /* TODO: pthread_join(tid, NULL); */\n    printf(\"Thread joined.\\n\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    printf(\"Hello from thread!\\n\");\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tid;\n    pthread_create(&tid, NULL, thread_func, NULL);\n    ____(tid, NULL);  // attendre le thread\n    printf(\"Thread joined.\\n\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    printf(\"Hello from thread!\\n\");\n    return NULL;\n}\n\nint main(void) {\n    pthread_t tid;\n    pthread_create(&tid, NULL, ____, NULL);\n    ____(tid, NULL);\n    printf(\"Thread joined.\\n\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <pthread.h>\n\n// Écrivez thread_func qui affiche \"Hello from thread!\"\n// Dans main: créez le thread, attendez-le, affichez \"Thread joined.\"\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n#include <pthread.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <pthread.h>\n\n/* == EXEMPLE ===============================================\n * Fonction thread simple qui retourne NULL\n * ========================================================= */\nvoid *example_func(void *arg) {\n    (void)arg;\n    return NULL;\n}\n/* Resultat: fonction qui retourne NULL */\n\n/* == VOTRE EXERCICE ========================================\n * Implémentez thread_func(void *arg)\n * Retournez NULL\n * ========================================================= */\n\nvoid *thread_func(void *arg) {\n    /* TODO: return NULL */\n    (void)arg;\n    return NULL;\n}",
+    "#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    /* TODO: do something with arg or ignore it */\n    (void)arg;\n    return NULL;\n}",
+    "#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    /* TODO: implement thread function body */\n    return NULL;\n}",
+    "#include <pthread.h>\n\n/* thread_func qui accepte void *arg et retourne NULL */\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    return NULL;\n}",
+    "#include <pthread.h>\n\nvoid *thread_func(void *arg) {\n    (void)arg;\n    return NULL;\n}"
   ]
 }

@@ -13,9 +13,10 @@
     "L'initialisation imbriquée utilise des accolades imbriquées : `.adresse = { .rue = ... }`"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "Nom : Alice Dupont\nAge : 28\nRue : 12 rue de la Paix\nVille : Paris (75001)\n",
-    "test_code": null
+    "test_code": "void test_nested_struct_init(void) {\n    Personne p = {\n        .nom = \"Alice Dupont\",\n        .age = 28,\n        .adresse = {\n            .rue = \"12 rue de la Paix\",\n            .ville = \"Paris\",\n            .code_postal = 75001\n        }\n    };\n    TEST_ASSERT_EQUAL_INT(28, p.age);\n    TEST_ASSERT_EQUAL_INT(75001, p.adresse.code_postal);\n}\n\nvoid test_nested_access_via_pointer(void) {\n    Personne p = {\n        .nom = \"Bob Martin\",\n        .age = 35,\n        .adresse = {\n            .rue = \"42 rue de Lyon\",\n            .ville = \"Lyon\",\n            .code_postal = 69000\n        }\n    };\n    Personne *ptr = &p;\n    TEST_ASSERT_EQUAL_INT(35, ptr->age);\n    TEST_ASSERT_EQUAL_INT(69000, ptr->adresse.code_postal);\n}\n\nvoid test_nested_string_access(void) {\n    Personne p = {\n        .nom = \"Charlie\",\n        .age = 42,\n        .adresse = {\n            .rue = \"100 rue de Marseille\",\n            .ville = \"Marseille\",\n            .code_postal = 13000\n        }\n    };\n    Personne *ptr = &p;\n    TEST_ASSERT_EQUAL_STRING(\"Marseille\", ptr->adresse.ville);\n}\n\nvoid test_modify_nested_field(void) {\n    Personne p = {\n        .nom = \"Diana\",\n        .age = 30,\n        .adresse = {\n            .rue = \"1 rue de Bretagne\",\n            .ville = \"Brest\",\n            .code_postal = 29200\n        }\n    };\n    p.adresse.code_postal = 29000;\n    p.age = 31;\n    TEST_ASSERT_EQUAL_INT(31, p.age);\n    TEST_ASSERT_EQUAL_INT(29000, p.adresse.code_postal);\n}\n\nint main(void) {\n    RUN_TEST(test_nested_struct_init);\n    RUN_TEST(test_nested_access_via_pointer);\n    RUN_TEST(test_nested_string_access);\n    RUN_TEST(test_modify_nested_field);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

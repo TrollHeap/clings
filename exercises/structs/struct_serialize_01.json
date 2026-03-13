@@ -13,9 +13,10 @@
     "`fread(recs, sizeof(Record), max, f)` retourne le nombre de structs lues"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "Written: 3 records\nRead: 3 records\nAlice, 25, 92.5\nBob, 30, 87.3\nCharlie, 22, 95.1\nIntegrity: 1\n",
-    "test_code": null
+    "test_code": "void test_write_records(void) {\n    Record data[] = {{\"Alice\", 25, 92.5f}, {\"Bob\", 30, 87.3f}, {\"Charlie\", 22, 95.1f}};\n    const char *path = \"/tmp/test_records.bin\";\n    int w = write_records(path, data, 3);\n    TEST_ASSERT_EQUAL_INT(3, w);\n    remove(path);\n}\n\nvoid test_read_records(void) {\n    Record data[] = {{\"Alice\", 25, 92.5f}, {\"Bob\", 30, 87.3f}, {\"Charlie\", 22, 95.1f}};\n    const char *path = \"/tmp/test_read.bin\";\n    write_records(path, data, 3);\n    Record loaded[3] = {0};\n    int r = read_records(path, loaded, 3);\n    TEST_ASSERT_EQUAL_INT(3, r);\n    remove(path);\n}\n\nvoid test_serialize_integrity(void) {\n    Record data[] = {{\"Alice\", 25, 92.5f}, {\"Bob\", 30, 87.3f}, {\"Charlie\", 22, 95.1f}};\n    const char *path = \"/tmp/test_integrity.bin\";\n    write_records(path, data, 3);\n    Record loaded[3] = {0};\n    read_records(path, loaded, 3);\n    int cmp = memcmp(data, loaded, sizeof(data)) == 0;\n    TEST_ASSERT_TRUE(cmp);\n    remove(path);\n}\n\nvoid test_single_record(void) {\n    Record single = {\"TestUser\", 40, 85.5f};\n    const char *path = \"/tmp/test_single.bin\";\n    write_records(path, &single, 1);\n    Record loaded = {0};\n    int r = read_records(path, &loaded, 1);\n    TEST_ASSERT_EQUAL_INT(1, r);\n    TEST_ASSERT_EQUAL_INT(40, loaded.age);\n    TEST_ASSERT_EQUAL_INT(85, (int)loaded.score);\n    remove(path);\n}\n\nint main(void) {\n    RUN_TEST(test_write_records);\n    RUN_TEST(test_read_records);\n    RUN_TEST(test_serialize_integrity);\n    RUN_TEST(test_single_record);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

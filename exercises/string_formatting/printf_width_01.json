@@ -5,17 +5,17 @@
   "difficulty": 1,
   "title": "Largeur et alignement printf",
   "description": "NSY103 — La largeur minimale dans printf contrôle l'espace occupé par une valeur. %10d aligne à droite sur 10 caractères, %-10d aligne à gauche. %0Nd remplit de zéros.\n\nAffichez des valeurs avec différentes largeurs et alignements.",
-  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    int a = 42, b = 1234, c = 7;\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", b);\n    printf(\"[____]\\n\", c);\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", b);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\nint main(void) {\n    int a = 42, b = 1234, c = 7;\n    printf(\"[%10d]\\n\", a);\n    printf(\"[%-10d]\\n\", a);\n    printf(\"[%10d]\\n\", b);\n    printf(\"[%-10d]\\n\", c);\n    printf(\"[%06d]\\n\", a);\n    printf(\"[%06d]\\n\", b);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}",
+  "solution_code": "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}",
   "hints": [
     "%10d → aligné à droite sur 10 caractères (espaces à gauche)",
     "%-10d → aligné à gauche sur 10 caractères (espaces à droite)",
     "%06d → rempli de zéros sur 6 chiffres"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "[        42]\n[42        ]\n[      1234]\n[7         ]\n[000042]\n[001234]\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_right_align(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[        42]\"));\n}\n\nvoid test_left_align(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[42        ]\"));\n}\n\nvoid test_zero_fill(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[000042]\"));\n    TEST_ASSERT_TRUE(strstr(buf, \"[001234]\"));\n}\n\nvoid test_large_value(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[      1234]\"));\n}\n\nint main(void) {\n    RUN_TEST(test_right_align);\n    RUN_TEST(test_left_align);\n    RUN_TEST(test_zero_fill);\n    RUN_TEST(test_large_value);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,52 +23,95 @@
       {
         "label": "Alignement à droite (%10d)",
         "stack": [
-          {"name": "format", "value": "\"%10d\""},
-          {"name": "a=42", "value": "[        42]"}
+          {
+            "name": "format",
+            "value": "\"%10d\""
+          },
+          {
+            "name": "a=42",
+            "value": "[        42]"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "format_width",
+            "args": "buf, sz",
+            "is_active": true
+          }
+        ],
         "explanation": "%10d réserve 10 positions, remplit d'espaces à gauche",
         "step_label": "1. Droite"
       },
       {
         "label": "Alignement à gauche (%-10d)",
         "stack": [
-          {"name": "format", "value": "\"%-10d\""},
-          {"name": "a=42", "value": "[42        ]"}
+          {
+            "name": "format",
+            "value": "\"%-10d\""
+          },
+          {
+            "name": "a=42",
+            "value": "[42        ]"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "format_width",
+            "args": "buf, sz",
+            "is_active": true
+          }
+        ],
         "explanation": "Le flag '-' force l'alignement à gauche",
         "step_label": "2. Gauche"
       },
       {
         "label": "Remplissage zéros (%06d)",
         "stack": [
-          {"name": "format", "value": "\"%06d\""},
-          {"name": "a=42", "value": "[000042]"},
-          {"name": "b=1234", "value": "[001234]"}
+          {
+            "name": "format",
+            "value": "\"%06d\""
+          },
+          {
+            "name": "a=42",
+            "value": "[000042]"
+          },
+          {
+            "name": "b=1234",
+            "value": "[001234]"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "format_width",
+            "args": "buf, sz",
+            "is_active": true
+          }
+        ],
         "explanation": "Le flag '0' remplace les espaces par des zéros",
         "step_label": "3. Zéros"
       }
     ]
   },
-  "prerequisites": ["printf-formats-01"],
+  "prerequisites": [
+    "printf-formats-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "%Nd largeur minimale, %-Nd alignement gauche, %0Nd zero-fill — contrôle total de la mise en forme",
   "common_mistake": "Confondre %-10d (gauche) et %10d (droite) — le signe '-' inverse l'alignement",
-  "kc_ids": ["KC-C05"],
+  "kc_ids": [
+    "KC-C05"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Largeurs et alignements avec printf\n * %8d = droite, %-8d = gauche, %05d = zero-fill\n * =========================================================== */\nvoid example_width(void) {\n    int x = 99, y = 5678;\n    printf(\"[%8d]\\n\", x);    /* [      99] */\n    printf(\"[%-8d]\\n\", x);   /* [99      ] */\n    printf(\"[%05d]\\n\", y);   /* [05678]   */\n}\n\n/* == VOTRE EXERCICE =========================================\n * a=42, b=1234, c=7\n * Largeur 10 droite/gauche, puis zero-fill 06\n * =========================================================== */\n\nint main(void) {\n    int a = 42, b = 1234, c = 7;\n    printf(\"[%10d]\\n\", 0);  /* TODO: a, droite */\n    printf(\"[%-10d]\\n\", 0); /* TODO: a, gauche */\n    printf(\"[%10d]\\n\", 0);  /* TODO: b, droite */\n    printf(\"[%-10d]\\n\", 0); /* TODO: c, gauche */\n    printf(\"[%06d]\\n\", 0);  /* TODO: a, zero-fill */\n    printf(\"[%06d]\\n\", 0);  /* TODO: b, zero-fill */\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    int a = 42, b = 1234, c = 7;\n    printf(\"[%10d]\\n\", a);\n    printf(\"[%-10d]\\n\", a);\n    printf(\"[____]\\n\", b);   // droite, largeur 10\n    printf(\"[____]\\n\", c);   // gauche, largeur 10\n    printf(\"[%06d]\\n\", a);\n    printf(\"[____]\\n\", b);   // zero-fill, largeur 6\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    int a = 42, b = 1234, c = 7;\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", b);\n    printf(\"[____]\\n\", c);\n    printf(\"[____]\\n\", a);\n    printf(\"[____]\\n\", b);\n    return 0;\n}",
-    "#include <stdio.h>\n\n// a=42, b=1234, c=7\n// Lignes 1-2: a droite/gauche largeur 10\n// Lignes 3-4: b droite/c gauche largeur 10\n// Lignes 5-6: a/b zero-fill largeur 6\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Largeurs et alignements avec snprintf\n * %8d = droite, %-8d = gauche, %05d = zero-fill\n * =========================================================== */\nvoid example_width(char *buf, size_t sz) {\n    int x = 99, y = 5678;\n    char out[128];\n    snprintf(out, sizeof(out), \"[%8d]\\n[%-8d]\\n[%05d]\\n\", x, x, y);\n    snprintf(buf, sz, \"%s\", out);\n}\n\n/* == VOTRE EXERCICE =========================================\n * a=42, b=1234, c=7\n * Largeur 10 droite/gauche, puis zero-fill 06\n * =========================================================== */\n\nvoid format_width(char *buf, size_t sz) {\n    /* TODO: implementation */\n}",
+    "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[____]\\n[____]\\n[%06d]\\n[____]\\n\",\n             a, a, ____, ____, a, ____);\n}",
+    "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[____]\\n[____]\\n[____]\\n[____]\\n[____]\\n[____]\\n\",\n             ____, ____, ____, ____, ____, ____);\n}",
+    "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    (void)buf; (void)sz;\n}",
+    "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n}"
   ]
 }

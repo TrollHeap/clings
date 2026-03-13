@@ -5,8 +5,8 @@
   "difficulty": 4,
   "title": "aligned_alloc et contraintes d'alignement",
   "description": "NSY103 — Certaines op\u00e9rations (SIMD, DMA, cache lines) requi\u00e8rent des adresses align\u00e9es sur des puissances de 2 sp\u00e9cifiques. `aligned_alloc(alignment, size)` (C11) alloue de la m\u00e9moire avec un alignement garanti. L'alignement doit \u00eatre une puissance de 2 et size doit \u00eatre un multiple de alignment.\n\nD\u00e9montrez les diff\u00e9rences d'alignement entre malloc et aligned_alloc.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <stdint.h>\n\nint is_aligned(void *ptr, size_t alignment) {\n    /* TODO: return ((uintptr_t)ptr % alignment) == 0 */\n    return 0;\n}"
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <stdint.h>\n\nint is_aligned(void *ptr, size_t alignment) {\n    return ((uintptr_t)ptr % alignment) == 0;\n}"
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <stdint.h>\n\nint is_aligned(void *ptr, size_t alignment) {\n    /* TODO: return ((uintptr_t)ptr % alignment) == 0 */\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <stdint.h>\n\nint is_aligned(void *ptr, size_t alignment) {\n    return ((uintptr_t)ptr % alignment) == 0;\n}",
   "hints": [
     "`is_aligned` : un pointeur est align\u00e9 sur N si `(uintptr_t)ptr % N == 0`",
     "`aligned_alloc(64, size)` : l'alignement (64) doit \u00eatre une puissance de 2, et size un multiple de l'alignement",

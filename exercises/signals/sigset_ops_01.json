@@ -5,17 +5,17 @@
   "difficulty": 2,
   "title": "Manipulation de sigset_t",
   "description": "NSY103 — sigset_t est un ensemble de signaux (bitmask). Les fonctions sigemptyset, sigfullset, sigaddset, sigdelset, sigismember permettent de manipuler cet ensemble.\n\nConstituez un masque incluant SIGINT, SIGTERM, SIGCHLD, puis testez sigismember.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
-  "starter_code": "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    ____(____);  // initialise à vide\n    ____(____,  SIGINT);\n    ____(____,  SIGTERM);\n    ____(____,  SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM);  // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <signal.h>\nint main(void) {\n    sigset_t set;\n    sigemptyset(&set);\n    sigaddset(&set, SIGINT);\n    sigaddset(&set, SIGTERM);\n    sigaddset(&set, SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    sigdelset(&set, SIGTERM);\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
+  "starter_code": "#include <signal.h>\n\n/* Test mode: no main() needed */",
+  "solution_code": "#include <signal.h>\n\n/* Test mode: sigset operations are tested directly */",
   "hints": [
     "sigemptyset(&set); // initialise à vide — TOUJOURS faire en premier",
     "sigaddset(&set, SIGINT); // ajoute SIGINT",
     "sigismember(&set, SIGTERM) retourne 1 si présent, 0 sinon"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "SIGINT  membre: 1\nSIGTERM membre: 1\nSIGCHLD membre: 1\nSIGKILL membre: 0\nSIGUSR1 membre: 0\nSIGTERM apres del: 0\n",
-    "test_code": null
+    "mode": "test",
+    "expected_tests_pass": 5,
+    "test_code": "void test_sigemptyset_makes_empty(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigaddset_adds_signal(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigaddset_multiple(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    sigaddset(&s, SIGTERM);\n    sigaddset(&s, SIGCHLD);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGTERM));\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGCHLD));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGKILL));\n}\n\nvoid test_sigdelset_removes_signal(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    sigaddset(&s, SIGTERM);\n    sigdelset(&s, SIGTERM);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigismember_not_in_empty_set(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGUSR1));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGKILL));\n}\n\nint main(void) {\n    RUN_TEST(test_sigemptyset_makes_empty);\n    RUN_TEST(test_sigaddset_adds_signal);\n    RUN_TEST(test_sigaddset_multiple);\n    RUN_TEST(test_sigdelset_removes_signal);\n    RUN_TEST(test_sigismember_not_in_empty_set);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,7 +23,10 @@
       {
         "label": "sigemptyset — set vide",
         "stack": [
-          {"name": "set", "value": "0x0000...0000 (tous bits à 0)"}
+          {
+            "name": "set",
+            "value": "0x0000...0000 (tous bits à 0)"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -31,9 +34,18 @@
       {
         "label": "sigaddset SIGINT(2), SIGTERM(15), SIGCHLD(17)",
         "stack": [
-          {"name": "set", "value": "bit2=1, bit15=1, bit17=1"},
-          {"name": "SIGKILL(9)", "value": "bit9=0 → membre: 0"},
-          {"name": "SIGUSR1(10)", "value": "bit10=0 → membre: 0"}
+          {
+            "name": "set",
+            "value": "bit2=1, bit15=1, bit17=1"
+          },
+          {
+            "name": "SIGKILL(9)",
+            "value": "bit9=0 → membre: 0"
+          },
+          {
+            "name": "SIGUSR1(10)",
+            "value": "bit10=0 → membre: 0"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -41,24 +53,34 @@
       {
         "label": "sigdelset SIGTERM(15)",
         "stack": [
-          {"name": "set", "value": "bit15=0 (retiré)"},
-          {"name": "SIGTERM membre", "value": "0"}
+          {
+            "name": "set",
+            "value": "bit15=0 (retiré)"
+          },
+          {
+            "name": "SIGTERM membre",
+            "value": "0"
+          }
         ],
         "heap": [],
         "arrows": []
       }
     ]
   },
-  "prerequisites": ["signal-constants-01"],
+  "prerequisites": [
+    "signal-constants-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "sigemptyset vide l'ensemble, sigaddset ajoute, sigismember teste — ce sont des opérations bit à bit",
   "common_mistake": "Oublier sigemptyset() avant de commencer — sigset_t non initialisée a un contenu aléatoire",
-  "kc_ids": ["KC-C08"],
+  "kc_ids": [
+    "KC-C08"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <signal.h>\n\n/* == EXEMPLE =======================================\n * Approche inverse : sigfillset + sigdelset\n * sigfillset remplit tous les signaux, puis on\n * retire ceux qu'on ne veut pas.\n * ================================================= */\nvoid example_inverse_mask(void) {\n    sigset_t full;\n    sigfillset(&full);\n    sigdelset(&full, SIGUSR1);\n    sigdelset(&full, SIGUSR2);\n    printf(\"SIGINT  dans full: %d\\n\", sigismember(&full, SIGINT));\n    printf(\"SIGUSR1 dans full: %d\\n\", sigismember(&full, SIGUSR1));\n    printf(\"SIGUSR2 dans full: %d\\n\", sigismember(&full, SIGUSR2));\n}\n/* Resultat: SIGINT=1, SIGUSR1=0, SIGUSR2=0 */\n\n/* == VOTRE EXERCICE ================================\n * Approche additive : sigemptyset + sigaddset\n * Inspirez-vous de example_inverse_mask ci-dessus.\n * Partez d'un set vide, ajoutez SIGINT/SIGTERM/SIGCHLD,\n * testez, puis supprimez SIGTERM.\n * ================================================= */\nint main(void) {\n    sigset_t set;\n    /* TODO: sigemptyset(&set); */\n    /* TODO: sigaddset SIGINT, SIGTERM, SIGCHLD */\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    /* TODO: sigdelset(&set, SIGTERM); */\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    sigemptyset(&set);\n    sigaddset(&set, SIGINT);\n    sigaddset(&set, SIGTERM);\n    sigaddset(&set, SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM); // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    sigset_t set;\n    ____(____);  // initialise à vide\n    ____(____,  SIGINT);\n    ____(____,  SIGTERM);\n    ____(____,  SIGCHLD);\n    printf(\"SIGINT  membre: %d\\n\", sigismember(&set, SIGINT));\n    printf(\"SIGTERM membre: %d\\n\", sigismember(&set, SIGTERM));\n    printf(\"SIGCHLD membre: %d\\n\", sigismember(&set, SIGCHLD));\n    printf(\"SIGKILL membre: %d\\n\", sigismember(&set, SIGKILL));\n    printf(\"SIGUSR1 membre: %d\\n\", sigismember(&set, SIGUSR1));\n    ____(____,  SIGTERM);  // supprimer SIGTERM\n    printf(\"SIGTERM apres del: %d\\n\", sigismember(&set, SIGTERM));\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    // sigset_t set; sigemptyset d'abord\n    // Ajouter SIGINT, SIGTERM, SIGCHLD\n    // Tester avec sigismember: SIGINT/SIGTERM/SIGCHLD=1, SIGKILL/SIGUSR1=0\n    // sigdelset(SIGTERM), retester SIGTERM=0\n    return 0;\n}",
-    "#include <stdio.h>\n#include <signal.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <signal.h>\n\n/* Test mode: understand sigemptyset, sigaddset, sigdelset, sigismember */\n",
+    "#include <signal.h>\n\n/* Empty set: sigemptyset(&set) */\n",
+    "#include <signal.h>\n\n/* Add signals: sigaddset(&set, SIG...) */\n",
+    "#include <signal.h>\n\n/* Test and delete: sigismember, sigdelset */\n",
+    "#include <signal.h>\n"
   ]
 }

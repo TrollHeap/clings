@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Conversion robuste avec strtol",
   "description": "NSY103 — strtol est la méthode robuste pour convertir des chaînes en entiers. Contrairement à atoi, elle détecte les erreurs via endptr et gère les bases (10, 16, 8, 2). errno doit être vérifié pour détecter les dépassements.\n\nConvertissez des chaînes en entiers avec strtol en vérifiant les erreurs.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <errno.h>\n\nint main(void) {\n    char *endptr;\n    char *s1 = \"12345\";\n    char *s2 = \"0xFF\";\n    char *s3 = \"42abc\";\n    char *s4 = \"hello\";\n    long v1 = ____(s1, &endptr, 10);\n    printf(\"s1: %ld (rest='%s')\\n\", v1, endptr);\n    long v2 = ____(s2, &endptr, 16);\n    printf(\"s2: %ld (rest='%s')\\n\", v2, endptr);\n    long v3 = ____(s3, &endptr, 10);\n    printf(\"s3: %ld (rest='%s')\\n\", v3, endptr);\n    long v4 = strtol(s4, &endptr, 10);\n    printf(\"s4: %ld (rest='%s') %s\\n\", v4, endptr, (endptr == s4) ? \"FAIL\" : \"OK\");\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <errno.h>\n\nint main(void) {\n    char *endptr;\n    char *s1 = \"12345\";\n    char *s2 = \"0xFF\";\n    char *s3 = \"42abc\";\n    char *s4 = \"hello\";\n    long v1 = strtol(s1, &endptr, 10);\n    printf(\"s1: %ld (rest='%s')\\n\", v1, endptr);\n    long v2 = strtol(s2, &endptr, 16);\n    printf(\"s2: %ld (rest='%s')\\n\", v2, endptr);\n    long v3 = strtol(s3, &endptr, 10);\n    printf(\"s3: %ld (rest='%s')\\n\", v3, endptr);\n    long v4 = strtol(s4, &endptr, 10);\n    printf(\"s4: %ld (rest='%s') %s\\n\", v4, endptr, (endptr == s4) ? \"FAIL\" : \"OK\");\n    return 0;\n}",
+  "starter_code": "#include <stdlib.h>\n#include <string.h>\n\nint safe_strtol(const char *s, int base, long *out) {\n    char *endptr;\n    long val = ____(s, &endptr, base);\n    if (endptr == s) return 0;  /* No conversion */\n    *out = val;\n    return 1;  /* Success */\n}",
+  "solution_code": "#include <stdlib.h>\n#include <string.h>\n\nint safe_strtol(const char *s, int base, long *out) {\n    char *endptr;\n    long val = strtol(s, &endptr, base);\n    if (endptr == s) return 0;  /* No conversion */\n    *out = val;\n    return 1;  /* Success */\n}",
   "hints": [
     "strtol(str, &endptr, base) — endptr pointe vers le premier caractère non parsé",
     "Si endptr == str, aucun chiffre n'a été lu (erreur)",
     "Base 16 pour l'hexadécimal, base 10 pour le décimal"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "s1: 12345 (rest='')\ns2: 255 (rest='')\ns3: 42 (rest='abc')\ns4: 0 (rest='hello') FAIL\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_decimal(void) {\n    long val;\n    int res = safe_strtol(\"12345\", 10, &val);\n    TEST_ASSERT_EQUAL_INT(1, res);\n    TEST_ASSERT_EQUAL_INT(12345, val);\n}\n\nvoid test_hex(void) {\n    long val;\n    int res = safe_strtol(\"0xFF\", 16, &val);\n    TEST_ASSERT_EQUAL_INT(1, res);\n    TEST_ASSERT_EQUAL_INT(255, val);\n}\n\nvoid test_partial(void) {\n    long val;\n    int res = safe_strtol(\"42abc\", 10, &val);\n    TEST_ASSERT_EQUAL_INT(1, res);\n    TEST_ASSERT_EQUAL_INT(42, val);\n}\n\nvoid test_invalid(void) {\n    long val = 999;\n    int res = safe_strtol(\"hello\", 10, &val);\n    TEST_ASSERT_EQUAL_INT(0, res);\n    TEST_ASSERT_EQUAL_INT(999, val);\n}\n\nint main(void) {\n    RUN_TEST(test_decimal);\n    RUN_TEST(test_hex);\n    RUN_TEST(test_partial);\n    RUN_TEST(test_invalid);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

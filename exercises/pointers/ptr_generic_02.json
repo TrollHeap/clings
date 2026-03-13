@@ -5,17 +5,17 @@
   "difficulty": 4,
   "title": "Dispatch table de pointeurs de fonctions",
   "description": "NSY103 — Une dispatch table est un tableau de pointeurs de fonctions indexé par un identifiant. C'est le mécanisme qui sous-tend les vtables en C++ et les syscall tables du noyau Linux.\n\nImplémentez une calculatrice avec une dispatch table de 4 opérations (+, -, *, /) indexées par un enum.",
-  "starter_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nstatic const char *op_names[] = {\"+\", \"-\", \"*\", \"/\"};\n\ntypedef ____ (*OpFunc)(int, int);\n\nint main(void) {\n    OpFunc dispatch[____] = {____, ____, ____, ____};\n    int pairs[][2] = {{10, 3}, {20, 4}, {7, 2}, {15, 5}};\n\n    for (int op = 0; op < OP_COUNT; op++) {\n        int a = pairs[op][0], b = pairs[op][1];\n        int result = ____;\n        printf(\"%d %s %d = %d\\n\", a, op_names[op], b, result);\n    }\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nstatic const char *op_names[] = {\"+\", \"-\", \"*\", \"/\"};\n\ntypedef int (*OpFunc)(int, int);\n\nint main(void) {\n    OpFunc dispatch[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    int pairs[][2] = {{10, 3}, {20, 4}, {7, 2}, {15, 5}};\n\n    for (int op = 0; op < OP_COUNT; op++) {\n        int a = pairs[op][0], b = pairs[op][1];\n        int result = dispatch[op](a, b);\n        printf(\"%d %s %d = %d\\n\", a, op_names[op], b, result);\n    }\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n",
+  "solution_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n",
   "hints": [
     "typedef pour simplifier : `typedef int (*OpFunc)(int, int);`",
     "La dispatch table est un tableau : `OpFunc dispatch[OP_COUNT] = {op_add, op_sub, ...};`",
     "Appeler via la table : `dispatch[op](a, b)` — l'index sélectionne la fonction"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "10 + 3 = 13\n20 - 4 = 16\n7 * 2 = 14\n15 / 5 = 3\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "typedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\ntypedef int (*OpFunc)(int, int);\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nOpFunc get_dispatch_table(void);\n\nvoid test_dispatch_add(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(13, table[OP_ADD](10, 3));\n}\n\nvoid test_dispatch_sub(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(16, table[OP_SUB](20, 4));\n}\n\nvoid test_dispatch_mul(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(14, table[OP_MUL](7, 2));\n}\n\nvoid test_dispatch_div(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(3, table[OP_DIV](15, 5));\n}\n\nint main(void) {\n    RUN_TEST(test_dispatch_add);\n    RUN_TEST(test_dispatch_sub);\n    RUN_TEST(test_dispatch_mul);\n    RUN_TEST(test_dispatch_div);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,20 +23,52 @@
       {
         "label": "Dispatch table initialisée",
         "stack": [
-          {"name": "dispatch[0]", "value": "→op_add"},
-          {"name": "dispatch[1]", "value": "→op_sub"},
-          {"name": "dispatch[2]", "value": "→op_mul"},
-          {"name": "dispatch[3]", "value": "→op_div"}
+          {
+            "name": "dispatch[0]",
+            "value": "→op_add"
+          },
+          {
+            "name": "dispatch[1]",
+            "value": "→op_sub"
+          },
+          {
+            "name": "dispatch[2]",
+            "value": "→op_mul"
+          },
+          {
+            "name": "dispatch[3]",
+            "value": "→op_div"
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "dispatch[0]", "to": "op_add", "label": "OP_ADD"},
-          {"from": "dispatch[1]", "to": "op_sub", "label": "OP_SUB"},
-          {"from": "dispatch[2]", "to": "op_mul", "label": "OP_MUL"},
-          {"from": "dispatch[3]", "to": "op_div", "label": "OP_DIV"}
+          {
+            "from": "dispatch[0]",
+            "to": "op_add",
+            "label": "OP_ADD"
+          },
+          {
+            "from": "dispatch[1]",
+            "to": "op_sub",
+            "label": "OP_SUB"
+          },
+          {
+            "from": "dispatch[2]",
+            "to": "op_mul",
+            "label": "OP_MUL"
+          },
+          {
+            "from": "dispatch[3]",
+            "to": "op_div",
+            "label": "OP_DIV"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "dispatch[] est un tableau de pointeurs de fonctions. Chaque entrée stocke l'adresse d'une fonction. L'enum sert d'index : OP_ADD=0, OP_SUB=1, etc.",
         "step_label": "Dispatch table — 4 pointeurs de fonctions"
@@ -44,29 +76,57 @@
       {
         "label": "Appel dispatch[OP_MUL](7, 2)",
         "stack": [
-          {"name": "op", "value": "2 (OP_MUL)"},
-          {"name": "a", "value": "7"},
-          {"name": "b", "value": "2"},
-          {"name": "result", "value": "14"}
+          {
+            "name": "op",
+            "value": "2 (OP_MUL)"
+          },
+          {
+            "name": "a",
+            "value": "7"
+          },
+          {
+            "name": "b",
+            "value": "2"
+          },
+          {
+            "name": "result",
+            "value": "14"
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "dispatch[2]", "to": "op_mul", "label": "call"}
+          {
+            "from": "dispatch[2]",
+            "to": "op_mul",
+            "label": "call"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": false},
-          {"function_name": "op_mul", "args": "7, 2", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": false
+          },
+          {
+            "function_name": "op_mul",
+            "args": "7, 2",
+            "is_active": true
+          }
         ],
         "explanation": "dispatch[2](7, 2) appelle op_mul(7, 2) = 14. L'indirection via la table permet de sélectionner la fonction au runtime — même mécanisme que les syscalls du noyau.",
         "step_label": "dispatch[2](7,2) → op_mul → 14"
       }
     ]
   },
-  "prerequisites": ["ptr-generic-01"],
+  "prerequisites": [
+    "ptr-generic-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Un tableau de pointeurs de fonctions indexé par enum forme une dispatch table — O(1) lookup",
   "common_mistake": "Oublier les parenthèses dans le typedef : `int (*OpFunc)(int,int)` vs `int *OpFunc(int,int)`",
-  "kc_ids": ["KC-C01"],
+  "kc_ids": [
+    "KC-C01"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Dispatch table pour conversions de temperature\n * Un tableau de pointeurs de fonctions indexe par enum.\n * =========================================================== */\ntypedef enum { CONV_C_TO_F, CONV_F_TO_C, CONV_COUNT } ConvType;\ntypedef double (*ConvFunc)(double);\n\ndouble c_to_f(double c) { return c * 9.0 / 5.0 + 32.0; }\ndouble f_to_c(double f) { return (f - 32.0) * 5.0 / 9.0; }\n\nvoid example_demo(void) {\n    ConvFunc table[CONV_COUNT] = {c_to_f, f_to_c};\n    printf(\"100C = %.1fF\\n\", table[CONV_C_TO_F](100.0));\n    printf(\"212F = %.1fC\\n\", table[CONV_F_TO_C](212.0));\n}\n/* Resultat: 100C = 212.0F / 212F = 100.0C */\n\n/* == VOTRE EXERCICE =========================================\n * Dispatch table pour calculatrice (+, -, *, /)\n * Inspirez-vous de example_demo ci-dessus.\n * Utilisez un enum Op et un tableau OpFunc dispatch[].\n * =========================================================== */\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nstatic const char *op_names[] = {\"+\", \"-\", \"*\", \"/\"};\ntypedef int (*OpFunc)(int, int);\n\nint main(void) {\n    /* TODO: creer dispatch table, appeler pour chaque paire */\n    int pairs[][2] = {{10, 3}, {20, 4}, {7, 2}, {15, 5}};\n    (void)pairs;\n    return 0;\n}",
     "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nstatic const char *op_names[] = {\"+\", \"-\", \"*\", \"/\"};\ntypedef int (*OpFunc)(int, int);\n\nint main(void) {\n    OpFunc dispatch[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    int pairs[][2] = {{10, 3}, {20, 4}, {7, 2}, {15, 5}};\n\n    for (int op = 0; op < OP_COUNT; op++) {\n        int a = pairs[op][0], b = pairs[op][1];\n        int result = ____; // appeler via dispatch table\n        printf(\"%d %s %d = %d\\n\", a, op_names[op], b, result);\n    }\n    return 0;\n}",

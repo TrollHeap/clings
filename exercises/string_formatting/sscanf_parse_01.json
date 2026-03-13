@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Parser une chaîne structurée avec sscanf",
   "description": "NSY103 — sscanf(str, fmt, &var1, &var2, ...) parse une chaîne selon un format. C'est l'inverse de sprintf.\n\nParsez une ligne de log format : '2026-03-02 14:30:05 [INFO] pid=42 cpu=87'",
-  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = sscanf(log, ____,\n                   ____, ____, ____, ____, ____, ____, ____, ____);\n    if (n == 8) {\n        printf(\"Date: %04d/%02d/%02d\\n\", year, month, day);\n        printf(\"Heure: %02d:%02d:%02d\\n\", hour, min, sec);\n        printf(\"PID: %d\\n\", pid);\n        printf(\"CPU: %d%%\\n\", cpu);\n    } else {\n        printf(\"Parse error: got %d fields\\n\", n);\n    }\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\nint main(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = sscanf(log, \"%d-%d-%d %d:%d:%d %*s pid=%d cpu=%d\",\n                   &year, &month, &day, &hour, &min, &sec, &pid, &cpu);\n    if (n == 8) {\n        printf(\"Date: %04d/%02d/%02d\\n\", year, month, day);\n        printf(\"Heure: %02d:%02d:%02d\\n\", hour, min, sec);\n        printf(\"PID: %d\\n\", pid);\n        printf(\"CPU: %d%%\\n\", cpu);\n    } else {\n        printf(\"Parse error: got %d fields\\n\", n);\n    }\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nint parse_log(const char *log, int *year, int *month, int *day,\n              int *hour, int *min, int *sec, int *pid, int *cpu) {\n    return sscanf(log, ____,\n                  ____, ____, ____, ____, ____, ____, ____, ____);\n}",
+  "solution_code": "#include <stdio.h>\n\nint parse_log(const char *log, int *year, int *month, int *day,\n              int *hour, int *min, int *sec, int *pid, int *cpu) {\n    return sscanf(log, \"%d-%d-%d %d:%d:%d %*s pid=%d cpu=%d\",\n                  year, month, day, hour, min, sec, pid, cpu);\n}",
   "hints": [
     "Pour une date : sscanf(s, \"%d-%d-%d\", &year, &month, &day);",
     "Pour skip un mot : utiliser %*s (ignore le champ sans stocker)",
     "Vérifier le retour de sscanf == nombre d'items attendus"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "Date: 2026/03/02\nHeure: 14:30:05\nPID: 42\nCPU: 87%\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_parse_basic(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);\n    TEST_ASSERT_EQUAL_INT(8, n);\n    TEST_ASSERT_EQUAL_INT(2026, year);\n    TEST_ASSERT_EQUAL_INT(3, month);\n}\n\nvoid test_parse_day(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);\n    TEST_ASSERT_EQUAL_INT(8, n);\n    TEST_ASSERT_EQUAL_INT(2, day);\n    TEST_ASSERT_EQUAL_INT(14, hour);\n}\n\nvoid test_parse_time(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);\n    TEST_ASSERT_EQUAL_INT(30, min);\n    TEST_ASSERT_EQUAL_INT(5, sec);\n    TEST_ASSERT_EQUAL_INT(8, n);\n}\n\nvoid test_parse_pid_cpu(void) {\n    char *log = \"2026-03-02 14:30:05 [INFO] pid=42 cpu=87\";\n    int year, month, day, hour, min, sec, pid, cpu;\n    int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);\n    TEST_ASSERT_EQUAL_INT(42, pid);\n    TEST_ASSERT_EQUAL_INT(87, cpu);\n    TEST_ASSERT_EQUAL_INT(8, n);\n}\n\nint main(void) {\n    RUN_TEST(test_parse_basic);\n    RUN_TEST(test_parse_day);\n    RUN_TEST(test_parse_time);\n    RUN_TEST(test_parse_pid_cpu);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

@@ -141,7 +141,8 @@ pub fn load_all_exercises() -> Result<ExerciseSet> {
         if filename == "annales_map.json" || filename == "kc_error_map.json" {
             continue;
         }
-        let file = EmbeddedExercises::get(p).unwrap();
+        let file = EmbeddedExercises::get(p)
+            .ok_or_else(|| KfError::Config(format!("embedded file missing: {p}")))?;
         let text = std::str::from_utf8(file.data.as_ref())
             .map_err(|e| KfError::Config(format!("UTF-8 invalide {p}: {e}")))?;
         match serde_json::from_str::<Exercise>(text) {

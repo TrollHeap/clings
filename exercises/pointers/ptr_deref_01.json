@@ -5,17 +5,17 @@
   "difficulty": 1,
   "title": "Déclarer et déréférencer un pointeur",
   "description": "NSY103 — Un pointeur est une variable qui stocke une adresse mémoire. L'opérateur `&` donne l'adresse d'une variable, `*` accède à la valeur pointée.\n\nDéclarez un entier `x = 42`, un pointeur `p` vers `x`, puis affichez la valeur via le pointeur.",
-  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    int x = 42;\n    ____ *p = ____;\n    printf(\"Valeur de x : %d\\n\", ____);\n    printf(\"Valeur via *p : %d\\n\", ____);\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\nint main(void) {\n    int x = 42;\n    int *p = &x;\n    printf(\"Valeur de x : %d\\n\", x);\n    printf(\"Valeur via *p : %d\\n\", *p);\n    printf(\"Adresses egales : %d\\n\", (p == &x));\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return 0;\n}\n\nvoid set_value(int *p, int val) {\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return *p;\n}\n\nvoid set_value(int *p, int val) {\n    *p = val;\n}\n",
   "hints": [
     "Pour déclarer un pointeur vers int : `int *p;`",
     "Pour obtenir l'adresse de x : `p = &x;`",
     "Pour lire la valeur via le pointeur : `printf(\"%d\", *p);`"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "Valeur de x : 42\nValeur via *p : 42\nAdresses egales : 1\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_get_value(void) {\n    int x = 42;\n    TEST_ASSERT_EQUAL_INT(42, get_value(&x));\n}\n\nvoid test_set_value(void) {\n    int x = 0;\n    set_value(&x, 99);\n    TEST_ASSERT_EQUAL_INT(99, x);\n}\n\nvoid test_get_after_set(void) {\n    int x = 10;\n    set_value(&x, 20);\n    TEST_ASSERT_EQUAL_INT(20, get_value(&x));\n}\n\nvoid test_negative_value(void) {\n    int x = -50;\n    TEST_ASSERT_EQUAL_INT(-50, get_value(&x));\n}\n\nint main(void) {\n    RUN_TEST(test_get_value);\n    RUN_TEST(test_set_value);\n    RUN_TEST(test_get_after_set);\n    RUN_TEST(test_negative_value);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

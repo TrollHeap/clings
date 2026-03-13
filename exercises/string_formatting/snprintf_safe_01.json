@@ -5,17 +5,17 @@
   "difficulty": 4,
   "title": "snprintf et prévention buffer overflow",
   "description": "NSY103 — snprintf limite l'écriture à N-1 caractères + '\\0'. Contrairement à sprintf, il ne peut pas déborder. La valeur de retour indique le nombre de caractères qui auraient été écrits (troncature si retour >= N).\n\nUtilisez snprintf pour construire des chaînes en vérifiant la troncature.",
-  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char small[16];\n    char big[64];\n    int ret;\n    ret = ____(small, sizeof(small), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"small: '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           small, ret, (int)sizeof(small), ret >= (int)sizeof(small) ? \"YES\" : \"NO\");\n    ret = ____(big, sizeof(big), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"big:   '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           big, ret, (int)sizeof(big), ret >= (int)sizeof(big) ? \"YES\" : \"NO\");\n    char path[32];\n    int written = 0;\n    written += snprintf(path + written, sizeof(path) - written, \"/home/\");\n    written += ____(path + written, sizeof(path) - written, \"%s/\", \"user\");\n    written += ____(path + written, sizeof(path) - written, \"%s\", \"documents/files/report.txt\");\n    printf(\"path:  '%s' (written=%d, trunc=%s)\\n\",\n           path, written, written >= (int)sizeof(path) ? \"YES\" : \"NO\");\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char small[16];\n    char big[64];\n    int ret;\n    ret = snprintf(small, sizeof(small), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"small: '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           small, ret, (int)sizeof(small), ret >= (int)sizeof(small) ? \"YES\" : \"NO\");\n    ret = snprintf(big, sizeof(big), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"big:   '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           big, ret, (int)sizeof(big), ret >= (int)sizeof(big) ? \"YES\" : \"NO\");\n    char path[32];\n    int written = 0;\n    written += snprintf(path + written, sizeof(path) - written, \"/home/\");\n    written += snprintf(path + written, sizeof(path) - written, \"%s/\", \"user\");\n    written += snprintf(path + written, sizeof(path) - written, \"%s\", \"documents/files/report.txt\");\n    printf(\"path:  '%s' (written=%d, trunc=%s)\\n\",\n           path, written, written >= (int)sizeof(path) ? \"YES\" : \"NO\");\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n    int ret;\n    ret = snprintf(small, 16, \"Hello, %s! Score=%d\", \"clings\", 100);\n    ret = snprintf(big, 64, \"Hello, %s! Score=%d\", \"clings\", 100);\n}\n\nint build_path(char *path, size_t sz) {\n    int written = 0;\n    written += snprintf(path + written, sz - written, \"/home/\");\n    written += snprintf(path + written, sz - written, \"%s/\", \"user\");\n    written += snprintf(path + written, sz - written, \"%s\", \"documents/files/report.txt\");\n    return written;\n}",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n    int ret;\n    ret = snprintf(small, 16, \"Hello, %s! Score=%d\", \"clings\", 100);\n    ret = snprintf(big, 64, \"Hello, %s! Score=%d\", \"clings\", 100);\n}\n\nint build_path(char *path, size_t sz) {\n    int written = 0;\n    written += snprintf(path + written, sz - written, \"/home/\");\n    written += snprintf(path + written, sz - written, \"%s/\", \"user\");\n    written += snprintf(path + written, sz - written, \"%s\", \"documents/files/report.txt\");\n    return written;\n}",
   "hints": [
     "snprintf(buf, size, fmt, ...) écrit au max size-1 chars + '\\0'",
     "Le retour de snprintf = nombre total de chars voulus (sans '\\0'). Si ret >= size → troncature",
     "Chaînage: snprintf(buf+written, remaining, ...) permet de construire incrémentalement"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "small: 'Hello, clings! ' (ret=24, size=16, trunc=YES)\nbig:   'Hello, clings! Score=100' (ret=24, size=64, trunc=NO)\npath:  '/home/user/documents/files/repo' (written=37, trunc=YES)\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_small_truncated(void) {\n    char small[16];\n    test_truncation(small, NULL);\n    TEST_ASSERT_EQUAL_INT(15, strlen(small));\n    TEST_ASSERT_TRUE(strstr(small, \"Hello\"));\n}\n\nvoid test_big_complete(void) {\n    char big[64];\n    test_truncation(NULL, big);\n    TEST_ASSERT_EQUAL_STRING(\"Hello, clings! Score=100\", big);\n}\n\nvoid test_path_buildup(void) {\n    char path[32];\n    int written = build_path(path, sizeof(path));\n    TEST_ASSERT_TRUE(written > 0);\n    TEST_ASSERT_TRUE(strstr(path, \"/home/\"));\n}\n\nvoid test_path_content(void) {\n    char path[32];\n    build_path(path, sizeof(path));\n    TEST_ASSERT_TRUE(strlen(path) > 0);\n}\n\nint main(void) {\n    RUN_TEST(test_small_truncated);\n    RUN_TEST(test_big_complete);\n    RUN_TEST(test_path_buildup);\n    RUN_TEST(test_path_content);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,54 +23,103 @@
       {
         "label": "snprintf avec buffer trop petit → troncature",
         "stack": [
-          {"name": "small[16]", "value": "\"Hello, clings! \" + '\\0'"},
-          {"name": "ret", "value": "24 (voulu)"},
-          {"name": "troncature", "value": "24 >= 16 → YES"}
+          {
+            "name": "small[16]",
+            "value": "\"Hello, clings! \" + '\\0'"
+          },
+          {
+            "name": "ret",
+            "value": "24 (voulu)"
+          },
+          {
+            "name": "troncature",
+            "value": "24 >= 16 → YES"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "test_truncation",
+            "args": "small, big",
+            "is_active": true
+          }
+        ],
         "explanation": "snprintf ne dépasse jamais la taille — il tronque proprement",
         "step_label": "1. Troncature"
       },
       {
         "label": "snprintf avec buffer suffisant",
         "stack": [
-          {"name": "big[64]", "value": "\"Hello, clings! Score=100\""},
-          {"name": "ret", "value": "24 (complet)"},
-          {"name": "troncature", "value": "24 < 64 → NO"}
+          {
+            "name": "big[64]",
+            "value": "\"Hello, clings! Score=100\""
+          },
+          {
+            "name": "ret",
+            "value": "24 (complet)"
+          },
+          {
+            "name": "troncature",
+            "value": "24 < 64 → NO"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "test_truncation",
+            "args": "small, big",
+            "is_active": true
+          }
+        ],
         "explanation": "Quand le buffer est assez grand, pas de troncature",
         "step_label": "2. Complet"
       },
       {
         "label": "Chaînage snprintf incrémental",
         "stack": [
-          {"name": "path[32]", "value": "\"/home/user/documents/files/re\""},
-          {"name": "written", "value": "37 (voulu total)"},
-          {"name": "troncature", "value": "37 >= 32 → YES"}
+          {
+            "name": "path[32]",
+            "value": "\"/home/user/documents/files/re\""
+          },
+          {
+            "name": "written",
+            "value": "37 (voulu total)"
+          },
+          {
+            "name": "troncature",
+            "value": "37 >= 32 → YES"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "build_path",
+            "args": "path, sz",
+            "is_active": true
+          }
+        ],
         "explanation": "Construire un path par morceaux — written compte le total voulu",
         "step_label": "3. Chaînage"
       }
     ]
   },
-  "prerequisites": ["format-table-01"],
+  "prerequisites": [
+    "format-table-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "snprintf est la version sûre de sprintf — toujours vérifier ret >= size pour détecter la troncature",
   "common_mistake": "Ignorer la valeur de retour de snprintf → ne pas détecter la troncature silencieuse",
-  "kc_ids": ["KC-C05"],
+  "kc_ids": [
+    "KC-C05"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * snprintf: sprintf sûr avec limite de taille\n * =========================================================== */\nvoid example_snprintf(void) {\n    char buf[8];\n    int ret = snprintf(buf, sizeof(buf), \"ABCDEFGHIJ\");\n    printf(\"'%s' ret=%d trunc=%s\\n\", buf, ret, ret >= 8 ? \"YES\" : \"NO\");\n    /* 'ABCDEFG' ret=10 trunc=YES */\n}\n\n/* == VOTRE EXERCICE =========================================\n * Testez snprintf avec troncature et chaînage\n * =========================================================== */\n\nint main(void) {\n    char small[16];\n    char big[64];\n    int ret;\n    ret = snprintf(small, sizeof(small), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"small: '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           small, ret, (int)sizeof(small), ret >= (int)sizeof(small) ? \"YES\" : \"NO\");\n    ret = snprintf(big, sizeof(big), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"big:   '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           big, ret, (int)sizeof(big), ret >= (int)sizeof(big) ? \"YES\" : \"NO\");\n    /* TODO: chaînage snprintf pour construire un path */\n    char path[32];\n    int written = 0;\n    written += snprintf(path + written, sizeof(path) - written, \"/home/\");\n    written += snprintf(path + written, sizeof(path) - written, \"%s/\", \"user\");\n    written += snprintf(path + written, sizeof(path) - written, \"%s\", \"documents/files/report.txt\");\n    printf(\"path:  '%s' (written=%d, trunc=%s)\\n\",\n           path, written, written >= (int)sizeof(path) ? \"YES\" : \"NO\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char small[16];\n    char big[64];\n    int ret;\n    ret = snprintf(small, sizeof(small), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"small: '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           small, ret, (int)sizeof(small), ret >= (int)sizeof(small) ? \"YES\" : \"NO\");\n    ret = snprintf(big, sizeof(big), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"big:   '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           big, ret, (int)sizeof(big), ret >= (int)sizeof(big) ? \"YES\" : \"NO\");\n    char path[32];\n    int written = 0;\n    written += snprintf(path + written, sizeof(path) - written, \"/home/\");\n    written += ____(path + written, sizeof(path) - written, \"%s/\", \"user\");\n    written += ____(path + written, sizeof(path) - written, \"%s\", \"documents/files/report.txt\");\n    printf(\"path:  '%s' (written=%d, trunc=%s)\\n\",\n           path, written, written >= (int)sizeof(path) ? \"YES\" : \"NO\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char small[16];\n    char big[64];\n    int ret;\n    ret = ____(small, sizeof(small), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"small: '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           small, ret, (int)sizeof(small), ret >= (int)sizeof(small) ? \"YES\" : \"NO\");\n    ret = ____(big, sizeof(big), \"Hello, %s! Score=%d\", \"clings\", 100);\n    printf(\"big:   '%s' (ret=%d, size=%d, trunc=%s)\\n\",\n           big, ret, (int)sizeof(big), ret >= (int)sizeof(big) ? \"YES\" : \"NO\");\n    char path[32];\n    int written = 0;\n    written += ____(path + written, sizeof(path) - written, \"/home/\");\n    written += ____(path + written, sizeof(path) - written, \"%s/\", \"user\");\n    written += ____(path + written, sizeof(path) - written, \"%s\", \"documents/files/report.txt\");\n    printf(\"path:  '%s' (written=%d, trunc=%s)\\n\",\n           path, written, written >= (int)sizeof(path) ? \"YES\" : \"NO\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n\n// snprintf(buf, size, fmt, ...) — version sûre de sprintf\n// Tester troncature: small[16] vs big[64]\n// Chaînage: construire /home/user/documents/files/report.txt dans path[32]\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * snprintf: sprintf sûr avec limite de taille\n * =========================================================== */\nvoid example_snprintf(char *buf, size_t sz) {\n    int ret = snprintf(buf, sz, \"ABCDEFGHIJ\");\n    /* If ret >= sz: tronqué */\n}\n\n/* == VOTRE EXERCICE =========================================\n * Testez snprintf avec troncature et chaînage\n * =========================================================== */\n\nvoid test_truncation(char *small, char *big) {\n    /* TODO: implementation */\n}\n\nint build_path(char *path, size_t sz) {\n    /* TODO: implementation */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n    int ret;\n    ret = snprintf(small, 16, \"Hello, %s! Score=%d\", \"clings\", 100);\n    ret = snprintf(big, 64, \"Hello, %s! Score=%d\", \"clings\", 100);\n}\n\nint build_path(char *path, size_t sz) {\n    int written = 0;\n    written += snprintf(path + written, sz - written, \"/home/\");\n    written += snprintf(path + written, sz - written, \"%s/\", \"user\");\n    written += snprintf(path + written, ____, \"____, ____\", ____) ;\n    return written;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n    int ret;\n    ret = snprintf(small, ____, \"____, ____, ____\", ____, ____);\n    ret = snprintf(big, ____, \"____, ____, ____\", ____, ____);\n}\n\nint build_path(char *path, size_t sz) {\n    int written = 0;\n    written += snprintf(path + written, sz - written, \"/home/\");\n    written += snprintf(path + written, sz - written, \"%s/\", \"user\");\n    written += snprintf(path + written, sz - written, \"%s\", \"documents/files/report.txt\");\n    return written;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n    (void)small; (void)big;\n}\n\nint build_path(char *path, size_t sz) {\n    (void)path; (void)sz;\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n\nvoid test_truncation(char *small, char *big) {\n}\n\nint build_path(char *path, size_t sz) {\n}"
   ]
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.0.0] — 2026-03-13
+
+### Remédiation audit — HIGH findings
+
+- **DRY `handle_search_key()`** : 65 lignes dupliquées entre `update_watch()` et `update_piscine()` extraites dans un helper statique retournant `bool` ; les callers gèrent les effets de bord (load exercice, save checkpoint)
+- **DRY `handle_vis_key()`** : bloc visualiseur dupliqué remplacé par un helper dédié dans les deux modes
+- **Erreurs silencieuses checkpoints** : 10+ `let _ = save_piscine_checkpoint(…)` / `let _ = save_exam_checkpoint(…)` remplacés par `self.save_checkpoint(conn, session_id, idx)` — logue les erreurs via `eprintln!`
+- **Triple scan HashMap O(n)** : 3 itérations `review_map.values().filter(…).count()` par frame dans `ui_watch.rs` remplacées par `state.due_count()` (méthode sur `AppState`)
+- **Allocation zéro par frame** : `mini_map()` et `render_visualizer_overlay()` dans `common.rs` — `Vec<&str>` intermédiaire remplacé par `String::with_capacity` + `push_str`
+- **Panic sur embedded file** : `.unwrap()` dans `exercises.rs` remplacé par `ok_or_else()?` — erreur propagée proprement
+
+---
+
 ## [2.9.9] — 2026-03-13
 
 ### TUI — Finalisation série v2.9.x

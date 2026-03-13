@@ -5,8 +5,8 @@
   "difficulty": 1,
   "title": "strdup maison : malloc + strcpy",
   "description": "NSY103 — `strdup` alloue de la m\u00e9moire avec `malloc` et y copie une cha\u00eene. Bien que POSIX, elle n'est pas dans le standard C. Impl\u00e9menter sa propre version enseigne le calcul de taille (`strlen+1` pour le '\\0') et le pattern allocation+copie.\n\nImpl\u00e9mentez `my_strdup` et d\u00e9montrez que la copie est ind\u00e9pendante de l'original.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    /* TODO: malloc(strlen(src)+1), strcpy, return */\n    return NULL;\n}"
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}"
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    /* TODO: malloc(strlen(src)+1), strcpy, return */\n    return NULL;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *my_strdup(const char *src) {\n    size_t len = strlen(src);\n    char *dst = malloc(len + 1);\n    if (!dst) return NULL;\n    strcpy(dst, src);\n    return dst;\n}",
   "hints": [
     "`malloc(len + 1)` : le +1 est pour le terminateur '\\0'",
     "`strcpy(dst, src)` copie la cha\u00eene y compris le '\\0'",

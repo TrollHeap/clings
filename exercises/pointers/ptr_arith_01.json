@@ -5,17 +5,17 @@
   "difficulty": 2,
   "title": "Arithmétique de pointeurs sur tableau",
   "description": "NSY103 — L'arithmétique de pointeurs permet de parcourir des tableaux efficacement. `p + i` pointe vers le i-ième élément après p.\n\nComplétez `sum_array()` qui additionne les éléments d'un tableau `int[]` via arithmétique de pointeurs (sans crochets `[]`).",
-  "starter_code": "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    int sum = ____;\n    for (int i = 0; i < ____; i++) {\n        sum += ____;\n    }\n    return sum;\n}\n\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\nint sum_array(const int *arr, int n) {\n    int sum = 0;\n    for (int i = 0; i < n; i++) {\n        sum += *(arr + i);\n    }\n    return sum;\n}\nint main(void) {\n    int nums[] = {10, 20, 30, 40, 50};\n    int total = sum_array(nums, 5);\n    printf(\"Somme : %d\\n\", total);\n    printf(\"Element 2 : %d\\n\", *(nums + 2));\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint sum_array(const int *arr, int n) {\n    int sum = 0;\n    for (int i = 0; i < n; i++) {\n        sum += *(arr + i);\n    }\n    return sum;\n}\n",
   "hints": [
     "Dans la boucle, utilisez `*(arr + i)` pour accéder à l'élément i",
     "La condition d'arrêt : `i < n`",
     "Initialisez `sum = 0` avant la boucle"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "Somme : 150\nElement 2 : 30\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_sum_empty(void) {\n    int arr[] = {0};\n    TEST_ASSERT_EQUAL_INT(0, sum_array(arr, 0));\n}\n\nvoid test_sum_single(void) {\n    int arr[] = {42};\n    TEST_ASSERT_EQUAL_INT(42, sum_array(arr, 1));\n}\n\nvoid test_sum_multiple(void) {\n    int arr[] = {10, 20, 30, 40, 50};\n    TEST_ASSERT_EQUAL_INT(150, sum_array(arr, 5));\n}\n\nvoid test_sum_negative(void) {\n    int arr[] = {-5, 10, -3};\n    TEST_ASSERT_EQUAL_INT(2, sum_array(arr, 3));\n}\n\nint main(void) {\n    RUN_TEST(test_sum_empty);\n    RUN_TEST(test_sum_single);\n    RUN_TEST(test_sum_multiple);\n    RUN_TEST(test_sum_negative);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

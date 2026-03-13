@@ -5,8 +5,8 @@
   "difficulty": 1,
   "title": "calloc vs malloc : z\u00e9ro-initialisation",
   "description": "NSY103 — `calloc(n, size)` alloue `n * size` octets et les initialise \u00e0 z\u00e9ro, contrairement \u00e0 `malloc` qui laisse la m\u00e9moire non initialis\u00e9e. calloc v\u00e9rifie aussi le d\u00e9bordement de `n * size`.\n\nComparez le comportement de malloc et calloc sur un tableau d'entiers.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    /* TODO: return calloc(n, sizeof(int)) */\n    return NULL;\n}"
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    return (int *)calloc(n, sizeof(int));\n}"
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    /* TODO: return calloc(n, sizeof(int)) */\n    return NULL;\n}",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint *alloc_zeros(int n) {\n    return (int *)calloc(n, sizeof(int));\n}",
   "hints": [
     "`calloc(n, sizeof(int))` \u00e9quivaut \u00e0 `malloc(n * sizeof(int))` + `memset(ptr, 0, n * sizeof(int))`",
     "calloc prot\u00e8ge contre le d\u00e9bordement de `n * size` (retourne NULL si overflow)",

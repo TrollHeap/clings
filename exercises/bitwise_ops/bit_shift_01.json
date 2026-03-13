@@ -5,17 +5,17 @@
   "difficulty": 1,
   "title": "Décalages gauche/droite",
   "description": "NSY103 — Les décalages bit-à-bit multiplient (<< par 2^n) ou divisent (>> par 2^n). Fondamentaux pour l'optimisation, la manipulation de registres et l'extraction de champs.\n\nCalculez des décalages et vérifiez l'équivalence avec la multiplication/division.",
-  "starter_code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0x15;\n    printf(\"val      = %u (0x%02X)\\n\", val, val);\n    printf(\"val << 1 = %u (0x%02X)\\n\", val ____ 1, val ____ 1);\n    printf(\"val << 4 = %u (0x%02X)\\n\", val ____ 4, val ____ 4);\n    printf(\"val >> 1 = %u (0x%02X)\\n\", val ____ 1, val ____ 1);\n    printf(\"val >> 3 = %u (0x%02X)\\n\", val ____ 3, val ____ 3);\n    printf(\"1 << 0   = %u\\n\", 1 << 0);\n    printf(\"1 << 3   = %u\\n\", 1 << 3);\n    printf(\"1 << 7   = %u\\n\", 1 << 7);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0x15;\n    printf(\"val      = %u (0x%02X)\\n\", val, val);\n    printf(\"val << 1 = %u (0x%02X)\\n\", val << 1, val << 1);\n    printf(\"val << 4 = %u (0x%02X)\\n\", val << 4, val << 4);\n    printf(\"val >> 1 = %u (0x%02X)\\n\", val >> 1, val >> 1);\n    printf(\"val >> 3 = %u (0x%02X)\\n\", val >> 3, val >> 3);\n    printf(\"1 << 0   = %u\\n\", 1 << 0);\n    printf(\"1 << 3   = %u\\n\", 1 << 3);\n    printf(\"1 << 7   = %u\\n\", 1 << 7);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int power_of_two(int n) {\n    return 0;\n}",
+  "solution_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}",
   "hints": [
     "<< décale les bits vers la gauche (multiplie par 2^n)",
     ">> décale les bits vers la droite (divise par 2^n)",
     "1 << n donne 2^n — utile pour créer des masques de bit"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "val      = 21 (0x15)\nval << 1 = 42 (0x2A)\nval << 4 = 336 (0x150)\nval >> 1 = 10 (0x0A)\nval >> 3 = 2 (0x02)\n1 << 0   = 1\n1 << 3   = 8\n1 << 7   = 128\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_shift_left(void) {\n    TEST_ASSERT_EQUAL_INT(42, shift_left(0x15, 1));\n    TEST_ASSERT_EQUAL_INT(336, shift_left(0x15, 4));\n    TEST_ASSERT_EQUAL_INT(160, shift_left(0x50, 1));\n    TEST_ASSERT_EQUAL_INT(8, shift_left(2, 2));\n}\n\nvoid test_shift_right(void) {\n    TEST_ASSERT_EQUAL_INT(10, shift_right(0x15, 1));\n    TEST_ASSERT_EQUAL_INT(2, shift_right(0x15, 3));\n    TEST_ASSERT_EQUAL_INT(127, shift_right(0xFF, 1));\n    TEST_ASSERT_EQUAL_INT(0, shift_right(0x01, 2));\n}\n\nvoid test_power_of_two(void) {\n    TEST_ASSERT_EQUAL_INT(1, power_of_two(0));\n    TEST_ASSERT_EQUAL_INT(8, power_of_two(3));\n    TEST_ASSERT_EQUAL_INT(128, power_of_two(7));\n    TEST_ASSERT_EQUAL_INT(256, power_of_two(8));\n}\n\nint main(void) {\n    RUN_TEST(test_shift_left);\n    RUN_TEST(test_shift_right);\n    RUN_TEST(test_power_of_two);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 3
   },
   "visualizer": {
     "type": "stack_heap",
@@ -29,7 +29,7 @@
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [{"function_name": "shift_left", "args": "0x15, 1", "is_active": true}],
         "explanation": "<< N multiplie par 2^N — les bits sortent par la gauche",
         "step_label": "1. Gauche"
       },
@@ -42,7 +42,7 @@
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [{"function_name": "shift_right", "args": "0x15, 1", "is_active": true}],
         "explanation": ">> N divise par 2^N — les bits sortent par la droite (tronqué)",
         "step_label": "2. Droite"
       },
@@ -55,7 +55,7 @@
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [{"function_name": "power_of_two", "args": "3", "is_active": true}],
         "explanation": "Pattern fondamental: 1 << N positionne un seul bit à la position N",
         "step_label": "3. Puissances"
       }
@@ -67,10 +67,10 @@
   "common_mistake": "Décaler un signed int à droite → extension de signe (arithmetic shift) au lieu de zero-fill",
   "kc_ids": ["KC-C04"],
   "starter_code_stages": [
-    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Décalages: << gauche (×2^n), >> droite (÷2^n)\n * =========================================================== */\nvoid example_shifts(void) {\n    unsigned int x = 0x0A; /* 00001010b = 10 */\n    printf(\"x << 2 = %u\\n\", x << 2); /* 40 */\n    printf(\"x >> 1 = %u\\n\", x >> 1); /* 5 */\n    printf(\"1 << 4 = %u\\n\", 1 << 4); /* 16 */\n}\n\n/* == VOTRE EXERCICE =========================================\n * val=0x15 (21), décalez et vérifiez les résultats\n * =========================================================== */\n\nint main(void) {\n    unsigned int val = 0x15;\n    printf(\"val      = %u (0x%02X)\\n\", val, val);\n    printf(\"val << 1 = %u (0x%02X)\\n\", val << 1, val << 1);\n    printf(\"val << 4 = %u (0x%02X)\\n\", val << 4, val << 4);\n    /* TODO: val >> 1, val >> 3, 1 << 0/3/7 */\n    printf(\"val >> 1 = %u (0x%02X)\\n\", val >> 1, val >> 1);\n    printf(\"val >> 3 = %u (0x%02X)\\n\", val >> 3, val >> 3);\n    printf(\"1 << 0   = %u\\n\", 1 << 0);\n    printf(\"1 << 3   = %u\\n\", 1 << 3);\n    printf(\"1 << 7   = %u\\n\", 1 << 7);\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0x15;\n    printf(\"val      = %u (0x%02X)\\n\", val, val);\n    printf(\"val << 1 = %u (0x%02X)\\n\", val << 1, val << 1);\n    printf(\"val << 4 = %u (0x%02X)\\n\", val << 4, val << 4);\n    printf(\"val >> 1 = %u (0x%02X)\\n\", val >> 1, val >> 1);\n    printf(\"val >> 3 = %u (0x%02X)\\n\", val >> 3, val >> 3);\n    printf(\"1 << 0   = %u\\n\", 1 ____ 0);\n    printf(\"1 << 3   = %u\\n\", 1 ____ 3);\n    printf(\"1 << 7   = %u\\n\", 1 ____ 7);\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    unsigned int val = 0x15;\n    printf(\"val      = %u (0x%02X)\\n\", val, val);\n    printf(\"val << 1 = %u (0x%02X)\\n\", val ____ 1, val ____ 1);\n    printf(\"val << 4 = %u (0x%02X)\\n\", val ____ 4, val ____ 4);\n    printf(\"val >> 1 = %u (0x%02X)\\n\", val ____ 1, val ____ 1);\n    printf(\"val >> 3 = %u (0x%02X)\\n\", val ____ 3, val ____ 3);\n    printf(\"1 << 0   = %u\\n\", 1 << 0);\n    printf(\"1 << 3   = %u\\n\", 1 << 3);\n    printf(\"1 << 7   = %u\\n\", 1 << 7);\n    return 0;\n}",
-    "#include <stdio.h>\n\n// val=0x15 (21)\n// Affichez val, val<<1, val<<4, val>>1, val>>3\n// Puis 1<<0, 1<<3, 1<<7\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Décalages: << gauche (×2^n), >> droite (÷2^n)\n * =========================================================== */\nvoid example_shifts(void) {\n    unsigned int x = 0x0A; /* 00001010b = 10 */\n    printf(\"x << 2 = %u\\n\", x << 2); /* 40 */\n    printf(\"x >> 1 = %u\\n\", x >> 1); /* 5 */\n    printf(\"1 << 4 = %u\\n\", 1 << 4); /* 16 */\n}\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}",
+    "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 ____ n;\n}",
+    "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val ____ n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val ____ n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}",
+    "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) { return 0; }\nunsigned int shift_right(unsigned int val, int n) { return 0; }\nunsigned int power_of_two(int n) { return 0; }",
+    "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) { return 0; }\nunsigned int shift_right(unsigned int val, int n) { return 0; }\nunsigned int power_of_two(int n) { return 0; }"
   ]
 }

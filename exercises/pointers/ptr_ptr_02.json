@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Tableau de pointeurs vers chaînes",
   "description": "NSY103 — Un `char *words[]` est un tableau de pointeurs, chaque élément pointant vers une chaîne littérale. C'est la structure de `argv` dans `main(int argc, char *argv[])`.\n\nCréez un tableau de pointeurs vers chaînes, triez-le alphabétiquement avec un tri à bulles, puis affichez le résultat.",
-  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = ____;\n                arr[j] = ____;\n                arr[j + 1] = ____;\n            }\n        }\n    }\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    int n = ____;\n    sort_strings(fruits, n);\n    for (int i = 0; i < n; i++) {\n        printf(\"%s\\n\", ____);\n    }\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = arr[j];\n                arr[j] = arr[j + 1];\n                arr[j + 1] = tmp;\n            }\n        }\n    }\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    int n = 5;\n    sort_strings(fruits, n);\n    for (int i = 0; i < n; i++) {\n        printf(\"%s\\n\", fruits[i]);\n    }\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = arr[j];\n                arr[j] = arr[j + 1];\n                arr[j + 1] = tmp;\n            }\n        }\n    }\n}\n",
   "hints": [
     "On échange les pointeurs (char *), pas les chaînes elles-mêmes — c'est un swap de pointeurs",
     "`strcmp(a, b) > 0` signifie que a vient après b alphabétiquement",
     "`char *fruits[]` est un tableau de pointeurs — chaque élément est une adresse vers une chaîne"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "abricot\nbanane\ncerise\ndatte\nelderberry\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_sort_two_strings(void) {\n    char *arr[] = {\"zebra\", \"apple\"};\n    sort_strings(arr, 2);\n    TEST_ASSERT_EQUAL_STRING(\"apple\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"zebra\", arr[1]);\n}\n\nvoid test_sort_three_strings(void) {\n    char *arr[] = {\"charlie\", \"alpha\", \"bravo\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"alpha\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"bravo\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"charlie\", arr[2]);\n}\n\nvoid test_sort_already_sorted(void) {\n    char *arr[] = {\"aaa\", \"bbb\", \"ccc\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"aaa\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"bbb\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"ccc\", arr[2]);\n}\n\nvoid test_sort_reverse_order(void) {\n    char *arr[] = {\"dog\", \"cat\", \"bat\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"bat\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"cat\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"dog\", arr[2]);\n}\n\nint main(void) {\n    RUN_TEST(test_sort_two_strings);\n    RUN_TEST(test_sort_three_strings);\n    RUN_TEST(test_sort_already_sorted);\n    RUN_TEST(test_sort_reverse_order);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,16 +23,35 @@
       {
         "label": "Tableau de pointeurs — avant tri",
         "stack": [
-          {"name": "fruits[0]", "value": "→\"banane\""},
-          {"name": "fruits[1]", "value": "→\"cerise\""},
-          {"name": "fruits[2]", "value": "→\"abricot\""},
-          {"name": "fruits[3]", "value": "→\"datte\""},
-          {"name": "fruits[4]", "value": "→\"elderberry\""}
+          {
+            "name": "fruits[0]",
+            "value": "→\"banane\""
+          },
+          {
+            "name": "fruits[1]",
+            "value": "→\"cerise\""
+          },
+          {
+            "name": "fruits[2]",
+            "value": "→\"abricot\""
+          },
+          {
+            "name": "fruits[3]",
+            "value": "→\"datte\""
+          },
+          {
+            "name": "fruits[4]",
+            "value": "→\"elderberry\""
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "Chaque fruits[i] est un pointeur (char *) vers une chaîne littérale en mémoire statique. Le tri échange les pointeurs, pas les chaînes.",
         "step_label": "Avant tri — pointeurs vers chaînes littérales"
@@ -40,17 +59,40 @@
       {
         "label": "Swap de pointeurs — fruits[0] et fruits[2]",
         "stack": [
-          {"name": "fruits[0]", "value": "→\"abricot\""},
-          {"name": "fruits[1]", "value": "→\"cerise\""},
-          {"name": "fruits[2]", "value": "→\"banane\""},
-          {"name": "fruits[3]", "value": "→\"datte\""},
-          {"name": "fruits[4]", "value": "→\"elderberry\""}
+          {
+            "name": "fruits[0]",
+            "value": "→\"abricot\""
+          },
+          {
+            "name": "fruits[1]",
+            "value": "→\"cerise\""
+          },
+          {
+            "name": "fruits[2]",
+            "value": "→\"banane\""
+          },
+          {
+            "name": "fruits[3]",
+            "value": "→\"datte\""
+          },
+          {
+            "name": "fruits[4]",
+            "value": "→\"elderberry\""
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": false},
-          {"function_name": "sort_strings", "args": "fruits, 5", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": false
+          },
+          {
+            "function_name": "sort_strings",
+            "args": "fruits, 5",
+            "is_active": true
+          }
         ],
         "explanation": "Le tri à bulles échange les pointeurs via tmp = arr[j]; arr[j] = arr[j+1]; arr[j+1] = tmp. Les chaînes en mémoire ne bougent pas — seuls les pointeurs changent.",
         "step_label": "Swap de pointeurs — pas de copie de chaînes"
@@ -58,27 +100,50 @@
       {
         "label": "Après tri — ordre alphabétique",
         "stack": [
-          {"name": "fruits[0]", "value": "→\"abricot\""},
-          {"name": "fruits[1]", "value": "→\"banane\""},
-          {"name": "fruits[2]", "value": "→\"cerise\""},
-          {"name": "fruits[3]", "value": "→\"datte\""},
-          {"name": "fruits[4]", "value": "→\"elderberry\""}
+          {
+            "name": "fruits[0]",
+            "value": "→\"abricot\""
+          },
+          {
+            "name": "fruits[1]",
+            "value": "→\"banane\""
+          },
+          {
+            "name": "fruits[2]",
+            "value": "→\"cerise\""
+          },
+          {
+            "name": "fruits[3]",
+            "value": "→\"datte\""
+          },
+          {
+            "name": "fruits[4]",
+            "value": "→\"elderberry\""
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "Le tri est terminé. Les pointeurs pointent maintenant dans l'ordre alphabétique. Complexité O(n^2), mais efficace car on ne copie que des pointeurs (8 octets chacun).",
         "step_label": "Après tri — pointeurs réordonnés"
       }
     ]
   },
-  "prerequisites": ["ptr-ptr-01"],
+  "prerequisites": [
+    "ptr-ptr-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "char *arr[] est un tableau de pointeurs — trier les pointeurs est plus rapide que copier les chaînes",
   "common_mistake": "Essayer de copier les chaînes avec = au lieu d'échanger les pointeurs",
-  "kc_ids": ["KC-C01"],
+  "kc_ids": [
+    "KC-C01"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Tableau de pointeurs vers int et tri par selection\n * On echange les pointeurs, pas les valeurs pointees.\n * =========================================================== */\nvoid example_sort_ptrs(int *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        int min_idx = i;\n        for (int j = i + 1; j < n; j++) {\n            if (*arr[j] < *arr[min_idx]) min_idx = j;\n        }\n        int *tmp = arr[i]; arr[i] = arr[min_idx]; arr[min_idx] = tmp;\n    }\n}\nvoid example_demo(void) {\n    int a = 30, b = 10, c = 20;\n    int *ptrs[] = {&a, &b, &c};\n    example_sort_ptrs(ptrs, 3);\n    for (int i = 0; i < 3; i++) printf(\"%d \", *ptrs[i]);\n    printf(\"\\n\");\n}\n/* Resultat: 10 20 30 */\n\n/* == VOTRE EXERCICE =========================================\n * Tableau de pointeurs vers chaines et tri a bulles\n * Utilisez strcmp pour comparer, echangez les pointeurs.\n * =========================================================== */\nvoid sort_strings(char *arr[], int n) {\n    (void)arr; (void)n; /* TODO */\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    int n = 5;\n    sort_strings(fruits, n);\n    for (int i = 0; i < n; i++) printf(\"%s\\n\", fruits[i]);\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = arr[j];\n                arr[j] = ____;\n                arr[j + 1] = ____;\n            }\n        }\n    }\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    int n = 5;\n    sort_strings(fruits, n);\n    for (int i = 0; i < n; i++) printf(\"%s\\n\", fruits[i]);\n    return 0;\n}",

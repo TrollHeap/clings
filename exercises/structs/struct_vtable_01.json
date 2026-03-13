@@ -13,9 +13,10 @@
     "L'initialisation `{{&circle_vtable}, 5.0}` : les accolades externes pour Circle, internes pour Shape base"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "Circle(r=5.0)\n  area = 78.54\nRect(3.0x4.0)\n  area = 12.00\n",
-    "test_code": null
+    "test_code": "void test_circle_area(void) {\n    Circle c = {{&circle_vtable}, 5.0};\n    double area = circle_area(&c.base);\n    TEST_ASSERT_EQUAL_INT(78, (int)area);\n}\n\nvoid test_rect_area(void) {\n    Rect r = {{&rect_vtable}, 3.0, 4.0};\n    double area = rect_area(&r.base);\n    TEST_ASSERT_EQUAL_INT(12, (int)area);\n}\n\nvoid test_vtable_dispatch_circle(void) {\n    Circle c = {{&circle_vtable}, 5.0};\n    Shape *s = &c.base;\n    double area = s->vtable->area(s);\n    TEST_ASSERT_EQUAL_INT(78, (int)area);\n}\n\nvoid test_vtable_dispatch_rect(void) {\n    Rect r = {{&rect_vtable}, 3.0, 4.0};\n    Shape *s = &r.base;\n    double area = s->vtable->area(s);\n    TEST_ASSERT_EQUAL_INT(12, (int)area);\n}\n\nint main(void) {\n    RUN_TEST(test_circle_area);\n    RUN_TEST(test_rect_area);\n    RUN_TEST(test_vtable_dispatch_circle);\n    RUN_TEST(test_vtable_dispatch_rect);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

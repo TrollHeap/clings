@@ -76,6 +76,21 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
     app.state.review_map = review_map;
     app.state.mastery_map = mastery_map;
 
+    // Build subject_order cache (unique subjects in appearance order)
+    let mut seen = std::collections::HashSet::new();
+    app.state.subject_order = app
+        .state
+        .exercises
+        .iter()
+        .filter_map(|ex| {
+            if seen.insert(ex.subject.clone()) {
+                Some(ex.subject.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // ── 3. Ratatui init ────────────────────────────────────────────────
     let mut terminal = ratatui::init();
 

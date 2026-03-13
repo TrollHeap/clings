@@ -5,17 +5,17 @@
   "difficulty": 3,
   "title": "Double pointeur — swap via **pp",
   "description": "NSY103 — Un pointeur vers un pointeur (`int **pp`) permet de modifier un pointeur depuis une fonction. Cela permet par exemple d'implémenter `swap` qui échange réellement les valeurs.\n\nImplémentez `swap(int *a, int *b)` qui échange les valeurs pointées, et démontrez l'utilisation de `int **pp`.",
-  "starter_code": "#include <stdio.h>\n\nvoid swap(____ *a, ____ *b) {\n    int tmp = ____;\n    *a = ____;\n    *b = ____;\n}\n\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(____, ____);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = ____;\n    printf(\"Via **pp : %d\\n\", ____);\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\nint main(void) {\n    int x = 10, y = 20;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres swap : x=%d y=%d\\n\", x, y);\n    int val = 99;\n    int *p = &val;\n    int **pp = &p;\n    printf(\"Via **pp : %d\\n\", **pp);\n    return 0;\n}",
+  "starter_code": "#include <stdio.h>\n\nvoid swap_int_ptr(int **a, int **b) {\n}\n",
+  "solution_code": "#include <stdio.h>\n\nvoid swap_int_ptr(int **a, int **b) {\n    int *tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\n",
   "hints": [
     "Pour swap : `int tmp = *a; *a = *b; *b = tmp;`",
     "Pour déclarer un pointeur vers pointeur : `int **pp = &p;`",
     "`**pp` lit la valeur finale, `*pp` lit le pointeur intermédiaire"
   ],
   "validation": {
-    "mode": "output",
-    "expected_output": "Avant : x=10 y=20\nApres swap : x=20 y=10\nVia **pp : 99\n",
-    "test_code": null
+    "mode": "test",
+    "test_code": "void test_swap_pointers(void) {\n    int x = 10, y = 20;\n    int *p = &x, *q = &y;\n    swap_int_ptr(&p, &q);\n    TEST_ASSERT_EQUAL_INT(20, *p);\n    TEST_ASSERT_EQUAL_INT(10, *q);\n}\n\nvoid test_swap_pointers_negative(void) {\n    int a = -5, b = 15;\n    int *pa = &a, *pb = &b;\n    swap_int_ptr(&pa, &pb);\n    TEST_ASSERT_EQUAL_INT(15, *pa);\n    TEST_ASSERT_EQUAL_INT(-5, *pb);\n}\n\nvoid test_swap_same_pointers(void) {\n    int z = 99;\n    int *p = &z, *q = &z;\n    swap_int_ptr(&p, &q);\n    TEST_ASSERT_EQUAL_INT(99, *p);\n    TEST_ASSERT_EQUAL_INT(99, *q);\n}\n\nvoid test_swap_multiple_times(void) {\n    int x = 1, y = 2;\n    int *p = &x, *q = &y;\n    swap_int_ptr(&p, &q);\n    TEST_ASSERT_EQUAL_INT(2, *p);\n    swap_int_ptr(&p, &q);\n    TEST_ASSERT_EQUAL_INT(1, *p);\n}\n\nint main(void) {\n    RUN_TEST(test_swap_pointers);\n    RUN_TEST(test_swap_pointers_negative);\n    RUN_TEST(test_swap_same_pointers);\n    RUN_TEST(test_swap_multiple_times);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

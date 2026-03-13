@@ -13,9 +13,10 @@
     "`memcmp(&a, &b, sizeof(Marker))` retourne 0 si identiques. Fonctionne car {0} initialise tout (y compris le padding)."
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "a = (10, 20, Alpha)\nb = (10, 20, Alpha)\nEgaux (memcmp) : 1\nApres modif b:\na = (10, 20, Alpha)\nb = (99, 20, Beta)\nEgaux (memcmp) : 0\n",
-    "test_code": null
+    "test_code": "void test_struct_copy(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    TEST_ASSERT_EQUAL_INT(10, b.x);\n    TEST_ASSERT_EQUAL_INT(20, b.y);\n}\n\nvoid test_memcmp_equal(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    int cmp_result = memcmp(&a, &b, sizeof(Marker)) == 0;\n    TEST_ASSERT_TRUE(cmp_result);\n}\n\nvoid test_memcmp_after_modification(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    b.x = 99;\n    int cmp_result = memcmp(&a, &b, sizeof(Marker)) == 0;\n    TEST_ASSERT_FALSE(cmp_result);\n}\n\nvoid test_independent_copies(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    strncpy(b.label, \"Beta\", sizeof(b.label) - 1);\n    b.label[sizeof(b.label) - 1] = '\\0';\n    TEST_ASSERT_EQUAL_STRING(\"Alpha\", a.label);\n    TEST_ASSERT_EQUAL_STRING(\"Beta\", b.label);\n    TEST_ASSERT_EQUAL_INT(10, a.x);\n    TEST_ASSERT_EQUAL_INT(10, b.x);\n}\n\nint main(void) {\n    RUN_TEST(test_struct_copy);\n    RUN_TEST(test_memcmp_equal);\n    RUN_TEST(test_memcmp_after_modification);\n    RUN_TEST(test_independent_copies);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",

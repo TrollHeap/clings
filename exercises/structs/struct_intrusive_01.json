@@ -13,9 +13,10 @@
     "list_add ins\u00e8re en t\u00eate : `node->next = head->next; head->next = node;`"
   ],
   "validation": {
-    "mode": "output",
+    "mode": "test",
     "expected_output": "Task list:\n  pid=300 name=vim\n  pid=200 name=bash\n  pid=100 name=init\noffsetof(Task, link) = 24\nsizeof(Task) = 32\n",
-    "test_code": null
+    "test_code": "void test_container_of_basic(void) {\n    Task t = {100, \"init\", {NULL}};\n    ListNode *node = &t.link;\n    Task *recovered = container_of(node, Task, link);\n    TEST_ASSERT_EQUAL_INT(100, recovered->pid);\n}\n\nvoid test_list_add_single(void) {\n    ListNode head = {NULL};\n    Task t1 = {100, \"init\", {NULL}};\n    list_add(&head, &t1.link);\n    TEST_ASSERT_NOT_NULL(head.next);\n    Task *t = container_of(head.next, Task, link);\n    TEST_ASSERT_EQUAL_INT(100, t->pid);\n}\n\nvoid test_list_add_multiple(void) {\n    ListNode head = {NULL};\n    Task t1 = {100, \"init\", {NULL}};\n    Task t2 = {200, \"bash\", {NULL}};\n    Task t3 = {300, \"vim\", {NULL}};\n    list_add(&head, &t1.link);\n    list_add(&head, &t2.link);\n    list_add(&head, &t3.link);\n    int pids[3] = {300, 200, 100};\n    int i = 0;\n    for (ListNode *n = head.next; n; n = n->next) {\n        Task *t = container_of(n, Task, link);\n        TEST_ASSERT_EQUAL_INT(pids[i], t->pid);\n        i++;\n    }\n    TEST_ASSERT_EQUAL_INT(3, i);\n}\n\nvoid test_container_of_offset(void) {\n    Task t = {999, \"test\", {NULL}};\n    size_t offset = offsetof(Task, link);\n    ListNode *node = &t.link;\n    Task *recovered = (Task *)((char *)node - offset);\n    TEST_ASSERT_EQUAL_INT(999, recovered->pid);\n}\n\nint main(void) {\n    RUN_TEST(test_container_of_basic);\n    RUN_TEST(test_list_add_single);\n    RUN_TEST(test_list_add_multiple);\n    RUN_TEST(test_container_of_offset);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
+    "expected_tests_pass": 4
   },
   "visualizer": {
     "type": "stack_heap",
