@@ -541,20 +541,8 @@ impl App {
                     _ => {}
                 }
             }
-            Msg::FileChanged => {
-                self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
-                self.state.status_msg_at = Some(Instant::now());
-            }
-            Msg::Tick => {
-                if let Some(at) = self.state.status_msg_at {
-                    if at.elapsed()
-                        > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
-                    {
-                        self.state.status_msg = None;
-                        self.state.status_msg_at = None;
-                    }
-                }
-            }
+            Msg::FileChanged => self.handle_file_changed(),
+            Msg::Tick => self.handle_tick_status_clear(),
         }
     }
 
@@ -782,19 +770,9 @@ impl App {
                     _ => {}
                 }
             }
-            Msg::FileChanged => {
-                self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
-                self.state.status_msg_at = Some(Instant::now());
-            }
+            Msg::FileChanged => self.handle_file_changed(),
             Msg::Tick => {
-                if let Some(at) = self.state.status_msg_at {
-                    if at.elapsed()
-                        > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
-                    {
-                        self.state.status_msg = None;
-                        self.state.status_msg_at = None;
-                    }
-                }
+                self.handle_tick_status_clear();
                 // Check deadline on tick
                 if let Some(deadline) = self.state.piscine_deadline {
                     if std::time::Instant::now() >= deadline {
@@ -803,6 +781,24 @@ impl App {
                         self.state.should_quit = true;
                     }
                 }
+            }
+        }
+    }
+
+    /// Mise à jour commune FileChanged — enregistre le message de status.
+    fn handle_file_changed(&mut self) {
+        self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
+        self.state.status_msg_at = Some(Instant::now());
+    }
+
+    /// Mise à jour commune Tick — expire le message de status après timeout.
+    fn handle_tick_status_clear(&mut self) {
+        if let Some(at) = self.state.status_msg_at {
+            if at.elapsed()
+                > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
+            {
+                self.state.status_msg = None;
+                self.state.status_msg_at = None;
             }
         }
     }
