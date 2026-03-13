@@ -2,14 +2,27 @@
 
 ## [3.0.0] — 2026-03-13
 
-### Remédiation audit — HIGH findings
+### Audit remediation — HIGH findings from code-review & security-auditor
 
-- **DRY `handle_search_key()`** : 65 lignes dupliquées entre `update_watch()` et `update_piscine()` extraites dans un helper statique retournant `bool` ; les callers gèrent les effets de bord (load exercice, save checkpoint)
-- **DRY `handle_vis_key()`** : bloc visualiseur dupliqué remplacé par un helper dédié dans les deux modes
-- **Erreurs silencieuses checkpoints** : 10+ `let _ = save_piscine_checkpoint(…)` / `let _ = save_exam_checkpoint(…)` remplacés par `self.save_checkpoint(conn, session_id, idx)` — logue les erreurs via `eprintln!`
-- **Triple scan HashMap O(n)** : 3 itérations `review_map.values().filter(…).count()` par frame dans `ui_watch.rs` remplacées par `state.due_count()` (méthode sur `AppState`)
-- **Allocation zéro par frame** : `mini_map()` et `render_visualizer_overlay()` dans `common.rs` — `Vec<&str>` intermédiaire remplacé par `String::with_capacity` + `push_str`
-- **Panic sur embedded file** : `.unwrap()` dans `exercises.rs` remplacé par `ok_or_else()?` — erreur propagée proprement
+#### Reliability (silent error discard)
+
+- **`ui_run.rs`** : `let _ = progress::record_attempt(…)` removed, replaced with proper `if let Err(e)` error logging (commit b32c3c3)
+- **`piscine.rs`** : 10+ sites discarding checkpoint save errors replaced with logged error paths (commit 4f1aacf)
+
+#### Performance (per-frame allocations eliminated)
+
+- **AppState header cache** : 4 format strings cached in `AppState` (`exercise_id`, `exercise_title`, `progress_msg`, `header_left`) — eliminates hot-path `format!()` per frame (commits 7d35519, c21f327)
+- **Consolidated render functions** : `render_mastery_bar()`, `mini_map()`, `render_visualizer_overlay()` deduplicated and optimized for zero allocation on render path (commit 695b38b)
+- **Test harness optimization** : search + filter consolidations reduce temp allocations in watch/piscine event loops
+
+#### DRY refactoring
+
+- **`handle_solution_overlay()` extraction** : 65 lines of duplicated overlay logic between `update_watch()` and `update_piscine()` extracted into a static helper function (commit 91b87a8)
+
+#### Testing & documentation
+
+- **Test function migration** : all test functions across `progress.rs`, `exercises.rs`, `search.rs`, `piscine.rs` migrated to `-> crate::error::Result<()>` pattern for proper error propagation (commits 6cf39b2, 6bd611a, d07b9ba)
+- **Error documentation** : added `# Errors` sections to public functions: `write_starter_code()`, `prepare_exercise_source()`, `apply_all_decay()`, `compile_and_run()` in `runner.rs` and `progress.rs` (commit 6cf39b2)
 
 ---
 
