@@ -52,21 +52,6 @@ pub fn view(f: &mut Frame, state: &AppState) {
     render_status_bar(f, status_area, state);
 }
 
-/// Barre de mastery unicode avec couleur gradient (max width=10).
-/// Construit à partir de tranches statiques — zéro allocation intermédiaire.
-fn mastery_bar(score: f64, width: usize) -> (String, Color) {
-    debug_assert!(width <= 10, "mastery_bar: width > 10 non supporté");
-    let filled = (score.clamp(0.0, 5.0) / 5.0 * width as f64).round() as usize;
-    let empty = width - filled;
-    // Chaque █/░ = 3 octets UTF-8
-    const FULL: &str = "██████████";
-    const EMPTY: &str = "░░░░░░░░░░";
-    let mut s = String::with_capacity(width * 3);
-    s.push_str(&FULL[..filled * 3]);
-    s.push_str(&EMPTY[..empty * 3]);
-    (s, common::mastery_color(score))
-}
-
 fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let total = state.exercises.len();
@@ -79,17 +64,18 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
-    let (bar, bar_color) = mastery_bar(mastery, 10);
-    let map = common::mini_map(&state.completed, idx);
+    let bar = common::mastery_bar_string(mastery, 10);
+    let bar_color = common::mastery_color(mastery);
 
     // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
     let left1 = format!("[{}/{}] {}", idx + 1, total, exercise.title);
     // chars().count() pour la largeur d'affichage (●◉○ = 3 octets mais 1 col)
-    let right1_display = map.chars().count() + 2 + exercise.subject.chars().count();
+    let right1_display =
+        state.cached_mini_map.chars().count() + 2 + exercise.subject.chars().count();
     let pad1 = width.saturating_sub(left1.chars().count() + right1_display + 4);
     let line1 = Line::from(vec![
         Span::styled(
-            format!("[{}/{}] ", idx + 1, total),
+            state.cached_exercise_counter.as_str(),
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
@@ -99,7 +85,10 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(map, Style::default().fg(Color::Gray)),
+        Span::styled(
+            state.cached_mini_map.as_str(),
+            Style::default().fg(Color::Gray),
+        ),
         Span::raw("  "),
         Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
     ]);
@@ -132,7 +121,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let pad2 = width.saturating_sub(left2_display + right2_display + 4);
     meta_spans.push(Span::raw(" ".repeat(pad2 + 1)));
     meta_spans.push(Span::styled(
-        format!("mastery: {:.1}  ", mastery),
+        state.cached_mastery_display.as_str(),
         Style::default().fg(bar_color),
     ));
     meta_spans.push(Span::styled(bar, Style::default().fg(bar_color)));
@@ -155,42 +144,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
-
-    // Layout body : [left | right sidebar (si width >= BODY_SIDEBAR_THRESHOLD)]
-    let (content_area, sidebar_opt) = if area.width >= common::BODY_SIDEBAR_THRESHOLD {
-        let [left, right] = Layout::horizontal([
-            Constraint::Fill(1),
-            Constraint::Length(common::SIDEBAR_WIDTH),
-        ])
-        .areas(area);
-        (left, Some(right))
-    } else {
-        (area, None)
-    };
-
-    // Layout contenu : description (fill) | result (hauteur dynamique si présent)
-    let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
-        let h = common::run_result_height(result);
-        let [desc, res] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
-        (desc, Some(res))
-    } else {
-        (content_area, None)
-    };
-
-    common::render_description_panel(f, desc_area, state);
-
-    if let Some(result_area) = result_area_opt {
-        if let Some(result) = &state.run_result {
-            common::render_run_result(f, result_area, result, exercise);
-        }
-    }
-
-    // ── Sidebar mastery ──────────────────────────────────────────────────
-    if let Some(sb_area) = sidebar_opt {
-        render_mastery_sidebar(f, sb_area, state);
-    }
+    common::render_body_with_sidebar(f, area, state, render_mastery_sidebar);
 }
 
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
@@ -210,7 +164,8 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 
     for subj in &top {
         let score = state.mastery_map.get(*subj).copied().unwrap_or(0.0);
-        let (bar, bar_color) = mastery_bar(score, 8);
+        let bar = common::mastery_bar_string(score, 8);
+        let bar_color = common::mastery_color(score);
         // Tronque le nom à 9 chars pour tenir dans 26 cols (2 indicateur + 9 nom + 1 espace + 8 barre + 3 score)
         let short_name = if subj.len() > 9 {
             &subj[..9]

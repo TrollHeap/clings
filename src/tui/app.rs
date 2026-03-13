@@ -56,6 +56,10 @@ pub struct AppState {
     pub help_active: bool,
     // Search: pending 'g' for gg → first
     pub search_g_pending: bool,
+    // Header cache — invalider sur changement d'exercice ou mise à jour mastery
+    pub cached_mini_map: String,
+    pub cached_exercise_counter: String, // "[N/total] "
+    pub cached_mastery_display: String,  // "mastery: X.X  "
 }
 
 impl AppState {
@@ -92,6 +96,9 @@ impl AppState {
             subject_order: Vec::new(),
             help_active: false,
             search_g_pending: false,
+            cached_mini_map: String::new(),
+            cached_exercise_counter: String::new(),
+            cached_mastery_display: String::new(),
         }
     }
 
@@ -113,6 +120,26 @@ impl App {
         Self {
             state: AppState::new(),
         }
+    }
+
+    /// Invalide les caches de header. Appeler après changement d'exercice ou mise à jour mastery.
+    fn invalidate_header_cache(state: &mut AppState) {
+        let idx = state.current_index;
+        let total = state.exercises.len();
+        state.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
+        let mastery = state
+            .mastery_map
+            .get(
+                state
+                    .exercises
+                    .get(idx)
+                    .map(|e| e.subject.as_str())
+                    .unwrap_or(""),
+            )
+            .copied()
+            .unwrap_or(0.0);
+        state.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+        state.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
     }
 
     /// Boucle principale watch avec Ratatui.
@@ -181,6 +208,7 @@ impl App {
             self.state.editor_pane = pane;
         }
 
+        Self::invalidate_header_cache(&mut self.state);
         Ok(())
     }
 
@@ -447,6 +475,7 @@ impl App {
                                     ) {
                                         eprintln!("[clings] erreur enregistrement tentative: {e}");
                                     }
+                                    Self::invalidate_header_cache(&mut self.state);
                                 }
                                 // Advance after short delay
                                 std::thread::sleep(std::time::Duration::from_secs(
@@ -488,6 +517,7 @@ impl App {
                                 ) {
                                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                                 }
+                                Self::invalidate_header_cache(&mut self.state);
                             }
                         }
                     }
@@ -677,6 +707,7 @@ impl App {
                                     ) {
                                         eprintln!("[clings] erreur enregistrement tentative: {e}");
                                     }
+                                    Self::invalidate_header_cache(&mut self.state);
                                 }
                                 // Advance after short delay
                                 std::thread::sleep(std::time::Duration::from_secs(
@@ -717,6 +748,7 @@ impl App {
                                 ) {
                                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                                 }
+                                Self::invalidate_header_cache(&mut self.state);
                             }
                         }
                     }

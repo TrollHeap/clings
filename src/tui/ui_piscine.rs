@@ -6,6 +6,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Gauge, Paragraph};
 use ratatui::Frame;
 
+use crate::constants::PISCINE_PROGRESS_BAR_WIDTH;
 use crate::tui::app::AppState;
 use crate::tui::common;
 
@@ -67,20 +68,19 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let idx = state.current_index;
     let width = area.width as usize;
 
-    let map = common::mini_map(&state.completed, idx);
-
     // Ligne 1 : [idx/total] titre + droit: mini-map
     let pad1 = {
         let left_len = format!("[{}/{}] {}", idx + 1, total, exercise.title)
             .chars()
             .count();
         // chars().count() pour ●◉○ (3 octets chacun, 1 col d'affichage)
-        let right_len = map.chars().count() + exercise.subject.chars().count() + 2;
+        let right_len =
+            state.cached_mini_map.chars().count() + exercise.subject.chars().count() + 2;
         width.saturating_sub(left_len + right_len + 4)
     };
     let line1 = Line::from(vec![
         Span::styled(
-            format!("[{}/{}] ", idx + 1, total),
+            state.cached_exercise_counter.as_str(),
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
@@ -90,7 +90,10 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(map, Style::default().fg(Color::Gray)),
+        Span::styled(
+            state.cached_mini_map.as_str(),
+            Style::default().fg(Color::Gray),
+        ),
         Span::raw("  "),
         Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
     ]);
@@ -178,42 +181,7 @@ fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
-
-    // Layout body : [left | right sidebar (si width >= BODY_SIDEBAR_THRESHOLD)]
-    let (content_area, sidebar_opt) = if area.width >= common::BODY_SIDEBAR_THRESHOLD {
-        let [left, right] = Layout::horizontal([
-            Constraint::Fill(1),
-            Constraint::Length(common::SIDEBAR_WIDTH),
-        ])
-        .areas(area);
-        (left, Some(right))
-    } else {
-        (area, None)
-    };
-
-    // Layout contenu : description (fill) | result (hauteur dynamique si présent)
-    let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
-        let h = common::run_result_height(result);
-        let [desc, res] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
-        (desc, Some(res))
-    } else {
-        (content_area, None)
-    };
-
-    common::render_description_panel(f, desc_area, state);
-
-    if let Some(result_area) = result_area_opt {
-        if let Some(result) = &state.run_result {
-            common::render_run_result(f, result_area, result, exercise);
-        }
-    }
-
-    // ── Sidebar piscine ──────────────────────────────────────────────────
-    if let Some(sb_area) = sidebar_opt {
-        render_piscine_sidebar(f, sb_area, state);
-    }
+    common::render_body_with_sidebar(f, area, state, render_piscine_sidebar);
 }
 
 fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
@@ -231,7 +199,7 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let mut lines: Vec<Line> = Vec::new();
 
     // Barre de progression globale
-    let bar_width = 20usize;
+    let bar_width = PISCINE_PROGRESS_BAR_WIDTH;
     let filled = (ratio * bar_width as f64).round() as usize;
     let progress_bar = format!(
         "[{}{}] {}/{}",
