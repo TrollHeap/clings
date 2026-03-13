@@ -60,6 +60,7 @@ pub struct AppState {
     pub cached_mini_map: String,
     pub cached_exercise_counter: String, // "[N/total] "
     pub cached_mastery_display: String,  // "mastery: X.X  "
+    pub cached_header_left_len: usize,   // Width of "[N/total] " + title in chars
 }
 
 impl AppState {
@@ -99,6 +100,7 @@ impl AppState {
             cached_mini_map: String::new(),
             cached_exercise_counter: String::new(),
             cached_mastery_display: String::new(),
+            cached_header_left_len: 0,
         }
     }
 
@@ -140,6 +142,15 @@ impl App {
             .unwrap_or(0.0);
         state.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
         state.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
+
+        // Cache the left header width: "[N/total] " + title chars count
+        let title = state
+            .exercises
+            .get(idx)
+            .map(|e| e.title.as_str())
+            .unwrap_or("");
+        state.cached_header_left_len =
+            state.cached_exercise_counter.chars().count() + title.chars().count();
     }
 
     /// Boucle principale watch avec Ratatui.

@@ -64,19 +64,14 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
 fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
-    let total = state.exercises.len();
-    let idx = state.current_index;
     let width = area.width as usize;
 
     // Ligne 1 : [idx/total] titre + droit: mini-map
     let pad1 = {
-        let left_len = format!("[{}/{}] {}", idx + 1, total, exercise.title)
-            .chars()
-            .count();
         // chars().count() pour ●◉○ (3 octets chacun, 1 col d'affichage)
         let right_len =
             state.cached_mini_map.chars().count() + exercise.subject.chars().count() + 2;
-        width.saturating_sub(left_len + right_len + 4)
+        width.saturating_sub(state.cached_header_left_len + right_len + 4)
     };
     let line1 = Line::from(vec![
         Span::styled(

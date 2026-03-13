@@ -54,8 +54,6 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
 fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
-    let total = state.exercises.len();
-    let idx = state.current_index;
     let width = area.width as usize;
 
     // Mastery du sujet courant
@@ -68,11 +66,10 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let bar_color = common::mastery_color(mastery);
 
     // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
-    let left1 = format!("[{}/{}] {}", idx + 1, total, exercise.title);
     // chars().count() pour la largeur d'affichage (●◉○ = 3 octets mais 1 col)
     let right1_display =
         state.cached_mini_map.chars().count() + 2 + exercise.subject.chars().count();
-    let pad1 = width.saturating_sub(left1.chars().count() + right1_display + 4);
+    let pad1 = width.saturating_sub(state.cached_header_left_len + right1_display + 4);
     let line1 = Line::from(vec![
         Span::styled(
             state.cached_exercise_counter.as_str(),
