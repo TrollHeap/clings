@@ -9,35 +9,16 @@ use crate::models::Exercise;
 use crate::runner::RunResult;
 use crate::search;
 
-/// Mode d'affichage de l'application
-#[derive(Debug, Clone)]
-pub enum AppMode {
-    Watch {
-        #[allow(dead_code)]
-        chapter: Option<u8>,
-    },
-    Piscine {
-        #[allow(dead_code)]
-        chapter: Option<u8>,
-        #[allow(dead_code)]
-        timed: Option<u64>,
-    },
-}
-
 /// Messages traités par App::update_watch()
 #[derive(Debug)]
 pub enum Msg {
     Key(ratatui::crossterm::event::KeyEvent),
     FileChanged,
     Tick,
-    #[allow(dead_code)]
-    Quit,
 }
 
 /// État centralisé — mode watch
 pub struct AppState {
-    #[allow(dead_code)]
-    pub mode: AppMode,
     pub should_quit: bool,
     // Watch data
     pub exercises: Vec<Exercise>,
@@ -78,9 +59,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(mode: AppMode) -> Self {
+    pub fn new() -> Self {
         Self {
-            mode,
             should_quit: false,
             exercises: Vec::new(),
             completed: Vec::new(),
@@ -129,9 +109,9 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(mode: AppMode) -> Self {
+    pub fn new() -> Self {
         Self {
-            state: AppState::new(mode),
+            state: AppState::new(),
         }
     }
 
@@ -322,6 +302,26 @@ impl App {
         }
     }
 
+    /// Gère les touches de l'overlay solution.
+    /// Retourne `true` si l'overlay était actif (l'appelant doit `return`).
+    fn handle_solution_overlay(
+        state: &mut AppState,
+        key: ratatui::crossterm::event::KeyEvent,
+    ) -> bool {
+        if !state.solution_active {
+            return false;
+        }
+        if matches!(
+            key.code,
+            ratatui::crossterm::event::KeyCode::Esc
+                | ratatui::crossterm::event::KeyCode::Char('s')
+                | ratatui::crossterm::event::KeyCode::Char('S')
+        ) {
+            state.solution_active = false;
+        }
+        true
+    }
+
     /// Sauvegarde le checkpoint piscine et exam (si session_id présent).
     /// Logue les erreurs sans les propager — contexte event loop.
     fn save_checkpoint(&self, conn: &rusqlite::Connection, session_id: Option<&str>, idx: usize) {
@@ -353,15 +353,7 @@ impl App {
                 }
 
                 // Solution overlay — Esc or [s] closes
-                if self.state.solution_active {
-                    if matches!(
-                        key.code,
-                        ratatui::crossterm::event::KeyCode::Esc
-                            | ratatui::crossterm::event::KeyCode::Char('s')
-                            | ratatui::crossterm::event::KeyCode::Char('S')
-                    ) {
-                        self.state.solution_active = false;
-                    }
+                if Self::handle_solution_overlay(&mut self.state, key) {
                     return;
                 }
 
@@ -520,9 +512,6 @@ impl App {
                     }
                 }
             }
-            Msg::Quit => {
-                self.state.should_quit = true;
-            }
         }
     }
 
@@ -597,15 +586,7 @@ impl App {
                 }
 
                 // Solution overlay — Esc or [s] closes
-                if self.state.solution_active {
-                    if matches!(
-                        key.code,
-                        ratatui::crossterm::event::KeyCode::Esc
-                            | ratatui::crossterm::event::KeyCode::Char('s')
-                            | ratatui::crossterm::event::KeyCode::Char('S')
-                    ) {
-                        self.state.solution_active = false;
-                    }
+                if Self::handle_solution_overlay(&mut self.state, key) {
                     return;
                 }
 
@@ -775,11 +756,6 @@ impl App {
                         self.state.should_quit = true;
                     }
                 }
-            }
-            Msg::Quit => {
-                let idx = self.state.current_index;
-                self.save_checkpoint(conn, session_id, idx);
-                self.state.should_quit = true;
             }
         }
     }
