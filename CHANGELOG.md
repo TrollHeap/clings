@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.0.1] — 2026-03-13
+
+### Audit 2 remediation — performance, sécurité, DRY
+
+#### Performance (zéro allocation hot-path)
+
+- **`progress_bar_string()`** (`common.rs`) : remplace `"█".repeat()` par slicing sur deux strings statiques `FULL_BAR_20`/`EMPTY_BAR_20` — 0 allocation par frame dans `render_piscine_sidebar`
+- **`cached_mini_map_len`** (`app.rs`) : cache la longueur de `cached_mini_map` dans `AppState` — élimine le `chars().count()` O(n) par frame dans `render_header`
+- **`handle_file_changed()` / `handle_tick_status_clear()`** : helpers extraits dans `impl App` — centralise le code de mise à jour du `status_msg` (DRY watch + piscine Tick handlers)
+
+#### Sécurité
+
+- **ReDoS guard** (`runner.rs`, `constants.rs`) : ajout de `MAX_REGEX_PATTERN_LEN = 500` octets — patterns dépassant ce seuil sont rejetés avec avertissement, éliminant le risque ReDoS sur entrées JSON malveillantes
+
+#### Tests
+
+- **`tui::common` tests** : 4 tests unitaires pour `progress_bar_string` et `mastery_bar_string` (coverage des cas limites 0.0, 0.5, 1.0 + largeur)
+- Total : 156 tests (152 → 156)
+
+---
+
 ## [3.0.0] — 2026-03-13
 
 ### Audit remediation — HIGH findings from code-review & security-auditor

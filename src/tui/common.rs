@@ -686,3 +686,35 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
         popup,
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_bar_string_empty() {
+        let (full, empty) = progress_bar_string(0.0);
+        assert_eq!(full, "");
+        assert_eq!(empty.chars().count(), 20);
+    }
+
+    #[test]
+    fn progress_bar_string_full() {
+        let (full, empty) = progress_bar_string(1.0);
+        assert_eq!(full.chars().count(), 20);
+        assert_eq!(empty, "");
+    }
+
+    #[test]
+    fn progress_bar_string_half() {
+        let (full, empty) = progress_bar_string(0.5);
+        assert_eq!(full.chars().count(), 10);
+        assert_eq!(empty.chars().count(), 10);
+    }
+
+    #[test]
+    fn mastery_bar_string_width() {
+        let bar = mastery_bar_string(2.5, 10);
+        assert_eq!(bar.chars().count(), 10);
+    }
+}
