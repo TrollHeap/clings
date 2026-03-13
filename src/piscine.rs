@@ -9,7 +9,7 @@ use crate::{exercises, progress};
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
-    use crate::tui::app::{App, AppMode};
+    use crate::tui::app::App;
 
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let mut conn = progress::open_db()?;
@@ -46,10 +46,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         .map(|i| i.min(total.saturating_sub(1)))
         .unwrap_or(0);
 
-    let mut app = App::new(AppMode::Piscine {
-        chapter: filter_chapter,
-        timed: timed_minutes,
-    });
+    let mut app = App::new();
     app.state.exercises = exercise_order.iter().map(|e| (*e).clone()).collect();
     app.state.completed = vec![false; total];
     app.state.current_index = start_index;
@@ -73,7 +70,9 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     let secs = elapsed.as_secs() % 60;
 
     if done == total {
-        let _ = progress::clear_piscine_checkpoint(&conn);
+        if let Err(e) = progress::clear_piscine_checkpoint(&conn) {
+            eprintln!("[clings] erreur suppression checkpoint piscine: {e}");
+        }
     }
 
     println!();
@@ -118,7 +117,7 @@ pub fn run_exam_piscine(
     timed_minutes: Option<u64>,
     session_id: Option<&str>,
 ) -> crate::error::Result<()> {
-    use crate::tui::app::{App, AppMode};
+    use crate::tui::app::App;
 
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;
@@ -145,10 +144,7 @@ pub fn run_exam_piscine(
         0
     };
 
-    let mut app = App::new(AppMode::Piscine {
-        chapter: None,
-        timed: timed_minutes,
-    });
+    let mut app = App::new();
     app.state.exercises = exercises;
     app.state.completed = vec![false; total];
     app.state.current_index = start_index;
@@ -172,7 +168,9 @@ pub fn run_exam_piscine(
     let secs = elapsed.as_secs() % 60;
 
     if done == total {
-        let _ = progress::clear_exam_checkpoint(&conn);
+        if let Err(e) = progress::clear_exam_checkpoint(&conn) {
+            eprintln!("[clings] erreur suppression checkpoint exam: {e}");
+        }
     }
 
     println!();
