@@ -112,7 +112,8 @@ pub fn cmd_search(query: &str, filter_subject: Option<&str>) -> Result<()> {
         let subject_map: std::collections::HashMap<&str, &crate::models::Subject> =
             subjects.iter().map(|s| (s.name.as_str(), s)).collect();
 
-        for (i, (exercise, _score)) in results.iter().enumerate() {
+        for (i, (idx, _score)) in results.iter().enumerate() {
+            let exercise = &all_exercises[*idx];
             let mastery = subject_map
                 .get(exercise.subject.as_str())
                 .map(|s| s.mastery_score.get())

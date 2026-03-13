@@ -10,6 +10,18 @@ use crate::models::{Difficulty, ValidationMode};
 use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
+/// Largeur minimale du terminal pour afficher la sidebar de progression.
+pub const BODY_SIDEBAR_THRESHOLD: u16 = 90;
+/// Largeur fixe de la sidebar de progression (colonnes).
+pub const SIDEBAR_WIDTH: u16 = 26;
+/// Séparateur horizontal (36 × ─) — const str évite l'allocation par frame.
+pub const SEPARATOR: &str = "────────────────────────────────────";
+
+/// Barre pleine (10 × █) — tranche statique pour mastery_bar sans allocation.
+const FULL_BAR: &str = "██████████";
+/// Barre vide (10 × ░) — tranche statique pour mastery_bar sans allocation.
+const EMPTY_BAR: &str = "░░░░░░░░░░";
+
 /// Étiquette de stage d'échafaudage (S0–S4).
 pub fn stage_label(stage: u8) -> &'static str {
     match stage {
@@ -98,6 +110,115 @@ pub fn mini_map(completed: &[bool], current: usize) -> String {
         });
     }
     map
+}
+
+/// Génère la chaîne barre de maîtrise (█░ format) pour usage dans les cellules de table.
+/// Utilise des tranches statiques (max 10) — zéro allocation intermédiaire.
+pub fn mastery_bar_string(score: f64, width: usize) -> String {
+    debug_assert!(width <= 10, "mastery_bar_string: width > 10 non supporté");
+    let filled = (score.clamp(0.0, 5.0) / 5.0 * width as f64).round() as usize;
+    let empty = width - filled;
+    // Chaque █/░ = 3 octets UTF-8
+    let mut s = String::with_capacity(width * 3);
+    s.push_str(&FULL_BAR[..filled * 3]);
+    s.push_str(&EMPTY_BAR[..empty * 3]);
+    s
+}
+
+/// Panneau description/indices — partagé entre watch et piscine.
+/// Affiche description, key_concept, common_mistake, fichiers, et indices révélés.
+pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
+    let exercise = &state.exercises[state.current_index];
+    let mut lines: Vec<Line> = Vec::with_capacity(16);
+
+    for line in exercise.description.lines() {
+        lines.push(Line::from(line));
+    }
+    let has_meta = exercise.key_concept.is_some()
+        || exercise.common_mistake.is_some()
+        || !exercise.files.is_empty();
+    if has_meta {
+        lines.push(Line::styled(
+            SEPARATOR,
+            Style::default().fg(Color::DarkGray),
+        ));
+    } else {
+        lines.push(Line::raw(""));
+    }
+
+    if let Some(kc) = &exercise.key_concept {
+        lines.push(Line::from(vec![
+            Span::styled("concept : ", Style::default().fg(Color::Cyan)),
+            Span::raw(kc.as_str()),
+        ]));
+    }
+    if let Some(cm) = &exercise.common_mistake {
+        lines.push(Line::from(vec![
+            Span::styled("piège   : ", Style::default().fg(Color::Yellow)),
+            Span::styled(cm.as_str(), Style::default().fg(Color::DarkGray)),
+        ]));
+    }
+    if !exercise.files.is_empty() {
+        let names: Vec<&str> = exercise.files.iter().map(|fi| fi.name.as_str()).collect();
+        lines.push(Line::from(vec![
+            Span::styled("fichiers: ", Style::default().fg(Color::Gray)),
+            Span::styled(names.join(", "), Style::default().fg(Color::DarkGray)),
+        ]));
+    }
+
+    if state.hint_index > 0 && !exercise.hints.is_empty() {
+        lines.push(Line::raw(""));
+        lines.push(Line::styled(
+            "── Indices ──",
+            Style::default().fg(Color::Cyan),
+        ));
+        for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
+            lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
+        }
+    }
+
+    let title = if let Some(path) = &state.source_path {
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("current.c");
+        format!("Exercice — {}", filename)
+    } else {
+        "Exercice".to_string()
+    };
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(Block::bordered().title(title))
+            .wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+/// Barre de statut à deux colonnes — partagée entre watch et piscine.
+/// Si `right_msg` est vide ou la largeur < 40, affiche seulement `left_msg`.
+pub fn render_split_status_bar(
+    f: &mut Frame,
+    area: Rect,
+    left_msg: String,
+    right_msg: String,
+    right_style: Style,
+    right_width: u16,
+) {
+    if right_msg.is_empty() || area.width < 40 {
+        f.render_widget(
+            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
+            area,
+        );
+    } else {
+        let [left_area, right_area] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(right_width)]).areas(area);
+        f.render_widget(
+            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
+            left_area,
+        );
+        f.render_widget(Paragraph::new(right_msg).style(right_style), right_area);
+    }
 }
 
 /// Hauteur dynamique du panneau run_result.

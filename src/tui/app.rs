@@ -196,14 +196,10 @@ impl App {
         self.state.status_msg = None;
 
         // Open/update neovim pane in tmux
-        let pane = crate::tmux::update_editor_pane(
-            self.state.editor_pane.as_deref(),
-            self.state
-                .source_path
-                .as_ref()
-                .expect("source_path toujours Some après load_current_exercise"),
-        );
-        self.state.editor_pane = pane;
+        if let Some(ref path) = self.state.source_path {
+            let pane = crate::tmux::update_editor_pane(self.state.editor_pane.as_deref(), path);
+            self.state.editor_pane = pane;
+        }
 
         Ok(())
     }
@@ -229,15 +225,10 @@ impl App {
                 .map(|(i, _)| i)
                 .collect();
         } else {
-            let base = state.exercises.as_ptr();
             state.search_results =
                 search::search_exercises(&state.exercises, &state.search_query, subject_filter)
                     .into_iter()
-                    .map(|(ex, _score)| {
-                        // SAFETY: `search_exercises` returns references into `state.exercises`
-                        // which is a contiguous Vec — both pointers share the same allocation.
-                        unsafe { (ex as *const crate::models::Exercise).offset_from(base) as usize }
-                    })
+                    .map(|(idx, _score)| idx)
                     .collect();
         }
         state.search_selected = 0;

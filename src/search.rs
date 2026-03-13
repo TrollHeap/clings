@@ -1,16 +1,19 @@
 //! Fuzzy exercise search using nucleo-matcher.
 
+use std::fmt::Write as _;
+
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 
 use crate::models::Exercise;
 
 /// Score un exercise contre une query. Retourne None si aucun match.
-/// `buf` est réutilisé entre les appels pour éviter des allocations répétées.
+/// `char_buf` et `str_buf` sont réutilisés entre appels pour éviter les allocations.
 fn score_exercise(
     matcher: &mut Matcher,
     query_buf: &[char],
     ex: &Exercise,
-    buf: &mut Vec<char>,
+    char_buf: &mut Vec<char>,
+    str_buf: &mut String,
 ) -> Option<u32> {
     let desc_end = ex
         .description
@@ -18,7 +21,9 @@ fn score_exercise(
         .nth(120)
         .map(|(i, _)| i)
         .unwrap_or(ex.description.len());
-    let haystack = format!(
+    str_buf.clear();
+    let _ = write!(
+        str_buf,
         "{} {} {} {} {}",
         ex.id,
         ex.title,
@@ -26,28 +31,38 @@ fn score_exercise(
         ex.key_concept.as_deref().unwrap_or(""),
         &ex.description[..desc_end],
     );
-    buf.clear();
+    char_buf.clear();
     matcher
-        .fuzzy_match(Utf32Str::new(&haystack, buf), Utf32Str::Unicode(query_buf))
+        .fuzzy_match(
+            Utf32Str::new(str_buf, char_buf),
+            Utf32Str::Unicode(query_buf),
+        )
         .map(|s| s as u32)
 }
 
 /// Recherche fuzzy sur la liste d'exercices.
-/// Retourne les exercices triés par score décroissant (meilleur match en premier).
-pub fn search_exercises<'a>(
-    exercises: &'a [Exercise],
+/// Retourne les indices dans `exercises` triés par score décroissant (meilleur match en premier).
+pub fn search_exercises(
+    exercises: &[Exercise],
     query: &str,
     filter_subject: Option<&str>,
-) -> Vec<(&'a Exercise, u32)> {
+) -> Vec<(usize, u32)> {
     let mut matcher = Matcher::new(Config::DEFAULT);
     let query_buf: Vec<char> = query.chars().collect();
-    let mut buf: Vec<char> = Vec::new();
+    let mut char_buf: Vec<char> = Vec::new();
+    let mut str_buf = String::new();
 
-    let mut results: Vec<(&Exercise, u32)> = exercises
-        .iter()
-        .filter(|ex| filter_subject.is_none_or(|s| ex.subject == s))
-        .filter_map(|ex| score_exercise(&mut matcher, &query_buf, ex, &mut buf).map(|s| (ex, s)))
-        .collect();
+    let mut results: Vec<(usize, u32)> = Vec::with_capacity(exercises.len());
+    for (idx, ex) in exercises.iter().enumerate() {
+        if filter_subject.is_some_and(|s| ex.subject != s) {
+            continue;
+        }
+        if let Some(score) =
+            score_exercise(&mut matcher, &query_buf, ex, &mut char_buf, &mut str_buf)
+        {
+            results.push((idx, score));
+        }
+    }
 
     results.sort_unstable_by(|a, b| b.1.cmp(&a.1));
     results
@@ -90,9 +105,9 @@ mod tests {
             filtered.len() <= all.len(),
             "filtrage par sujet ne doit pas augmenter le nombre de résultats"
         );
-        for (ex, _) in &filtered {
+        for (idx, _) in &filtered {
             assert_eq!(
-                ex.subject, first_subject,
+                exercises[*idx].subject, first_subject,
                 "tous les résultats doivent appartenir au sujet filtré"
             );
         }

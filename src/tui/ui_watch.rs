@@ -3,7 +3,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::AppState;
@@ -52,13 +52,19 @@ pub fn view(f: &mut Frame, state: &AppState) {
     render_status_bar(f, status_area, state);
 }
 
-/// Barre de mastery unicode avec couleur gradient.
-/// Retourne (bar_string, color) pour affichage coloré.
+/// Barre de mastery unicode avec couleur gradient (max width=10).
+/// Construit à partir de tranches statiques — zéro allocation intermédiaire.
 fn mastery_bar(score: f64, width: usize) -> (String, Color) {
+    debug_assert!(width <= 10, "mastery_bar: width > 10 non supporté");
     let filled = (score.clamp(0.0, 5.0) / 5.0 * width as f64).round() as usize;
-    let full = "█".repeat(filled);
-    let empty = "░".repeat(width - filled);
-    (format!("{}{}", full, empty), common::mastery_color(score))
+    let empty = width - filled;
+    // Chaque █/░ = 3 octets UTF-8
+    const FULL: &str = "██████████";
+    const EMPTY: &str = "░░░░░░░░░░";
+    let mut s = String::with_capacity(width * 3);
+    s.push_str(&FULL[..filled * 3]);
+    s.push_str(&EMPTY[..empty * 3]);
+    (s, common::mastery_color(score))
 }
 
 fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
@@ -117,8 +123,8 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         ));
     }
 
-    // "mastery: X.X  " + 10 chars de barre
-    let right2_display = format!("mastery: {:.1}  ", mastery).chars().count() + 10;
+    // "mastery: X.X  " (14 chars fixes, mastery ∈ [0.0,5.0] → toujours 1 chiffre) + 10 barre
+    let right2_display = 14 + 10;
     let left2_display: usize = meta_spans
         .iter()
         .map(|s| s.content.chars().count())
@@ -151,96 +157,33 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
 
-    // Layout body : [left | right sidebar (si width >= 90)]
-    let (content_area, sidebar_opt) = if area.width >= 90 {
-        let [left, right] =
-            Layout::horizontal([Constraint::Fill(1), Constraint::Length(26)]).areas(area);
+    // Layout body : [left | right sidebar (si width >= BODY_SIDEBAR_THRESHOLD)]
+    let (content_area, sidebar_opt) = if area.width >= common::BODY_SIDEBAR_THRESHOLD {
+        let [left, right] = Layout::horizontal([
+            Constraint::Fill(1),
+            Constraint::Length(common::SIDEBAR_WIDTH),
+        ])
+        .areas(area);
         (left, Some(right))
     } else {
         (area, None)
     };
 
     // Layout contenu : description (fill) | result (hauteur dynamique si présent)
-    let body_areas = if let Some(result) = &state.run_result {
+    let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
         let h = common::run_result_height(result);
         let [desc, res] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
-        vec![desc, res]
+        (desc, Some(res))
     } else {
-        vec![content_area]
+        (content_area, None)
     };
 
-    // ── Description / hints ──────────────────────────────────────────────
-    let desc_area = body_areas[0];
-    let mut lines: Vec<Line> = Vec::with_capacity(16);
+    common::render_description_panel(f, desc_area, state);
 
-    for line in exercise.description.lines() {
-        lines.push(Line::from(line));
-    }
-    let has_meta = exercise.key_concept.is_some()
-        || exercise.common_mistake.is_some()
-        || !exercise.files.is_empty();
-    if has_meta {
-        lines.push(Line::styled(
-            "─".repeat(36),
-            Style::default().fg(Color::DarkGray),
-        ));
-    } else {
-        lines.push(Line::raw(""));
-    }
-
-    if let Some(kc) = &exercise.key_concept {
-        lines.push(Line::from(vec![
-            Span::styled("concept : ", Style::default().fg(Color::Cyan)),
-            Span::raw(kc.as_str()),
-        ]));
-    }
-    if let Some(cm) = &exercise.common_mistake {
-        lines.push(Line::from(vec![
-            Span::styled("piège   : ", Style::default().fg(Color::Yellow)),
-            Span::styled(cm.as_str(), Style::default().fg(Color::DarkGray)),
-        ]));
-    }
-    if !exercise.files.is_empty() {
-        let names: Vec<&str> = exercise.files.iter().map(|f| f.name.as_str()).collect();
-        lines.push(Line::from(vec![
-            Span::styled("fichiers: ", Style::default().fg(Color::Gray)),
-            Span::styled(names.join(", "), Style::default().fg(Color::DarkGray)),
-        ]));
-    }
-
-    if state.hint_index > 0 && !exercise.hints.is_empty() {
-        lines.push(Line::raw(""));
-        lines.push(Line::styled(
-            "── Indices ──",
-            Style::default().fg(Color::Cyan),
-        ));
-        for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
-            lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
-        }
-    }
-
-    let title = if let Some(path) = &state.source_path {
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("current.c");
-        format!("Exercice — {}", filename)
-    } else {
-        "Exercice".to_string()
-    };
-
-    f.render_widget(
-        Paragraph::new(lines)
-            .block(Block::bordered().title(title.as_str()))
-            .wrap(Wrap { trim: false }),
-        desc_area,
-    );
-
-    // ── Résultat de compilation ──────────────────────────────────────────
-    if let Some(result_area) = body_areas.get(1) {
+    if let Some(result_area) = result_area_opt {
         if let Some(result) = &state.run_result {
-            common::render_run_result(f, *result_area, result, exercise);
+            common::render_run_result(f, result_area, result, exercise);
         }
     }
 
@@ -359,34 +302,22 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     // Droite : failures ou révision
-    let right_msg = if state.consecutive_failures > 0 {
-        format!("✗ {}", state.consecutive_failures)
+    let (right_msg, right_style) = if state.consecutive_failures > 0 {
+        (
+            format!("✗ {}", state.consecutive_failures),
+            Style::default().fg(Color::Red),
+        )
     } else {
         let due = state.due_count();
         if due > 0 {
-            format!("révision: {}j", due)
+            (
+                format!("révision: {}j", due),
+                Style::default().fg(Color::Yellow),
+            )
         } else {
-            String::new()
+            (String::new(), Style::default())
         }
     };
 
-    if right_msg.is_empty() || area.width < 40 {
-        f.render_widget(
-            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
-            area,
-        );
-    } else {
-        let [left_area, right_area] =
-            Layout::horizontal([Constraint::Fill(1), Constraint::Length(15)]).areas(area);
-        f.render_widget(
-            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
-            left_area,
-        );
-        let right_style = if state.consecutive_failures > 0 {
-            Style::default().fg(Color::Red)
-        } else {
-            Style::default().fg(Color::Yellow)
-        };
-        f.render_widget(Paragraph::new(right_msg).style(right_style), right_area);
-    }
+    common::render_split_status_bar(f, area, left_msg, right_msg, right_style, 15);
 }

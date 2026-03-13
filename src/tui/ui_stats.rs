@@ -210,17 +210,11 @@ fn draw_stats(
             .iter()
             .take(15)
             .map(|s| {
-                let mastery_bar = format!(
-                    "{}{}",
-                    "█".repeat((s.mastery_score.get() / 5.0 * 10.0).round() as usize),
-                    "░".repeat(
-                        10 - ((s.mastery_score.get() / 5.0 * 10.0).round() as usize).min(10)
-                    )
-                );
+                let score = s.mastery_score.get();
                 Row::new(vec![
                     s.name.clone(),
-                    format!("{:.1}", s.mastery_score.get()),
-                    mastery_bar,
+                    format!("{:.1}", score),
+                    common::mastery_bar_string(score, 10),
                 ])
             })
             .collect();

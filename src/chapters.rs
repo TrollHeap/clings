@@ -7,7 +7,8 @@ use crate::models::{Exercise, Subject};
 pub struct Chapter {
     /// Numéro du chapitre dans la progression NSY103 (1-based)
     pub number: u8,
-    /// Intitulé affiché dans la TUI
+    /// Intitulé affiché dans la TUI (non encore rendu en production)
+    #[allow(dead_code)]
     pub title: &'static str,
     /// Noms des sujets appartenant à ce chapitre
     pub subjects: &'static [&'static str],
@@ -183,49 +184,6 @@ pub fn flatten_chapters<'a>(blocks: &[ChapterBlock<'a>]) -> Vec<&'a Exercise> {
         .collect()
 }
 
-/// Informations de position d'un exercice dans sa progression par chapitre.
-#[allow(dead_code)]
-pub struct ChapterContext {
-    /// Numéro du chapitre courant
-    pub chapter_number: u8,
-    /// Intitulé du chapitre courant
-    pub chapter_title: &'static str,
-    /// Nombre total de chapitres dans la progression
-    pub total_chapters: u8,
-    /// Position de l'exercice dans son chapitre (1-based)
-    pub exercise_in_chapter: usize,
-    /// Nombre total d'exercices dans ce chapitre
-    pub chapter_size: usize,
-}
-
-/// Get chapter context for a given exercise index in the flattened list.
-#[allow(dead_code)]
-pub fn chapter_context_at(blocks: &[ChapterBlock], flat_index: usize) -> ChapterContext {
-    let mut offset = 0;
-    for block in blocks {
-        if flat_index < offset + block.exercises.len() {
-            return ChapterContext {
-                chapter_number: block.chapter.number,
-                chapter_title: block.chapter.title,
-                total_chapters: u8::try_from(CHAPTERS.len())
-                    .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255"),
-                exercise_in_chapter: flat_index - offset + 1,
-                chapter_size: block.exercises.len(),
-            };
-        }
-        offset += block.exercises.len();
-    }
-    // Fallback
-    ChapterContext {
-        chapter_number: 0,
-        chapter_title: "???",
-        total_chapters: u8::try_from(CHAPTERS.len())
-            .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255"),
-        exercise_in_chapter: 0,
-        chapter_size: 0,
-    }
-}
-
 /// Filtre les blocs par numéro de chapitre. Retourne `false` si le résultat est vide.
 pub fn filter_by_chapter(blocks: &mut Vec<ChapterBlock<'_>>, chapter: Option<u8>) -> bool {
     if let Some(n) = chapter {
@@ -297,67 +255,5 @@ mod tests {
         assert_eq!(flattened.len(), 2);
         assert_eq!(flattened[0].id, "ex1");
         assert_eq!(flattened[1].id, "ex2");
-    }
-
-    #[test]
-    fn test_chapter_context_at_valid() {
-        let ex1 = Exercise {
-            id: "ex1".to_string(),
-            subject: "structs".to_string(),
-            lang: crate::models::Lang::C,
-            difficulty: crate::models::Difficulty::Easy,
-            title: "Exercise 1".to_string(),
-            description: "Test".to_string(),
-            starter_code: "".to_string(),
-            solution_code: "".to_string(),
-            hints: vec![],
-            validation: crate::models::ValidationConfig {
-                expected_output: Some("test".to_string()),
-                ..Default::default()
-            },
-            prerequisites: vec![],
-            files: vec![],
-            exercise_type: Default::default(),
-            key_concept: None,
-            common_mistake: None,
-            kc_ids: vec![],
-            starter_code_stages: vec![],
-            visualizer: Default::default(),
-        };
-
-        let ex2 = Exercise {
-            id: "ex2".to_string(),
-            ..ex1.clone()
-        };
-
-        let blocks = vec![ChapterBlock {
-            chapter: &CHAPTERS[0], // Fondamentaux C, chapter_number = 1
-            exercises: vec![&ex1, &ex2],
-        }];
-
-        let ctx = chapter_context_at(&blocks, 0);
-        assert_eq!(ctx.chapter_number, 1);
-        assert_eq!(ctx.chapter_title, "Fondamentaux C");
-        assert_eq!(ctx.exercise_in_chapter, 1);
-        assert_eq!(ctx.chapter_size, 2);
-        assert_eq!(
-            ctx.total_chapters,
-            u8::try_from(CHAPTERS.len())
-                .expect("compile-time assert guarantees CHAPTERS.len() ≤ 255")
-        );
-
-        let ctx = chapter_context_at(&blocks, 1);
-        assert_eq!(ctx.chapter_number, 1);
-        assert_eq!(ctx.exercise_in_chapter, 2);
-    }
-
-    #[test]
-    fn test_chapter_context_at_invalid() {
-        let blocks = vec![];
-        let ctx = chapter_context_at(&blocks, 0);
-        assert_eq!(ctx.chapter_number, 0);
-        assert_eq!(ctx.chapter_title, "???");
-        assert_eq!(ctx.exercise_in_chapter, 0);
-        assert_eq!(ctx.chapter_size, 0);
     }
 }

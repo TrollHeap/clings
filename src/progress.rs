@@ -63,9 +63,9 @@ pub fn open_db() -> Result<Connection> {
     let db_path = dir.join(DB_FILENAME);
     let conn = Connection::open(&db_path)?;
 
-    conn.execute_batch(&format!(
-        "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout={DB_BUSY_TIMEOUT_MS};"
-    ))?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "foreign_keys", true)?;
+    conn.pragma_update(None, "busy_timeout", DB_BUSY_TIMEOUT_MS)?;
     conn.execute_batch(SCHEMA)?;
     migrate_v1(&conn)?;
 
@@ -77,7 +77,7 @@ fn migrate_v1(conn: &Connection) -> Result<()> {
     let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
     if version < DB_USER_VERSION_CURRENT {
         conn.execute_batch(SCHEMA_V1)?;
-        conn.execute_batch(&format!("PRAGMA user_version = {DB_USER_VERSION_CURRENT};"))?;
+        conn.pragma_update(None, "user_version", DB_USER_VERSION_CURRENT)?;
     }
     Ok(())
 }
