@@ -58,11 +58,19 @@ pub struct AppState {
     pub piscine_fail_count: u32,
     // Status message (file saved, etc.)
     pub status_msg: Option<String>,
+    pub status_msg_at: Option<Instant>,
     // Fuzzy search overlay
     pub search_active: bool,
     pub search_query: String,
     pub search_results: Vec<usize>,
     pub search_selected: usize,
+    pub search_subject_filter: bool,
+    // Subject order cache (filled once on init)
+    pub subject_order: Vec<String>,
+    // Help overlay
+    pub help_active: bool,
+    // Search: pending 'g' for gg → first
+    pub search_g_pending: bool,
 }
 
 impl AppState {
@@ -89,10 +97,15 @@ impl AppState {
             piscine_timer_total: 0,
             piscine_fail_count: 0,
             status_msg: None,
+            status_msg_at: None,
             search_active: false,
             search_query: String::new(),
             search_results: Vec::new(),
             search_selected: 0,
+            search_subject_filter: false,
+            subject_order: Vec::new(),
+            help_active: false,
+            search_g_pending: false,
         }
     }
 }
@@ -181,13 +194,34 @@ impl App {
 
     /// Recompute search results from current query (indices into state.exercises).
     fn rebuild_search(state: &mut AppState) {
-        if state.search_query.is_empty() {
-            state.search_results = (0..state.exercises.len()).collect();
+        let subject_filter = if state.search_subject_filter {
+            state
+                .exercises
+                .get(state.current_index)
+                .map(|ex| ex.subject.as_str())
         } else {
+            None
+        };
+        if state.search_query.is_empty() && subject_filter.is_none() {
+            state.search_results = (0..state.exercises.len()).collect();
+        } else if state.search_query.is_empty() {
+            state.search_results = state
+                .exercises
+                .iter()
+                .enumerate()
+                .filter(|(_, ex)| subject_filter.is_none_or(|s| ex.subject == s))
+                .map(|(i, _)| i)
+                .collect();
+        } else {
+            let base = state.exercises.as_ptr();
             state.search_results =
-                search::search_exercises(&state.exercises, &state.search_query, None)
+                search::search_exercises(&state.exercises, &state.search_query, subject_filter)
                     .into_iter()
-                    .filter_map(|(ex, _score)| state.exercises.iter().position(|e| e.id == ex.id))
+                    .map(|(ex, _score)| {
+                        // SAFETY: `search_exercises` returns references into `state.exercises`
+                        // which is a contiguous Vec — both pointers share the same allocation.
+                        unsafe { (ex as *const crate::models::Exercise).offset_from(base) as usize }
+                    })
                     .collect();
         }
         state.search_selected = 0;
@@ -208,6 +242,10 @@ impl App {
                             self.state.search_query.clear();
                             self.state.search_results.clear();
                         }
+                        KeyCode::Tab => {
+                            self.state.search_subject_filter = !self.state.search_subject_filter;
+                            Self::rebuild_search(&mut self.state);
+                        }
                         KeyCode::Enter => {
                             if !self.state.search_results.is_empty() {
                                 let idx = self.state.search_results[self.state.search_selected];
@@ -225,6 +263,7 @@ impl App {
                             if len > 0 {
                                 self.state.search_selected = (self.state.search_selected + 1) % len;
                             }
+                            self.state.search_g_pending = false;
                         }
                         KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
                             let len = self.state.search_results.len();
@@ -232,17 +271,43 @@ impl App {
                                 self.state.search_selected =
                                     self.state.search_selected.checked_sub(1).unwrap_or(len - 1);
                             }
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Char('G') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected = len - 1;
+                            }
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Char('g') => {
+                            if self.state.search_g_pending {
+                                self.state.search_selected = 0;
+                                self.state.search_g_pending = false;
+                            } else {
+                                self.state.search_g_pending = true;
+                            }
                         }
                         KeyCode::Backspace => {
                             self.state.search_query.pop();
                             Self::rebuild_search(&mut self.state);
+                            self.state.search_g_pending = false;
                         }
                         KeyCode::Char(c) => {
+                            self.state.search_g_pending = false;
                             self.state.search_query.push(c);
                             Self::rebuild_search(&mut self.state);
                         }
-                        _ => {}
+                        _ => {
+                            self.state.search_g_pending = false;
+                        }
                     }
+                    return;
+                }
+
+                // Help overlay — any key closes
+                if self.state.help_active {
+                    self.state.help_active = false;
                     return;
                 }
 
@@ -286,8 +351,12 @@ impl App {
                     }
                     KeyCode::Char('/') => {
                         self.state.search_active = true;
+                        self.state.search_subject_filter = false;
                         self.state.search_query.clear();
                         Self::rebuild_search(&mut self.state);
+                    }
+                    KeyCode::Char('?') => {
+                        self.state.help_active = true;
                     }
                     KeyCode::Char('j')
                     | KeyCode::Char('J')
@@ -374,9 +443,15 @@ impl App {
             }
             Msg::FileChanged(_) => {
                 self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
+                self.state.status_msg_at = Some(Instant::now());
             }
             Msg::Tick => {
-                // Clear status message after a while (optionnel)
+                if let Some(at) = self.state.status_msg_at {
+                    if at.elapsed() > std::time::Duration::from_secs(3) {
+                        self.state.status_msg = None;
+                        self.state.status_msg_at = None;
+                    }
+                }
             }
             Msg::Quit => {
                 self.state.should_quit = true;
@@ -442,6 +517,82 @@ impl App {
 
         match msg {
             Msg::Key(key) => {
+                // Search overlay — capture all keys when active
+                if self.state.search_active {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.state.search_active = false;
+                            self.state.search_query.clear();
+                            self.state.search_results.clear();
+                        }
+                        KeyCode::Tab => {
+                            self.state.search_subject_filter = !self.state.search_subject_filter;
+                            Self::rebuild_search(&mut self.state);
+                        }
+                        KeyCode::Enter => {
+                            if !self.state.search_results.is_empty() {
+                                let idx = self.state.search_results[self.state.search_selected];
+                                self.state.current_index = idx;
+                                self.state.search_active = false;
+                                self.state.search_query.clear();
+                                self.state.search_results.clear();
+                                if let Err(e) = self.load_current_exercise(conn) {
+                                    eprintln!("[clings] erreur chargement exercice: {e}");
+                                }
+                                let cidx = self.state.current_index;
+                                let _ = crate::progress::save_piscine_checkpoint(conn, cidx);
+                                if let Some(sid) = session_id {
+                                    let _ = crate::progress::save_exam_checkpoint(conn, sid, cidx);
+                                }
+                            }
+                        }
+                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected = (self.state.search_selected + 1) % len;
+                            }
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected =
+                                    self.state.search_selected.checked_sub(1).unwrap_or(len - 1);
+                            }
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Char('G') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected = len - 1;
+                            }
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Char('g') => {
+                            if self.state.search_g_pending {
+                                self.state.search_selected = 0;
+                                self.state.search_g_pending = false;
+                            } else {
+                                self.state.search_g_pending = true;
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            self.state.search_query.pop();
+                            Self::rebuild_search(&mut self.state);
+                            self.state.search_g_pending = false;
+                        }
+                        KeyCode::Char(c) => {
+                            self.state.search_g_pending = false;
+                            self.state.search_query.push(c);
+                            Self::rebuild_search(&mut self.state);
+                        }
+                        _ => {
+                            self.state.search_g_pending = false;
+                        }
+                    }
+                    return;
+                }
+
                 // Visualizer mode — arrow keys / any key to close
                 if self.state.vis_active {
                     match key.code {
@@ -579,6 +730,7 @@ impl App {
                                         if let Some(cm) = &exercise.common_mistake {
                                             self.state.status_msg =
                                                 Some(format!("⚠ Piège : {}", cm));
+                                            self.state.status_msg_at = Some(Instant::now());
                                         }
                                     }
                                 }
@@ -592,6 +744,10 @@ impl App {
                                 }
                             }
                         }
+                    }
+                    KeyCode::Char('/') => {
+                        self.state.search_active = true;
+                        Self::rebuild_search(&mut self.state);
                     }
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         let idx = self.state.current_index;
@@ -614,8 +770,15 @@ impl App {
             }
             Msg::FileChanged(_) => {
                 self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
+                self.state.status_msg_at = Some(Instant::now());
             }
             Msg::Tick => {
+                if let Some(at) = self.state.status_msg_at {
+                    if at.elapsed() > std::time::Duration::from_secs(3) {
+                        self.state.status_msg = None;
+                        self.state.status_msg_at = None;
+                    }
+                }
                 // Check deadline on tick
                 if let Some(deadline) = self.state.piscine_deadline {
                     if std::time::Instant::now() >= deadline {

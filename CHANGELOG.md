@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.9.9] — 2026-03-13
+
+### TUI — Finalisation série v2.9.x
+
+- **v2.9.7** — Overlay d'aide `[?]` en mode watch : popup 60%×70% listant tous les raccourcis, fermé par n'importe quelle touche. `help_active: bool` dans `AppState`. `render_help_overlay()` dans `common.rs`. Status bar : `[?] aide` dans les hints normaux, `[Esc/?] fermer` quand actif.
+- **v2.9.8** — Navigation vim `[g]`/`[G]` dans l'overlay search (watch + piscine) : `G` → dernier résultat, `gg` → premier résultat. `search_g_pending: bool` dans `AppState`. Hint bar mise à jour : `[g/G] début/fin`.
+- **v2.9.2–v2.9.6** (consolidés) — Fix sélection invisible (`ListState` + all items), `status_msg_at` expiration 3s, filtre sujet `[Tab]` en recherche, perf sidebar O(n) → O(1) via `subject_order` cache, search piscine.
+
+---
+
 ## [2.9.1] — 2026-03-13
 
 ### Cohérence — documentation et tests search

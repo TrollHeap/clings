@@ -333,22 +333,30 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         " "
     };
     let query_display = format!("{}{}", state.search_query, cursor);
+    let overlay_title = if state.search_subject_filter {
+        let subject = state
+            .exercises
+            .get(state.current_index)
+            .map(|ex| ex.subject.as_str())
+            .unwrap_or("?");
+        format!("/ Recherche (sujet: {})", subject)
+    } else {
+        "/ Recherche".to_string()
+    };
     f.render_widget(
         Paragraph::new(query_display).block(
             Block::bordered()
-                .title("/ Recherche")
+                .title(overlay_title)
                 .style(Style::default().bg(Color::Black))
                 .border_style(Style::default().fg(Color::Cyan)),
         ),
         query_area,
     );
 
-    // Results list
-    let max_visible = results_area.height.saturating_sub(2) as usize;
+    // Results list — pass ALL results so ListState scroll works correctly
     let results: Vec<(&crate::models::Exercise, usize)> = state
         .search_results
         .iter()
-        .take(max_visible.max(1) * 3)
         .filter_map(|&idx| state.exercises.get(idx).map(|ex| (ex, idx)))
         .collect();
 
@@ -402,8 +410,77 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
 
     // Hint bar
     f.render_widget(
-        Paragraph::new("[↑↓/jk] nav  [Entrée] aller  [Esc] fermer")
-            .style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(
+            "[↑↓/jk] nav  [g/G] début/fin  [Entrée] aller  [Tab] filtre sujet  [Esc] fermer",
+        )
+        .style(Style::default().fg(Color::DarkGray)),
         hint_area,
+    );
+}
+
+/// Overlay d'aide — raccourcis clavier du mode watch.
+pub fn render_help_overlay(f: &mut Frame, area: Rect) {
+    let [_, popup_v, _] = Layout::vertical([
+        Constraint::Percentage(15),
+        Constraint::Percentage(70),
+        Constraint::Percentage(15),
+    ])
+    .areas(area);
+    let [_, popup, _] = Layout::horizontal([
+        Constraint::Percentage(20),
+        Constraint::Percentage(60),
+        Constraint::Percentage(20),
+    ])
+    .areas(popup_v);
+
+    f.render_widget(ratatui::widgets::Clear, popup);
+
+    let bindings: &[(&str, &str)] = &[
+        ("[j] / [n]", "Exercice suivant"),
+        ("[k]", "Exercice précédent"),
+        ("[r]", "Compiler et vérifier"),
+        ("[h]", "Afficher l'indice"),
+        ("[v]", "Visualiseur mémoire"),
+        ("[/]", "Recherche fuzzy"),
+        ("[Tab]", "Filtrer par sujet (en recherche)"),
+        ("[←][→]", "Étape visualiseur"),
+        ("[q]", "Quitter"),
+        ("", ""),
+        ("[?]", "Afficher cette aide"),
+    ];
+
+    let mut lines: Vec<Line> = vec![Line::raw("")];
+    for (key, desc) in bindings {
+        if key.is_empty() {
+            lines.push(Line::raw(""));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("  {:<10}", key),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::styled(*desc, Style::default().fg(Color::White)),
+            ]));
+        }
+    }
+    lines.push(Line::raw(""));
+    lines.push(Line::styled(
+        "  Appuyez sur n'importe quelle touche pour fermer",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(
+                Block::bordered()
+                    .title("Aide — raccourcis")
+                    .style(Style::default().bg(Color::Black))
+                    .border_style(Style::default().fg(Color::Cyan)),
+            )
+            .wrap(Wrap { trim: false }),
+        popup,
     );
 }

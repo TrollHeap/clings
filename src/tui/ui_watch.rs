@@ -37,7 +37,9 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
     render_header(f, header_area, state);
 
-    if state.vis_active {
+    if state.help_active {
+        common::render_help_overlay(f, body_area);
+    } else if state.vis_active {
         common::render_visualizer_overlay(f, body_area, state);
     } else if state.search_active {
         common::render_search_overlay(f, body_area, state);
@@ -257,17 +259,9 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
 
-    // Collecte les sujets uniques depuis les exercices — O(n) via HashSet
-    let mut seen = std::collections::HashSet::new();
-    let chapter_subjects: Vec<&String> = state
-        .exercises
-        .iter()
-        .map(|ex| &ex.subject)
-        .filter(|s| seen.insert(s.as_str()))
-        .collect();
-    // Priorité au sujet courant puis les 7 premiers
+    // Priorité au sujet courant puis les 7 premiers depuis le cache
     let top: Vec<&String> = {
-        let mut result: Vec<&String> = chapter_subjects.iter().copied().take(8).collect();
+        let mut result: Vec<&String> = state.subject_order.iter().take(8).collect();
         if !result.contains(&&exercise.subject) {
             result.insert(0, &exercise.subject);
             result.truncate(8);
@@ -340,7 +334,9 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let has_vis = !exercise.visualizer.steps.is_empty();
 
     let has_hints = !exercise.hints.is_empty();
-    let left_msg = if state.search_active {
+    let left_msg = if state.help_active {
+        "[Esc/?] fermer".to_string()
+    } else if state.search_active {
         "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer".to_string()
     } else if let Some(status) = &state.status_msg {
         status.as_str().to_string()
@@ -358,6 +354,7 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             parts.push("[v] vis".to_string());
         }
         parts.push("[/] search".to_string());
+        parts.push("[?] aide".to_string());
         parts.push("[q] quit".to_string());
         parts.join("  ")
     };
