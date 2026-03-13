@@ -26,6 +26,31 @@ const TEST_H_FILENAME: &str = "test.h";
 /// Nom du fichier C généré qui inclut current.c + le code du harnais.
 const TEST_C_FILENAME: &str = "test_current.c";
 
+/// Patterns C interdits dans `test_code` — prévient l'injection de code via exercices externes.
+const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
+    "system(",
+    "popen(",
+    "execv(",
+    "execvp(",
+    "execve(",
+    "execl(",
+    "execlp(",
+    "execle(",
+    "dlopen(",
+    "dlsym(",
+    "__attribute__((constructor))",
+    "#pragma",
+];
+
+/// Valide `test_code` avant d'écrire le fichier C généré.
+/// Retourne `Some(pattern)` si un pattern interdit est trouvé, `None` sinon.
+fn validate_test_code(code: &str) -> Option<&'static str> {
+    FORBIDDEN_TEST_CODE_PATTERNS
+        .iter()
+        .copied()
+        .find(|&pat| code.contains(pat))
+}
+
 // Per-thread cache of compiled regexes: pattern string → compiled Regex (or None if invalid).
 thread_local! {
     static REGEX_CACHE: RefCell<HashMap<String, Option<regex::Regex>>> =
@@ -288,6 +313,12 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
             );
         }
     };
+
+    if let Some(forbidden) = validate_test_code(test_code) {
+        return make_compile_error(format!(
+            "test_code invalide : pattern interdit détecté (`{forbidden}`)"
+        ));
+    }
 
     // Write test.h from embedded asset
     let test_h_content = include_str!("../assets/test.h");

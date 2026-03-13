@@ -68,28 +68,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let bar_color = common::mastery_color(mastery);
 
     // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
-    // chars().count() pour la largeur d'affichage (●◉○ = 3 octets mais 1 col)
-    let right1_display = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
-    let pad1 = width.saturating_sub(state.cached_header_left_len + right1_display + 4);
-    let line1 = Line::from(vec![
-        Span::styled(
-            state.cached_exercise_counter.as_str(),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            exercise.title.as_str(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(
-            state.cached_mini_map.as_str(),
-            Style::default().fg(Color::Gray),
-        ),
-        Span::raw("  "),
-        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
-    ]);
+    let line1 = common::render_header_line1(state, exercise, width);
 
     // ── Ligne 2 : stars | type | stage ── + droit: mastery bar ────────
     let stars = common::difficulty_stars(exercise.difficulty);
@@ -98,7 +77,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         Span::styled(stars, Style::default().fg(diff_color)),
         Span::raw("  │  "),
         Span::styled(
-            exercise.exercise_type.to_string(),
+            state.cached_exercise_type.as_str(),
             Style::default().fg(Color::Gray),
         ),
     ];
@@ -238,16 +217,10 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             Cow::Borrowed("[r] run"),
         ];
         if has_hints {
-            let hint_label: Cow<'static, str> = if state.hint_index == 0 {
-                Cow::Borrowed("[h] hint")
-            } else {
-                Cow::Owned(format!(
-                    "[h] hint ({}/{})",
-                    state.hint_index,
-                    exercise.hints.len()
-                ))
-            };
-            parts.insert(0, hint_label);
+            parts.insert(
+                0,
+                common::hint_label(state.hint_index, exercise.hints.len(), "hint"),
+            );
         }
         if has_vis {
             parts.push(Cow::Borrowed("[v] vis"));

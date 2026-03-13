@@ -6,7 +6,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::models::{Difficulty, ValidationMode};
+use std::borrow::Cow;
+
+use crate::models::{Difficulty, Exercise, ValidationMode};
 use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
@@ -46,6 +48,52 @@ pub fn stage_label(stage: u8) -> &'static str {
         3 => "S3",
         _ => "S4",
     }
+}
+
+/// Construit l'étiquette de hint pour la status bar.
+///
+/// Retourne `"[h] <label>"` quand aucun hint n'est révélé (zéro allocation via `Cow::Borrowed`),
+/// et `"[h] <label> (n/total)"` sinon (`Cow::Owned`).
+pub fn hint_label(hint_index: usize, hint_count: usize, label: &'static str) -> Cow<'static, str> {
+    if hint_index == 0 {
+        match label {
+            "hint" => Cow::Borrowed("[h] hint"),
+            "indice" => Cow::Borrowed("[h] indice"),
+            _ => Cow::Owned(format!("[h] {label}")),
+        }
+    } else {
+        Cow::Owned(format!("[h] {label} ({hint_index}/{hint_count})"))
+    }
+}
+
+/// Construit la ligne 1 du header (commune à watch et piscine) :
+/// `[idx/total] Titre <padding> mini-map  sujet`
+pub fn render_header_line1<'a>(
+    state: &'a AppState,
+    exercise: &'a Exercise,
+    width: usize,
+) -> Line<'a> {
+    let right1_display = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
+    let pad1 = width.saturating_sub(state.cached_header_left_len + right1_display + 4);
+    Line::from(vec![
+        Span::styled(
+            state.cached_exercise_counter.as_str(),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            exercise.title.as_str(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" ".repeat(pad1 + 1)),
+        Span::styled(
+            state.cached_mini_map.as_str(),
+            Style::default().fg(Color::Gray),
+        ),
+        Span::raw("  "),
+        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
+    ])
 }
 
 /// Calcule la zone d'un popup centré avec des marges en pourcentage.

@@ -60,8 +60,14 @@ pub struct AppState {
     pub cached_mini_map: String,
     pub cached_exercise_counter: String, // "[N/total] "
     pub cached_mastery_display: String,  // "mastery: X.X  "
+    pub cached_exercise_type: String,    // ExerciseType::to_string() — invariant par exercice
     pub cached_header_left_len: usize,   // Width of "[N/total] " + title in chars
     pub cached_mini_map_len: usize,      // Display width of cached_mini_map (chars count)
+    // Piscine timer cache — mis à jour dans Tick quand la seconde change
+    pub cached_piscine_elapsed_str: String,
+    pub piscine_last_elapsed_secs: u64,
+    pub cached_piscine_remaining_str: String,
+    pub piscine_last_remaining_secs: u64,
 }
 
 impl AppState {
@@ -101,8 +107,13 @@ impl AppState {
             cached_mini_map: String::new(),
             cached_exercise_counter: String::new(),
             cached_mastery_display: String::new(),
+            cached_exercise_type: String::new(),
             cached_header_left_len: 0,
             cached_mini_map_len: 0,
+            cached_piscine_elapsed_str: String::new(),
+            piscine_last_elapsed_secs: u64::MAX,
+            cached_piscine_remaining_str: String::new(),
+            piscine_last_remaining_secs: u64::MAX,
         }
     }
 
@@ -145,6 +156,11 @@ impl App {
         state.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
         state.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
         state.cached_mini_map_len = state.cached_mini_map.chars().count();
+        state.cached_exercise_type = state
+            .exercises
+            .get(idx)
+            .map(|e| e.exercise_type.to_string())
+            .unwrap_or_default();
 
         // Cache the left header width: "[N/total] " + title chars count
         let title = state
@@ -563,6 +579,22 @@ impl App {
     ) -> Result<()> {
         use std::time::Duration;
 
+        // Initialise le cache timer piscine pour le premier frame
+        if let Some(start) = self.state.piscine_start {
+            let elapsed = start.elapsed().as_secs();
+            self.state.piscine_last_elapsed_secs = elapsed;
+            self.state.cached_piscine_elapsed_str =
+                format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
+        }
+        if let Some(deadline) = self.state.piscine_deadline {
+            let remaining = deadline
+                .checked_duration_since(std::time::Instant::now())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            self.state.piscine_last_remaining_secs = remaining;
+            self.state.cached_piscine_remaining_str = format_remaining_secs(remaining);
+        }
+
         // Prépare le premier exercice
         self.load_current_exercise(conn)?;
 
@@ -776,9 +808,28 @@ impl App {
             Msg::FileChanged => self.handle_file_changed(),
             Msg::Tick => {
                 self.handle_tick_status_clear();
-                // Check deadline on tick
+                // Mise à jour du cache timer elapsed (1 allocation/seconde max)
+                if let Some(start) = self.state.piscine_start {
+                    let elapsed = start.elapsed().as_secs();
+                    if elapsed != self.state.piscine_last_elapsed_secs {
+                        self.state.piscine_last_elapsed_secs = elapsed;
+                        self.state.cached_piscine_elapsed_str =
+                            format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
+                    }
+                }
+                // Mise à jour du cache timer restant (1 allocation/seconde max)
                 if let Some(deadline) = self.state.piscine_deadline {
-                    if std::time::Instant::now() >= deadline {
+                    let now = std::time::Instant::now();
+                    let remaining = deadline
+                        .checked_duration_since(now)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    if remaining != self.state.piscine_last_remaining_secs {
+                        self.state.piscine_last_remaining_secs = remaining;
+                        self.state.cached_piscine_remaining_str = format_remaining_secs(remaining);
+                    }
+                    // Check deadline on tick (réutilise `now` — évite un second syscall)
+                    if now >= deadline {
                         let idx = self.state.current_index;
                         self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
@@ -804,5 +855,17 @@ impl App {
                 self.state.status_msg_at = None;
             }
         }
+    }
+}
+
+/// Formate un nombre de secondes restantes en chaîne lisible.
+/// Partagé entre `run_piscine()` (init) et le Tick handler.
+fn format_remaining_secs(remaining: u64) -> String {
+    if remaining == 0 {
+        "Temps écoulé".to_string()
+    } else if remaining >= 60 {
+        format!("{}m{:02}s restantes", remaining / 60, remaining % 60)
+    } else {
+        format!("{}s restantes", remaining)
     }
 }

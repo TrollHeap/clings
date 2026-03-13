@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Gauge, Paragraph};
 use ratatui::Frame;
@@ -68,30 +68,7 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let width = area.width as usize;
 
     // Ligne 1 : [idx/total] titre + droit: mini-map
-    let pad1 = {
-        // chars().count() pour ●◉○ (3 octets chacun, 1 col d'affichage)
-        let right_len = state.cached_mini_map_len + exercise.subject.chars().count() + 2;
-        width.saturating_sub(state.cached_header_left_len + right_len + 4)
-    };
-    let line1 = Line::from(vec![
-        Span::styled(
-            state.cached_exercise_counter.as_str(),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            exercise.title.as_str(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(
-            state.cached_mini_map.as_str(),
-            Style::default().fg(Color::Gray),
-        ),
-        Span::raw("  "),
-        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
-    ]);
+    let line1 = common::render_header_line1(state, exercise, width);
 
     // Ligne 2 : difficulté | sujet | stage | temps écoulé
     let stars = common::difficulty_stars(exercise.difficulty);
@@ -110,11 +87,12 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
         ));
     }
 
-    if let Some(start) = state.piscine_start {
-        let elapsed = start.elapsed().as_secs();
-        let elapsed_str = format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
+    if state.piscine_start.is_some() && !state.cached_piscine_elapsed_str.is_empty() {
         meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(elapsed_str, Style::default().fg(Color::Gray)));
+        meta_spans.push(Span::styled(
+            state.cached_piscine_elapsed_str.as_str(),
+            Style::default().fg(Color::Gray),
+        ));
     }
 
     let line2 = Line::from(meta_spans);
@@ -146,16 +124,7 @@ fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {
             0.0
         };
 
-        let label = if remaining_secs <= 0.0 {
-            "Temps écoulé".to_string()
-        } else {
-            let secs = remaining_secs as u64;
-            if secs >= 60 {
-                format!("{}m{:02}s restantes", secs / 60, secs % 60)
-            } else {
-                format!("{}s restantes", secs)
-            }
-        };
+        let label = state.cached_piscine_remaining_str.as_str();
 
         let color = if ratio > 0.5 {
             Color::Green
@@ -265,16 +234,10 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             Cow::Borrowed("[k] précédent"),
         ];
         if has_hints {
-            let hint_label: Cow<'static, str> = if state.hint_index == 0 {
-                Cow::Borrowed("[h] indice")
-            } else {
-                Cow::Owned(format!(
-                    "[h] indice ({}/{})",
-                    state.hint_index,
-                    exercise.hints.len()
-                ))
-            };
-            parts.insert(1, hint_label);
+            parts.insert(
+                1,
+                common::hint_label(state.hint_index, exercise.hints.len(), "indice"),
+            );
         }
         if has_vis {
             parts.push(Cow::Borrowed("[v] vis"));

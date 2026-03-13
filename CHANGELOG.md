@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.0.2] — 2026-03-14
+
+### Sécurité, performance, DRY (patch)
+
+#### Sécurité
+
+- **`validate_test_code()`** (`runner.rs`) : nouvelle fonction appelée avant l'écriture de `test_current.c` — bloque 12 patterns dangereux (`#include`, `system()`, `exec*`, `__asm__`, pointeurs de fonction vers syscalls, etc.) pour prévenir l'injection de code C arbitraire via le champ `test_code` d'un exercice malveillant
+
+#### Performance (zéro allocation hot-path)
+
+- **Cache timer piscine** (`app.rs`) : `cached_piscine_elapsed_str` + `cached_piscine_remaining_str` — sentinelles `piscine_last_elapsed_secs`/`piscine_last_remaining_secs` initialisées à `u64::MAX` ; les strings ne sont reformatées que lors du changement de seconde (~1/s au lieu de ~60/s)
+- **`hint_label()` zéro-alloc** (`common.rs`) : le cas `hint_index == 0` utilise désormais `Cow::Borrowed` via `match` sur les labels connus (`"hint"`, `"indice"`) — élimine l'allocation `format!()` pour la barre de statut
+
+#### DRY
+
+- **`format_remaining_secs()`** (`app.rs`) : helper extrait — centralise le formatage `Xm YYs` / `Xs` / `"Temps écoulé"` partagé entre l'init `run_piscine()` et le Tick handler
+- **`Instant::now()` dédupliqué** (`app.rs`) : le Tick handler réutilise `now` (déjà calculé pour `checked_duration_since`) au lieu d'un second appel syscall pour la vérification `>= deadline`
+
+---
+
 ## [3.0.1] — 2026-03-13
 
 ### Audit 2 remediation — performance, sécurité, DRY
