@@ -20,9 +20,7 @@ fn avg_mastery(subjects: &[Subject]) -> f64 {
 
 /// Render mastery bar as (█░░░░░░░░░ format) + score as Spans for Ratatui.
 fn mastery_bar_spans(score: f64) -> Vec<Span<'static>> {
-    let filled = (score / 5.0 * 10.0).round() as usize;
-    let empty = 10 - filled.min(10);
-    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
+    let bar = common::mastery_bar_string(score, 10);
     let color = common::mastery_color(score);
     vec![
         Span::styled(bar, Style::default().fg(color)),

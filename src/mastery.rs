@@ -67,16 +67,6 @@ pub fn apply_decay(subject: &mut Subject) {
     }
 }
 
-/// Estime le nombre de jours avant le prochain review à partir du score de maîtrise.
-/// Utilisé pour l'affichage post-validation en mode review.
-/// Formule : round(mastery * interval_multiplier), borné entre base et max.
-#[allow(dead_code)]
-pub(crate) fn next_interval_days(mastery: f32) -> u32 {
-    let cfg = &crate::config::get().srs;
-    let raw = (mastery as f64 * cfg.interval_multiplier).round() as i64;
-    raw.clamp(cfg.base_interval_days, cfg.max_interval_days) as u32
-}
-
 /// Calcule le prochain horodatage de révision et le nouvel intervalle SRS.
 /// En cas de succès l'intervalle est multiplié par `interval_multiplier` (max `max_interval_days`) ;
 /// en cas d'échec il revient à `base_interval_days`.
@@ -266,28 +256,5 @@ mod tests {
     #[test]
     fn test_mastery_delta_failure() {
         assert_eq!(mastery_delta(false), FAILURE_DELTA);
-    }
-
-    // ── next_interval_days ──────────────────────────────────────────────
-
-    #[test]
-    fn next_interval_days_min_clamp() {
-        // mastery=0.0 → raw=round(0.0 * 2.5)=0 → clamped to base_interval_days (1)
-        let result = next_interval_days(0.0);
-        assert_eq!(result, SRS_BASE_INTERVAL_DAYS as u32);
-    }
-
-    #[test]
-    fn next_interval_days_max_clamp() {
-        // mastery=30.0 → raw=round(30.0 * 2.5)=75 → clamped to max_interval_days (60)
-        let result = next_interval_days(30.0);
-        assert_eq!(result, SRS_MAX_INTERVAL_DAYS as u32);
-    }
-
-    #[test]
-    fn next_interval_days_mid() {
-        // mastery=2.0 → raw=round(2.0 * 2.5)=5 → within [1, 60], returns 5
-        let result = next_interval_days(2.0);
-        assert_eq!(result, 5);
     }
 }

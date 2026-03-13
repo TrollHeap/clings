@@ -19,17 +19,8 @@ pub enum WatchAction {
     Advance,
     /// Continue watching for changes
     Continue,
-    /// User wants to skip
-    #[allow(dead_code)]
-    Skip,
     /// User wants to quit
     Quit,
-    /// Navigate to next exercise (j)
-    #[allow(dead_code)]
-    Next,
-    /// Navigate to previous exercise (k)
-    #[allow(dead_code)]
-    Prev,
 }
 
 /// Watch a file for modifications while also listening for keyboard commands.

@@ -6,7 +6,7 @@ use colored::Colorize;
 
 use crate::constants::SECS_PER_DAY;
 use crate::error::Result;
-use crate::tui::app::{App, AppMode};
+use crate::tui::app::App;
 use crate::{chapters, exercises, progress, tmux};
 
 pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
@@ -68,9 +68,7 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         .collect();
 
     // ── 2. Prépare AppState ────────────────────────────────────────────
-    let mut app = App::new(AppMode::Watch {
-        chapter: filter_chapter,
-    });
+    let mut app = App::new();
     app.state.exercises = exercise_order.into_iter().cloned().collect();
     app.state.completed = vec![false; total];
     app.state.review_map = review_map;
