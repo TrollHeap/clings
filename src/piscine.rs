@@ -305,11 +305,12 @@ mod tests {
 
     /// Vérifie le roundtrip save/load du checkpoint piscine sur une DB in-memory.
     #[test]
-    fn test_checkpoint_roundtrip() {
+    fn test_checkpoint_roundtrip() -> crate::error::Result<()> {
         let conn = open_test_db();
-        progress::save_piscine_checkpoint(&conn, 3).unwrap();
-        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        progress::save_piscine_checkpoint(&conn, 3)?;
+        let loaded = progress::load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, Some(3));
+        Ok(())
     }
 
     /// Vérifie que le mécanisme de skip incrémente bien l'index d'exercice.
@@ -328,41 +329,45 @@ mod tests {
 
     /// Vérifie que clear_piscine_checkpoint efface bien le checkpoint.
     #[test]
-    fn test_clear_checkpoint() {
+    fn test_clear_checkpoint() -> crate::error::Result<()> {
         let conn = open_test_db();
-        progress::save_piscine_checkpoint(&conn, 5).unwrap();
-        progress::clear_piscine_checkpoint(&conn).unwrap();
-        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        progress::save_piscine_checkpoint(&conn, 5)?;
+        progress::clear_piscine_checkpoint(&conn)?;
+        let loaded = progress::load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     /// Vérifie que le checkpoint est mis à jour à chaque avancement.
     #[test]
-    fn test_checkpoint_advances_with_index() {
+    fn test_checkpoint_advances_with_index() -> crate::error::Result<()> {
         let conn = open_test_db();
         for expected_index in [0usize, 1, 2, 5, 10] {
-            progress::save_piscine_checkpoint(&conn, expected_index).unwrap();
-            let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+            progress::save_piscine_checkpoint(&conn, expected_index)?;
+            let loaded = progress::load_piscine_checkpoint(&conn)?;
             assert_eq!(loaded, Some(expected_index));
         }
+        Ok(())
     }
 
     /// Vérifie que le checkpoint est écrasé (pas accumulé) lors de mises à jour successives.
     #[test]
-    fn test_checkpoint_overwrite() {
+    fn test_checkpoint_overwrite() -> crate::error::Result<()> {
         let conn = open_test_db();
-        progress::save_piscine_checkpoint(&conn, 3).unwrap();
-        progress::save_piscine_checkpoint(&conn, 7).unwrap();
-        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        progress::save_piscine_checkpoint(&conn, 3)?;
+        progress::save_piscine_checkpoint(&conn, 7)?;
+        let loaded = progress::load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, Some(7));
+        Ok(())
     }
 
     /// Vérifie que load renvoie None si aucun checkpoint n'a été sauvegardé.
     #[test]
-    fn test_load_checkpoint_missing_returns_none() {
+    fn test_load_checkpoint_missing_returns_none() -> crate::error::Result<()> {
         let conn = open_test_db();
-        let loaded = progress::load_piscine_checkpoint(&conn).unwrap();
+        let loaded = progress::load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     /// Vérifie l'ordre chapter→difficulty sur une liste mixte d'exercices.

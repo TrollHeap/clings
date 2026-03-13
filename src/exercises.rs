@@ -187,10 +187,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_load_all_exercises_finds_files() {
-        let result = load_all_exercises();
-        assert!(result.is_ok(), "Should find exercises from project root");
-        let (exercises, by_subject) = result.unwrap();
+    fn test_load_all_exercises_finds_files() -> crate::error::Result<()> {
+        let (exercises, by_subject) = load_all_exercises()?;
         assert!(!exercises.is_empty(), "Should load at least one exercise");
         assert!(!by_subject.is_empty(), "Should group by subject");
         // Verify indices are in bounds
@@ -199,26 +197,30 @@ mod tests {
                 assert!(i < exercises.len());
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn test_find_exercise_exists() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_find_exercise_exists() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         let first_id = &exercises[0].id;
         let found = find_exercise(&exercises, first_id);
         assert!(found.is_some());
-        assert_eq!(found.unwrap().id, *first_id);
+        let ex = found.expect("should find exercise");
+        assert_eq!(ex.id, *first_id);
+        Ok(())
     }
 
     #[test]
-    fn test_find_exercise_missing() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_find_exercise_missing() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         assert!(find_exercise(&exercises, "nonexistent-id-999").is_none());
+        Ok(())
     }
 
     #[test]
-    fn test_exercises_have_required_fields() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_exercises_have_required_fields() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             assert!(!ex.id.is_empty(), "Exercise ID must not be empty");
             assert!(!ex.subject.is_empty(), "Subject must not be empty");
@@ -228,11 +230,12 @@ mod tests {
                 "Starter code must not be empty"
             );
         }
+        Ok(())
     }
 
     #[test]
-    fn test_by_subject_consistency() {
-        let (exercises, by_subject) = load_all_exercises().unwrap();
+    fn test_by_subject_consistency() -> crate::error::Result<()> {
+        let (exercises, by_subject) = load_all_exercises()?;
         let total_in_map: usize = by_subject.values().map(|v| v.len()).sum();
         assert_eq!(exercises.len(), total_in_map);
         // Verify subjects in map match the exercises they index
@@ -241,11 +244,12 @@ mod tests {
                 assert_eq!(&exercises[i].subject, subject);
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn test_exercise_ids_unique() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_exercise_ids_unique() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         let ids: std::collections::HashSet<&str> =
             exercises.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(
@@ -255,11 +259,12 @@ mod tests {
             exercises.len(),
             ids.len()
         );
+        Ok(())
     }
 
     #[test]
-    fn test_exercises_fields_complete() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_exercises_fields_complete() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             assert!(!ex.title.is_empty(), "Exercise {} has empty title", ex.id);
             assert!(
@@ -279,11 +284,12 @@ mod tests {
             );
             assert!(!ex.hints.is_empty(), "Exercise {} has no hints", ex.id);
         }
+        Ok(())
     }
 
     #[test]
-    fn test_starter_code_stages_count() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_starter_code_stages_count() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             if !ex.starter_code_stages.is_empty() {
                 assert_eq!(
@@ -303,12 +309,13 @@ mod tests {
                 }
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn test_output_validation_has_expected() {
+    fn test_output_validation_has_expected() -> crate::error::Result<()> {
         use crate::models::ValidationMode;
-        let (exercises, _) = load_all_exercises().unwrap();
+        let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             // Test-mode exercises validate via test_code, not expected_output
             if matches!(ex.validation.mode, ValidationMode::Test) {
@@ -319,18 +326,23 @@ mod tests {
                 "Exercise {} has no expected_output",
                 ex.id
             );
-            let expected = ex.validation.expected_output.as_ref().unwrap();
+            let expected = ex
+                .validation
+                .expected_output
+                .as_ref()
+                .expect("expected_output should exist");
             assert!(
                 !expected.is_empty(),
                 "Exercise {} has empty expected_output",
                 ex.id
             );
         }
+        Ok(())
     }
 
     #[test]
-    fn test_difficulty_range() {
-        let (exercises, _) = load_all_exercises().unwrap();
+    fn test_difficulty_range() -> crate::error::Result<()> {
+        let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             let d = ex.difficulty as u8;
             assert!(
@@ -340,14 +352,15 @@ mod tests {
                 d
             );
         }
+        Ok(())
     }
 
     /// Vérifie que les exercices Test et Both sont présents dans la liste chargée
     /// (garantit qu'aucun filtre silencieux ne les exclut de la navigation).
     #[test]
-    fn test_test_and_both_exercises_are_loaded() {
+    fn test_test_and_both_exercises_are_loaded() -> crate::error::Result<()> {
         use crate::models::ValidationMode;
-        let (exercises, _) = load_all_exercises().unwrap();
+        let (exercises, _) = load_all_exercises()?;
         let has_test = exercises
             .iter()
             .any(|ex| matches!(ex.validation.mode, ValidationMode::Test));
@@ -362,5 +375,6 @@ mod tests {
             has_both,
             "Aucun exercice ValidationMode::Both dans la liste chargée"
         );
+        Ok(())
     }
 }

@@ -666,344 +666,364 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ensure_subject_creates_row() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        let sub = get_subject(&conn, "pointers").unwrap();
+    fn test_ensure_subject_creates_row() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        let sub = get_subject(&conn, "pointers")?;
         assert!(sub.is_some());
-        let sub = sub.unwrap();
+        let sub = sub.expect("subject should exist after insert");
         assert_eq!(sub.name, "pointers");
         assert_eq!(sub.mastery_score.get(), 0.0);
         assert_eq!(sub.difficulty_unlocked, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_ensure_subject_idempotent() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        let subjects = get_all_subjects(&conn).unwrap();
+    fn test_ensure_subject_idempotent() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        ensure_subject(&conn, "pointers")?;
+        let subjects = get_all_subjects(&conn)?;
         assert_eq!(subjects.len(), 1);
+        Ok(())
     }
 
     #[test]
-    fn test_record_attempt_success() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "structs").unwrap();
-        let sub = record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
+    fn test_record_attempt_success() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "structs")?;
+        let sub = record_attempt(&conn, "structs", "struct-point-01", true)?;
         assert_eq!(sub.mastery_score.get(), 1.0);
         assert_eq!(sub.attempts_total, 1);
         assert_eq!(sub.attempts_success, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_record_attempt_failure() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "structs").unwrap();
+    fn test_record_attempt_failure() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "structs")?;
 
         // First succeed to have score > 0
-        record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
-        let sub = record_attempt(&conn, "structs", "struct-point-01", false).unwrap();
+        record_attempt(&conn, "structs", "struct-point-01", true)?;
+        let sub = record_attempt(&conn, "structs", "struct-point-01", false)?;
         assert_eq!(sub.mastery_score.get(), 0.5);
         assert_eq!(sub.attempts_total, 2);
         assert_eq!(sub.attempts_success, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_reset_progress() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
-        reset_progress(&conn).unwrap();
-        let subjects = get_all_subjects(&conn).unwrap();
+    fn test_reset_progress() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        record_attempt(&conn, "pointers", "ptr-deref-01", true)?;
+        reset_progress(&conn)?;
+        let subjects = get_all_subjects(&conn)?;
         assert!(subjects.is_empty());
+        Ok(())
     }
 
     #[test]
-    fn test_get_subject_missing() {
-        let conn = open_test_db().unwrap();
-        let sub = get_subject(&conn, "nonexistent").unwrap();
+    fn test_get_subject_missing() -> Result<()> {
+        let conn = open_test_db()?;
+        let sub = get_subject(&conn, "nonexistent")?;
         assert!(sub.is_none());
+        Ok(())
     }
 
     #[test]
-    fn test_reset_subject_isolated() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        ensure_subject(&conn, "structs").unwrap();
-        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
-        record_attempt(&conn, "structs", "struct-point-01", true).unwrap();
+    fn test_reset_subject_isolated() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        ensure_subject(&conn, "structs")?;
+        record_attempt(&conn, "pointers", "ptr-deref-01", true)?;
+        record_attempt(&conn, "structs", "struct-point-01", true)?;
 
-        reset_subject(&conn, "pointers").unwrap();
+        reset_subject(&conn, "pointers")?;
 
         // pointers supprimé
-        assert!(get_subject(&conn, "pointers").unwrap().is_none());
+        assert!(get_subject(&conn, "pointers")?.is_none());
         // structs intact
-        let s = get_subject(&conn, "structs").unwrap().unwrap();
+        let s = get_subject(&conn, "structs")?.expect("structs should exist after insert");
         assert_eq!(s.mastery_score.get(), 1.0);
         // log pointers supprimé, log structs intact
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM practice_log WHERE subject = 'structs'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM practice_log WHERE subject = 'structs'",
+            [],
+            |r| r.get(0),
+        )?;
         assert_eq!(count, 1);
-        let count_ptr: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM practice_log WHERE subject = 'pointers'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
+        let count_ptr: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM practice_log WHERE subject = 'pointers'",
+            [],
+            |r| r.get(0),
+        )?;
         assert_eq!(count_ptr, 0);
+        Ok(())
     }
 
     #[test]
-    fn test_kv_checkpoint_roundtrip() {
-        let conn = open_test_db().unwrap();
-        save_piscine_checkpoint(&conn, 42).unwrap();
-        let loaded = load_piscine_checkpoint(&conn).unwrap();
+    fn test_kv_checkpoint_roundtrip() -> Result<()> {
+        let conn = open_test_db()?;
+        save_piscine_checkpoint(&conn, 42)?;
+        let loaded = load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, Some(42));
+        Ok(())
     }
 
     #[test]
-    fn test_kv_checkpoint_missing_returns_none() {
-        let conn = open_test_db().unwrap();
-        let loaded = load_piscine_checkpoint(&conn).unwrap();
+    fn test_kv_checkpoint_missing_returns_none() -> Result<()> {
+        let conn = open_test_db()?;
+        let loaded = load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     #[test]
-    fn test_kv_checkpoint_clear() {
-        let conn = open_test_db().unwrap();
-        save_piscine_checkpoint(&conn, 7).unwrap();
-        clear_piscine_checkpoint(&conn).unwrap();
-        let loaded = load_piscine_checkpoint(&conn).unwrap();
+    fn test_kv_checkpoint_clear() -> Result<()> {
+        let conn = open_test_db()?;
+        save_piscine_checkpoint(&conn, 7)?;
+        clear_piscine_checkpoint(&conn)?;
+        let loaded = load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     #[test]
-    fn test_kv_checkpoint_overwrite() {
-        let conn = open_test_db().unwrap();
-        save_piscine_checkpoint(&conn, 3).unwrap();
-        save_piscine_checkpoint(&conn, 17).unwrap();
-        let loaded = load_piscine_checkpoint(&conn).unwrap();
+    fn test_kv_checkpoint_overwrite() -> Result<()> {
+        let conn = open_test_db()?;
+        save_piscine_checkpoint(&conn, 3)?;
+        save_piscine_checkpoint(&conn, 17)?;
+        let loaded = load_piscine_checkpoint(&conn)?;
         assert_eq!(loaded, Some(17));
+        Ok(())
     }
 
     #[test]
-    fn test_exam_checkpoint_roundtrip() {
-        let conn = open_test_db().unwrap();
-        save_exam_checkpoint(&conn, "nsy103-2024", 5).unwrap();
-        let loaded = load_exam_checkpoint(&conn, "nsy103-2024").unwrap();
+    fn test_exam_checkpoint_roundtrip() -> Result<()> {
+        let conn = open_test_db()?;
+        save_exam_checkpoint(&conn, "nsy103-2024", 5)?;
+        let loaded = load_exam_checkpoint(&conn, "nsy103-2024")?;
         assert_eq!(loaded, Some(5));
+        Ok(())
     }
 
     #[test]
-    fn test_exam_checkpoint_session_isolation() {
-        let conn = open_test_db().unwrap();
-        save_exam_checkpoint(&conn, "nsy103-2024", 3).unwrap();
-        let other = load_exam_checkpoint(&conn, "utc502-2023").unwrap();
+    fn test_exam_checkpoint_session_isolation() -> Result<()> {
+        let conn = open_test_db()?;
+        save_exam_checkpoint(&conn, "nsy103-2024", 3)?;
+        let other = load_exam_checkpoint(&conn, "utc502-2023")?;
         assert_eq!(other, None);
+        Ok(())
     }
 
     #[test]
-    fn test_exam_checkpoint_session_id_with_colon() {
-        let conn = open_test_db().unwrap();
-        save_exam_checkpoint(&conn, "utc502:2024", 7).unwrap();
-        let loaded = load_exam_checkpoint(&conn, "utc502:2024").unwrap();
+    fn test_exam_checkpoint_session_id_with_colon() -> Result<()> {
+        let conn = open_test_db()?;
+        save_exam_checkpoint(&conn, "utc502:2024", 7)?;
+        let loaded = load_exam_checkpoint(&conn, "utc502:2024")?;
         assert_eq!(loaded, Some(7));
         // A session_id that only matches the prefix must not match
-        let wrong = load_exam_checkpoint(&conn, "utc502").unwrap();
+        let wrong = load_exam_checkpoint(&conn, "utc502")?;
         assert_eq!(wrong, None);
+        Ok(())
     }
 
     #[test]
-    fn test_exam_checkpoint_clear() {
-        let conn = open_test_db().unwrap();
-        save_exam_checkpoint(&conn, "nsy103-2024", 2).unwrap();
-        clear_exam_checkpoint(&conn).unwrap();
-        let loaded = load_exam_checkpoint(&conn, "nsy103-2024").unwrap();
+    fn test_exam_checkpoint_clear() -> Result<()> {
+        let conn = open_test_db()?;
+        save_exam_checkpoint(&conn, "nsy103-2024", 2)?;
+        clear_exam_checkpoint(&conn)?;
+        let loaded = load_exam_checkpoint(&conn, "nsy103-2024")?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     #[test]
-    fn test_due_subjects_past_review() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_due_subjects_past_review() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         // next_review_at dans le passé → sujet doit apparaître
         let past = Utc::now().timestamp() - 3_600;
         conn.execute(
             "UPDATE subjects SET next_review_at = ?1 WHERE name = 'pointers'",
             params![past],
-        )
-        .unwrap();
-        let due = get_due_subjects(&conn).unwrap();
+        )?;
+        let due = get_due_subjects(&conn)?;
         assert!(due.contains(&"pointers".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn test_due_subjects_future_review() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_due_subjects_future_review() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         // next_review_at dans le futur → sujet absent
         let future = Utc::now().timestamp() + SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET next_review_at = ?1 WHERE name = 'pointers'",
             params![future],
-        )
-        .unwrap();
-        let due = get_due_subjects(&conn).unwrap();
+        )?;
+        let due = get_due_subjects(&conn)?;
         assert!(!due.contains(&"pointers".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn test_due_subjects_null_review() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_due_subjects_null_review() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         // next_review_at NULL par défaut → sujet absent
-        let due = get_due_subjects(&conn).unwrap();
+        let due = get_due_subjects(&conn)?;
         assert!(!due.contains(&"pointers".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn test_get_streak_empty() {
-        let conn = open_test_db().unwrap();
-        assert_eq!(get_streak(&conn).unwrap(), 0);
+    fn test_get_streak_empty() -> Result<()> {
+        let conn = open_test_db()?;
+        assert_eq!(get_streak(&conn)?, 0);
+        Ok(())
     }
 
     #[test]
-    fn test_get_streak_today() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_get_streak_today() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         let now = Utc::now().timestamp();
         conn.execute(
             "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES ('t1', 'pointers', 'ex1', 1, ?1)",
             params![now],
-        ).unwrap();
-        assert_eq!(get_streak(&conn).unwrap(), 1);
+        )?;
+        assert_eq!(get_streak(&conn)?, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_get_streak_consecutive_days() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_get_streak_consecutive_days() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         let now = Utc::now().timestamp();
         for (i, id) in ["c1", "c2", "c3"].iter().enumerate() {
             let ts = now - (i as i64) * SECS_PER_DAY;
             conn.execute(
                 "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
                 params![id, ts],
-            ).unwrap();
+            )?;
         }
-        assert_eq!(get_streak(&conn).unwrap(), 3);
+        assert_eq!(get_streak(&conn)?, 3);
+        Ok(())
     }
 
     #[test]
-    fn test_get_streak_broken() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_get_streak_broken() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
         let now = Utc::now().timestamp();
         // Aujourd'hui et il y a 3 jours (pas hier) → streak = 1
         for (id, offset) in [("b1", 0i64), ("b2", 3)] {
             conn.execute(
                 "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
                 params![id, now - offset * SECS_PER_DAY],
-            ).unwrap();
+            )?;
         }
-        assert_eq!(get_streak(&conn).unwrap(), 1);
+        assert_eq!(get_streak(&conn)?, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_apply_all_decay_updates_db() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "structs").unwrap();
+    fn test_apply_all_decay_updates_db() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "structs")?;
         let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
             params![old_ts],
-        ).unwrap();
-        apply_all_decay(&mut conn).unwrap();
-        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        )?;
+        apply_all_decay(&mut conn)?;
+        let sub = get_subject(&conn, "structs")?.expect("structs should exist after insert");
         assert_eq!(sub.mastery_score.get(), 1.5);
+        Ok(())
     }
 
     #[test]
-    fn test_apply_all_decay_no_change_when_recent() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pipes").unwrap();
+    fn test_apply_all_decay_no_change_when_recent() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "pipes")?;
         let recent_ts = Utc::now().timestamp() - 5 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 3.0, last_practiced_at = ?1 WHERE name = 'pipes'",
             params![recent_ts],
-        )
-        .unwrap();
-        apply_all_decay(&mut conn).unwrap();
-        let sub = get_subject(&conn, "pipes").unwrap().unwrap();
+        )?;
+        apply_all_decay(&mut conn)?;
+        let sub = get_subject(&conn, "pipes")?.expect("pipes should exist after insert");
         assert_eq!(sub.mastery_score.get(), 3.0);
+        Ok(())
     }
 
     #[test]
-    fn test_apply_all_decay_updates_last_practiced_at() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "structs").unwrap();
+    fn test_apply_all_decay_updates_last_practiced_at() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "structs")?;
         let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'structs'",
             params![old_ts],
-        )
-        .unwrap();
-        apply_all_decay(&mut conn).unwrap();
-        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        )?;
+        apply_all_decay(&mut conn)?;
+        let sub = get_subject(&conn, "structs")?.expect("structs should exist after insert");
         assert_eq!(sub.mastery_score.get(), 1.5, "score must decay by 0.5");
         // last_practiced_at must have advanced (not remain at old_ts)
         assert!(
-            sub.last_practiced_at.unwrap() > old_ts,
+            sub.last_practiced_at
+                .expect("last_practiced_at should be set")
+                > old_ts,
             "last_practiced_at must advance after decay"
         );
+        Ok(())
     }
 
     #[test]
-    fn test_apply_all_decay_idempotent_in_db() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pipes").unwrap();
+    fn test_apply_all_decay_idempotent_in_db() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "pipes")?;
         let old_ts = Utc::now().timestamp() - 15 * SECS_PER_DAY;
         conn.execute(
             "UPDATE subjects SET mastery_score = 2.0, last_practiced_at = ?1 WHERE name = 'pipes'",
             params![old_ts],
-        )
-        .unwrap();
-        apply_all_decay(&mut conn).unwrap();
-        let sub1 = get_subject(&conn, "pipes").unwrap().unwrap();
-        apply_all_decay(&mut conn).unwrap();
-        let sub2 = get_subject(&conn, "pipes").unwrap().unwrap();
+        )?;
+        apply_all_decay(&mut conn)?;
+        let sub1 = get_subject(&conn, "pipes")?.expect("pipes should exist after insert");
+        apply_all_decay(&mut conn)?;
+        let sub2 = get_subject(&conn, "pipes")?.expect("pipes should exist after insert");
         assert_eq!(
             sub1.mastery_score.get(),
             sub2.mastery_score.get(),
             "decay must not compound on second call"
         );
+        Ok(())
     }
 
     #[test]
-    fn test_record_attempt_persists_srs_fields() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pipes").unwrap();
-        let sub = record_attempt(&conn, "pipes", "pipe-01", true).unwrap();
+    fn test_record_attempt_persists_srs_fields() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pipes")?;
+        let sub = record_attempt(&conn, "pipes", "pipe-01", true)?;
         // Après un succès, intervalle SRS = round(1 * 2.5) = 3
         assert_eq!(sub.srs_interval_days.get(), 3);
         assert!(sub.next_review_at.is_some());
         // Vérifier la persistance en DB
-        let reloaded = get_subject(&conn, "pipes").unwrap().unwrap();
+        let reloaded = get_subject(&conn, "pipes")?.expect("pipes should exist after insert");
         assert_eq!(reloaded.srs_interval_days, sub.srs_interval_days);
         assert_eq!(reloaded.next_review_at, sub.next_review_at);
+        Ok(())
     }
 
     #[test]
-    fn test_import_progress_clamps_mastery_score() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "structs").unwrap();
+    fn test_import_progress_clamps_mastery_score() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "structs")?;
 
         // Create JSON with mastery_score = 10.0 (exceeds MASTERY_MAX = 5.0)
         let json = r#"
@@ -1023,18 +1043,19 @@ mod tests {
         }
         "#;
 
-        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true)?;
         assert_eq!(count, 1);
 
         // Verify the score was clamped to MASTERY_MAX (5.0)
-        let sub = get_subject(&conn, "structs").unwrap().unwrap();
+        let sub = get_subject(&conn, "structs")?.expect("structs should exist after insert");
         assert_eq!(sub.mastery_score.get(), crate::constants::MASTERY_MAX);
+        Ok(())
     }
 
     #[test]
-    fn test_import_progress_clamps_negative_score() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
+    fn test_import_progress_clamps_negative_score() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
 
         // Create JSON with mastery_score = -2.0 (below MASTERY_MIN = 0.0)
         let json = r#"
@@ -1054,18 +1075,19 @@ mod tests {
         }
         "#;
 
-        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true)?;
         assert_eq!(count, 1);
 
         // Verify the score was clamped to MASTERY_MIN (0.0)
-        let sub = get_subject(&conn, "pointers").unwrap().unwrap();
+        let sub = get_subject(&conn, "pointers")?.expect("pointers should exist after insert");
         assert_eq!(sub.mastery_score.get(), crate::constants::MASTERY_MIN);
+        Ok(())
     }
 
     #[test]
-    fn test_import_progress_preserves_valid_scores() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "memory_allocation").unwrap();
+    fn test_import_progress_preserves_valid_scores() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "memory_allocation")?;
 
         // Create JSON with a valid mastery_score = 2.5
         let json = r#"
@@ -1085,19 +1107,21 @@ mod tests {
         }
         "#;
 
-        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true)?;
         assert_eq!(count, 1);
 
         // Verify the score was preserved
-        let sub = get_subject(&conn, "memory_allocation").unwrap().unwrap();
+        let sub = get_subject(&conn, "memory_allocation")?
+            .expect("memory_allocation should exist after insert");
         assert_eq!(sub.mastery_score.get(), 2.5);
         assert_eq!(sub.attempts_total, 5);
+        Ok(())
     }
 
     #[test]
-    fn test_import_progress_clamps_all_fields() {
-        let mut conn = open_test_db().unwrap();
-        ensure_subject(&conn, "signals").unwrap();
+    fn test_import_progress_clamps_all_fields() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "signals")?;
 
         // difficulty_unlocked = 99 (>5), srs_interval_days = 9999 (>60),
         // attempts_total = -3 (<0), attempts_success = 100 (> attempts_total after clamp)
@@ -1118,10 +1142,10 @@ mod tests {
         }
         "#;
 
-        let (count, _warnings) = import_progress(&mut conn, json, true).unwrap();
+        let (count, _warnings) = import_progress(&mut conn, json, true)?;
         assert_eq!(count, 1);
 
-        let sub = get_subject(&conn, "signals").unwrap().unwrap();
+        let sub = get_subject(&conn, "signals")?.expect("signals should exist after insert");
         assert_eq!(sub.difficulty_unlocked, 5, "difficulty clamped to 5");
         assert_eq!(
             sub.srs_interval_days.get(),
@@ -1136,71 +1160,77 @@ mod tests {
             sub.attempts_success, 0,
             "attempts_success clamped to attempts_total"
         );
+        Ok(())
     }
 
     // ── G2 : last_exam_session KV ─────────────────────────────────────────
 
     #[test]
-    fn test_save_load_last_exam_session_roundtrip() {
-        let conn = open_test_db().unwrap();
-        save_last_exam_session(&conn, "nsy103-s1-2024").unwrap();
-        let loaded = load_last_exam_session(&conn).unwrap();
+    fn test_save_load_last_exam_session_roundtrip() -> Result<()> {
+        let conn = open_test_db()?;
+        save_last_exam_session(&conn, "nsy103-s1-2024")?;
+        let loaded = load_last_exam_session(&conn)?;
         assert_eq!(loaded, Some("nsy103-s1-2024".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn test_load_last_exam_session_missing_returns_none() {
-        let conn = open_test_db().unwrap();
-        let loaded = load_last_exam_session(&conn).unwrap();
+    fn test_load_last_exam_session_missing_returns_none() -> Result<()> {
+        let conn = open_test_db()?;
+        let loaded = load_last_exam_session(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
     }
 
     // ── G4 : exercise_scores ─────────────────────────────────────────────
 
     #[test]
-    fn test_exercise_scores_upsert() {
-        let conn = open_test_db().unwrap();
-        ensure_subject(&conn, "pointers").unwrap();
-        record_attempt(&conn, "pointers", "ptr-deref-01", true).unwrap();
-        record_attempt(&conn, "pointers", "ptr-deref-01", false).unwrap();
-        let scores = get_exercise_scores(&conn, "pointers").unwrap();
+    fn test_exercise_scores_upsert() -> Result<()> {
+        let conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        record_attempt(&conn, "pointers", "ptr-deref-01", true)?;
+        record_attempt(&conn, "pointers", "ptr-deref-01", false)?;
+        let scores = get_exercise_scores(&conn, "pointers")?;
         assert_eq!(scores.len(), 1);
         let (id, successes, attempts) = &scores[0];
         assert_eq!(id, "ptr-deref-01");
         assert_eq!(*attempts, 2);
         assert_eq!(*successes, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_get_all_weakest_exercises() {
-        let conn = open_test_db().unwrap();
+    fn test_get_all_weakest_exercises() -> Result<()> {
+        let conn = open_test_db()?;
         // Record attempts: subj A has ex_a1 (0/1) and ex_a2 (1/1)
-        record_attempt(&conn, "subj_a", "ex_a1", false).unwrap();
-        record_attempt(&conn, "subj_a", "ex_a2", true).unwrap();
-        record_attempt(&conn, "subj_b", "ex_b1", true).unwrap();
-        let map = get_all_weakest_exercises(&conn).unwrap();
+        record_attempt(&conn, "subj_a", "ex_a1", false)?;
+        record_attempt(&conn, "subj_a", "ex_a2", true)?;
+        record_attempt(&conn, "subj_b", "ex_b1", true)?;
+        let map = get_all_weakest_exercises(&conn)?;
         // ex_a1 has lower success rate (0%) than ex_a2 (100%)
         assert_eq!(map.get("subj_a").map(|s| s.as_str()), Some("ex_a1"));
         assert_eq!(map.get("subj_b").map(|s| s.as_str()), Some("ex_b1"));
+        Ok(())
     }
 
     #[test]
-    fn test_migrate_v1_idempotent() {
-        let conn = open_test_db().unwrap();
+    fn test_migrate_v1_idempotent() -> Result<()> {
+        let conn = open_test_db()?;
         // open_test_db already runs migrate_v1 via SCHEMA_V1; call again
-        migrate_v1(&conn).unwrap();
-        migrate_v1(&conn).unwrap();
+        migrate_v1(&conn)?;
+        migrate_v1(&conn)?;
         // Table still exists and is queryable
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM exercise_scores", [], |r| r.get(0))
-            .unwrap();
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM exercise_scores", [], |r| r.get(0))?;
         assert_eq!(count, 0);
+        Ok(())
     }
 
     #[test]
-    fn test_exercise_scores_empty_for_unknown_subject() {
-        let conn = open_test_db().unwrap();
-        let scores = get_exercise_scores(&conn, "unknown_subject_xyz").unwrap();
+    fn test_exercise_scores_empty_for_unknown_subject() -> Result<()> {
+        let conn = open_test_db()?;
+        let scores = get_exercise_scores(&conn, "unknown_subject_xyz")?;
         assert!(scores.is_empty());
+        Ok(())
     }
 }
