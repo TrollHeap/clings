@@ -8,6 +8,12 @@
 - **v2.9.8** — Navigation vim `[g]`/`[G]` dans l'overlay search (watch + piscine) : `G` → dernier résultat, `gg` → premier résultat. `search_g_pending: bool` dans `AppState`. Hint bar mise à jour : `[g/G] début/fin`.
 - **v2.9.2–v2.9.6** (consolidés) — Fix sélection invisible (`ListState` + all items), `status_msg_at` expiration 3s, filtre sujet `[Tab]` en recherche, perf sidebar O(n) → O(1) via `subject_order` cache, search piscine.
 
+### Perf — Zéro allocation par frame dans render_search_overlay
+
+- `render_search_overlay` (`common.rs`) : suppression du `Vec<(&Exercise, usize)>` intermédiaire — itération directe sur `search_results`
+- Troncature UTF-8 safe via `char_indices().nth(N)` — élimine les allocations `String` temporaires par item de liste
+- Résultat : 0 allocation par frame dans le chemin de rendu search (60Hz)
+
 ---
 
 ## [2.9.1] — 2026-03-13
