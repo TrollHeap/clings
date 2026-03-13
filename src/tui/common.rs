@@ -353,25 +353,34 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         query_area,
     );
 
-    // Results list — pass ALL results so ListState scroll works correctly
-    let results: Vec<(&crate::models::Exercise, usize)> = state
+    // Results list — iterate directly from indices, no intermediate Vec
+    let items: Vec<ListItem> = state
         .search_results
         .iter()
-        .filter_map(|&idx| state.exercises.get(idx).map(|ex| (ex, idx)))
-        .collect();
-
-    let items: Vec<ListItem> = results
-        .iter()
-        .map(|(ex, _idx)| {
+        .filter_map(|&idx| state.exercises.get(idx))
+        .map(|ex| {
             let stars = difficulty_stars(ex.difficulty);
             let color = difficulty_color(ex.difficulty);
+            // char_indices().nth(N) gives the byte boundary without allocating an intermediate String
+            let title_end = ex
+                .title
+                .char_indices()
+                .nth(28)
+                .map(|(i, _)| i)
+                .unwrap_or(ex.title.len());
+            let subj_end = ex
+                .subject
+                .char_indices()
+                .nth(16)
+                .map(|(i, _)| i)
+                .unwrap_or(ex.subject.len());
             ListItem::new(Line::from(vec![
                 Span::styled(
-                    format!("{:<30}", ex.title.chars().take(28).collect::<String>()),
+                    format!("{:<30}", &ex.title[..title_end]),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled(
-                    format!("{:<18}", ex.subject.chars().take(16).collect::<String>()),
+                    format!("{:<18}", &ex.subject[..subj_end]),
                     Style::default().fg(Color::Gray),
                 ),
                 Span::styled(stars, Style::default().fg(color)),
