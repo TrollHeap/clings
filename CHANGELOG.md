@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.8.0] — 2026-03-13
+
+### Refactor DRY — extraction common.rs
+
+- `src/tui/common.rs` créé : ~280 lignes extraites de `ui_watch.rs` et `ui_piscine.rs`
+- Fonctions mutualisées : rendu sidebar, mastery bar, header, layout helpers
+- Suppression de la duplication entre les 9 fonctions dupliquées identifiées dans l'audit v2.7.0
+
+---
+
 ## [2.7.0] — 2026-03-12
 
 ### TUI — Migration Ratatui v3
