@@ -498,10 +498,14 @@ pub fn get_daily_activity(conn: &Connection, days: u32) -> Result<Vec<(String, u
         .map_err(crate::error::KfError::from)
 }
 
-/// Apply decay to all subjects that are candidates for decay (batched in single transaction).
+/// Applique la décroissance SRS à tous les sujets avec `mastery > 0`
+/// et `elapsed >= decay_days`. Idempotent : sûr d'appeler plusieurs fois.
 ///
 /// Only fetches subjects with `mastery_score > 0`, a known `last_practiced_at`, and enough
 /// elapsed time — skipping the rest entirely instead of loading the full table.
+///
+/// # Errors
+/// `KfError::Database` si la transaction échoue.
 pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
     let decay_days = crate::config::get().srs.decay_days;
     let mut stmt = conn.prepare_cached(

@@ -196,6 +196,10 @@ fn spawn_gcc_and_collect(
 ///
 /// Returns a [`RunResult`] with `success`, compiler/runtime `message`, and
 /// updated `mastery` score delta.
+///
+/// # Never panics
+/// Toutes les erreurs (compilation, timeout, output mismatch) sont capturées
+/// dans `RunResult` — jamais de panic.
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     let tmp_fallback2 = std::path::PathBuf::from("/tmp");
     let work_dir = source_path.parent().unwrap_or_else(|| {
@@ -517,8 +521,11 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
         .unwrap_or(&exercise.starter_code)
 }
 
-/// Write starter code to the current.c file.
-/// If mastery is provided, selects the appropriate stage.
+/// Écrit le code source de l'exercice dans `~/.clings/current.c` via temp-file+rename atomique.
+///
+/// # Errors
+/// - `std::io::Error` si `$HOME` n'est pas défini ou défini incorrectement
+/// - `std::io::Error` si l'écriture ou le rename échoue
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
     let dir = work_dir().map_err(|e| match e {
         KfError::Io(io) => io,
@@ -539,8 +546,15 @@ pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io:
     Ok(source_path)
 }
 
-/// Charge la mastery d'un sujet et écrit le starter code adapté au stage.
-/// Retourne (source_path, current_stage).
+/// Charge la mastery du sujet depuis la DB, sélectionne le stage de code (0–4),
+/// et écrit le starter code correspondant.
+///
+/// # Returns
+/// `(source_path, current_stage)` — `current_stage` est `None` si l'exercice
+/// n'a pas de staged_code.
+///
+/// # Errors
+/// Propage les erreurs de `write_starter_code` et de la DB.
 pub fn prepare_exercise_source(
     conn: &rusqlite::Connection,
     exercise: &crate::models::Exercise,
