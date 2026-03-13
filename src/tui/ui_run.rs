@@ -78,12 +78,14 @@ pub fn run_exercise(exercise: &Exercise, mastery_score: Option<f64>) -> Result<(
                 }
             } else if result.success {
                 println!("  {} Exercice résolu !", "✓".bold().green());
-                let _ = progress::record_attempt(
+                if let Err(e) = progress::record_attempt(
                     &conn,
                     &exercise_clone.subject,
                     &exercise_clone.id,
                     true,
-                );
+                ) {
+                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                }
             } else {
                 println!("  {} Sortie incorrecte.", "✗".bold().red());
                 println!();
@@ -91,12 +93,14 @@ pub fn run_exercise(exercise: &Exercise, mastery_score: Option<f64>) -> Result<(
                 for line in result.stdout.lines() {
                     println!("    {}", line.red());
                 }
-                let _ = progress::record_attempt(
+                if let Err(e) = progress::record_attempt(
                     &conn,
                     &exercise_clone.subject,
                     &exercise_clone.id,
                     false,
-                );
+                ) {
+                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                }
             }
 
             if result.success {
