@@ -7,6 +7,7 @@ use std::time::Instant;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::runner::RunResult;
+use crate::search;
 
 /// Mode d'affichage de l'application
 #[derive(Debug, Clone)]
@@ -57,6 +58,11 @@ pub struct AppState {
     pub piscine_fail_count: u32,
     // Status message (file saved, etc.)
     pub status_msg: Option<String>,
+    // Fuzzy search overlay
+    pub search_active: bool,
+    pub search_query: String,
+    pub search_results: Vec<usize>,
+    pub search_selected: usize,
 }
 
 impl AppState {
@@ -83,6 +89,10 @@ impl AppState {
             piscine_timer_total: 0,
             piscine_fail_count: 0,
             status_msg: None,
+            search_active: false,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            search_selected: 0,
         }
     }
 }
@@ -169,6 +179,20 @@ impl App {
         Ok(())
     }
 
+    /// Recompute search results from current query (indices into state.exercises).
+    fn rebuild_search(state: &mut AppState) {
+        if state.search_query.is_empty() {
+            state.search_results = (0..state.exercises.len()).collect();
+        } else {
+            state.search_results =
+                search::search_exercises(&state.exercises, &state.search_query, None)
+                    .into_iter()
+                    .filter_map(|(ex, _score)| state.exercises.iter().position(|e| e.id == ex.id))
+                    .collect();
+        }
+        state.search_selected = 0;
+    }
+
     /// Dispatch Watch messages → état
     pub fn update_watch(&mut self, msg: Msg, conn: &rusqlite::Connection) {
         use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
@@ -176,6 +200,52 @@ impl App {
 
         match msg {
             Msg::Key(key) => {
+                // Search overlay — capture all keys when active
+                if self.state.search_active {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.state.search_active = false;
+                            self.state.search_query.clear();
+                            self.state.search_results.clear();
+                        }
+                        KeyCode::Enter => {
+                            if !self.state.search_results.is_empty() {
+                                let idx = self.state.search_results[self.state.search_selected];
+                                self.state.current_index = idx;
+                                self.state.search_active = false;
+                                self.state.search_query.clear();
+                                self.state.search_results.clear();
+                                if let Err(e) = self.load_current_exercise(conn) {
+                                    eprintln!("[clings] erreur chargement exercice: {e}");
+                                }
+                            }
+                        }
+                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected = (self.state.search_selected + 1) % len;
+                            }
+                        }
+                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                            let len = self.state.search_results.len();
+                            if len > 0 {
+                                self.state.search_selected =
+                                    self.state.search_selected.checked_sub(1).unwrap_or(len - 1);
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            self.state.search_query.pop();
+                            Self::rebuild_search(&mut self.state);
+                        }
+                        KeyCode::Char(c) => {
+                            self.state.search_query.push(c);
+                            Self::rebuild_search(&mut self.state);
+                        }
+                        _ => {}
+                    }
+                    return;
+                }
+
                 // Visualizer mode — arrow keys / any key to close
                 if self.state.vis_active {
                     match key.code {
@@ -213,6 +283,11 @@ impl App {
                             self.state.vis_active = true;
                             self.state.vis_step = 0;
                         }
+                    }
+                    KeyCode::Char('/') => {
+                        self.state.search_active = true;
+                        self.state.search_query.clear();
+                        Self::rebuild_search(&mut self.state);
                     }
                     KeyCode::Char('j')
                     | KeyCode::Char('J')

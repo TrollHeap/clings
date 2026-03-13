@@ -3,7 +3,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::models::{Difficulty, ValidationMode};
@@ -298,5 +298,112 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
             )
             .wrap(Wrap { trim: false }),
         popup,
+    );
+}
+
+/// Overlay de recherche fuzzy (touche `/` depuis watch).
+pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+    let [_, popup_v, _] = Layout::vertical([
+        Constraint::Percentage(15),
+        Constraint::Percentage(70),
+        Constraint::Percentage(15),
+    ])
+    .areas(area);
+    let [_, popup, _] = Layout::horizontal([
+        Constraint::Percentage(10),
+        Constraint::Percentage(80),
+        Constraint::Percentage(10),
+    ])
+    .areas(popup_v);
+
+    f.render_widget(Clear, popup);
+
+    // Split: query input (3 lines) | results list (fill) | hint bar (1 line)
+    let [query_area, results_area, hint_area] = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .areas(popup);
+
+    // Query input
+    let cursor = if (f.count() / 4).is_multiple_of(2) {
+        "█"
+    } else {
+        " "
+    };
+    let query_display = format!("{}{}", state.search_query, cursor);
+    f.render_widget(
+        Paragraph::new(query_display).block(
+            Block::bordered()
+                .title("/ Recherche")
+                .style(Style::default().bg(Color::Black))
+                .border_style(Style::default().fg(Color::Cyan)),
+        ),
+        query_area,
+    );
+
+    // Results list
+    let max_visible = results_area.height.saturating_sub(2) as usize;
+    let results: Vec<(&crate::models::Exercise, usize)> = state
+        .search_results
+        .iter()
+        .take(max_visible.max(1) * 3)
+        .filter_map(|&idx| state.exercises.get(idx).map(|ex| (ex, idx)))
+        .collect();
+
+    let items: Vec<ListItem> = results
+        .iter()
+        .map(|(ex, _idx)| {
+            let stars = difficulty_stars(ex.difficulty);
+            let color = difficulty_color(ex.difficulty);
+            ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!("{:<30}", ex.title.chars().take(28).collect::<String>()),
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled(
+                    format!("{:<18}", ex.subject.chars().take(16).collect::<String>()),
+                    Style::default().fg(Color::Gray),
+                ),
+                Span::styled(stars, Style::default().fg(color)),
+            ]))
+        })
+        .collect();
+
+    let count = state.search_results.len();
+    let list_title = if state.search_query.is_empty() {
+        format!(" {count} exercices ")
+    } else {
+        format!(" {count} résultats ")
+    };
+
+    let mut list_state = ListState::default();
+    if !state.search_results.is_empty() {
+        list_state.select(Some(state.search_selected));
+    }
+
+    f.render_stateful_widget(
+        List::new(items)
+            .block(
+                Block::bordered()
+                    .title(list_title)
+                    .style(Style::default().bg(Color::Black))
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        results_area,
+        &mut list_state,
+    );
+
+    // Hint bar
+    f.render_widget(
+        Paragraph::new("[↑↓/jk] nav  [Entrée] aller  [Esc] fermer")
+            .style(Style::default().fg(Color::DarkGray)),
+        hint_area,
     );
 }

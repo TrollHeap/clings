@@ -39,6 +39,8 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
     if state.vis_active {
         common::render_visualizer_overlay(f, body_area, state);
+    } else if state.search_active {
+        common::render_search_overlay(f, body_area, state);
     } else {
         render_body(f, body_area, state);
     }
@@ -338,7 +340,9 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     let has_vis = !exercise.visualizer.steps.is_empty();
 
     let has_hints = !exercise.hints.is_empty();
-    let left_msg = if let Some(status) = &state.status_msg {
+    let left_msg = if state.search_active {
+        "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer".to_string()
+    } else if let Some(status) = &state.status_msg {
         status.as_str().to_string()
     } else {
         let mut parts = vec![
@@ -353,6 +357,7 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
         if has_vis {
             parts.push("[v] vis".to_string());
         }
+        parts.push("[/] search".to_string());
         parts.push("[q] quit".to_string());
         parts.join("  ")
     };

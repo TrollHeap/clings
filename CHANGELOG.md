@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.9.0] — 2026-03-13
+
+### TUI — Recherche fuzzy `[/]`
+
+- Touche `[/]` depuis le mode watch ouvre un overlay de recherche en temps réel
+- Filtrage fuzzy via `nucleo-matcher` (réutilise `search::search_exercises`)
+- Navigation `[j]`/`[k]`/flèches, `[Entrée]` pour sauter à l'exercice, `[Esc]` pour fermer
+- `AppState` enrichi : `search_active`, `search_query`, `search_results`, `search_selected`
+- Overlay centré 80%×70% avec curseur clignotant animé et liste `ListState` stateful
+- Status bar contextuelle : affiche les raccourcis search quand l'overlay est actif
+- `[/] search` ajouté dans les keybinds normaux du status bar
+
+---
+
 ## [2.8.0] — 2026-03-13
 
 ### Refactor DRY — extraction common.rs
