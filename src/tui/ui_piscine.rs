@@ -8,7 +8,6 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Gauge, Paragraph};
 use ratatui::Frame;
 
-use crate::constants::PISCINE_PROGRESS_BAR_WIDTH;
 use crate::tui::app::AppState;
 use crate::tui::common;
 
@@ -195,16 +194,9 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Barre de progression globale
-    let bar_width = PISCINE_PROGRESS_BAR_WIDTH;
-    let filled = (ratio * bar_width as f64).round() as usize;
-    let progress_bar = format!(
-        "[{}{}] {}/{}",
-        "█".repeat(filled),
-        "░".repeat(bar_width - filled),
-        done,
-        total
-    );
+    // Barre de progression globale (tranches statiques — 0 allocation)
+    let (full_part, empty_part) = common::progress_bar_string(ratio);
+    let progress_bar = format!("[{full_part}{empty_part}] {done}/{total}");
     lines.push(Line::from(Span::styled(
         progress_bar,
         Style::default().fg(Color::Green),

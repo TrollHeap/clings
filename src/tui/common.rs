@@ -22,6 +22,21 @@ const FULL_BAR: &str = "██████████";
 /// Barre vide (10 × ░) — tranche statique pour mastery_bar sans allocation.
 const EMPTY_BAR: &str = "░░░░░░░░░░";
 
+/// Barre pleine (20 × █) — pour la progress bar piscine (width=20).
+const FULL_BAR_20: &str = "████████████████████";
+/// Barre vide (20 × ░) — pour la progress bar piscine (width=20).
+const EMPTY_BAR_20: &str = "░░░░░░░░░░░░░░░░░░░░";
+
+/// Retourne deux tranches statiques `(full_part, empty_part)` pour
+/// construire une barre de progression de largeur 20 sans allocation.
+///
+/// `ratio` doit être dans [0.0, 1.0].
+pub fn progress_bar_string(ratio: f64) -> (&'static str, &'static str) {
+    let filled = ((ratio * 20.0).round() as usize).min(20);
+    let empty = 20 - filled;
+    (&FULL_BAR_20[..filled * 3], &EMPTY_BAR_20[..empty * 3])
+}
+
 /// Étiquette de stage d'échafaudage (S0–S4).
 pub fn stage_label(stage: u8) -> &'static str {
     match stage {
@@ -218,6 +233,46 @@ pub fn render_split_status_bar(
             left_area,
         );
         f.render_widget(Paragraph::new(right_msg).style(right_style), right_area);
+    }
+}
+
+/// Layout body partagé : description + résultat + sidebar optionnelle.
+/// Élimine la duplication entre `render_body` (watch) et `render_piscine_body`.
+pub fn render_body_with_sidebar(
+    f: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    render_sidebar: fn(&mut Frame, Rect, &AppState),
+) {
+    let (content_area, sidebar_opt) = if area.width >= BODY_SIDEBAR_THRESHOLD {
+        let [left, right] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(SIDEBAR_WIDTH)])
+                .areas(area);
+        (left, Some(right))
+    } else {
+        (area, None)
+    };
+
+    let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
+        let h = run_result_height(result);
+        let [desc, res] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
+        (desc, Some(res))
+    } else {
+        (content_area, None)
+    };
+
+    render_description_panel(f, desc_area, state);
+
+    if let Some(result_area) = result_area_opt {
+        if let Some(result) = &state.run_result {
+            let exercise = &state.exercises[state.current_index];
+            render_run_result(f, result_area, result, exercise);
+        }
+    }
+
+    if let Some(sb_area) = sidebar_opt {
+        render_sidebar(f, sb_area, state);
     }
 }
 
