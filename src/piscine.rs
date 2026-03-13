@@ -281,7 +281,7 @@ mod tests {
 
     /// Vérifie que les exercices sont triés chapter → difficulty via order_by_chapters.
     #[test]
-    fn test_piscine_order() {
+    fn test_piscine_order() -> crate::error::Result<()> {
         // "pipes" = chapitre 9, "structs" = chapitre 1
         let ex_pipes_hard = make_exercise("pipes-hard", "pipes", Difficulty::Hard);
         let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
@@ -301,6 +301,7 @@ mod tests {
         // Au sein de structs : Easy avant Medium
         assert_eq!(order[0].difficulty, Difficulty::Easy);
         assert_eq!(order[1].difficulty, Difficulty::Medium);
+        Ok(())
     }
 
     /// Vérifie le roundtrip save/load du checkpoint piscine sur une DB in-memory.
@@ -315,7 +316,7 @@ mod tests {
 
     /// Vérifie que le mécanisme de skip incrémente bien l'index d'exercice.
     #[test]
-    fn test_skip_increments_index() {
+    fn test_skip_increments_index() -> crate::error::Result<()> {
         let total = 5usize;
         let mut index = 2usize;
         index += 1;
@@ -325,6 +326,7 @@ mod tests {
         index = total - 1;
         index += 1;
         assert_eq!(index, total);
+        Ok(())
     }
 
     /// Vérifie que clear_piscine_checkpoint efface bien le checkpoint.
@@ -373,7 +375,7 @@ mod tests {
     /// Vérifie l'ordre chapter→difficulty sur une liste mixte d'exercices.
     /// "structs" est dans ch.1 "Fondamentaux C", "pipes" est dans ch.9 "Pipes".
     #[test]
-    fn test_piscine_order_multi_chapter() {
+    fn test_piscine_order_multi_chapter() -> crate::error::Result<()> {
         let ex_pipes_easy = make_exercise("pipes-easy", "pipes", Difficulty::Easy);
         let ex_structs_hard = make_exercise("structs-hard", "structs", Difficulty::Hard);
         let ex_structs_easy = make_exercise("structs-easy", "structs", Difficulty::Easy);
@@ -406,5 +408,6 @@ mod tests {
         assert_eq!(structs_positions.len(), 2);
         assert_eq!(order[structs_positions[0]].difficulty, Difficulty::Easy);
         assert_eq!(order[structs_positions[1]].difficulty, Difficulty::Hard);
+        Ok(())
     }
 }
