@@ -442,6 +442,14 @@ fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
             REGEX_CACHE.with(|cache| {
                 let mut map = cache.borrow_mut();
                 let re = map.entry(key.clone()).or_insert_with(|| {
+                    if key.len() > crate::constants::MAX_REGEX_PATTERN_LEN {
+                        eprintln!(
+                            "Avertissement : pattern regex trop long ({} octets, max {}), ignoré.",
+                            key.len(),
+                            crate::constants::MAX_REGEX_PATTERN_LEN
+                        );
+                        return None;
+                    }
                     let compiled = regex::Regex::new(&key);
                     if let Err(ref e) = compiled {
                         eprintln!("Avertissement : regex invalide dans l'exercice ({key:?}): {e}");

@@ -79,3 +79,7 @@ pub const MSG_EXERCISE_SOLVED_ADVANCING: &str = "Exercice résolu ! Avancement d
 pub const TEST_SUMMARY_TESTS: &str = "Tests";
 pub const TEST_SUMMARY_FAILURES: &str = "Failures";
 pub const TEST_SUMMARY_IGNORED: &str = "Ignored";
+
+// === Security ===
+/// Longueur maximale d'un pattern regex dans les exercices (anti-ReDoS).
+pub const MAX_REGEX_PATTERN_LEN: usize = 500;
