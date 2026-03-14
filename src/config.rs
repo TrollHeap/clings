@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 use serde::{Deserialize, Serialize};
 
 use crate::constants;
+use crate::error::KfError;
 
 static CONFIG: OnceLock<ClingConfig> = OnceLock::new();
 
@@ -112,7 +113,7 @@ pub fn get() -> &'static ClingConfig {
 
 /// Write a single `section.key = value` into `~/.clings/clings.toml`.
 /// Creates the file if it does not exist.
-pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
+pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<()> {
     const ALLOWED: &[(&str, &str)] = &[
         ("srs", "decay_days"),
         ("srs", "base_interval_days"),
@@ -121,18 +122,19 @@ pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
         ("ui", "tmux_pane_width"),
     ];
     if !ALLOWED.iter().any(|(s, k)| *s == section && *k == key) {
-        return Err(format!(
+        return Err(KfError::Config(format!(
             "clé inconnue '{section}.{key}' — valeurs autorisées : {}",
             ALLOWED
                 .iter()
                 .map(|(s, k)| format!("{s}.{k}"))
                 .collect::<Vec<_>>()
                 .join(", ")
-        ));
+        )));
     }
 
     let path = {
-        let home = std::env::var_os("HOME").ok_or_else(|| "$HOME non définie".to_string())?;
+        let home = std::env::var_os("HOME")
+            .ok_or_else(|| KfError::Config("$HOME non définie".to_string()))?;
         std::path::PathBuf::from(home)
             .join(constants::CLINGS_DIR)
             .join("clings.toml")
@@ -141,8 +143,8 @@ pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
     // Load current TOML as a Value so we preserve unknown fields
     let mut doc: toml::Value = if path.exists() {
         std::fs::read_to_string(&path)
-            .map_err(|e| e.to_string())
-            .and_then(|s| toml::from_str(&s).map_err(|e| e.to_string()))
+            .map_err(|e| KfError::Config(e.to_string()))
+            .and_then(|s| toml::from_str(&s).map_err(|e| KfError::Config(e.to_string())))
             .unwrap_or(toml::Value::Table(toml::map::Map::new()))
     } else {
         toml::Value::Table(toml::map::Map::new())
@@ -161,23 +163,23 @@ pub fn set_value(section: &str, key: &str, value: &str) -> Result<(), String> {
 
     let table = doc
         .as_table_mut()
-        .ok_or_else(|| "format TOML invalide".to_string())?;
+        .ok_or_else(|| KfError::Config("format TOML invalide".to_string()))?;
 
     let section_table = table
         .entry(section)
         .or_insert_with(|| toml::Value::Table(toml::map::Map::new()))
         .as_table_mut()
-        .ok_or_else(|| format!("section '{section}' n'est pas une table"))?;
+        .ok_or_else(|| KfError::Config(format!("section '{section}' n'est pas une table")))?;
 
     section_table.insert(key.to_string(), parsed);
 
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(parent).map_err(|e| KfError::Config(e.to_string()))?;
     }
 
-    let serialized = toml::to_string_pretty(&doc).map_err(|e| e.to_string())?;
-    std::fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    let serialized = toml::to_string_pretty(&doc).map_err(|e| KfError::Config(e.to_string()))?;
+    std::fs::write(&path, serialized).map_err(|e| KfError::Config(e.to_string()))?;
 
     Ok(())
 }

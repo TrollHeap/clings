@@ -93,7 +93,7 @@ pub fn cmd_config(key: &str, value: &str) -> Result<()> {
             "Format de clé invalide : '{key}' — attendu 'section.champ' (ex: srs.decay_days)"
         ))
     })?;
-    config::set_value(section, field, value).map_err(KfError::Config)?;
+    config::set_value(section, field, value)?;
     println!(
         "  {} {key} = {value}",
         "Config mise à jour :".bold().green()

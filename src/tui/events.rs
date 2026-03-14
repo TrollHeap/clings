@@ -39,12 +39,13 @@ pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
         let (watcher_tx, watcher_rx) = mpsc::channel();
         let mut watcher = match RecommendedWatcher::new(watcher_tx, notify::Config::default()) {
             Ok(w) => w,
-            Err(_) => return,
+            Err(e) => {
+                eprintln!("[clings] watcher indisponible: {e}");
+                return;
+            }
         };
-        if watcher
-            .watch(&watch_path, RecursiveMode::NonRecursive)
-            .is_err()
-        {
+        if let Err(e) = watcher.watch(&watch_path, RecursiveMode::NonRecursive) {
+            eprintln!("[clings] impossible de surveiller {:?}: {e}", watch_path);
             return;
         }
         let mut last = std::time::Instant::now();
