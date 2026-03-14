@@ -45,6 +45,12 @@ pub const C_MAUVE: Color = Color::Rgb(203, 166, 247); // Mauve (Advanced)
 pub const C_TEAL: Color = Color::Rgb(148, 226, 213); // Teal (Expert, heap)
 pub const C_YELLOW: Color = Color::Rgb(249, 226, 175); // Yellow (streak)
 
+// ── Badge backgrounds ──────────────────────────────────────────────────
+const C_BADGE_COMPLETE: Color = Color::Rgb(30, 45, 30);
+const C_BADGE_FIXBUG: Color = Color::Rgb(45, 25, 30);
+const C_BADGE_FILLBLANK: Color = Color::Rgb(45, 35, 20);
+const C_BADGE_REFACTOR: Color = Color::Rgb(20, 40, 42);
+
 /// Étoiles pleines (★ × 5) — tranche statique pour étoiles de difficulté sans allocation.
 const FULL_STARS: &str = "★★★★★";
 /// Étoiles vides (☆ × 5) — tranche statique pour étoiles de difficulté sans allocation.
@@ -142,28 +148,28 @@ pub fn exercise_type_badge(t: ExerciseType) -> Span<'static> {
         ExerciseType::Complete => span!(
             Style::default()
                 .fg(C_SUCCESS)
-                .bg(Color::Rgb(30, 45, 30))
+                .bg(C_BADGE_COMPLETE)
                 .add_modifier(Modifier::BOLD);
             " COMPLETE "
         ),
         ExerciseType::FixBug => span!(
             Style::default()
                 .fg(C_DANGER)
-                .bg(Color::Rgb(45, 25, 30))
+                .bg(C_BADGE_FIXBUG)
                 .add_modifier(Modifier::BOLD);
             " FIX_BUG "
         ),
         ExerciseType::FillBlank => span!(
             Style::default()
                 .fg(C_WARNING)
-                .bg(Color::Rgb(45, 35, 20))
+                .bg(C_BADGE_FILLBLANK)
                 .add_modifier(Modifier::BOLD);
             " FILL_BLANK "
         ),
         ExerciseType::Refactor => span!(
             Style::default()
                 .fg(C_INFO)
-                .bg(Color::Rgb(20, 40, 42))
+                .bg(C_BADGE_REFACTOR)
                 .add_modifier(Modifier::BOLD);
             " REFACTOR "
         ),
