@@ -139,18 +139,34 @@ pub fn difficulty_stars_line(d: Difficulty) -> Line<'static> {
 /// Badge coloré pour le type d'exercice.
 pub fn exercise_type_badge(t: ExerciseType) -> Span<'static> {
     match t {
-        ExerciseType::Complete => {
-            span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); " COMPLETE ")
-        }
-        ExerciseType::FixBug => {
-            span!(Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD); " FIX_BUG ")
-        }
-        ExerciseType::FillBlank => {
-            span!(Style::default().fg(C_WARNING).add_modifier(Modifier::BOLD); " FILL_BLANK ")
-        }
-        ExerciseType::Refactor => {
-            span!(Style::default().fg(C_INFO).add_modifier(Modifier::BOLD); " REFACTOR ")
-        }
+        ExerciseType::Complete => span!(
+            Style::default()
+                .fg(C_SUCCESS)
+                .bg(Color::Rgb(30, 45, 30))
+                .add_modifier(Modifier::BOLD);
+            " COMPLETE "
+        ),
+        ExerciseType::FixBug => span!(
+            Style::default()
+                .fg(C_DANGER)
+                .bg(Color::Rgb(45, 25, 30))
+                .add_modifier(Modifier::BOLD);
+            " FIX_BUG "
+        ),
+        ExerciseType::FillBlank => span!(
+            Style::default()
+                .fg(C_WARNING)
+                .bg(Color::Rgb(45, 35, 20))
+                .add_modifier(Modifier::BOLD);
+            " FILL_BLANK "
+        ),
+        ExerciseType::Refactor => span!(
+            Style::default()
+                .fg(C_INFO)
+                .bg(Color::Rgb(20, 40, 42))
+                .add_modifier(Modifier::BOLD);
+            " REFACTOR "
+        ),
     }
 }
 
