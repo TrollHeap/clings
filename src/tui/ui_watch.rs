@@ -54,86 +54,73 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let width = area.width as usize;
 
-    // ── L1 : clings ─ [N/total] Titre   ★diff  TYPE  [S2] ──────────────
     let stars = common::difficulty_stars(exercise.difficulty);
     let stars_color = common::difficulty_color(exercise.difficulty);
     let type_badge = common::exercise_type_badge(exercise.exercise_type.clone());
     let stage_badge = state.current_stage.map(common::stage_badge);
 
-    // "clings ─ " = 9 chars display, cached_header_left_len = counter + title chars
-    let prefix_len = 9usize;
-    let type_char_len: usize = type_badge.content.chars().count();
-    let stage_char_len: usize = stage_badge
-        .as_ref()
-        .map(|s| s.content.chars().count())
-        .unwrap_or(0);
-    let right1_len = 2
-        + 5
-        + 2
-        + type_char_len
-        + if stage_char_len > 0 {
-            2 + stage_char_len
-        } else {
-            0
-        };
-    let left1_len = prefix_len + state.cached_header_left_len;
-    let pad1 = width.saturating_sub(left1_len + right1_len + 2);
+    // ── L1 : Titre (plein gauche)   TYPE_BADGE (droit) ───────────────────
+    let title_len = exercise.title.chars().count();
+    let type_char_len = type_badge.content.chars().count();
+    let pad1 = width.saturating_sub(title_len + type_char_len + 1);
 
-    let mut line1_spans: Vec<Span<'_>> = vec![
-        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings ─ "),
-        Span::styled(
-            state.cached_exercise_counter.as_str(),
-            Style::default()
-                .fg(common::C_SUCCESS)
-                .add_modifier(Modifier::BOLD),
-        ),
+    let line1 = Line::from(vec![
         Span::styled(
             exercise.title.as_str(),
             Style::default().add_modifier(Modifier::BOLD),
         ),
-        Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(stars, Style::default().fg(stars_color)),
-        Span::raw("  "),
+        Span::raw(" ".repeat(pad1)),
         type_badge,
-    ];
-    if let Some(sb) = stage_badge {
-        line1_spans.push(Span::raw("  "));
-        line1_spans.push(sb);
-    }
-    let line1 = Line::from(line1_spans);
+    ]);
 
-    // ── L2 : mini_map  subject                  ↻ N révision(s) ─────────
+    // ── L2 : clings · N/total · subject · ★★★★★ · [S0]   ↻ N révision(s) ─
     let due_count = state.due_count();
+    let counter_str = format!("{}/{}", state.current_index + 1, state.exercises.len());
     let right2 = if due_count > 0 {
         format!("↻ {} révision(s)", due_count)
     } else {
         String::new()
     };
-    let left2_chars = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
+
+    // Compute left2 display length for padding
+    let stage_display_len = stage_badge
+        .as_ref()
+        .map(|sb| 3 + sb.content.chars().count()) // " · [S0]"
+        .unwrap_or(0);
+    let left2_len = 6 // "clings"
+        + 3 + counter_str.len()       // " · 1/61"
+        + 3 + exercise.subject.chars().count() // " · pointers"
+        + 3 + 5                        // " · ★★★★★"
+        + stage_display_len;
     let pad2 = if right2.is_empty() {
         0usize
     } else {
-        width.saturating_sub(left2_chars + right2.chars().count() + 2)
+        width.saturating_sub(left2_len + right2.chars().count() + 1)
     };
 
     let mut line2_spans: Vec<Span<'_>> = vec![
-        Span::styled(
-            state.cached_mini_map.as_str(),
-            Style::default().fg(common::C_TEXT_DIM),
-        ),
-        Span::raw("  "),
+        span!(Style::default().fg(common::C_MAUVE).add_modifier(Modifier::BOLD); "clings"),
+        span!(Style::default().fg(common::C_OVERLAY); " · "),
+        span!(Style::default().fg(common::C_SUCCESS); "{}", counter_str),
+        span!(Style::default().fg(common::C_OVERLAY); " · "),
         Span::styled(
             exercise.subject.as_str(),
-            Style::default().fg(common::C_TEXT_DIM),
+            Style::default().fg(common::C_SUBTEXT),
         ),
+        span!(Style::default().fg(common::C_OVERLAY); " · "),
+        Span::styled(stars, Style::default().fg(stars_color)),
     ];
+    if let Some(sb) = stage_badge {
+        line2_spans.push(span!(Style::default().fg(common::C_OVERLAY); " · "));
+        line2_spans.push(sb);
+    }
     if !right2.is_empty() {
         line2_spans.push(Span::raw(" ".repeat(pad2 + 1)));
         line2_spans.push(Span::styled(right2, Style::default().fg(common::C_WARNING)));
     }
     let line2 = Line::from(line2_spans);
 
-    // ── L3 : Maîtrise ████████░░ 2.4/5.0   key_concept ──────────────────
+    // ── L3 : ██████████ N.N/5.0  —  key_concept ─────────────────────────
     let mastery = state
         .mastery_map
         .get(&exercise.subject)
@@ -143,7 +130,6 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let bar_color = common::mastery_color(mastery);
 
     let mut line3_spans: Vec<Span<'_>> = vec![
-        Span::styled("Maîtrise ", Style::default().fg(common::C_TEXT_DIM)),
         Span::styled(bar, Style::default().fg(bar_color)),
         Span::styled(
             format!(" {:.1}/5.0", mastery),
@@ -151,7 +137,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         ),
     ];
     if let Some(kc) = &exercise.key_concept {
-        line3_spans.push(Span::raw("   "));
+        line3_spans.push(span!(Style::default().fg(common::C_OVERLAY); "  —  "));
         line3_spans.push(Span::styled(
             kc.as_str(),
             Style::default().fg(common::C_OVERLAY),
