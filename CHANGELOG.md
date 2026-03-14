@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.1] — 2026-03-15
+
+### Qualité & robustesse
+
+- **`ExerciseType` derive `Copy`** (`models.rs`) : supprime les `.clone()` inutiles dans les fonctions de rendu
+- **Log erreurs I/O tmux** (`tmux.rs`) : `tmux split-window` logue désormais les erreurs de lancement au lieu de les avaler silencieusement
+- **Log reap zombie** (`runner.rs`) : erreurs `child.wait()` non-ECHILD loguées après timeout ou erreur `try_wait`
+- **Log drain pipes** (`runner.rs`) : erreurs de lecture stdout/stderr loguées dans les threads de drain
+- **Log checkpoints invalides** (`progress.rs`) : checkpoints piscine/exam corrompus loguent un avertissement
+- **Style** (`authoring.rs`) : `.to_string()` → `.to_owned()` sur les littéraux de chaîne
+- **Gestion erreur** (`commands/data.rs`) : `let _ = flush()` → `flush().ok()`
+
+---
+
 ## [3.1.0] — 2026-03-14
 
 ### TUI — Header redesign + UX improvements (minor)

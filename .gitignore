@@ -5,3 +5,6 @@ log.txt
 output.txt
 .worktrees/
 .superpowers/
+*_AUDIT.md
+AUDIT_*.md
+PERFORMANCE_AUDIT.md
