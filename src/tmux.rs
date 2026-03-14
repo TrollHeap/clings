@@ -93,6 +93,7 @@ pub fn open_editor_pane(file: &Path) -> Option<String> {
         .arg("--")
         .arg(file)
         .output()
+        .map_err(|e| eprintln!("[clings/tmux] impossible de lancer tmux split-window : {e}"))
         .ok()?;
 
     if output.status.success() {

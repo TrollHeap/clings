@@ -111,7 +111,7 @@ pub struct ValidationConfig {
 }
 
 /// Nature pédagogique d'un exercice.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExerciseType {
     /// Écrire le code complet depuis le squelette fourni (défaut)

@@ -33,7 +33,7 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
     let id = format!("{subject}-new-{ts}");
 
     let (expected_output, test_code, expected_tests_pass) = match validation_mode {
-        ValidationMode::Output => (Some("__EXPECTED_OUTPUT__".to_string()), None, None),
+        ValidationMode::Output => (Some("__EXPECTED_OUTPUT__".to_owned()), None, None),
         ValidationMode::Test => (
             None,
             Some(
@@ -47,7 +47,7 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
             Some(1usize),
         ),
         ValidationMode::Both => (
-            Some("__EXPECTED_OUTPUT__".to_string()),
+            Some("__EXPECTED_OUTPUT__".to_owned()),
             Some(
                 "#include \"test.h\"\n\
                  TEST(test_placeholder) {\n\
@@ -74,7 +74,7 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
         solution_code:
             "#include <stdio.h>\n\nint main(void) {\n    // __SOLUTION_CODE__\n    return 0;\n}\n"
                 .to_string(),
-        hints: vec!["__HINT_1__".to_string(), "__HINT_2__".to_string()],
+        hints: vec!["__HINT_1__".to_owned(), "__HINT_2__".to_owned()],
         validation: ValidationConfig {
             mode: validation_mode,
             expected_output,

@@ -362,8 +362,11 @@ pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
 
 /// Load piscine checkpoint, returns None if no checkpoint saved.
 pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
-    // .parse().ok(): parse error means invalid/missing checkpoint — return None
-    Ok(kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| s.parse().ok()))
+    Ok(kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| {
+        s.parse()
+            .map_err(|_| eprintln!("[clings/progress] checkpoint piscine invalide : {s:?}"))
+            .ok()
+    }))
 }
 
 /// Clear piscine checkpoint (called when piscine is fully completed).
@@ -379,11 +382,14 @@ pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -
 /// Load exam checkpoint for the given session_id. Returns None if no checkpoint exists or if the
 /// stored session differs (i.e. the user switched to a different exam session).
 pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Option<usize>> {
-    // .parse().ok(): parse error means invalid/missing checkpoint — return None
     Ok(kv_get(conn, EXAM_CHECKPOINT_KEY)?.and_then(|s| {
         s.rsplit_once(':')
             .filter(|(sid, _)| *sid == session_id)
-            .and_then(|(_, rest)| rest.parse().ok())
+            .and_then(|(_, rest)| {
+                rest.parse()
+                    .map_err(|_| eprintln!("[clings/progress] checkpoint exam invalide : {s:?}"))
+                    .ok()
+            })
     }))
 }
 

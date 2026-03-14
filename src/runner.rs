@@ -189,7 +189,12 @@ fn spawn_gcc_and_collect(
             Ok(None) => {
                 if std::time::Instant::now() >= deadline {
                     kill_and_drain(&child, stdout_thread, stderr_thread);
-                    let _ = child.wait();
+                    // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
+                    if let Err(e) = child.wait() {
+                        if e.raw_os_error() != Some(libc::ECHILD) {
+                            eprintln!("[clings/runner] avertissement : reap zombie échoué : {e}");
+                        }
+                    }
                     return Err(KfError::Config(format!(
                         "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
                         timeout.as_secs_f64()
@@ -199,7 +204,12 @@ fn spawn_gcc_and_collect(
             }
             Err(e) => {
                 kill_and_drain(&child, stdout_thread, stderr_thread);
-                let _ = child.wait();
+                // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
+                if let Err(we) = child.wait() {
+                    if we.raw_os_error() != Some(libc::ECHILD) {
+                        eprintln!("[clings/runner] avertissement : reap zombie échoué : {we}");
+                    }
+                }
                 return Err(KfError::Io(e));
             }
         }
@@ -622,16 +632,24 @@ fn spawn_drain_threads(
 ) {
     let stdout_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
-        // .ok(): partial read is acceptable — we cap at MAX_OUTPUT_BYTES anyway
-        std::io::Read::read_to_string(&mut std::io::Read::take(stdout, MAX_OUTPUT_BYTES), &mut buf)
-            .ok();
+        // lecture plafonnée à MAX_OUTPUT_BYTES ; erreur I/O loguée pour diagnostic
+        if let Err(e) = std::io::Read::read_to_string(
+            &mut std::io::Read::take(stdout, MAX_OUTPUT_BYTES),
+            &mut buf,
+        ) {
+            eprintln!("[clings/runner] avertissement : lecture pipe stdout : {e}");
+        }
         buf
     });
     let stderr_thread = std::thread::spawn(move || -> String {
         let mut buf = String::new();
-        // .ok(): partial read is acceptable — we cap at MAX_OUTPUT_BYTES anyway
-        std::io::Read::read_to_string(&mut std::io::Read::take(stderr, MAX_OUTPUT_BYTES), &mut buf)
-            .ok();
+        // lecture plafonnée à MAX_OUTPUT_BYTES ; erreur I/O loguée pour diagnostic
+        if let Err(e) = std::io::Read::read_to_string(
+            &mut std::io::Read::take(stderr, MAX_OUTPUT_BYTES),
+            &mut buf,
+        ) {
+            eprintln!("[clings/runner] avertissement : lecture pipe stderr : {e}");
+        }
         buf
     });
     (stdout_thread, stderr_thread)

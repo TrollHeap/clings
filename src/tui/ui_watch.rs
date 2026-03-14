@@ -56,7 +56,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     let stars = common::difficulty_stars(exercise.difficulty);
     let stars_color = common::difficulty_color(exercise.difficulty);
-    let type_badge = common::exercise_type_badge(exercise.exercise_type.clone());
+    let type_badge = common::exercise_type_badge(exercise.exercise_type);
     let stage_badge = state.current_stage.map(common::stage_badge);
 
     // ── L1 : Titre (plein gauche)   TYPE_BADGE (droit) ───────────────────
@@ -195,7 +195,7 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 
     lines.push(line![
         span!(common::C_TEXT_DIM; "type    "),
-        common::exercise_type_badge(exercise.exercise_type.clone()),
+        common::exercise_type_badge(exercise.exercise_type),
     ]);
 
     if let Some(stage) = state.current_stage {
