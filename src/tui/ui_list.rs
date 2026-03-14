@@ -3,7 +3,7 @@
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
-use ratatui::widgets::{Block, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, BorderType, List, ListItem, ListState, Paragraph};
 use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
 
@@ -97,6 +97,12 @@ fn draw_list(
 ) {
     let area = f.area();
 
+    // Fond global opaque — évite la transparence terminal
+    f.render_widget(
+        Block::default().style(Style::default().bg(common::C_BG)),
+        area,
+    );
+
     // Layout: header (3) | list (fill) | footer (1)
     let [header_area, list_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
@@ -111,7 +117,13 @@ fn draw_list(
         span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "{}", header_title)
     ];
     f.render_widget(
-        Paragraph::new(header_text).block(Block::bordered().title("List")),
+        Paragraph::new(header_text).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG))
+                .title("List"),
+        ),
         header_area,
     );
 
@@ -139,7 +151,13 @@ fn draw_list(
         .collect();
 
     let list = List::new(items)
-        .block(Block::bordered().title("Exercices"))
+        .block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG))
+                .title("Exercices"),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
     f.render_widget(list, list_area);

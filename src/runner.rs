@@ -333,6 +333,11 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
+    if source_filename.contains('"') || source_filename.contains('\n') {
+        return make_compile_error(format!(
+            "Nom de fichier source invalide : {source_filename:?}"
+        ));
+    }
     let test_c_content =
         format!("#include \"{source_filename}\"\n#include \"test.h\"\n\n{test_code}\n");
     if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {

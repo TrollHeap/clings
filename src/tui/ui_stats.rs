@@ -5,7 +5,7 @@ use ratatui::layout::{Constraint, Direction};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
-    Bar, BarChart, BarGroup, Block, Paragraph, Row, Sparkline, Table, TableState,
+    Bar, BarChart, BarGroup, Block, BorderType, Paragraph, Row, Sparkline, Table, TableState,
 };
 use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
@@ -75,6 +75,12 @@ fn draw_stats(
 ) {
     let area = f.area();
 
+    // Fond global opaque — évite la transparence terminal
+    f.render_widget(
+        Block::default().style(Style::default().bg(common::C_BG)),
+        area,
+    );
+
     // Layout: header (3) | body (fill) | footer (1)
     let [header_area, body_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
@@ -83,7 +89,13 @@ fn draw_stats(
         span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings — Statistiques")
     ];
     f.render_widget(
-        Paragraph::new(header_text).block(Block::bordered().title("Stats")),
+        Paragraph::new(header_text).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG))
+                .title("Stats"),
+        ),
         header_area,
     );
 
@@ -93,7 +105,12 @@ fn draw_stats(
         f.render_widget(
             Paragraph::new(text)
                 .style(Style::default().fg(common::C_OVERLAY))
-                .block(Block::bordered()),
+                .block(
+                    Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style(Style::default().fg(common::C_BORDER))
+                        .style(Style::default().bg(common::C_BG)),
+                ),
             body_area,
         );
     } else {
@@ -116,7 +133,12 @@ fn draw_stats(
         lines.push(Line::raw(""));
 
         // Determine which section to show
-        let content_paragraph = Paragraph::new(lines).block(Block::bordered());
+        let content_paragraph = Paragraph::new(lines).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG)),
+        );
 
         // Sparkline for daily activity
         if let Some(daily_data) = daily {
@@ -132,6 +154,9 @@ fn draw_stats(
                 let sparkline = Sparkline::default()
                     .block(
                         Block::bordered()
+                            .border_type(BorderType::Rounded)
+                            .border_style(Style::default().fg(common::C_BORDER))
+                            .style(Style::default().bg(common::C_BG))
                             .title(format!("Activité 30j — {} tentatives", total_attempts)),
                     )
                     .data(&counts)
@@ -176,7 +201,13 @@ fn draw_stats(
                             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
                     ),
                 )
-                .block(Block::bordered().title("Tentatives par sujet"));
+                .block(
+                    Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style(Style::default().fg(common::C_BORDER))
+                        .style(Style::default().bg(common::C_BG))
+                        .title("Tentatives par sujet"),
+                );
 
                 f.render_widget(table, body_area);
                 return;
@@ -225,7 +256,13 @@ fn draw_stats(
         let group = BarGroup::default().bars(&bars);
         let bar_chart = BarChart::default()
             .direction(Direction::Horizontal)
-            .block(Block::bordered().title("Maîtrise par sujet"))
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(common::C_BORDER))
+                    .style(Style::default().bg(common::C_BG))
+                    .title("Maîtrise par sujet"),
+            )
             .bar_width(1)
             .bar_gap(0)
             .max(50)

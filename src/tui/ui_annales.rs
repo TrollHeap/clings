@@ -4,7 +4,7 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers
 use ratatui::layout::Constraint;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
-use ratatui::widgets::{Block, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Block, BorderType, Paragraph, Row, Table, TableState};
 use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
 
@@ -114,6 +114,12 @@ fn draw_annales(
 ) {
     let area = f.area();
 
+    // Fond global opaque — évite la transparence terminal
+    f.render_widget(
+        Block::default().style(Style::default().bg(common::C_BG)),
+        area,
+    );
+
     // Layout: header (3) | table (fill) | footer (1)
     let [header_area, table_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
@@ -123,7 +129,13 @@ fn draw_annales(
         Span::raw(" — correspondance exercices"),
     ];
     f.render_widget(
-        Paragraph::new(header_text).block(Block::bordered().title("Annales")),
+        Paragraph::new(header_text).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG))
+                .title("Annales"),
+        ),
         header_area,
     );
 
@@ -158,7 +170,12 @@ fn draw_annales(
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         ),
     )
-    .block(Block::bordered())
+    .block(
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(common::C_BORDER))
+            .style(Style::default().bg(common::C_BG)),
+    )
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
     f.render_stateful_widget(table, table_area, table_state);

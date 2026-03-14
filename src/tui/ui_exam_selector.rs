@@ -2,9 +2,9 @@
 
 use ratatui::{
     layout::{Constraint, Direction, HorizontalAlignment, Layout},
-    style::Style,
+    style::{Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -130,7 +130,15 @@ fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
         })
         .collect();
 
-    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sessions"));
+    let list = List::new(items)
+        .block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(common::C_BORDER))
+                .style(Style::default().bg(common::C_BG))
+                .title("Sessions"),
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     f.render_widget(list, chunks[1]);
 
     // Footer
