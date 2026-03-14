@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Gauge, Paragraph};
 use ratatui::Frame;
 use ratatui_macros::{span, vertical};
@@ -30,7 +30,7 @@ pub fn view(f: &mut Frame, state: &AppState) {
         return;
     }
 
-    // Layout : header (4) | timer (3 si timed) | body (fill) | status (1)
+    // Layout : header (3) | timer (3 si timed) | body (fill) | status (1)
     let timer_constraint = if state.piscine_deadline.is_some() {
         Constraint::Length(3)
     } else {
@@ -38,7 +38,7 @@ pub fn view(f: &mut Frame, state: &AppState) {
     };
 
     let [header_area, timer_area, body_rest, status_area] = Layout::vertical([
-        Constraint::Length(4),
+        Constraint::Length(3),
         timer_constraint,
         Constraint::Fill(1),
         Constraint::Length(1),
@@ -68,51 +68,113 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let width = area.width as usize;
 
-    // Ligne 1 : [idx/total] titre + droit: mini-map
-    let line1 = common::render_header_line1(state, exercise, width);
+    // ── L1 : clings ─ piscine  [N/total] Titre   ★diff  subject  [S2] ──
+    let stars = common::difficulty_stars(exercise.difficulty);
+    let stars_color = common::difficulty_color(exercise.difficulty);
+    let stage_badge = state.current_stage.map(common::stage_badge);
 
-    // Ligne 2 : difficulté | sujet | stage | temps écoulé
-    let stars_line = common::difficulty_stars_line(exercise.difficulty);
-    let mut meta_spans: Vec<Span> = Vec::new();
-    meta_spans.extend(stars_line.spans);
-    meta_spans.push(Span::raw("  │  "));
-    meta_spans.push(Span::styled(
-        exercise.subject.as_str(),
-        Style::default().fg(common::C_TEXT_DIM),
-    ));
+    // "clings ─ piscine  " = 18 chars display
+    let prefix_len = 18usize;
+    let stage_char_len: usize = stage_badge
+        .as_ref()
+        .map(|s| s.content.chars().count())
+        .unwrap_or(0);
+    let subj_len = exercise.subject.chars().count();
+    let right1_len = 2
+        + 5
+        + 2
+        + subj_len
+        + if stage_char_len > 0 {
+            2 + stage_char_len
+        } else {
+            0
+        };
+    let left1_len = prefix_len + state.cached_header_left_len;
+    let pad1 = width.saturating_sub(left1_len + right1_len + 2);
 
-    if let Some(stage) = state.current_stage {
-        meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(common::stage_badge(stage));
+    let mut line1_spans: Vec<Span<'_>> = vec![
+        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings ─ piscine  "),
+        Span::styled(
+            state.cached_exercise_counter.as_str(),
+            Style::default()
+                .fg(common::C_SUCCESS)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            exercise.title.as_str(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" ".repeat(pad1 + 1)),
+        Span::styled(stars, Style::default().fg(stars_color)),
+        Span::raw("  "),
+        Span::styled(
+            exercise.subject.as_str(),
+            Style::default().fg(common::C_TEXT_DIM),
+        ),
+    ];
+    if let Some(sb) = stage_badge {
+        line1_spans.push(Span::raw("  "));
+        line1_spans.push(sb);
     }
+    let line1 = Line::from(line1_spans);
 
-    if state.piscine_start.is_some() && !state.cached_piscine_elapsed_str.is_empty() {
-        meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(Span::styled(
-            state.cached_piscine_elapsed_str.as_str(),
+    // ── L2 : mini_map  elapsed              ✗ N échec(s) ─────────────────
+    let right2 = if state.piscine_fail_count > 0 {
+        format!("✗ {} échec(s)", state.piscine_fail_count)
+    } else {
+        String::new()
+    };
+    let elapsed = if state.piscine_start.is_some() && !state.cached_piscine_elapsed_str.is_empty() {
+        state.cached_piscine_elapsed_str.as_str()
+    } else {
+        ""
+    };
+    let left2_chars = state.cached_mini_map_len
+        + if elapsed.is_empty() {
+            0
+        } else {
+            2 + elapsed.chars().count()
+        };
+    let pad2 = if right2.is_empty() {
+        0usize
+    } else {
+        width.saturating_sub(left2_chars + right2.chars().count() + 2)
+    };
+
+    let mut line2_spans: Vec<Span<'_>> = vec![Span::styled(
+        state.cached_mini_map.as_str(),
+        Style::default().fg(common::C_TEXT_DIM),
+    )];
+    if !elapsed.is_empty() {
+        line2_spans.push(Span::raw("  "));
+        line2_spans.push(Span::styled(
+            elapsed,
             Style::default().fg(common::C_TEXT_DIM),
         ));
     }
+    if !right2.is_empty() {
+        line2_spans.push(Span::raw(" ".repeat(pad2 + 1)));
+        line2_spans.push(Span::styled(right2, Style::default().fg(common::C_DANGER)));
+    }
+    let line2 = Line::from(line2_spans);
 
-    let line2 = Line::from(meta_spans);
-
-    // Ligne 3 : échecs cumulés si > 0
-    let line3 = if state.piscine_fail_count > 0 {
+    // ── L3 : progression piscine [done/total] ────────────────────────────
+    let total = state.exercises.len();
+    let done = state.completed.iter().filter(|&&c| c).count();
+    let line3 = if done > 0 {
         Line::from(Span::styled(
-            format!("✗ {} échec(s) cumulé(s)", state.piscine_fail_count),
-            Style::default().fg(common::C_DANGER),
+            format!("✓ {}/{} exercices complétés", done, total),
+            Style::default().fg(common::C_SUCCESS),
         ))
     } else {
         Line::raw("")
     };
 
-    let text = Text::from(vec![line1, line2, line3]);
-    let block = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(common::C_BORDER))
-        .style(Style::default().bg(common::C_BG))
-        .title(span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings — piscine"));
-    f.render_widget(Paragraph::new(text).block(block), area);
+    f.render_widget(
+        Paragraph::new(vec![line1, line2, line3])
+            .block(Block::default().style(Style::default().bg(common::C_BG))),
+        area,
+    );
 }
 
 fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {

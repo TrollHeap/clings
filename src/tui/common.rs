@@ -10,14 +10,14 @@ use ratatui::widgets::{
 use ratatui::Frame;
 use ratatui_macros::{line, span, vertical};
 
-use crate::models::{Difficulty, Exercise, ExerciseType, ValidationMode};
+use crate::models::{Difficulty, ExerciseType, ValidationMode};
 use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
 /// Largeur minimale du terminal pour afficher la sidebar de progression.
-pub const BODY_SIDEBAR_THRESHOLD: u16 = 90;
+pub const BODY_SIDEBAR_THRESHOLD: u16 = 110;
 /// Largeur fixe de la sidebar de progression (colonnes).
-pub const SIDEBAR_WIDTH: u16 = 26;
+pub const SIDEBAR_WIDTH: u16 = 38;
 /// Séparateur horizontal (36 × ─) — const str évite l'allocation par frame.
 pub const SEPARATOR: &str = "────────────────────────────────────";
 
@@ -77,34 +77,6 @@ pub fn next_stage_threshold(score: f64) -> Option<(f64, f64, u8)> {
     } else {
         None
     }
-}
-
-/// Construit la ligne 1 du header (commune à watch et piscine) :
-/// `[idx/total] Titre <padding> mini-map  sujet`
-pub fn render_header_line1<'a>(
-    state: &'a AppState,
-    exercise: &'a Exercise,
-    width: usize,
-) -> Line<'a> {
-    let right1_display = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
-    let pad1 = width.saturating_sub(state.cached_header_left_len + right1_display + 4);
-    Line::from(vec![
-        Span::styled(
-            state.cached_exercise_counter.as_str(),
-            Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            exercise.title.as_str(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" ".repeat(pad1 + 1)),
-        Span::styled(
-            state.cached_mini_map.as_str(),
-            Style::default().fg(C_TEXT_DIM),
-        ),
-        Span::raw("  "),
-        Span::styled(exercise.subject.as_str(), Style::default().fg(C_TEXT_DIM)),
-    ])
 }
 
 /// Calcule la zone d'un popup centré avec des marges en pourcentage.

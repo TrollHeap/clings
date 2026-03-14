@@ -2,12 +2,12 @@
 
 use std::borrow::Cow;
 
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph};
 use ratatui::Frame;
-use ratatui_macros::{line, span};
+use ratatui_macros::{line, span, vertical};
 
 use crate::tui::app::AppState;
 use crate::tui::common;
@@ -30,13 +30,8 @@ pub fn view(f: &mut Frame, state: &AppState) {
         return;
     }
 
-    // Layout : header (4) | body (fill) | status (1)
-    let [header_area, body_area, status_area] = Layout::vertical([
-        Constraint::Length(4),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(area);
+    // Layout : header (3) | body (fill) | status (1)
+    let [header_area, body_area, status_area] = vertical![==3, *=1, ==1].areas(area);
 
     render_header(f, header_area, state);
 
@@ -59,7 +54,86 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let width = area.width as usize;
 
-    // Mastery du sujet courant
+    // ── L1 : clings ─ [N/total] Titre   ★diff  TYPE  [S2] ──────────────
+    let stars = common::difficulty_stars(exercise.difficulty);
+    let stars_color = common::difficulty_color(exercise.difficulty);
+    let type_badge = common::exercise_type_badge(exercise.exercise_type.clone());
+    let stage_badge = state.current_stage.map(common::stage_badge);
+
+    // "clings ─ " = 9 chars display, cached_header_left_len = counter + title chars
+    let prefix_len = 9usize;
+    let type_char_len: usize = type_badge.content.chars().count();
+    let stage_char_len: usize = stage_badge
+        .as_ref()
+        .map(|s| s.content.chars().count())
+        .unwrap_or(0);
+    let right1_len = 2
+        + 5
+        + 2
+        + type_char_len
+        + if stage_char_len > 0 {
+            2 + stage_char_len
+        } else {
+            0
+        };
+    let left1_len = prefix_len + state.cached_header_left_len;
+    let pad1 = width.saturating_sub(left1_len + right1_len + 2);
+
+    let mut line1_spans: Vec<Span<'_>> = vec![
+        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings ─ "),
+        Span::styled(
+            state.cached_exercise_counter.as_str(),
+            Style::default()
+                .fg(common::C_SUCCESS)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            exercise.title.as_str(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" ".repeat(pad1 + 1)),
+        Span::styled(stars, Style::default().fg(stars_color)),
+        Span::raw("  "),
+        type_badge,
+    ];
+    if let Some(sb) = stage_badge {
+        line1_spans.push(Span::raw("  "));
+        line1_spans.push(sb);
+    }
+    let line1 = Line::from(line1_spans);
+
+    // ── L2 : mini_map  subject                  ↻ N révision(s) ─────────
+    let due_count = state.due_count();
+    let right2 = if due_count > 0 {
+        format!("↻ {} révision(s)", due_count)
+    } else {
+        String::new()
+    };
+    let left2_chars = state.cached_mini_map_len + 2 + exercise.subject.chars().count();
+    let pad2 = if right2.is_empty() {
+        0usize
+    } else {
+        width.saturating_sub(left2_chars + right2.chars().count() + 2)
+    };
+
+    let mut line2_spans: Vec<Span<'_>> = vec![
+        Span::styled(
+            state.cached_mini_map.as_str(),
+            Style::default().fg(common::C_TEXT_DIM),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            exercise.subject.as_str(),
+            Style::default().fg(common::C_TEXT_DIM),
+        ),
+    ];
+    if !right2.is_empty() {
+        line2_spans.push(Span::raw(" ".repeat(pad2 + 1)));
+        line2_spans.push(Span::styled(right2, Style::default().fg(common::C_WARNING)));
+    }
+    let line2 = Line::from(line2_spans);
+
+    // ── L3 : Maîtrise ████████░░ 2.4/5.0   key_concept ──────────────────
     let mastery = state
         .mastery_map
         .get(&exercise.subject)
@@ -68,53 +142,28 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let bar = common::mastery_bar_string(mastery, 10);
     let bar_color = common::mastery_color(mastery);
 
-    // ── Ligne 1 : [idx/total] Titre ── + droit: chapter mini-map ──────
-    let line1 = common::render_header_line1(state, exercise, width);
-
-    // ── Ligne 2 : stars | type | stage ── + droit: mastery bar ────────
-    let stars_line = common::difficulty_stars_line(exercise.difficulty);
-    let mut meta_spans: Vec<Span> = Vec::new();
-    meta_spans.extend(stars_line.spans);
-    meta_spans.push(Span::raw("  │  "));
-    meta_spans.push(common::exercise_type_badge(exercise.exercise_type.clone()));
-    if let Some(stage) = state.current_stage {
-        meta_spans.push(Span::raw("  │  "));
-        meta_spans.push(common::stage_badge(stage));
+    let mut line3_spans: Vec<Span<'_>> = vec![
+        Span::styled("Maîtrise ", Style::default().fg(common::C_TEXT_DIM)),
+        Span::styled(bar, Style::default().fg(bar_color)),
+        Span::styled(
+            format!(" {:.1}/5.0", mastery),
+            Style::default().fg(bar_color),
+        ),
+    ];
+    if let Some(kc) = &exercise.key_concept {
+        line3_spans.push(Span::raw("   "));
+        line3_spans.push(Span::styled(
+            kc.as_str(),
+            Style::default().fg(common::C_OVERLAY),
+        ));
     }
+    let line3 = Line::from(line3_spans);
 
-    // "mastery: X.X  " (14 chars fixes, mastery ∈ [0.0,5.0] → toujours 1 chiffre) + 10 barre
-    let right2_display = 14 + 10;
-    let left2_display: usize = meta_spans
-        .iter()
-        .map(|s| s.content.chars().count())
-        .sum::<usize>();
-    let pad2 = width.saturating_sub(left2_display + right2_display + 4);
-    meta_spans.push(Span::raw(" ".repeat(pad2 + 1)));
-    meta_spans.push(Span::styled(
-        state.cached_mastery_display.as_str(),
-        Style::default().fg(bar_color),
-    ));
-    meta_spans.push(Span::styled(bar, Style::default().fg(bar_color)));
-    let line2 = Line::from(meta_spans);
-
-    // ── Ligne 3 : révision due (optionnelle) ──────────────────────────
-    let due_count = state.due_count();
-    let line3 = if due_count > 0 {
-        Line::from(Span::styled(
-            format!("↻ {} révision(s) due(s)", due_count),
-            Style::default().fg(common::C_WARNING),
-        ))
-    } else {
-        Line::raw("")
-    };
-
-    let text = Text::from(vec![line1, line2, line3]);
-    let block = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(common::C_BORDER))
-        .style(Style::default().bg(common::C_BG))
-        .title(span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings — watch"));
-    f.render_widget(Paragraph::new(text).block(block), area);
+    f.render_widget(
+        Paragraph::new(vec![line1, line2, line3])
+            .block(Block::default().style(Style::default().bg(common::C_BG))),
+        area,
+    );
 }
 
 fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
@@ -123,93 +172,80 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
-
-    // Priorité au sujet courant puis les 7 premiers depuis le cache
-    let top: Vec<&String> = {
-        let mut result: Vec<&String> = state.subject_order.iter().take(8).collect();
-        if !result.contains(&&exercise.subject) {
-            result.insert(0, &exercise.subject);
-            result.truncate(8);
-        }
-        result
-    };
-
-    let mut lines: Vec<Line> = Vec::new();
-
-    for subj in &top {
-        let score = state.mastery_map.get(*subj).copied().unwrap_or(0.0);
-        let bar = common::mastery_bar_string(score, 8);
-        let bar_color = common::mastery_color(score);
-        // Tronque le nom à 9 chars pour tenir dans 26 cols (2 indicateur + 9 nom + 1 espace + 8 barre + 3 score)
-        let short_name = if subj.len() > 9 {
-            &subj[..9]
-        } else {
-            subj.as_str()
-        };
-        let is_current = *subj == &exercise.subject;
-        let (indicator, name_style, score_color) = if is_current {
-            (
-                "▶ ",
-                Style::default()
-                    .fg(common::C_ACCENT)
-                    .add_modifier(Modifier::BOLD),
-                common::C_ACCENT,
-            )
-        } else {
-            (
-                "  ",
-                Style::default().fg(common::C_TEXT_DIM),
-                common::C_TEXT_DIM,
-            )
-        };
-        lines.push(line![
-            Span::styled(indicator, name_style),
-            span!(name_style; "{:<8}", short_name),
-            Span::raw(" "),
-            span!(Style::default().fg(bar_color); "{}", bar),
-            span!(Style::default().fg(score_color); " {:.1}", score),
-        ]);
-    }
-
-    // Séparateur
-    lines.push(Line::raw(""));
-
-    // Failures consécutives
-    if state.consecutive_failures > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("✗ {} erreurs consec.", state.consecutive_failures),
-            Style::default().fg(common::C_DANGER),
-        )));
-    }
-
-    // Révisions dues
-    let due_count = state.due_count();
-    if due_count > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("↻ {} révision(s)", due_count),
-            Style::default().fg(common::C_WARNING),
-        )));
-    }
-
-    // Barre de progression vers le stage suivant
-    let mastery_score = state
+    let mastery = state
         .mastery_map
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
-    if let Some((floor, threshold, next_stage)) = common::next_stage_threshold(mastery_score) {
-        let ratio = ((mastery_score - floor) / (threshold - floor)).clamp(0.0, 1.0);
-        let bar = common::mastery_bar_string(ratio * 5.0, 8);
-        let remaining = threshold - mastery_score;
-        lines.push(Line::raw(""));
+    let bar_color = common::mastery_color(mastery);
+
+    let mut lines: Vec<Line<'_>> = Vec::new();
+
+    // ── Section EXERCICE ─────────────────────────────────────────────────
+    lines.push(Line::from(Span::styled(
+        exercise.title.as_str(),
+        Style::default()
+            .fg(common::C_TEXT)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::raw(""));
+    lines.push(line![
+        span!(common::C_TEXT_DIM; "sujet   "),
+        Span::styled(
+            exercise.subject.as_str(),
+            Style::default().fg(common::C_SUBTEXT)
+        ),
+    ]);
+
+    let diff_line = common::difficulty_stars_line(exercise.difficulty);
+    let mut diff_spans: Vec<Span<'_>> = vec![span!(common::C_TEXT_DIM; "diff    ")];
+    diff_spans.extend(diff_line.spans);
+    lines.push(Line::from(diff_spans));
+
+    lines.push(line![
+        span!(common::C_TEXT_DIM; "type    "),
+        common::exercise_type_badge(exercise.exercise_type.clone()),
+    ]);
+
+    if let Some(stage) = state.current_stage {
         lines.push(line![
-            span!(common::C_INFO; "{}", bar),
+            span!(common::C_TEXT_DIM; "étape   "),
+            common::stage_badge(stage),
+        ]);
+    }
+
+    // ── Séparateur ────────────────────────────────────────────────────────
+    lines.push(Line::styled(
+        common::SEPARATOR,
+        Style::default().fg(common::C_OVERLAY),
+    ));
+
+    // ── Section SUJET ─────────────────────────────────────────────────────
+    let bar = common::mastery_bar_string(mastery, 10);
+    lines.push(line![
+        span!(Style::default().fg(bar_color); "{}", bar),
+        span!(Style::default().fg(bar_color); " {:.1}/5.0", mastery),
+    ]);
+
+    // Barre de progression vers le stage suivant
+    if let Some((floor, threshold, next_stage)) = common::next_stage_threshold(mastery) {
+        let ratio = ((mastery - floor) / (threshold - floor)).clamp(0.0, 1.0);
+        let next_bar = common::mastery_bar_string(ratio * 5.0, 8);
+        let remaining = threshold - mastery;
+        lines.push(line![
+            span!(common::C_INFO; "{}", next_bar),
             span!(common::C_TEXT_DIM; " →S{} ({:.1})", next_stage, remaining),
         ]);
     }
 
-    // Prochaine révision (si aucune n'est due maintenant)
-    if due_count == 0 {
+    // Révisions dues ou prochaine révision
+    let due_count = state.due_count();
+    if due_count > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("↻ {} révision(s) dues", due_count),
+            Style::default().fg(common::C_WARNING),
+        )));
+    } else {
         let next_due_days = state
             .review_map
             .values()
@@ -224,11 +260,21 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
         }
     }
 
+    // Erreurs consécutives
+    if state.consecutive_failures > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("✗ {} erreurs consec.", state.consecutive_failures),
+            Style::default().fg(common::C_DANGER),
+        )));
+    }
+
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(common::C_BORDER))
         .style(Style::default().bg(common::C_BG))
-        .title(span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "Progression"));
+        .title(
+            span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "Exercice"),
+        );
     f.render_widget(Paragraph::new(lines).block(block), area);
 }
 
