@@ -1,10 +1,10 @@
 //! Vue Ratatui pour liste d'exercices — list scrollable avec filtrage.
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::layout::{Constraint, Layout};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::{Modifier, Style};
+use ratatui::text::Span;
 use ratatui::widgets::{Block, List, ListItem, ListState, Paragraph};
+use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
 
 use crate::error::Result;
@@ -98,12 +98,7 @@ fn draw_list(
     let area = f.area();
 
     // Layout: header (3) | list (fill) | footer (1)
-    let [header_area, list_area, footer_area] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(area);
+    let [header_area, list_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
     // ── Header ────────────────────────────────────────────────────────
     let header_title = if due_subjects.is_some() {
@@ -112,12 +107,9 @@ fn draw_list(
         format!("clings — Exercices [{}]", filtered.len())
     };
 
-    let header_text = Line::from(vec![Span::styled(
-        header_title,
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )]);
+    let header_text = line![
+        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "{}", header_title)
+    ];
     f.render_widget(
         Paragraph::new(header_text).block(Block::bordered().title("List")),
         header_area,
@@ -134,14 +126,14 @@ fn draw_list(
                 .map(|s| format!(" [{:.1}]", s.mastery_score.get()))
                 .unwrap_or_default();
 
-            let content = Line::from(vec![
-                Span::styled(diff, Style::default().fg(diff_color)),
+            let content = line![
+                span!(diff_color; "{}", diff),
                 Span::raw("  "),
-                Span::styled(ex.id.as_str(), Style::default().fg(Color::DarkGray)),
+                span!(common::C_OVERLAY; "{}", ex.id),
                 Span::raw("  "),
                 Span::raw(ex.title.as_str()),
-                Span::styled(mastery_info, Style::default().fg(Color::DarkGray)),
-            ]);
+                span!(common::C_OVERLAY; "{}", mastery_info),
+            ];
             ListItem::new(content)
         })
         .collect();
@@ -155,7 +147,7 @@ fn draw_list(
     // ── Footer ────────────────────────────────────────────────────────
     let footer_text = "[↑↓/jk] naviguer  [q] quitter";
     f.render_widget(
-        Paragraph::new(footer_text).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(footer_text).style(Style::default().fg(common::C_OVERLAY)),
         footer_area,
     );
 }

@@ -267,6 +267,7 @@ dependencies = [
  "notify",
  "nucleo-matcher",
  "ratatui",
+ "ratatui-macros",
  "regex",
  "rusqlite",
  "rust-embed",

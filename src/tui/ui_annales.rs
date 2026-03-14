@@ -1,14 +1,16 @@
 //! Vue Ratatui pour annales — table scrollable des sessions et questions.
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::layout::{Constraint, Layout};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::layout::Constraint;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::Span;
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState};
+use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
 
 use crate::error::Result;
 use crate::models::{AnnaleSession, Exercise};
+use crate::tui::common;
 
 /// Lance une vue Ratatui autonome pour afficher les annales.
 pub fn run_annales(annales: &[AnnaleSession], exercises: &[Exercise]) -> Result<()> {
@@ -113,23 +115,13 @@ fn draw_annales(
     let area = f.area();
 
     // Layout: header (3) | table (fill) | footer (1)
-    let [header_area, table_area, footer_area] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(area);
+    let [header_area, table_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
     // ── Header ────────────────────────────────────────────────────────
-    let header_text = Line::from(vec![
-        Span::styled(
-            "Annales NSY103",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+    let header_text = line![
+        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "Annales NSY103"),
         Span::raw(" — correspondance exercices"),
-    ]);
+    ];
     f.render_widget(
         Paragraph::new(header_text).block(Block::bordered().title("Annales")),
         header_area,
@@ -162,7 +154,7 @@ fn draw_annales(
     .header(
         Row::new(vec!["Session", "Q#", "Titre", "Sujets", "Exercices"]).style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(common::C_ACCENT)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         ),
     )
@@ -174,7 +166,7 @@ fn draw_annales(
     // ── Footer ────────────────────────────────────────────────────────
     let footer_text = "[↑↓/jk] naviguer  [q] quitter";
     f.render_widget(
-        Paragraph::new(footer_text).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(footer_text).style(Style::default().fg(common::C_OVERLAY)),
         footer_area,
     );
 }

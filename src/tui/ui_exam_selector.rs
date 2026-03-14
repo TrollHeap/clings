@@ -2,13 +2,14 @@
 
 use ratatui::{
     layout::{Constraint, Direction, HorizontalAlignment, Layout},
-    style::{Color, Style},
+    style::Style,
     text::Line,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
 use crate::models::AnnaleSession;
+use crate::tui::common;
 
 /// Ratatui-based exam session selector.
 /// Retourne l'ID de la session choisie, ou None si annulé.
@@ -90,7 +91,7 @@ mod tests {
 fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
     f.render_widget(
-        Block::default().style(Style::default().bg(Color::Black)),
+        Block::default().style(Style::default().bg(common::C_BG)),
         f.area(),
     );
 

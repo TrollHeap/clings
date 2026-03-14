@@ -1,10 +1,13 @@
 //! Vue Ratatui pour statistiques — mastery moyenne, sparkline, table par sujet.
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::layout::{Constraint, Layout};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::layout::{Constraint, Direction};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Row, Sparkline, Table, TableState};
+use ratatui::widgets::{
+    Bar, BarChart, BarGroup, Block, Paragraph, Row, Sparkline, Table, TableState,
+};
+use ratatui_macros::{line, span, vertical};
 use std::time::Duration;
 
 use crate::error::Result;
@@ -23,7 +26,7 @@ fn mastery_bar_spans(score: f64) -> Vec<Span<'static>> {
     let bar = common::mastery_bar_string(score, 10);
     let color = common::mastery_color(score);
     vec![
-        Span::styled(bar, Style::default().fg(color)),
+        span!(Style::default().fg(color); "{}", bar),
         Span::raw(format!(" {:.1}", score)),
     ]
 }
@@ -73,20 +76,12 @@ fn draw_stats(
     let area = f.area();
 
     // Layout: header (3) | body (fill) | footer (1)
-    let [header_area, body_area, footer_area] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(area);
+    let [header_area, body_area, footer_area] = vertical![==3, *=1, ==1].areas(area);
 
     // ── Header ────────────────────────────────────────────────────────
-    let header_text = Line::from(vec![Span::styled(
-        "clings — Statistiques",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )]);
+    let header_text = line![
+        span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings — Statistiques")
+    ];
     f.render_widget(
         Paragraph::new(header_text).block(Block::bordered().title("Stats")),
         header_area,
@@ -97,7 +92,7 @@ fn draw_stats(
         let text = "Aucun sujet pratiqué pour l'instant.";
         f.render_widget(
             Paragraph::new(text)
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(common::C_OVERLAY))
                 .block(Block::bordered()),
             body_area,
         );
@@ -106,24 +101,16 @@ fn draw_stats(
         let mut lines: Vec<Line> = Vec::new();
 
         // Streak
-        lines.push(Line::from(vec![
-            Span::styled("Série: ", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                streak.to_string(),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
+        lines.push(line![
+            span!(common::C_ACCENT; "Série: "),
+            span!(Style::default().fg(common::C_YELLOW).add_modifier(Modifier::BOLD); "{}", streak),
             Span::raw("  jours consécutifs"),
-        ]));
+        ]);
 
         let avg = avg_mastery(subjects);
 
         // Average mastery
-        let mut avg_line = vec![Span::styled(
-            "Maîtrise moyenne: ",
-            Style::default().fg(Color::Cyan),
-        )];
+        let mut avg_line = vec![span!(common::C_ACCENT; "Maîtrise moyenne: ")];
         avg_line.extend(mastery_bar_spans(avg));
         lines.push(Line::from(avg_line));
         lines.push(Line::raw(""));
@@ -138,8 +125,7 @@ fn draw_stats(
                 let total_attempts: u32 = daily_data.iter().map(|(_, c)| c).sum();
 
                 // Layout for sparkline + stats below
-                let [para_area, spark_area] =
-                    Layout::vertical([Constraint::Length(4), Constraint::Fill(1)]).areas(body_area);
+                let [para_area, spark_area] = vertical![==4, *=1].areas(body_area);
 
                 f.render_widget(content_paragraph, para_area);
 
@@ -149,7 +135,9 @@ fn draw_stats(
                             .title(format!("Activité 30j — {} tentatives", total_attempts)),
                     )
                     .data(&counts)
-                    .style(Style::default().fg(Color::Yellow));
+                    .bar_set(ratatui::symbols::bar::NINE_LEVELS)
+                    .style(Style::default().fg(common::C_YELLOW))
+                    .absent_value_style(Style::default().fg(common::C_OVERLAY));
 
                 f.render_widget(sparkline, spark_area);
                 return;
@@ -184,7 +172,7 @@ fn draw_stats(
                 .header(
                     Row::new(vec!["Sujet", "Succès", "Échecs", "Total"]).style(
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(common::C_ACCENT)
                             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
                     ),
                 )
@@ -195,7 +183,7 @@ fn draw_stats(
             }
         }
 
-        // Mastery table (default)
+        // Mastery BarChart (default) — horizontal, 1 barre par sujet
         let mut sorted: Vec<&Subject> = subjects.iter().collect();
         sorted.sort_by(|a, b| {
             b.mastery_score
@@ -204,42 +192,52 @@ fn draw_stats(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let rows: Vec<Row> = sorted
+        let [para_area, chart_area] = vertical![==4, *=1].areas(body_area);
+        f.render_widget(content_paragraph, para_area);
+
+        // Build labels first (owned Strings) then borrow into Bar
+        let label_strings: Vec<String> = sorted
             .iter()
-            .take(15)
+            .take(10)
             .map(|s| {
-                let score = s.mastery_score.get();
-                Row::new(vec![
-                    s.name.clone(),
-                    format!("{:.1}", score),
-                    common::mastery_bar_string(score, 10),
-                ])
+                if s.name.len() > 10 {
+                    s.name[..10].to_string()
+                } else {
+                    s.name.clone()
+                }
             })
             .collect();
 
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Percentage(40),
-                Constraint::Percentage(15),
-                Constraint::Percentage(45),
-            ],
-        )
-        .header(
-            Row::new(vec!["Sujet", "Maîtrise", "Barre"]).style(
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            ),
-        )
-        .block(Block::bordered().title("Maîtrise par sujet"));
+        let bars: Vec<Bar<'_>> = sorted
+            .iter()
+            .take(10)
+            .zip(label_strings.iter())
+            .map(|(s, label)| {
+                let score = s.mastery_score.get();
+                Bar::default()
+                    .value((score * 10.0) as u64)
+                    .style(Style::default().fg(common::mastery_color(score)))
+                    .text_value(format!("{:.1}", score))
+                    .label(Line::from(label.as_str()))
+            })
+            .collect();
 
-        f.render_stateful_widget(table, body_area, table_state);
+        let group = BarGroup::default().bars(&bars);
+        let bar_chart = BarChart::default()
+            .direction(Direction::Horizontal)
+            .block(Block::bordered().title("Maîtrise par sujet"))
+            .bar_width(1)
+            .bar_gap(0)
+            .max(50)
+            .data(group);
+
+        f.render_widget(bar_chart, chart_area);
+        let _ = table_state; // unused in this branch
     }
 
     // ── Footer ────────────────────────────────────────────────────────
     f.render_widget(
-        Paragraph::new("[q] quitter").style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new("[q] quitter").style(Style::default().fg(common::C_OVERLAY)),
         footer_area,
     );
 }

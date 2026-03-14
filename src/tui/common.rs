@@ -3,12 +3,14 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, BorderType, Clear, List, ListItem, ListState, Paragraph, Scrollbar,
+    ScrollbarOrientation, ScrollbarState, Wrap,
+};
 use ratatui::Frame;
+use ratatui_macros::{line, span, vertical};
 
-use std::borrow::Cow;
-
-use crate::models::{Difficulty, Exercise, ValidationMode};
+use crate::models::{Difficulty, Exercise, ExerciseType, ValidationMode};
 use crate::runner::RunResult;
 use crate::tui::app::AppState;
 
@@ -24,45 +26,56 @@ const FULL_BAR: &str = "██████████";
 /// Barre vide (10 × ░) — tranche statique pour mastery_bar sans allocation.
 const EMPTY_BAR: &str = "░░░░░░░░░░";
 
-/// Barre pleine (20 × █) — pour la progress bar piscine (width=20).
-const FULL_BAR_20: &str = "████████████████████";
-/// Barre vide (20 × ░) — pour la progress bar piscine (width=20).
-const EMPTY_BAR_20: &str = "░░░░░░░░░░░░░░░░░░░░";
+// ── Palette Catppuccin Mocha ──────────────────────────────────────────────────
+pub const C_BG: Color = Color::Rgb(30, 30, 46); // Base
+pub const C_SURFACE: Color = Color::Rgb(24, 24, 37); // Mantle
+pub const C_BORDER: Color = Color::Rgb(69, 71, 90); // Surface1
+pub const C_TEXT_DIM: Color = Color::Rgb(147, 153, 178); // Overlay2
+pub const C_ACCENT: Color = Color::Rgb(137, 180, 250); // Blue
+pub const C_OVERLAY: Color = Color::Rgb(108, 112, 134); // Overlay0
+pub const C_SUBTEXT: Color = Color::Rgb(186, 194, 222); // Subtext1
+pub const C_TEXT: Color = Color::Rgb(205, 214, 244); // Text
 
-/// Retourne deux tranches statiques `(full_part, empty_part)` pour
-/// construire une barre de progression de largeur 20 sans allocation.
-///
-/// `ratio` doit être dans [0.0, 1.0].
-pub fn progress_bar_string(ratio: f64) -> (&'static str, &'static str) {
-    let filled = ((ratio * 20.0).round() as usize).min(20);
-    let empty = 20 - filled;
-    (&FULL_BAR_20[..filled * 3], &EMPTY_BAR_20[..empty * 3])
-}
+// ── Couleurs sémantiques ───────────────────────────────────────────────────────
+pub const C_SUCCESS: Color = Color::Rgb(166, 227, 161); // Green
+pub const C_WARNING: Color = Color::Rgb(250, 179, 135); // Peach
+pub const C_DANGER: Color = Color::Rgb(243, 139, 168); // Red
+pub const C_INFO: Color = Color::Rgb(137, 220, 235); // Sky
+pub const C_MAUVE: Color = Color::Rgb(203, 166, 247); // Mauve (Advanced)
+pub const C_TEAL: Color = Color::Rgb(148, 226, 213); // Teal (Expert, heap)
+pub const C_YELLOW: Color = Color::Rgb(249, 226, 175); // Yellow (streak)
 
-/// Étiquette de stage d'échafaudage (S0–S4).
-pub fn stage_label(stage: u8) -> &'static str {
+/// Étoiles pleines (★ × 5) — tranche statique pour étoiles de difficulté sans allocation.
+const FULL_STARS: &str = "★★★★★";
+/// Étoiles vides (☆ × 5) — tranche statique pour étoiles de difficulté sans allocation.
+const EMPTY_STARS: &str = "☆☆☆☆☆";
+
+/// Badge coloré pour le stage d'échafaudage courant (S0–S4).
+/// Couleur croissante : S0 neutre → S4 mauve+bold.
+pub fn stage_badge(stage: u8) -> Span<'static> {
     match stage {
-        0 => "S0",
-        1 => "S1",
-        2 => "S2",
-        3 => "S3",
-        _ => "S4",
+        0 => span!(C_TEXT_DIM; "[S0]"),
+        1 => span!(C_WARNING; "[S1]"),
+        2 => span!(C_INFO; "[S2]"),
+        3 => span!(C_SUCCESS; "[S3]"),
+        _ => span!(Style::default().fg(C_MAUVE).add_modifier(Modifier::BOLD); "[S4]"),
     }
 }
 
-/// Construit l'étiquette de hint pour la status bar.
-///
-/// Retourne `"[h] <label>"` quand aucun hint n'est révélé (zéro allocation via `Cow::Borrowed`),
-/// et `"[h] <label> (n/total)"` sinon (`Cow::Owned`).
-pub fn hint_label(hint_index: usize, hint_count: usize, label: &'static str) -> Cow<'static, str> {
-    if hint_index == 0 {
-        match label {
-            "hint" => Cow::Borrowed("[h] hint"),
-            "indice" => Cow::Borrowed("[h] indice"),
-            _ => Cow::Owned(format!("[h] {label}")),
-        }
+/// Retourne `(floor, threshold, next_stage)` pour afficher la progression vers le stage suivant.
+/// Retourne `None` si le score est déjà au stage maximum (S4, mastery ≥ 4.0).
+/// Seuils alignés avec `runner::mastery_to_stage` : S0<1.0 S1<2.0 S2<3.0 S3<4.0 S4≥4.0.
+pub fn next_stage_threshold(score: f64) -> Option<(f64, f64, u8)> {
+    if score < 1.0 {
+        Some((0.0, 1.0, 1))
+    } else if score < 2.0 {
+        Some((1.0, 2.0, 2))
+    } else if score < 3.0 {
+        Some((2.0, 3.0, 3))
+    } else if score < 4.0 {
+        Some((3.0, 4.0, 4))
     } else {
-        Cow::Owned(format!("[h] {label} ({hint_index}/{hint_count})"))
+        None
     }
 }
 
@@ -78,9 +91,7 @@ pub fn render_header_line1<'a>(
     Line::from(vec![
         Span::styled(
             state.cached_exercise_counter.as_str(),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             exercise.title.as_str(),
@@ -89,10 +100,10 @@ pub fn render_header_line1<'a>(
         Span::raw(" ".repeat(pad1 + 1)),
         Span::styled(
             state.cached_mini_map.as_str(),
-            Style::default().fg(Color::Gray),
+            Style::default().fg(C_TEXT_DIM),
         ),
         Span::raw("  "),
-        Span::styled(exercise.subject.as_str(), Style::default().fg(Color::Gray)),
+        Span::styled(exercise.subject.as_str(), Style::default().fg(C_TEXT_DIM)),
     ])
 }
 
@@ -118,11 +129,11 @@ fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
 /// Couleur associée à un niveau de difficulté.
 pub fn difficulty_color(d: Difficulty) -> Color {
     match d {
-        Difficulty::Easy => Color::Green,
-        Difficulty::Medium => Color::Yellow,
-        Difficulty::Hard => Color::Red,
-        Difficulty::Advanced => Color::Magenta,
-        Difficulty::Expert => Color::Cyan,
+        Difficulty::Easy => C_SUCCESS,
+        Difficulty::Medium => C_WARNING,
+        Difficulty::Hard => C_DANGER,
+        Difficulty::Advanced => C_MAUVE,
+        Difficulty::Expert => C_TEAL,
     }
 }
 
@@ -137,16 +148,50 @@ pub fn difficulty_stars(d: Difficulty) -> &'static str {
     }
 }
 
+/// Ligne d'étoiles colorées : étoiles pleines en couleur de difficulté, vides en C_BORDER.
+pub fn difficulty_stars_line(d: Difficulty) -> Line<'static> {
+    let (filled, color): (usize, Color) = match d {
+        Difficulty::Easy => (1, C_SUCCESS),
+        Difficulty::Medium => (2, C_WARNING),
+        Difficulty::Hard => (3, C_DANGER),
+        Difficulty::Advanced => (4, C_MAUVE),
+        Difficulty::Expert => (5, C_TEAL),
+    };
+    let empty = 5 - filled;
+    Line::from(vec![
+        Span::styled(&FULL_STARS[..filled * 3], Style::default().fg(color)),
+        Span::styled(&EMPTY_STARS[..empty * 3], Style::default().fg(C_BORDER)),
+    ])
+}
+
+/// Badge coloré pour le type d'exercice.
+pub fn exercise_type_badge(t: ExerciseType) -> Span<'static> {
+    match t {
+        ExerciseType::Complete => {
+            span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); " COMPLETE ")
+        }
+        ExerciseType::FixBug => {
+            span!(Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD); " FIX_BUG ")
+        }
+        ExerciseType::FillBlank => {
+            span!(Style::default().fg(C_WARNING).add_modifier(Modifier::BOLD); " FILL_BLANK ")
+        }
+        ExerciseType::Refactor => {
+            span!(Style::default().fg(C_INFO).add_modifier(Modifier::BOLD); " REFACTOR ")
+        }
+    }
+}
+
 /// Couleur gradient pour un score de maîtrise (0.0–5.0).
 pub fn mastery_color(score: f64) -> Color {
     if score < 1.0 {
-        Color::Red
+        C_DANGER
     } else if score < 2.5 {
-        Color::Yellow
+        C_WARNING
     } else if score < 4.0 {
-        Color::Green
+        C_SUCCESS
     } else {
-        Color::Cyan
+        C_TEAL
     }
 }
 
@@ -188,6 +233,26 @@ pub fn mastery_bar_string(score: f64, width: usize) -> String {
     s
 }
 
+/// Parse une ligne avec syntaxe backtick inline : `code` → C_ACCENT BOLD.
+fn parse_inline_code(line: &str) -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut is_code = false;
+    for part in line.split('`') {
+        if !part.is_empty() {
+            if is_code {
+                spans.push(Span::styled(
+                    part.to_owned(),
+                    Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                spans.push(Span::raw(part.to_owned()));
+            }
+        }
+        is_code = !is_code;
+    }
+    Line::from(spans)
+}
+
 /// Panneau description/indices — partagé entre watch et piscine.
 /// Affiche description, key_concept, common_mistake, fichiers, et indices révélés.
 pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
@@ -195,46 +260,37 @@ pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
     let mut lines: Vec<Line> = Vec::with_capacity(16);
 
     for line in exercise.description.lines() {
-        lines.push(Line::from(line));
+        lines.push(parse_inline_code(line));
     }
     let has_meta = exercise.key_concept.is_some()
         || exercise.common_mistake.is_some()
         || !exercise.files.is_empty();
     if has_meta {
-        lines.push(Line::styled(
-            SEPARATOR,
-            Style::default().fg(Color::DarkGray),
-        ));
+        lines.push(Line::styled(SEPARATOR, Style::default().fg(C_OVERLAY)));
     } else {
         lines.push(Line::raw(""));
     }
 
     if let Some(kc) = &exercise.key_concept {
-        lines.push(Line::from(vec![
-            Span::styled("concept : ", Style::default().fg(Color::Cyan)),
-            Span::raw(kc.as_str()),
-        ]));
+        lines.push(line![span!(C_TEAL; "concept : "), Span::raw(kc.as_str()),]);
     }
     if let Some(cm) = &exercise.common_mistake {
-        lines.push(Line::from(vec![
-            Span::styled("piège   : ", Style::default().fg(Color::Yellow)),
-            Span::styled(cm.as_str(), Style::default().fg(Color::DarkGray)),
-        ]));
+        lines.push(line![
+            span!(C_WARNING; "piège   : "),
+            span!(C_OVERLAY; "{}", cm.as_str()),
+        ]);
     }
     if !exercise.files.is_empty() {
         let names: Vec<&str> = exercise.files.iter().map(|fi| fi.name.as_str()).collect();
-        lines.push(Line::from(vec![
-            Span::styled("fichiers: ", Style::default().fg(Color::Gray)),
-            Span::styled(names.join(", "), Style::default().fg(Color::DarkGray)),
-        ]));
+        lines.push(line![
+            span!(C_TEXT_DIM; "fichiers: "),
+            span!(C_OVERLAY; "{}", names.join(", ")),
+        ]);
     }
 
     if state.hint_index > 0 && !exercise.hints.is_empty() {
         lines.push(Line::raw(""));
-        lines.push(Line::styled(
-            "── Indices ──",
-            Style::default().fg(Color::Cyan),
-        ));
+        lines.push(Line::styled("── Indices ──", Style::default().fg(C_TEAL)));
         for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
             lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
         }
@@ -250,36 +306,75 @@ pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
         "Exercice".to_string()
     };
 
+    let content_length = lines.len();
+    let scroll = state.description_scroll;
+    let mut scroll_state = ScrollbarState::new(content_length).position(scroll as usize);
+
     f.render_widget(
         Paragraph::new(lines)
-            .block(Block::bordered().title(title))
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(C_BORDER))
+                    .style(Style::default().bg(C_BG))
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", title)),
+            )
+            .scroll((scroll, 0))
             .wrap(Wrap { trim: false }),
         area,
     );
+
+    f.render_stateful_widget(
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None),
+        area,
+        &mut scroll_state,
+    );
+}
+
+/// Retourne la ligne de statut pour les états spéciaux (overlay actif, compilation, status_msg).
+/// Retourne `None` si aucun état spécial — l'appelant construit alors la ligne de touches.
+/// `has_help` : true pour le mode watch (qui possède un overlay d'aide [?]).
+pub fn status_bar_prefix_line(state: &AppState, has_help: bool) -> Option<Line<'static>> {
+    let dim = Style::default().fg(C_TEXT_DIM);
+    if state.compile_pending {
+        return Some(Line::styled("⏳ Compilation en cours…", dim));
+    }
+    if has_help && state.help_active {
+        return Some(Line::styled("[Esc/?] fermer", dim));
+    }
+    if state.solution_active {
+        return Some(Line::styled("[Esc/s] fermer solution", dim));
+    }
+    if state.search_active {
+        return Some(Line::styled(
+            "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer",
+            dim,
+        ));
+    }
+    if let Some(status) = &state.status_msg {
+        return Some(Line::styled(status.clone(), dim));
+    }
+    None
 }
 
 /// Barre de statut à deux colonnes — partagée entre watch et piscine.
-/// Si `right_msg` est vide ou la largeur < 40, affiche seulement `left_msg`.
+/// Si `right_msg` est vide ou la largeur < 40, affiche seulement `left_line`.
 pub fn render_split_status_bar(
     f: &mut Frame,
     area: Rect,
-    left_msg: String,
+    left_line: Line<'static>,
     right_msg: String,
     right_style: Style,
     right_width: u16,
 ) {
     if right_msg.is_empty() || area.width < 40 {
-        f.render_widget(
-            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
-            area,
-        );
+        f.render_widget(Paragraph::new(left_line), area);
     } else {
         let [left_area, right_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(right_width)]).areas(area);
-        f.render_widget(
-            Paragraph::new(left_msg).style(Style::default().fg(Color::DarkGray)),
-            left_area,
-        );
+        f.render_widget(Paragraph::new(left_line), left_area);
         f.render_widget(Paragraph::new(right_msg).style(right_style), right_area);
     }
 }
@@ -343,20 +438,20 @@ pub fn render_run_result(
     exercise: &crate::models::Exercise,
 ) {
     let (title, title_color) = if result.success {
-        (format!("✓ SUCCÈS ({}ms)", result.duration_ms), Color::Green)
+        (format!("✓ SUCCÈS ({}ms)", result.duration_ms), C_SUCCESS)
     } else if result.compile_error {
-        ("✗ ERREUR DE COMPILATION".to_string(), Color::Red)
+        ("✗ ERREUR DE COMPILATION".to_string(), C_DANGER)
     } else if result.timeout {
-        ("✗ TIMEOUT".to_string(), Color::Red)
+        ("✗ TIMEOUT".to_string(), C_DANGER)
     } else {
         let is_test = matches!(
             exercise.validation.mode,
             ValidationMode::Test | ValidationMode::Both
         );
         if is_test {
-            ("✗ TESTS ÉCHOUÉS".to_string(), Color::Red)
+            ("✗ TESTS ÉCHOUÉS".to_string(), C_DANGER)
         } else {
-            ("✗ SORTIE INCORRECTE".to_string(), Color::Red)
+            ("✗ SORTIE INCORRECTE".to_string(), C_DANGER)
         }
     };
 
@@ -365,17 +460,11 @@ pub fn render_run_result(
 
     if result.success {
         for line in result.stdout.lines() {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::Green),
-            )));
+            lines.push(Line::from(span!(C_SUCCESS; "{}", line)));
         }
     } else if result.compile_error {
         for line in result.stderr.lines().take(5) {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::Red),
-            )));
+            lines.push(Line::from(span!(C_DANGER; "{}", line)));
         }
     } else if result.timeout {
         lines.push(Line::from("Dépassement de 10s — boucle infinie ?"));
@@ -386,32 +475,17 @@ pub fn render_run_result(
         for i in 0..max_len.min(4) {
             match (exp_lines.get(i), got_lines.get(i)) {
                 (Some(e), Some(g)) if *e == *g => {
-                    lines.push(Line::from(Span::styled(
-                        format!("  {}", e),
-                        Style::default().fg(Color::Green),
-                    )));
+                    lines.push(Line::from(span!(C_SUCCESS; "  {}", e)));
                 }
                 (Some(e), Some(g)) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("- {}", e),
-                        Style::default().fg(Color::Red),
-                    )));
-                    lines.push(Line::from(Span::styled(
-                        format!("+ {}", g),
-                        Style::default().fg(Color::Yellow),
-                    )));
+                    lines.push(Line::from(span!(C_DANGER; "- {}", e)));
+                    lines.push(Line::from(span!(C_WARNING; "+ {}", g)));
                 }
                 (Some(e), None) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("- {}", e),
-                        Style::default().fg(Color::Red),
-                    )));
+                    lines.push(Line::from(span!(C_DANGER; "- {}", e)));
                 }
                 (None, Some(g)) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("+ {}", g),
-                        Style::default().fg(Color::Yellow),
-                    )));
+                    lines.push(Line::from(span!(C_WARNING; "+ {}", g)));
                 }
                 (None, None) => {}
             }
@@ -419,10 +493,9 @@ pub fn render_run_result(
     }
 
     let block = Block::bordered()
-        .title(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ))
+        .border_type(BorderType::Rounded)
+        .style(Style::default().bg(C_BG))
+        .title(span!(Style::default().fg(color).add_modifier(Modifier::BOLD); "{}", title))
         .border_style(Style::default().fg(color));
     f.render_widget(Paragraph::new(lines).block(block), area);
 }
@@ -464,7 +537,7 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         }
         dots.push_str(if i == step_idx { "●" } else { "○" });
     }
-    lines.push(Line::styled(dots, Style::default().fg(Color::Yellow)));
+    lines.push(Line::styled(dots, Style::default().fg(C_WARNING)));
     lines.push(Line::raw(""));
 
     let label = if !step.step_label.is_empty() {
@@ -478,21 +551,11 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     ));
     lines.push(Line::raw(""));
 
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("{:<25}", "STACK"),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            "HEAP",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]));
+    lines.push(line![
+        span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "{:<25}", "STACK"),
+        span!(C_OVERLAY; " │ "),
+        span!(Style::default().fg(C_TEAL).add_modifier(Modifier::BOLD); "HEAP"),
+    ]);
 
     let max_rows = step.stack.len().max(step.heap.len()).max(1);
     for i in 0..max_rows {
@@ -512,25 +575,25 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
                     String::new()
                 }
             });
-        lines.push(Line::from(vec![
-            Span::styled(format!("{:<25}", left), Style::default().fg(Color::Green)),
-            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(right, Style::default().fg(Color::Cyan)),
-        ]));
+        lines.push(line![
+            span!(C_SUCCESS; "{:<25}", left),
+            span!(C_OVERLAY; " │ "),
+            span!(C_TEAL; "{}", right),
+        ]);
     }
 
     lines.push(Line::raw(""));
 
     if !step.explanation.is_empty() {
         for part in step.explanation.split(". ") {
-            lines.push(Line::styled(part, Style::default().fg(Color::Gray)));
+            lines.push(Line::styled(part, Style::default().fg(C_TEXT_DIM)));
         }
     }
 
     lines.push(Line::raw(""));
     lines.push(Line::styled(
         "[←] préc   [→] suiv   [v] fermer",
-        Style::default().fg(Color::Gray),
+        Style::default().fg(C_TEXT_DIM),
     ));
 
     let title = format!("Visualiseur {}/{}", step_idx + 1, steps.len());
@@ -538,9 +601,10 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         Paragraph::new(lines)
             .block(
                 Block::bordered()
-                    .title(title)
-                    .style(Style::default().bg(Color::Black))
-                    .border_style(Style::default().fg(Color::Yellow)),
+                    .border_type(BorderType::Rounded)
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", title))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_BORDER)),
             )
             .wrap(Wrap { trim: false }),
         popup,
@@ -553,12 +617,7 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(Clear, popup);
 
     // Split: query input (3 lines) | results list (fill) | hint bar (1 line)
-    let [query_area, results_area, hint_area] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(popup);
+    let [query_area, results_area, hint_area] = vertical![==3, *=1, ==1].areas(popup);
 
     // Query input
     let cursor = if (f.count() / 4).is_multiple_of(2) {
@@ -580,9 +639,10 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(
         Paragraph::new(query_display).block(
             Block::bordered()
-                .title(overlay_title)
-                .style(Style::default().bg(Color::Black))
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_type(BorderType::Rounded)
+                .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", overlay_title))
+                .style(Style::default().bg(C_SURFACE))
+                .border_style(Style::default().fg(C_ACCENT)),
         ),
         query_area,
     );
@@ -608,17 +668,11 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
                 .nth(16)
                 .map(|(i, _)| i)
                 .unwrap_or(ex.subject.len());
-            ListItem::new(Line::from(vec![
-                Span::styled(
-                    format!("{:<30}", &ex.title[..title_end]),
-                    Style::default().fg(Color::White),
-                ),
-                Span::styled(
-                    format!("{:<18}", &ex.subject[..subj_end]),
-                    Style::default().fg(Color::Gray),
-                ),
-                Span::styled(stars, Style::default().fg(color)),
-            ]))
+            ListItem::new(line![
+                span!(C_TEXT; "{:<30}", &ex.title[..title_end]),
+                span!(C_SUBTEXT; "{:<18}", &ex.subject[..subj_end]),
+                span!(Style::default().fg(color); "{}", stars),
+            ])
         })
         .collect();
 
@@ -638,15 +692,12 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         List::new(items)
             .block(
                 Block::bordered()
+                    .border_type(BorderType::Rounded)
                     .title(list_title)
-                    .style(Style::default().bg(Color::Black))
-                    .border_style(Style::default().fg(Color::DarkGray)),
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_BORDER)),
             )
-            .highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
         results_area,
         &mut list_state,
     );
@@ -656,7 +707,7 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         Paragraph::new(
             "[↑↓/jk] nav  [g/G] début/fin  [Entrée] aller  [Tab] filtre sujet  [Esc] fermer",
         )
-        .style(Style::default().fg(Color::DarkGray)),
+        .style(Style::default().fg(C_TEXT_DIM)),
         hint_area,
     );
 }
@@ -671,9 +722,10 @@ pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::mode
         Paragraph::new(lines)
             .block(
                 Block::bordered()
-                    .title("Solution — [Esc/s] fermer")
-                    .style(Style::default().bg(Color::Black))
-                    .border_style(Style::default().fg(Color::Yellow)),
+                    .border_type(BorderType::Rounded)
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Solution — [Esc/s] fermer"))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_BORDER)),
             )
             .wrap(Wrap { trim: false }),
         popup,
@@ -704,31 +756,27 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
         if key.is_empty() {
             lines.push(Line::raw(""));
         } else {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("  {:<10}", key),
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
+            lines.push(line![
+                span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  {:<10}", key),
                 Span::raw("  "),
-                Span::styled(*desc, Style::default().fg(Color::White)),
-            ]));
+                span!(C_TEXT_DIM; "{}", *desc),
+            ]);
         }
     }
     lines.push(Line::raw(""));
     lines.push(Line::styled(
         "  Appuyez sur n'importe quelle touche pour fermer",
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(C_TEXT_DIM),
     ));
 
     f.render_widget(
         Paragraph::new(lines)
             .block(
                 Block::bordered()
-                    .title("Aide — raccourcis")
-                    .style(Style::default().bg(Color::Black))
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_type(BorderType::Rounded)
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Aide — raccourcis"))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_BORDER)),
             )
             .wrap(Wrap { trim: false }),
         popup,
@@ -738,27 +786,6 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn progress_bar_string_empty() {
-        let (full, empty) = progress_bar_string(0.0);
-        assert_eq!(full, "");
-        assert_eq!(empty.chars().count(), 20);
-    }
-
-    #[test]
-    fn progress_bar_string_full() {
-        let (full, empty) = progress_bar_string(1.0);
-        assert_eq!(full.chars().count(), 20);
-        assert_eq!(empty, "");
-    }
-
-    #[test]
-    fn progress_bar_string_half() {
-        let (full, empty) = progress_bar_string(0.5);
-        assert_eq!(full.chars().count(), 10);
-        assert_eq!(empty.chars().count(), 10);
-    }
 
     #[test]
     fn mastery_bar_string_width() {

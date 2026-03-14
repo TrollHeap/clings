@@ -54,6 +54,8 @@ pub struct AppState {
     pub subject_order: Vec<String>,
     // Help overlay
     pub help_active: bool,
+    // Description panel scroll offset
+    pub description_scroll: u16,
     // Search: pending 'g' for gg → first
     pub search_g_pending: bool,
     // Header cache — invalider sur changement d'exercice ou mise à jour mastery
@@ -103,6 +105,7 @@ impl AppState {
             search_subject_filter: false,
             subject_order: Vec::new(),
             help_active: false,
+            description_scroll: 0,
             search_g_pending: false,
             cached_mini_map: String::new(),
             cached_exercise_counter: String::new(),
@@ -231,6 +234,7 @@ impl App {
         self.state.already_recorded = false;
         self.state.consecutive_failures = 0;
         self.state.status_msg = None;
+        self.state.description_scroll = 0;
 
         // Open/update neovim pane in tmux
         if let Some(ref path) = self.state.source_path {
@@ -551,6 +555,14 @@ impl App {
                             }
                         }
                     }
+                    KeyCode::PageDown => {
+                        self.state.description_scroll =
+                            self.state.description_scroll.saturating_add(3);
+                    }
+                    KeyCode::PageUp => {
+                        self.state.description_scroll =
+                            self.state.description_scroll.saturating_sub(3);
+                    }
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         self.state.should_quit = true;
                     }
@@ -791,6 +803,14 @@ impl App {
                     KeyCode::Char('/') => {
                         self.state.search_active = true;
                         Self::rebuild_search(&mut self.state);
+                    }
+                    KeyCode::PageDown => {
+                        self.state.description_scroll =
+                            self.state.description_scroll.saturating_add(3);
+                    }
+                    KeyCode::PageUp => {
+                        self.state.description_scroll =
+                            self.state.description_scroll.saturating_sub(3);
                     }
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         let idx = self.state.current_index;
