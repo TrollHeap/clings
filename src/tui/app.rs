@@ -44,6 +44,7 @@ pub struct AppState {
     // Status message (file saved, etc.)
     pub status_msg: Option<String>,
     pub status_msg_at: Option<Instant>,
+    pub skip_file_changed: bool,
     // Fuzzy search overlay
     pub search_active: bool,
     pub search_query: String,
@@ -98,6 +99,7 @@ impl AppState {
             piscine_fail_count: 0,
             status_msg: None,
             status_msg_at: None,
+            skip_file_changed: false,
             search_active: false,
             search_query: String::new(),
             search_results: Vec::new(),
@@ -220,6 +222,7 @@ impl App {
             return Ok(());
         }
         let exercise = &self.state.exercises[idx];
+        self.state.skip_file_changed = true;
         let (source_path, stage) = crate::runner::prepare_exercise_source(conn, exercise)?;
 
         // Restart watcher if we change exercise
@@ -861,6 +864,10 @@ impl App {
 
     /// Mise à jour commune FileChanged — enregistre le message de status.
     fn handle_file_changed(&mut self) {
+        if self.state.skip_file_changed {
+            self.state.skip_file_changed = false;
+            return;
+        }
         self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
         self.state.status_msg_at = Some(Instant::now());
     }

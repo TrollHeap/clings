@@ -30,8 +30,8 @@ pub fn view(f: &mut Frame, state: &AppState) {
         return;
     }
 
-    // Layout : header (4) | body (fill) | status (1)
-    let [header_area, body_area, status_area] = vertical![==4, *=1, ==1].areas(area);
+    // Layout : header (6) | body (fill) | status (1)
+    let [header_area, body_area, status_area] = vertical![==6, *=1, ==1].areas(area);
 
     render_header(f, header_area, state);
 
@@ -146,7 +146,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let line3 = Line::from(line3_spans);
 
     f.render_widget(
-        Paragraph::new(vec![line1, line2, line3]).block(
+        Paragraph::new(vec![line1, Line::from(""), line2, Line::from(""), line3]).block(
             Block::default()
                 .style(Style::default().bg(common::C_BG))
                 .borders(Borders::BOTTOM)

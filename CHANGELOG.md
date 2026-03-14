@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.1.0] — 2026-03-14
+
+### TUI — Header redesign + UX improvements (minor)
+
+#### Header watch mode
+
+- **Layout C2** (`ui_watch.rs`) : séparateur horizontal `─` sous le header, espacement vertical 6 lignes — meilleure hiérarchie visuelle entre titre, métadonnées et statut
+- **Layout B** (`ui_watch.rs`) : variante title-first, ligne de métadonnées avec séparateurs `·`
+- **Compact header** (`ui_watch.rs`) : 3 lignes, sidebar élargie à 38 colonnes, sidebar enrichie
+
+#### Badges exercice
+
+- **Background colors** (`common.rs`) : chaque type d'exercice (`complete`, `fix_bug`, `fill_blank`, `refactor`) affiche un badge avec couleur de fond Catppuccin distincte
+- **Color constants** (`common.rs`) : palette Catppuccin Mocha extraite en 20 constantes nommées (`C_BG`, `C_TEXT`, `C_SUCCESS`, `C_MAUVE`, etc.)
+
+#### UX
+
+- **Description scroll** (`app.rs`, `common.rs`) : `PageUp`/`PageDown` scrolle le panneau description — `description_scroll: u16` dans `AppState`, scrollbar ratatui intégrée
+- **Flicker fix** (`app.rs`) : flag `skip_file_changed` — navigation `j`/`k` ne déclenche plus le message "fichier sauvegardé" parasite
+
+#### Refactoring
+
+- **ratatui-macros** (`common.rs`, `ui_watch.rs`, `ui_piscine.rs`, `ui_stats.rs`, etc.) : migration complète vers `vertical![]`, `horizontal![]`, `span!`, `line!`, `row!` — layouts déclaratifs, code plus lisible
+
+#### Sécurité
+
+- **Injection guard** (`runner.rs`) : `source_filename` validé contre `"` et `\n` avant génération du `#include` — prévient l'injection dans les directives C générées
+
+---
+
 ## [3.0.2] — 2026-03-14
 
 ### Sécurité, performance, DRY (patch)
