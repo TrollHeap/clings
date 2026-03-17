@@ -375,6 +375,7 @@ pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
 }
 
 /// Save exam checkpoint: stores "{session_id}:{index}" under exam_checkpoint key.
+/// `session_id` is an annale ID (e.g. "nsy103_2023_juin") — no colons allowed, parsed with `rsplit_once(':')`.
 pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -> Result<()> {
     kv_set(conn, EXAM_CHECKPOINT_KEY, &format!("{session_id}:{index}"))
 }

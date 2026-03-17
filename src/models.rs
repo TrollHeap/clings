@@ -411,6 +411,7 @@ pub struct AnnaleQuestion {
     pub number: u32,
     pub points: f32,
     pub title: String,
+    /// Résumé de la question — désérialisé depuis JSON, affiché dans un futur mode détaillé.
     #[serde(default)]
     #[allow(dead_code)]
     pub summary: String,
@@ -427,6 +428,7 @@ pub struct AnnaleSession {
     #[serde(default)]
     pub id: String,
     pub title: String,
+    /// Date de la session d'examen — désérialisée depuis JSON, affichée dans un futur mode détaillé.
     #[serde(default)]
     #[allow(dead_code)]
     pub date: String,

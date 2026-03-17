@@ -80,6 +80,12 @@ pub const TEST_SUMMARY_TESTS: &str = "Tests";
 pub const TEST_SUMMARY_FAILURES: &str = "Failures";
 pub const TEST_SUMMARY_IGNORED: &str = "Ignored";
 
+// === TUI result messages ===
+pub const MSG_COMPILE_ERROR: &str = "✗ ERREUR DE COMPILATION";
+pub const MSG_TIMEOUT: &str = "✗ TIMEOUT";
+pub const MSG_TESTS_FAILED: &str = "✗ TESTS ÉCHOUÉS";
+pub const MSG_WRONG_OUTPUT: &str = "✗ SORTIE INCORRECTE";
+
 // === Security ===
 /// Longueur maximale d'un pattern regex dans les exercices (anti-ReDoS).
 pub const MAX_REGEX_PATTERN_LEN: usize = 500;

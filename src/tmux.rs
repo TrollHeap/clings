@@ -13,6 +13,9 @@ pub fn is_tmux() -> bool {
     std::env::var("TMUX").is_ok()
 }
 
+/// Validates that `bin` is a safe, existing executable.
+/// Absolute paths are checked with `is_file()`; relative names are character-whitelisted
+/// then resolved via `command -v` (injection-safe via positional args).
 fn is_valid_executable(bin: &str) -> bool {
     let path = std::path::Path::new(bin);
     if path.is_absolute() {
@@ -34,7 +37,8 @@ fn is_valid_executable(bin: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Resolve the editor binary: $VISUAL → $EDITOR → config/TMUX_EDITOR fallback.
+/// Resolve the editor binary with cascading fallback: `$VISUAL` → `$EDITOR` → config → `nvim`.
+/// Validates the resolved binary before returning; falls back to `TMUX_EDITOR` if invalid.
 fn resolve_editor() -> String {
     let editor = std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))
@@ -166,5 +170,25 @@ mod tests {
         // No old pane, no tmux → must return None
         let result = update_editor_pane(None, Path::new("/tmp/test_clings.c"));
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_valid_executable_rejects_shell_chars() {
+        assert!(!is_valid_executable("vim;rm -rf"));
+        assert!(!is_valid_executable("vim$(whoami)"));
+        assert!(!is_valid_executable("vim`id`"));
+        assert!(!is_valid_executable("vim | cat"));
+        assert!(!is_valid_executable(""));
+    }
+
+    #[test]
+    fn test_is_valid_executable_accepts_valid_names() {
+        // These may or may not exist — test the character validation, not PATH resolution
+        assert!(is_valid_executable("sh")); // should exist on all POSIX systems
+    }
+
+    #[test]
+    fn test_is_valid_executable_absolute_nonexistent() {
+        assert!(!is_valid_executable("/nonexistent/path/to/editor"));
     }
 }

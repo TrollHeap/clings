@@ -75,13 +75,13 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
     app.state.mastery_map = mastery_map;
 
     // Build subject_order cache (unique subjects in appearance order)
-    let mut seen = std::collections::HashSet::new();
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     app.state.subject_order = app
         .state
         .exercises
         .iter()
         .filter_map(|ex| {
-            if seen.insert(ex.subject.clone()) {
+            if seen.insert(ex.subject.as_str()) {
                 Some(ex.subject.clone())
             } else {
                 None

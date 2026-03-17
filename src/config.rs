@@ -97,11 +97,15 @@ pub fn load() -> ClingConfig {
             eprintln!("  [clings] erreur config TOML: {e}");
             ClingConfig::default()
         }),
-        Err(_) => ClingConfig::default(),
+        Err(e) => {
+            eprintln!("  [clings] impossible de lire clings.toml: {e}");
+            ClingConfig::default()
+        }
     }
 }
 
 /// Initialize the global config. Must be called once at startup.
+/// Double-init is a no-op (OnceLock guarantees single initialization).
 pub fn init(cfg: ClingConfig) {
     CONFIG.set(cfg).ok();
 }

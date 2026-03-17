@@ -49,7 +49,10 @@ fn run_selector_loop(
             draw_selector(f, sessions, *cursor);
         });
 
-        if event::poll(Duration::from_millis(100)).unwrap_or(false) {
+        if event::poll(Duration::from_millis(100)).unwrap_or_else(|e| {
+            eprintln!("[clings/exam] erreur poll clavier: {e}");
+            false
+        }) {
             if let Ok(Event::Key(key)) = event::read() {
                 if key.kind == KeyEventKind::Press {
                     match key.code {

@@ -40,6 +40,14 @@ const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
     "dlsym(",
     "__attribute__((constructor))",
     "#pragma",
+    "fork(",
+    "kill(",
+    "signal(",
+    "setuid(",
+    "setgid(",
+    "chroot(",
+    "mount(",
+    "ptrace(",
 ];
 
 /// Valide `test_code` avant d'écrire le fichier C généré.
@@ -74,7 +82,8 @@ pub struct RunResult {
     pub timeout: bool,
 }
 
-/// Determine linker flags based on subject.
+/// Returns subject-specific linker flags for gcc.
+/// Threads subjects need `-lpthread`, IPC subjects need `-lrt`, others need none.
 fn linker_flags(subject: &str) -> Vec<&'static str> {
     match subject {
         "pthreads" | "semaphores" | "sync_concepts" | "sockets" | "capstones" => {
@@ -171,15 +180,21 @@ fn spawn_gcc_and_collect(
         .map_err(KfError::Io)?;
 
     // INVARIANT: Stdio::piped() was requested — take() returns None only if already consumed,
-    // which cannot happen here. Propagate as Config error rather than panic.
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| KfError::Config("stdout pipe non disponible".to_owned()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| KfError::Config("stderr pipe non disponible".to_owned()))?;
+    // which cannot happen here. Kill child and propagate as Config error rather than panic.
+    let stdout = match child.stdout.take() {
+        Some(s) => s,
+        None => {
+            kill_process_group(&child);
+            return Err(KfError::Config("stdout pipe non disponible".to_owned()));
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(s) => s,
+        None => {
+            kill_process_group(&child);
+            return Err(KfError::Config("stderr pipe non disponible".to_owned()));
+        }
+    };
     let (stdout_thread, stderr_thread) = spawn_drain_threads(stdout, stderr);
 
     let deadline = std::time::Instant::now() + timeout;
@@ -236,10 +251,10 @@ fn spawn_gcc_and_collect(
 /// Toutes les erreurs (compilation, timeout, output mismatch) sont capturées
 /// dans `RunResult` — jamais de panic.
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
-    let tmp_fallback2 = std::path::PathBuf::from("/tmp");
+    let fallback_work_dir = std::path::PathBuf::from("/tmp");
     let work_dir = source_path.parent().unwrap_or_else(|| {
         eprintln!("avertissement : répertoire HOME indisponible, utilisation de /tmp");
-        tmp_fallback2.as_path()
+        fallback_work_dir.as_path()
     });
 
     match exercise.validation.mode {
@@ -343,7 +358,10 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
-    if source_filename.contains('"') || source_filename.contains('\n') {
+    if !source_filename
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
         return make_compile_error(format!(
             "Nom de fichier source invalide : {source_filename:?}"
         ));
@@ -452,14 +470,14 @@ fn dispatch_gcc_result(
 ) -> RunResult {
     match gcc_result {
         Ok((stdout, stderr, status)) => {
-            let duration_ms = start.elapsed().as_millis() as u64;
+            let duration_ms = start.elapsed().as_millis().min(u64::MAX as u128) as u64;
             on_ok(stdout, stderr, status, duration_ms)
         }
         Err(KfError::Config(msg)) if msg.starts_with(TIMEOUT_MSG_PREFIX) => RunResult {
             success: false,
             stdout: String::new(),
             stderr: msg,
-            duration_ms: timeout.as_millis() as u64,
+            duration_ms: timeout.as_millis().min(u64::MAX as u128) as u64,
             compile_error: false,
             timeout: true,
         },
@@ -468,7 +486,7 @@ fn dispatch_gcc_result(
             success: false,
             stdout: String::new(),
             stderr: format!("Wait error: {e}"),
-            duration_ms: start.elapsed().as_millis() as u64,
+            duration_ms: start.elapsed().as_millis().min(u64::MAX as u128) as u64,
             compile_error: false,
             timeout: false,
         },
@@ -487,23 +505,22 @@ fn validate_output(stdout: &str, exercise: &Exercise) -> bool {
             let key = pattern.trim().to_string();
             REGEX_CACHE.with(|cache| {
                 let mut map = cache.borrow_mut();
-                let re = map.entry(key.clone()).or_insert_with(|| {
-                    if key.len() > crate::constants::MAX_REGEX_PATTERN_LEN {
+                let re = map.entry(key).or_insert_with_key(|k| {
+                    if k.len() > crate::constants::MAX_REGEX_PATTERN_LEN {
                         eprintln!(
                             "Avertissement : pattern regex trop long ({} octets, max {}), ignoré.",
-                            key.len(),
+                            k.len(),
                             crate::constants::MAX_REGEX_PATTERN_LEN
                         );
                         return None;
                     }
-                    let compiled = regex::Regex::new(&key);
+                    let compiled = regex::Regex::new(k);
                     if let Err(ref e) = compiled {
-                        eprintln!("Avertissement : regex invalide dans l'exercice ({key:?}): {e}");
+                        eprintln!("Avertissement : regex invalide dans l'exercice ({k:?}): {e}");
                     }
-                    // .ok(): invalid regex → logged above; None causes is_match to return false
                     compiled.ok()
                 });
-                re.as_ref().map(|r| r.is_match(&norm_out)).unwrap_or(false)
+                re.as_ref().is_some_and(|r| r.is_match(&norm_out))
             })
         } else {
             norm_out == norm_exp
@@ -554,6 +571,7 @@ pub fn work_dir() -> crate::error::Result<PathBuf> {
 }
 
 /// Map mastery score to stage index (0-4).
+#[must_use]
 pub fn mastery_to_stage(mastery: f64) -> u8 {
     match mastery {
         m if m < 1.0 => 0,
@@ -566,6 +584,7 @@ pub fn mastery_to_stage(mastery: f64) -> u8 {
 
 /// Select the appropriate starter code stage based on mastery score.
 /// Higher mastery → harder stage (less scaffolding).
+#[must_use]
 pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
     let stage = mastery_to_stage(mastery) as usize;
     exercise
@@ -592,7 +611,10 @@ pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io:
     // Atomic write: temp file + rename (POSIX guarantee, no corruption window)
     let temp_path = source_path.with_extension("c.tmp");
     std::fs::write(&temp_path, code.as_bytes())?;
-    std::fs::rename(&temp_path, &source_path)?;
+    if let Err(e) = std::fs::rename(&temp_path, &source_path) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(e);
+    }
 
     write_exercise_files(exercise, &dir)?;
 
@@ -689,9 +711,9 @@ fn kill_process_group(child: &std::process::Child) {
     if pid == 0 {
         return;
     }
-    // SAFETY: pid was obtained from Child::id() which guarantees a valid positive PID.
-    // Negating it sends SIGKILL to the entire process group, which is intentional
-    // to clean up any subprocesses spawned by the C program.
+    // SAFETY: pid was obtained from Child::id() which returns u32 > 0 for valid processes;
+    // we checked pid != 0 above. Negating it sends SIGKILL to the entire process group,
+    // which is intentional to clean up any subprocesses spawned by the C program.
     unsafe {
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
@@ -802,64 +824,26 @@ mod tests {
     }
 
     #[test]
-    fn test_linker_flags_pthreads() {
-        let flags = linker_flags("pthreads");
-        assert_eq!(flags, vec!["-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_semaphores() {
-        let flags = linker_flags("semaphores");
-        assert_eq!(flags, vec!["-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_sync_concepts() {
-        let flags = linker_flags("sync_concepts");
-        assert_eq!(flags, vec!["-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_sockets() {
-        let flags = linker_flags("sockets");
-        assert_eq!(flags, vec!["-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_capstones() {
-        let flags = linker_flags("capstones");
-        assert_eq!(flags, vec!["-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_message_queues() {
-        let flags = linker_flags("message_queues");
-        assert_eq!(flags, vec!["-lrt", "-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_shared_memory() {
-        let flags = linker_flags("shared_memory");
-        assert_eq!(flags, vec!["-lrt", "-lpthread"]);
-    }
-
-    #[test]
-    fn test_linker_flags_file_io() {
-        let flags = linker_flags("file_io");
-        assert_eq!(flags, vec!["-lrt"]);
-    }
-
-    #[test]
-    fn test_linker_flags_unknown() {
-        let flags = linker_flags("unknown_subject");
-        assert_eq!(flags, Vec::<&'static str>::new());
-    }
-
-    #[test]
-    fn test_linker_flags_pointers() {
-        let flags = linker_flags("pointers");
-        let expected: Vec<&'static str> = Vec::new();
-        assert_eq!(flags, expected);
+    fn test_linker_flags() {
+        let cases: &[(&str, &[&str])] = &[
+            ("pthreads", &["-lpthread"]),
+            ("semaphores", &["-lpthread"]),
+            ("sync_concepts", &["-lpthread"]),
+            ("sockets", &["-lpthread"]),
+            ("capstones", &["-lpthread"]),
+            ("message_queues", &["-lrt", "-lpthread"]),
+            ("shared_memory", &["-lrt", "-lpthread"]),
+            ("file_io", &["-lrt"]),
+            ("unknown_subject", &[]),
+            ("pointers", &[]),
+        ];
+        for (subject, expected) in cases {
+            assert_eq!(
+                linker_flags(subject),
+                *expected,
+                "linker_flags({subject:?})"
+            );
+        }
     }
 
     #[test]
@@ -1048,5 +1032,67 @@ mod tests {
         let (found, failures) = parse_test_summary("");
         assert!(!found);
         assert_eq!(failures, 1);
+    }
+
+    #[test]
+    fn test_validate_test_code_detects_forbidden_patterns() {
+        let cases = &[
+            ("system(\"ls\");", "system("),
+            ("popen(cmd, \"r\");", "popen("),
+            ("execv(\"/bin/sh\", args);", "execv("),
+            ("dlopen(\"lib.so\", RTLD_LAZY);", "dlopen("),
+            ("fork();", "fork("),
+            ("kill(pid, SIGTERM);", "kill("),
+            ("ptrace(PTRACE_ATTACH, pid, 0, 0);", "ptrace("),
+            ("setuid(0);", "setuid("),
+        ];
+        for (code, expected_pattern) in cases {
+            let result = validate_test_code(code);
+            assert_eq!(
+                result,
+                Some(*expected_pattern),
+                "should detect {expected_pattern:?} in {code:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_test_code_allows_safe_code() {
+        let safe_code = r#"
+            void test_add(void) {
+                int result = add(2, 3);
+                TEST_ASSERT_EQUAL_INT(5, result);
+            }
+            int main(void) {
+                RUN_TEST(test_add);
+                TEST_SUMMARY();
+                return _clings_failures > 0 ? 1 : 0;
+            }
+        "#;
+        assert_eq!(validate_test_code(safe_code), None);
+    }
+
+    #[test]
+    fn test_write_exercise_files_rejects_path_traversal() {
+        use crate::models::ExerciseFile;
+        let dir = std::env::temp_dir().join("clings_test_traversal");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut exercise = make_exercise("test", None);
+        exercise.files = vec![ExerciseFile {
+            name: "../escape.txt".to_string(),
+            content: "pwned".to_string(),
+            readonly: false,
+        }];
+
+        let result = write_exercise_files(&exercise, &dir);
+        // The ".." is caught by the contains("..") check
+        assert!(result.is_ok()); // write_exercise_files logs and skips, doesn't error
+        assert!(
+            !dir.parent().unwrap().join("escape.txt").exists(),
+            "path traversal should not create files outside work_dir"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

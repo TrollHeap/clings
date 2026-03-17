@@ -21,7 +21,10 @@ pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
     std::thread::spawn(move || {
         let tick = Duration::from_millis(100);
         loop {
-            if event::poll(tick).unwrap_or(false) {
+            if event::poll(tick).unwrap_or_else(|e| {
+                eprintln!("[clings/events] erreur poll clavier: {e}");
+                false
+            }) {
                 if let Ok(Event::Key(k)) = event::read() {
                     if k.kind == KeyEventKind::Press && tx_key.send(Msg::Key(k)).is_err() {
                         break;

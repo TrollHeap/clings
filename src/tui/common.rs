@@ -431,21 +431,22 @@ pub fn render_run_result(
     result: &RunResult,
     exercise: &crate::models::Exercise,
 ) {
+    use crate::constants::{MSG_COMPILE_ERROR, MSG_TESTS_FAILED, MSG_TIMEOUT, MSG_WRONG_OUTPUT};
     let (title, title_color) = if result.success {
         (format!("✓ SUCCÈS ({}ms)", result.duration_ms), C_SUCCESS)
     } else if result.compile_error {
-        ("✗ ERREUR DE COMPILATION".to_string(), C_DANGER)
+        (MSG_COMPILE_ERROR.to_string(), C_DANGER)
     } else if result.timeout {
-        ("✗ TIMEOUT".to_string(), C_DANGER)
+        (MSG_TIMEOUT.to_string(), C_DANGER)
     } else {
         let is_test = matches!(
             exercise.validation.mode,
             ValidationMode::Test | ValidationMode::Both
         );
         if is_test {
-            ("✗ TESTS ÉCHOUÉS".to_string(), C_DANGER)
+            (MSG_TESTS_FAILED.to_string(), C_DANGER)
         } else {
-            ("✗ SORTIE INCORRECTE".to_string(), C_DANGER)
+            (MSG_WRONG_OUTPUT.to_string(), C_DANGER)
         }
     };
 

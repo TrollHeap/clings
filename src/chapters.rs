@@ -7,7 +7,7 @@ use crate::models::{Exercise, Subject};
 pub struct Chapter {
     /// Numéro du chapitre dans la progression NSY103 (1-based)
     pub number: u8,
-    /// Intitulé affiché dans la TUI (non encore rendu en production)
+    /// Intitulé du chapitre — utilisé dans les tests et réservé pour affichage TUI futur.
     #[allow(dead_code)]
     pub title: &'static str,
     /// Noms des sujets appartenant à ce chapitre
