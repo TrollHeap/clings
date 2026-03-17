@@ -94,6 +94,13 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 
     let result = app.run_watch(&mut terminal, &conn);
 
+    // Save session state for "Continue" in launcher
+    if let Err(e) =
+        progress::save_last_session(&conn, "watch", filter_chapter, app.state.current_index)
+    {
+        eprintln!("[clings] erreur sauvegarde session: {e}");
+    }
+
     ratatui::restore();
 
     // ── 4. Cleanup tmux ────────────────────────────────────────────────

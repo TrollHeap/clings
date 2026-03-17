@@ -206,7 +206,28 @@ fn main() {
             Ok(())
         }
         Some(Commands::Search { query, subject }) => cmd_search(&query, subject.as_deref()),
-        None => cmd_watch(None),
+        None => (|| {
+            let conn = progress::open_db()?;
+            match tui::ui_launcher::select_launch(&conn) {
+                tui::ui_launcher::LaunchChoice::Continue => {
+                    let (mode, chapter, _index) = progress::load_last_session(&conn)?
+                        .unwrap_or_else(|| ("watch".to_string(), None, 0));
+                    match mode.as_str() {
+                        "piscine" => piscine::cmd_piscine(chapter, None),
+                        _ => cmd_watch(chapter),
+                    }
+                }
+                tui::ui_launcher::LaunchChoice::Start {
+                    mode: tui::ui_launcher::LaunchMode::Watch,
+                    chapter,
+                } => cmd_watch(chapter),
+                tui::ui_launcher::LaunchChoice::Start {
+                    mode: tui::ui_launcher::LaunchMode::Piscine,
+                    chapter,
+                } => piscine::cmd_piscine(chapter, None),
+                tui::ui_launcher::LaunchChoice::Quit => Ok(()),
+            }
+        })(),
     };
 
     if let Err(e) = result {

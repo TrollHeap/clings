@@ -4,7 +4,7 @@ use colored::Colorize;
 
 use crate::chapters;
 use crate::error::Result;
-use crate::{exercises, progress};
+use crate::{exercises, progress, tmux};
 
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
@@ -56,7 +56,20 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
 
     let mut terminal = ratatui::init();
     let result = app.run_piscine(&mut terminal, &conn, None);
+
+    // Save session state for "Continue" in launcher
+    if let Err(e) =
+        progress::save_last_session(&conn, "piscine", filter_chapter, app.state.current_index)
+    {
+        eprintln!("[clings] erreur sauvegarde session: {e}");
+    }
+
     ratatui::restore();
+
+    // Cleanup tmux editor pane
+    if let Some(pane) = &app.state.editor_pane {
+        tmux::kill_pane(pane);
+    }
 
     // Post-run stats
     let done = app.state.completed.iter().filter(|&&c| c).count();
@@ -155,6 +168,11 @@ pub fn run_exam_piscine(
     let mut terminal = ratatui::init();
     let result = app.run_piscine(&mut terminal, &conn, session_id);
     ratatui::restore();
+
+    // Cleanup tmux editor pane
+    if let Some(pane) = &app.state.editor_pane {
+        tmux::kill_pane(pane);
+    }
 
     // Post-run stats
     let done = app.state.completed.iter().filter(|&&c| c).count();

@@ -668,6 +668,38 @@ pub fn import_progress(
     Ok((count, warnings))
 }
 
+/// Save last session state (mode + chapter + exercise index) for the launcher "Continue" option.
+pub fn save_last_session(
+    conn: &Connection,
+    mode: &str,
+    chapter: Option<u8>,
+    index: usize,
+) -> Result<()> {
+    kv_set(conn, "last_mode", mode)?;
+    kv_set(
+        conn,
+        "last_chapter",
+        &chapter.map_or("0".to_string(), |c| c.to_string()),
+    )?;
+    kv_set(conn, "last_exercise_index", &index.to_string())?;
+    Ok(())
+}
+
+/// Load last session state. Returns None if no session was saved.
+pub fn load_last_session(conn: &Connection) -> Result<Option<(String, Option<u8>, usize)>> {
+    let mode = kv_get(conn, "last_mode")?;
+    let chapter = kv_get(conn, "last_chapter")?;
+    let index = kv_get(conn, "last_exercise_index")?;
+    match (mode, chapter, index) {
+        (Some(m), Some(c), Some(i)) => {
+            let ch = c.parse::<u8>().ok().filter(|&n| n > 0);
+            let idx = i.parse::<usize>().unwrap_or(0);
+            Ok(Some((m, ch, idx)))
+        }
+        _ => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1238,6 +1270,34 @@ mod tests {
         let conn = open_test_db()?;
         let scores = get_exercise_scores(&conn, "unknown_subject_xyz")?;
         assert!(scores.is_empty());
+        Ok(())
+    }
+
+    // ── Last session (launcher "Continue") ──────────────────────────────
+
+    #[test]
+    fn test_last_session_roundtrip() -> Result<()> {
+        let conn = open_test_db()?;
+        save_last_session(&conn, "watch", Some(7), 12)?;
+        let loaded = load_last_session(&conn)?;
+        assert_eq!(loaded, Some(("watch".to_string(), Some(7), 12)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_last_session_all_chapters() -> Result<()> {
+        let conn = open_test_db()?;
+        save_last_session(&conn, "piscine", None, 5)?;
+        let loaded = load_last_session(&conn)?;
+        assert_eq!(loaded, Some(("piscine".to_string(), None, 5)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_last_session_missing_returns_none() -> Result<()> {
+        let conn = open_test_db()?;
+        let loaded = load_last_session(&conn)?;
+        assert_eq!(loaded, None);
         Ok(())
     }
 }
