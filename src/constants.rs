@@ -24,6 +24,10 @@ pub const DIFFICULTY_3_UNLOCK: f64 = 4.0;
 pub const DIFFICULTY_4_UNLOCK: f64 = 4.5;
 pub const DIFFICULTY_5_UNLOCK: f64 = 5.0;
 
+// === Status bar layout ===
+pub const STATUS_BAR_KEY_MIN_WIDTH: u16 = 15;
+pub const STATUS_BAR_SPACING: u16 = 10;
+
 // === UI dimensions ===
 pub const HEADER_WIDTH: usize = 56;
 pub const PROGRESS_BAR_WIDTH: usize = 30;

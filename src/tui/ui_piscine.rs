@@ -1,7 +1,5 @@
 //! Vue piscine — rendu Ratatui pour le mode progression linéaire.
 
-use std::borrow::Cow;
-
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -51,11 +49,13 @@ pub fn view(f: &mut Frame, state: &AppState) {
         render_piscine_timer(f, timer_area, state);
     }
 
-    if state.vis_active {
+    if state.overlay.list_active {
+        common::render_list_overlay(f, body_rest, state);
+    } else if state.overlay.vis_active {
         common::render_visualizer_overlay(f, body_rest, state);
-    } else if state.solution_active {
+    } else if state.overlay.solution_active {
         common::render_solution_overlay(f, body_rest, &state.exercises[state.current_index]);
-    } else if state.search_active {
+    } else if state.overlay.search_active {
         common::render_search_overlay(f, body_rest, state);
     } else {
         render_piscine_body(f, body_rest, state);
@@ -89,13 +89,13 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
         } else {
             0
         };
-    let left1_len = prefix_len + state.cached_header_left_len;
+    let left1_len = prefix_len + state.header_cache.cached_header_left_len;
     let pad1 = width.saturating_sub(left1_len + right1_len + 2);
 
     let mut line1_spans: Vec<Span<'_>> = vec![
         span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); "clings ─ piscine  "),
         Span::styled(
-            state.cached_exercise_counter.as_str(),
+            state.header_cache.cached_exercise_counter.as_str(),
             Style::default()
                 .fg(common::C_SUCCESS)
                 .add_modifier(Modifier::BOLD),
@@ -124,12 +124,14 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         String::new()
     };
-    let elapsed = if state.piscine_start.is_some() && !state.cached_piscine_elapsed_str.is_empty() {
-        state.cached_piscine_elapsed_str.as_str()
+    let elapsed = if state.piscine_start.is_some()
+        && !state.timer_cache.cached_piscine_elapsed_str.is_empty()
+    {
+        state.timer_cache.cached_piscine_elapsed_str.as_str()
     } else {
         ""
     };
-    let left2_chars = state.cached_mini_map_len
+    let left2_chars = state.header_cache.cached_mini_map_len
         + if elapsed.is_empty() {
             0
         } else {
@@ -142,7 +144,7 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let mut line2_spans: Vec<Span<'_>> = vec![Span::styled(
-        state.cached_mini_map.as_str(),
+        state.header_cache.cached_mini_map.as_str(),
         Style::default().fg(common::C_TEXT_DIM),
     )];
     if !elapsed.is_empty() {
@@ -189,7 +191,7 @@ fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {
             0.0
         };
 
-        let label = state.cached_piscine_remaining_str.as_str();
+        let label = state.timer_cache.cached_piscine_remaining_str.as_str();
 
         let color = if ratio > 0.5 {
             common::C_SUCCESS
@@ -297,9 +299,10 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
+    use crate::constants::STATUS_BAR_SPACING;
+
     let exercise = &state.exercises[state.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
-
     let has_hints = !exercise.hints.is_empty();
 
     let dim = Style::default().fg(common::C_TEXT_DIM);
@@ -311,56 +314,41 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
         if let Some(prefix) = common::status_bar_prefix_line(state, false) {
             prefix
         } else {
-            let mut spans: Vec<Span<'static>> = Vec::new();
-
-            macro_rules! push_key {
-                ($key:literal, $desc:literal) => {
-                    if !spans.is_empty() {
-                        spans.push(Span::raw("  "));
-                    }
-                    spans.push(Span::styled($key, key_style));
-                    spans.push(Span::styled($desc, dim));
-                };
-            }
-
-            push_key!("[r]", " compiler");
+            let mut binds: Vec<(&str, &str)> = Vec::with_capacity(8);
+            binds.push(("[r]", " compiler"));
             if has_hints {
-                spans.push(Span::raw("  "));
-                let hint_rest: Cow<'static, str> = if state.hint_index == 0 {
-                    Cow::Borrowed(" indice")
-                } else {
-                    Cow::Owned(format!(
-                        " indice ({}/{})",
-                        state.hint_index,
-                        exercise.hints.len()
-                    ))
-                };
-                spans.push(Span::styled("[h]", key_style));
-                spans.push(Span::styled(hint_rest, dim));
+                binds.push(("[h]", " indice"));
             }
-            push_key!("[n]", " suivant");
-            push_key!("[k]", " précédent");
+            binds.push(("[n]", " suivant"));
+            binds.push(("[k]", " précédent"));
             if has_vis {
-                push_key!("[v]", " vis");
+                binds.push(("[v]", " vis"));
             }
-            push_key!("[/]", " search");
-            push_key!("[q]", " quitter");
+            binds.push(("[l]", " liste"));
+            binds.push(("[/]", " search"));
+            binds.push(("[q]", " quitter"));
+
+            let mut spans = common::render_keybinds(&binds, key_style, dim);
+
+            // Hint counter overlay (dynamic, not static)
+            if has_hints && state.hint_index > 0 {
+                if let Some(pos) = spans.iter().position(|s| s.content == " indice") {
+                    spans[pos] = Span::styled(
+                        format!(" indice ({}/{})", state.hint_index, exercise.hints.len()),
+                        dim,
+                    );
+                }
+            }
             Line::from(spans)
         };
 
-    // Droite : échecs cumulés
-    let right_msg = if state.piscine_fail_count > 0 {
-        format!("✗ {}", state.piscine_fail_count)
-    } else {
-        String::new()
-    };
-
+    let (right_msg, right_style) = common::render_status_right_piscine(state);
     common::render_split_status_bar(
         f,
         area,
         left_line,
         right_msg,
-        Style::default().fg(common::C_DANGER),
-        10,
+        right_style,
+        STATUS_BAR_SPACING,
     );
 }

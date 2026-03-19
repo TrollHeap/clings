@@ -4,10 +4,25 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use crate::chapters::CHAPTERS;
 use crate::error::Result;
 use crate::models::Exercise;
 use crate::runner::RunResult;
 use crate::search;
+
+/// Item dans la liste d'affichage de l'overlay `[l]` — header de chapitre ou exercice.
+#[derive(Debug, Clone)]
+pub enum ListDisplayItem {
+    ChapterHeader {
+        chapter_number: u8,
+        title: &'static str,
+        exercise_count: usize,
+        done_count: usize,
+    },
+    Exercise {
+        exercise_index: usize,
+    },
+}
 
 /// Messages traités par App::update_watch()
 #[derive(Debug)]
@@ -15,6 +30,54 @@ pub enum Msg {
     Key(ratatui::crossterm::event::KeyEvent),
     FileChanged,
     Tick,
+}
+
+/// État des overlays (help, list, search, solution, visualizer).
+#[derive(Default)]
+pub struct OverlayState {
+    pub help_active: bool,
+    pub list_active: bool,
+    pub list_selected: usize,
+    pub list_display_items: Vec<ListDisplayItem>,
+    pub search_active: bool,
+    pub search_query: String,
+    pub search_results: Vec<usize>,
+    pub search_selected: usize,
+    pub search_subject_filter: bool,
+    pub search_g_pending: bool,
+    pub solution_active: bool,
+    pub vis_active: bool,
+    pub vis_step: usize,
+}
+
+/// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
+#[derive(Default)]
+pub struct HeaderCache {
+    pub cached_mini_map: String,
+    pub cached_exercise_counter: String,
+    pub cached_mastery_display: String,
+    pub cached_exercise_type: String,
+    pub cached_header_left_len: usize,
+    pub cached_mini_map_len: usize,
+}
+
+/// Cache du timer piscine — mis à jour dans Tick quand la seconde change.
+pub struct PiscineTimerCache {
+    pub cached_piscine_elapsed_str: String,
+    pub piscine_last_elapsed_secs: u64,
+    pub cached_piscine_remaining_str: String,
+    pub piscine_last_remaining_secs: u64,
+}
+
+impl Default for PiscineTimerCache {
+    fn default() -> Self {
+        Self {
+            cached_piscine_elapsed_str: String::new(),
+            piscine_last_elapsed_secs: u64::MAX,
+            cached_piscine_remaining_str: String::new(),
+            piscine_last_remaining_secs: u64::MAX,
+        }
+    }
 }
 
 /// État centralisé — mode watch
@@ -29,10 +92,7 @@ pub struct AppState {
     pub current_stage: Option<u8>,
     pub editor_pane: Option<String>,
     pub hint_index: usize,
-    pub solution_active: bool,
     pub compile_pending: bool,
-    pub vis_active: bool,
-    pub vis_step: usize,
     pub consecutive_failures: u8,
     pub already_recorded: bool,
     pub review_map: HashMap<String, Option<i64>>,
@@ -45,32 +105,14 @@ pub struct AppState {
     pub status_msg: Option<String>,
     pub status_msg_at: Option<Instant>,
     pub skip_file_changed: bool,
-    // Fuzzy search overlay
-    pub search_active: bool,
-    pub search_query: String,
-    pub search_results: Vec<usize>,
-    pub search_selected: usize,
-    pub search_subject_filter: bool,
     // Subject order cache (filled once on init)
     pub subject_order: Vec<String>,
-    // Help overlay
-    pub help_active: bool,
     // Description panel scroll offset
     pub description_scroll: u16,
-    // Search: pending 'g' for gg → first
-    pub search_g_pending: bool,
-    // Header cache — invalider sur changement d'exercice ou mise à jour mastery
-    pub cached_mini_map: String,
-    pub cached_exercise_counter: String, // "[N/total] "
-    pub cached_mastery_display: String,  // "mastery: X.X  "
-    pub cached_exercise_type: String,    // ExerciseType::to_string() — invariant par exercice
-    pub cached_header_left_len: usize,   // Width of "[N/total] " + title in chars
-    pub cached_mini_map_len: usize,      // Display width of cached_mini_map (chars count)
-    // Piscine timer cache — mis à jour dans Tick quand la seconde change
-    pub cached_piscine_elapsed_str: String,
-    pub piscine_last_elapsed_secs: u64,
-    pub cached_piscine_remaining_str: String,
-    pub piscine_last_remaining_secs: u64,
+    // Sub-structs
+    pub overlay: OverlayState,
+    pub header_cache: HeaderCache,
+    pub timer_cache: PiscineTimerCache,
 }
 
 impl AppState {
@@ -85,10 +127,7 @@ impl AppState {
             current_stage: None,
             editor_pane: None,
             hint_index: 0,
-            solution_active: false,
             compile_pending: false,
-            vis_active: false,
-            vis_step: 0,
             consecutive_failures: 0,
             already_recorded: false,
             review_map: HashMap::new(),
@@ -100,25 +139,11 @@ impl AppState {
             status_msg: None,
             status_msg_at: None,
             skip_file_changed: false,
-            search_active: false,
-            search_query: String::new(),
-            search_results: Vec::new(),
-            search_selected: 0,
-            search_subject_filter: false,
             subject_order: Vec::new(),
-            help_active: false,
             description_scroll: 0,
-            search_g_pending: false,
-            cached_mini_map: String::new(),
-            cached_exercise_counter: String::new(),
-            cached_mastery_display: String::new(),
-            cached_exercise_type: String::new(),
-            cached_header_left_len: 0,
-            cached_mini_map_len: 0,
-            cached_piscine_elapsed_str: String::new(),
-            piscine_last_elapsed_secs: u64::MAX,
-            cached_piscine_remaining_str: String::new(),
-            piscine_last_remaining_secs: u64::MAX,
+            overlay: OverlayState::default(),
+            header_cache: HeaderCache::default(),
+            timer_cache: PiscineTimerCache::default(),
         }
     }
 
@@ -146,7 +171,7 @@ impl App {
     fn invalidate_header_cache(state: &mut AppState) {
         let idx = state.current_index;
         let total = state.exercises.len();
-        state.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
+        state.header_cache.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
         let mastery = state
             .mastery_map
             .get(
@@ -158,10 +183,10 @@ impl App {
             )
             .copied()
             .unwrap_or(0.0);
-        state.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
-        state.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
-        state.cached_mini_map_len = state.cached_mini_map.chars().count();
-        state.cached_exercise_type = state
+        state.header_cache.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+        state.header_cache.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
+        state.header_cache.cached_mini_map_len = state.header_cache.cached_mini_map.chars().count();
+        state.header_cache.cached_exercise_type = state
             .exercises
             .get(idx)
             .map(|e| e.exercise_type.to_string())
@@ -173,8 +198,8 @@ impl App {
             .get(idx)
             .map(|e| e.title.as_str())
             .unwrap_or("");
-        state.cached_header_left_len =
-            state.cached_exercise_counter.chars().count() + title.chars().count();
+        state.header_cache.cached_header_left_len =
+            state.header_cache.cached_exercise_counter.chars().count() + title.chars().count();
     }
 
     /// Boucle principale watch avec Ratatui.
@@ -230,10 +255,10 @@ impl App {
         self.state.current_stage = stage;
         self.state.run_result = None;
         self.state.hint_index = 0;
-        self.state.solution_active = false;
+        self.state.overlay.solution_active = false;
         self.state.compile_pending = false;
-        self.state.vis_active = false;
-        self.state.vis_step = 0;
+        self.state.overlay.vis_active = false;
+        self.state.overlay.vis_step = 0;
         self.state.already_recorded = false;
         self.state.consecutive_failures = 0;
         self.state.status_msg = None;
@@ -251,7 +276,7 @@ impl App {
 
     /// Recompute search results from current query (indices into state.exercises).
     fn rebuild_search(state: &mut AppState) {
-        let subject_filter = if state.search_subject_filter {
+        let subject_filter = if state.overlay.search_subject_filter {
             state
                 .exercises
                 .get(state.current_index)
@@ -259,10 +284,10 @@ impl App {
         } else {
             None
         };
-        if state.search_query.is_empty() && subject_filter.is_none() {
-            state.search_results = (0..state.exercises.len()).collect();
-        } else if state.search_query.is_empty() {
-            state.search_results = state
+        if state.overlay.search_query.is_empty() && subject_filter.is_none() {
+            state.overlay.search_results = (0..state.exercises.len()).collect();
+        } else if state.overlay.search_query.is_empty() {
+            state.overlay.search_results = state
                 .exercises
                 .iter()
                 .enumerate()
@@ -270,13 +295,207 @@ impl App {
                 .map(|(i, _)| i)
                 .collect();
         } else {
-            state.search_results =
-                search::search_exercises(&state.exercises, &state.search_query, subject_filter)
-                    .into_iter()
-                    .map(|(idx, _score)| idx)
-                    .collect();
+            state.overlay.search_results = search::search_exercises(
+                &state.exercises,
+                &state.overlay.search_query,
+                subject_filter,
+            )
+            .into_iter()
+            .map(|(idx, _score)| idx)
+            .collect();
         }
-        state.search_selected = 0;
+        state.overlay.search_selected = 0;
+    }
+
+    /// Reconstruit `list_display_items` depuis `state.exercises` et `CHAPTERS`.
+    fn build_list_display_items(state: &mut AppState) {
+        let subject_to_chapter: std::collections::HashMap<&str, usize> = CHAPTERS
+            .iter()
+            .enumerate()
+            .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s, i)))
+            .collect();
+
+        state.overlay.list_display_items.clear();
+        let mut current_chapter: Option<usize> = None;
+
+        for (ex_idx, ex) in state.exercises.iter().enumerate() {
+            let ch_idx = subject_to_chapter.get(ex.subject.as_str()).copied();
+
+            if ch_idx != current_chapter {
+                current_chapter = ch_idx;
+                let (number, title) = match ch_idx {
+                    Some(i) => (CHAPTERS[i].number, CHAPTERS[i].title),
+                    None => (0, "Divers"),
+                };
+                // Count exercises in this chapter group
+                let mut count = 0;
+                let mut done = 0;
+                for (j, ejx) in state.exercises[ex_idx..].iter().enumerate() {
+                    let j_ch = subject_to_chapter.get(ejx.subject.as_str()).copied();
+                    if j > 0 && j_ch != ch_idx {
+                        break;
+                    }
+                    count += 1;
+                    if state.completed.get(ex_idx + j).copied().unwrap_or(false) {
+                        done += 1;
+                    }
+                }
+                state
+                    .overlay
+                    .list_display_items
+                    .push(ListDisplayItem::ChapterHeader {
+                        chapter_number: number,
+                        title,
+                        exercise_count: count,
+                        done_count: done,
+                    });
+            }
+            state
+                .overlay
+                .list_display_items
+                .push(ListDisplayItem::Exercise {
+                    exercise_index: ex_idx,
+                });
+        }
+    }
+
+    /// Trouve le prochain item Exercise dans `list_display_items` en avançant depuis `from` (wrap).
+    fn next_exercise_item(items: &[ListDisplayItem], from: usize, forward: bool) -> usize {
+        let len = items.len();
+        if len == 0 {
+            return 0;
+        }
+        let mut pos = from;
+        for _ in 0..len {
+            pos = if forward {
+                (pos + 1) % len
+            } else {
+                pos.checked_sub(1).unwrap_or(len - 1)
+            };
+            if matches!(items[pos], ListDisplayItem::Exercise { .. }) {
+                return pos;
+            }
+        }
+        from
+    }
+
+    /// Gère les touches de l'overlay liste.
+    /// Retourne `true` si Enter a été pressé (jump-to-exercise).
+    fn handle_list_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) -> bool {
+        use ratatui::crossterm::event::KeyCode;
+        let len = state.overlay.list_display_items.len();
+        if len == 0 {
+            if matches!(
+                key.code,
+                KeyCode::Esc
+                    | KeyCode::Char('l')
+                    | KeyCode::Char('L')
+                    | KeyCode::Char('q')
+                    | KeyCode::Char('Q')
+            ) {
+                state.overlay.list_active = false;
+            }
+            return false;
+        }
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('L') => {
+                state.overlay.list_active = false;
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => {
+                state.overlay.list_active = false;
+            }
+            KeyCode::Enter => {
+                if let Some(ListDisplayItem::Exercise { exercise_index }) = state
+                    .overlay
+                    .list_display_items
+                    .get(state.overlay.list_selected)
+                {
+                    state.current_index = *exercise_index;
+                    state.overlay.list_active = false;
+                    return true;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                state.overlay.list_selected = Self::next_exercise_item(
+                    &state.overlay.list_display_items,
+                    state.overlay.list_selected,
+                    true,
+                );
+            }
+            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                state.overlay.list_selected = Self::next_exercise_item(
+                    &state.overlay.list_display_items,
+                    state.overlay.list_selected,
+                    false,
+                );
+            }
+            KeyCode::Tab => {
+                // Jump to first exercise of next chapter
+                let items = &state.overlay.list_display_items;
+                let mut found_next_header = false;
+                for (i, item) in items.iter().enumerate() {
+                    if i > state.overlay.list_selected && !found_next_header {
+                        if matches!(item, ListDisplayItem::ChapterHeader { .. }) {
+                            found_next_header = true;
+                        }
+                    } else if found_next_header && matches!(item, ListDisplayItem::Exercise { .. })
+                    {
+                        state.overlay.list_selected = i;
+                        return false;
+                    }
+                }
+                // No next chapter → no-op (no confusing wrap)
+            }
+            KeyCode::BackTab => {
+                // Jump to first exercise of previous chapter
+                let items = &state.overlay.list_display_items;
+                // Find current chapter header (scan backward from list_selected)
+                let mut current_ch_header = None;
+                for i in (0..=state.overlay.list_selected).rev() {
+                    if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
+                        current_ch_header = Some(i);
+                        break;
+                    }
+                }
+                // Find previous chapter header
+                if let Some(ch_pos) = current_ch_header {
+                    if ch_pos > 0 {
+                        for i in (0..ch_pos).rev() {
+                            if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
+                                // Jump to first exercise after this header
+                                if i + 1 < items.len()
+                                    && matches!(items[i + 1], ListDisplayItem::Exercise { .. })
+                                {
+                                    state.overlay.list_selected = i + 1;
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+                // No previous chapter → no-op (no confusing wrap)
+            }
+            KeyCode::Char('G') => {
+                // Last exercise item
+                for (i, item) in state.overlay.list_display_items.iter().enumerate().rev() {
+                    if matches!(item, ListDisplayItem::Exercise { .. }) {
+                        state.overlay.list_selected = i;
+                        break;
+                    }
+                }
+            }
+            KeyCode::Char('g') => {
+                // First exercise item
+                for (i, item) in state.overlay.list_display_items.iter().enumerate() {
+                    if matches!(item, ListDisplayItem::Exercise { .. }) {
+                        state.overlay.list_selected = i;
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
     }
 
     /// Gère les touches de l'overlay de recherche.
@@ -286,65 +505,69 @@ impl App {
         use ratatui::crossterm::event::KeyCode;
         match key.code {
             KeyCode::Esc => {
-                state.search_active = false;
-                state.search_query.clear();
-                state.search_results.clear();
+                state.overlay.search_active = false;
+                state.overlay.search_query.clear();
+                state.overlay.search_results.clear();
             }
             KeyCode::Tab => {
-                state.search_subject_filter = !state.search_subject_filter;
+                state.overlay.search_subject_filter = !state.overlay.search_subject_filter;
                 Self::rebuild_search(state);
             }
             KeyCode::Enter => {
-                if !state.search_results.is_empty() {
-                    let idx = state.search_results[state.search_selected];
+                if !state.overlay.search_results.is_empty() {
+                    let idx = state.overlay.search_results[state.overlay.search_selected];
                     state.current_index = idx;
-                    state.search_active = false;
-                    state.search_query.clear();
-                    state.search_results.clear();
+                    state.overlay.search_active = false;
+                    state.overlay.search_query.clear();
+                    state.overlay.search_results.clear();
                     return true;
                 }
             }
             KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
-                let len = state.search_results.len();
+                let len = state.overlay.search_results.len();
                 if len > 0 {
-                    state.search_selected = (state.search_selected + 1) % len;
+                    state.overlay.search_selected = (state.overlay.search_selected + 1) % len;
                 }
-                state.search_g_pending = false;
+                state.overlay.search_g_pending = false;
             }
             KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
-                let len = state.search_results.len();
+                let len = state.overlay.search_results.len();
                 if len > 0 {
-                    state.search_selected = state.search_selected.checked_sub(1).unwrap_or(len - 1);
+                    state.overlay.search_selected = state
+                        .overlay
+                        .search_selected
+                        .checked_sub(1)
+                        .unwrap_or(len - 1);
                 }
-                state.search_g_pending = false;
+                state.overlay.search_g_pending = false;
             }
             KeyCode::Char('G') => {
-                let len = state.search_results.len();
+                let len = state.overlay.search_results.len();
                 if len > 0 {
-                    state.search_selected = len - 1;
+                    state.overlay.search_selected = len - 1;
                 }
-                state.search_g_pending = false;
+                state.overlay.search_g_pending = false;
             }
             KeyCode::Char('g') => {
-                if state.search_g_pending {
-                    state.search_selected = 0;
-                    state.search_g_pending = false;
+                if state.overlay.search_g_pending {
+                    state.overlay.search_selected = 0;
+                    state.overlay.search_g_pending = false;
                 } else {
-                    state.search_g_pending = true;
+                    state.overlay.search_g_pending = true;
                 }
             }
             KeyCode::Backspace => {
-                state.search_query.pop();
+                state.overlay.search_query.pop();
                 Self::rebuild_search(state);
-                state.search_g_pending = false;
+                state.overlay.search_g_pending = false;
             }
             KeyCode::Char(c) => {
-                state.search_g_pending = false;
-                state.search_query.push(c);
+                state.overlay.search_g_pending = false;
+                state.overlay.search_query.push(c);
                 Self::rebuild_search(state);
             }
             _ => {
-                state.search_g_pending = false;
+                state.overlay.search_g_pending = false;
             }
         }
         false
@@ -356,13 +579,13 @@ impl App {
         match key.code {
             KeyCode::Right => {
                 let total = state.exercises[state.current_index].visualizer.steps.len();
-                state.vis_step = (state.vis_step + 1).min(total.saturating_sub(1));
+                state.overlay.vis_step = (state.overlay.vis_step + 1).min(total.saturating_sub(1));
             }
             KeyCode::Left => {
-                state.vis_step = state.vis_step.saturating_sub(1);
+                state.overlay.vis_step = state.overlay.vis_step.saturating_sub(1);
             }
             _ => {
-                state.vis_active = false;
+                state.overlay.vis_active = false;
             }
         }
     }
@@ -373,7 +596,7 @@ impl App {
         state: &mut AppState,
         key: ratatui::crossterm::event::KeyEvent,
     ) -> bool {
-        if !state.solution_active {
+        if !state.overlay.solution_active {
             return false;
         }
         if matches!(
@@ -382,7 +605,7 @@ impl App {
                 | ratatui::crossterm::event::KeyCode::Char('s')
                 | ratatui::crossterm::event::KeyCode::Char('S')
         ) {
-            state.solution_active = false;
+            state.overlay.solution_active = false;
         }
         true
     }
@@ -400,6 +623,144 @@ impl App {
         }
     }
 
+    /// Dispatch overlay keys shared between watch and piscine.
+    /// Returns `true` if the key was handled by an overlay (caller should `return`).
+    /// If an overlay navigation triggers a jump, calls `load_current_exercise`.
+    fn handle_overlay_dispatch(
+        &mut self,
+        key: ratatui::crossterm::event::KeyEvent,
+        conn: &rusqlite::Connection,
+        session_id: Option<&str>,
+    ) -> bool {
+        if self.state.overlay.list_active {
+            if Self::handle_list_key(&mut self.state, key) {
+                if let Err(e) = self.load_current_exercise(conn) {
+                    eprintln!("[clings] erreur chargement exercice: {e}");
+                }
+                if let Some(sid) = session_id {
+                    let idx = self.state.current_index;
+                    self.save_checkpoint(conn, Some(sid), idx);
+                }
+            }
+            return true;
+        }
+        if self.state.overlay.search_active {
+            if Self::handle_search_key(&mut self.state, key) {
+                if let Err(e) = self.load_current_exercise(conn) {
+                    eprintln!("[clings] erreur chargement exercice: {e}");
+                }
+                if let Some(sid) = session_id {
+                    let idx = self.state.current_index;
+                    self.save_checkpoint(conn, Some(sid), idx);
+                }
+            }
+            return true;
+        }
+        if Self::handle_solution_overlay(&mut self.state, key) {
+            return true;
+        }
+        if self.state.overlay.help_active {
+            self.state.overlay.help_active = false;
+            return true;
+        }
+        if self.state.overlay.vis_active {
+            Self::handle_vis_key(&mut self.state, key);
+            return true;
+        }
+        false
+    }
+
+    /// Shared hint reveal handler `[h]`.
+    fn handle_hint_reveal(&mut self) {
+        let hints_len = self.state.exercises[self.state.current_index].hints.len();
+        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
+    }
+
+    /// Shared visualizer toggle `[v]`.
+    fn handle_vis_toggle(&mut self) {
+        if !self.state.exercises[self.state.current_index]
+            .visualizer
+            .steps
+            .is_empty()
+        {
+            self.state.overlay.vis_active = true;
+            self.state.overlay.vis_step = 0;
+        }
+    }
+
+    /// Shared list overlay open `[l]`.
+    fn open_list_overlay(&mut self) {
+        Self::build_list_display_items(&mut self.state);
+        self.state.overlay.list_active = true;
+        let ci = self.state.current_index;
+        self.state.overlay.list_selected = self
+            .state
+            .overlay
+            .list_display_items
+            .iter()
+            .position(|item| {
+                matches!(item, ListDisplayItem::Exercise { exercise_index } if *exercise_index == ci)
+            })
+            .unwrap_or(0);
+    }
+
+    /// Shared search overlay open `[/]`.
+    fn open_search_overlay(&mut self) {
+        self.state.overlay.search_active = true;
+        self.state.overlay.search_subject_filter = false;
+        self.state.overlay.search_query.clear();
+        Self::rebuild_search(&mut self.state);
+    }
+
+    /// Navigate to next exercise, optionally saving checkpoint.
+    /// Returns `true` if navigation happened, `false` if at end.
+    fn navigate_next(&mut self, conn: &rusqlite::Connection, session_id: Option<&str>) -> bool {
+        let next = self.state.current_index + 1;
+        if next < self.state.exercises.len() {
+            self.state.current_index = next;
+            if let Err(e) = self.load_current_exercise(conn) {
+                eprintln!("[clings] erreur chargement exercice: {e}");
+            }
+            if let Some(sid) = session_id {
+                self.save_checkpoint(conn, Some(sid), next);
+            }
+            true
+        } else {
+            if let Some(sid) = session_id {
+                self.save_checkpoint(conn, Some(sid), self.state.current_index);
+            }
+            false
+        }
+    }
+
+    /// Navigate to previous exercise, optionally saving checkpoint.
+    fn navigate_prev(&mut self, conn: &rusqlite::Connection, session_id: Option<&str>) {
+        if self.state.current_index > 0 {
+            self.state.current_index -= 1;
+            if let Err(e) = self.load_current_exercise(conn) {
+                eprintln!("[clings] erreur chargement exercice: {e}");
+            }
+            if let Some(sid) = session_id {
+                let idx = self.state.current_index;
+                self.save_checkpoint(conn, Some(sid), idx);
+            }
+        }
+    }
+
+    /// Check if solution can be revealed (all hints shown OR enough failures).
+    fn can_reveal_solution(&self, failure_threshold: usize) -> bool {
+        let exercise = &self.state.exercises[self.state.current_index];
+        let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
+        all_shown || self.state.consecutive_failures as usize >= failure_threshold
+    }
+
+    /// Check if piscine solution can be revealed (fail_count-based threshold).
+    fn can_reveal_solution_piscine(&self) -> bool {
+        let exercise = &self.state.exercises[self.state.current_index];
+        let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
+        all_shown || self.state.piscine_fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
+    }
+
     /// Dispatch Watch messages → état
     pub fn update_watch(&mut self, msg: Msg, conn: &rusqlite::Connection) {
         use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
@@ -407,30 +768,7 @@ impl App {
 
         match msg {
             Msg::Key(key) => {
-                // Search overlay — capture all keys when active
-                if self.state.search_active {
-                    if Self::handle_search_key(&mut self.state, key) {
-                        if let Err(e) = self.load_current_exercise(conn) {
-                            eprintln!("[clings] erreur chargement exercice: {e}");
-                        }
-                    }
-                    return;
-                }
-
-                // Solution overlay — Esc or [s] closes
-                if Self::handle_solution_overlay(&mut self.state, key) {
-                    return;
-                }
-
-                // Help overlay — any key closes
-                if self.state.help_active {
-                    self.state.help_active = false;
-                    return;
-                }
-
-                // Visualizer mode — arrow keys / any key to close
-                if self.state.vis_active {
-                    Self::handle_vis_key(&mut self.state, key);
+                if self.handle_overlay_dispatch(key, conn, None) {
                     return;
                 }
 
@@ -438,124 +776,81 @@ impl App {
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         self.state.should_quit = true;
                     }
-                    KeyCode::Char('h') | KeyCode::Char('H') => {
-                        let hints_len = self.state.exercises[self.state.current_index].hints.len();
-                        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
-                    }
+                    KeyCode::Char('h') | KeyCode::Char('H') => self.handle_hint_reveal(),
                     KeyCode::Char('s') | KeyCode::Char('S') => {
-                        let exercise = &self.state.exercises[self.state.current_index];
-                        let all_shown = exercise.hints.is_empty()
-                            || self.state.hint_index >= exercise.hints.len();
-                        let enough_failures = self.state.consecutive_failures as usize
-                            >= CONSECUTIVE_FAILURE_THRESHOLD;
-                        if all_shown || enough_failures {
-                            self.state.solution_active = !self.state.solution_active;
+                        if self.can_reveal_solution(CONSECUTIVE_FAILURE_THRESHOLD) {
+                            self.state.overlay.solution_active =
+                                !self.state.overlay.solution_active;
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => {
-                        if !self.state.exercises[self.state.current_index]
-                            .visualizer
-                            .steps
-                            .is_empty()
-                        {
-                            self.state.vis_active = true;
-                            self.state.vis_step = 0;
-                        }
-                    }
-                    KeyCode::Char('/') => {
-                        self.state.search_active = true;
-                        self.state.search_subject_filter = false;
-                        self.state.search_query.clear();
-                        Self::rebuild_search(&mut self.state);
-                    }
+                    KeyCode::Char('v') | KeyCode::Char('V') => self.handle_vis_toggle(),
+                    KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
+                    KeyCode::Char('/') => self.open_search_overlay(),
                     KeyCode::Char('?') => {
-                        self.state.help_active = true;
+                        self.state.overlay.help_active = true;
                     }
                     KeyCode::Char('j')
                     | KeyCode::Char('J')
                     | KeyCode::Char('n')
                     | KeyCode::Char('N') => {
-                        let next = self.state.current_index + 1;
-                        if next < self.state.exercises.len() {
-                            self.state.current_index = next;
-                            if let Err(e) = self.load_current_exercise(conn) {
-                                eprintln!("[clings] erreur chargement exercice: {e}");
-                            }
-                        }
+                        self.navigate_next(conn, None);
                     }
                     KeyCode::Char('k') | KeyCode::Char('K') => {
-                        if self.state.current_index > 0 {
-                            self.state.current_index -= 1;
-                            if let Err(e) = self.load_current_exercise(conn) {
-                                eprintln!("[clings] erreur chargement exercice: {e}");
-                            }
-                        }
+                        self.navigate_prev(conn, None);
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
-                        if let Some(path) = self.state.source_path.as_deref() {
-                            self.state.compile_pending = true;
-                            let exercise = &self.state.exercises[self.state.current_index];
-                            let result = crate::runner::compile_and_run(path, exercise);
-                            self.state.compile_pending = false;
-                            let success = result.success;
-                            self.state.run_result = Some(result);
+                        let Some(path) = self.state.source_path.as_deref() else {
+                            return;
+                        };
+                        self.state.compile_pending = true;
+                        let exercise = &self.state.exercises[self.state.current_index];
+                        let result = crate::runner::compile_and_run(path, exercise);
+                        self.state.compile_pending = false;
+                        let success = result.success;
+                        self.state.run_result = Some(result);
 
-                            if success {
-                                self.state.consecutive_failures = 0;
-                                if !self.state.already_recorded {
-                                    self.state.already_recorded = true;
-                                    if let Err(e) = crate::progress::record_attempt(
-                                        conn,
-                                        &exercise.subject,
-                                        &exercise.id,
-                                        true,
-                                    ) {
-                                        eprintln!("[clings] erreur enregistrement tentative: {e}");
-                                    }
-                                    Self::invalidate_header_cache(&mut self.state);
-                                }
-                                // Advance after short delay
-                                std::thread::sleep(std::time::Duration::from_secs(
-                                    SUCCESS_PAUSE_SECS,
-                                ));
-                                let next = self.state.current_index + 1;
-                                self.state.completed[self.state.current_index] = true;
-                                if next < self.state.exercises.len() {
-                                    self.state.current_index = next;
-                                    if let Err(e) = self.load_current_exercise(conn) {
-                                        eprintln!("[clings] erreur chargement exercice: {e}");
-                                    }
-                                } else {
-                                    self.state.should_quit = true;
-                                }
-                            } else {
-                                self.state.consecutive_failures =
-                                    self.state.consecutive_failures.saturating_add(1);
-                                if (self.state.consecutive_failures as usize)
-                                    >= CONSECUTIVE_FAILURE_THRESHOLD
-                                {
-                                    // Reveal first hint automatically if none shown yet
-                                    if self.state.hint_index == 0 {
-                                        let hints_len = self.state.exercises
-                                            [self.state.current_index]
-                                            .hints
-                                            .len();
-                                        if hints_len > 0 {
-                                            self.state.hint_index = 1;
-                                        }
-                                    }
-                                }
-                                let exercise = &self.state.exercises[self.state.current_index];
+                        if success {
+                            self.state.consecutive_failures = 0;
+                            if !self.state.already_recorded {
+                                self.state.already_recorded = true;
                                 if let Err(e) = crate::progress::record_attempt(
                                     conn,
                                     &exercise.subject,
                                     &exercise.id,
-                                    false,
+                                    true,
                                 ) {
                                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                                 }
                                 Self::invalidate_header_cache(&mut self.state);
                             }
+                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
+                            self.state.completed[self.state.current_index] = true;
+                            if !self.navigate_next(conn, None) {
+                                self.state.should_quit = true;
+                            }
+                        } else {
+                            self.state.consecutive_failures =
+                                self.state.consecutive_failures.saturating_add(1);
+                            if (self.state.consecutive_failures as usize)
+                                >= CONSECUTIVE_FAILURE_THRESHOLD
+                                && self.state.hint_index == 0
+                            {
+                                let hints_len =
+                                    self.state.exercises[self.state.current_index].hints.len();
+                                if hints_len > 0 {
+                                    self.state.hint_index = 1;
+                                }
+                            }
+                            let exercise = &self.state.exercises[self.state.current_index];
+                            if let Err(e) = crate::progress::record_attempt(
+                                conn,
+                                &exercise.subject,
+                                &exercise.id,
+                                false,
+                            ) {
+                                eprintln!("[clings] erreur enregistrement tentative: {e}");
+                            }
+                            Self::invalidate_header_cache(&mut self.state);
                         }
                     }
                     KeyCode::PageDown => {
@@ -597,8 +892,8 @@ impl App {
         // Initialise le cache timer piscine pour le premier frame
         if let Some(start) = self.state.piscine_start {
             let elapsed = start.elapsed().as_secs();
-            self.state.piscine_last_elapsed_secs = elapsed;
-            self.state.cached_piscine_elapsed_str =
+            self.state.timer_cache.piscine_last_elapsed_secs = elapsed;
+            self.state.timer_cache.cached_piscine_elapsed_str =
                 format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
         }
         if let Some(deadline) = self.state.piscine_deadline {
@@ -606,8 +901,8 @@ impl App {
                 .checked_duration_since(std::time::Instant::now())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            self.state.piscine_last_remaining_secs = remaining;
-            self.state.cached_piscine_remaining_str = format_remaining_secs(remaining);
+            self.state.timer_cache.piscine_last_remaining_secs = remaining;
+            self.state.timer_cache.cached_piscine_remaining_str = format_remaining_secs(remaining);
         }
 
         // Prépare le premier exercice
@@ -649,31 +944,11 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) {
-        use crate::constants::PISCINE_FAILURE_THRESHOLD;
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 
         match msg {
             Msg::Key(key) => {
-                // Search overlay — capture all keys when active
-                if self.state.search_active {
-                    if Self::handle_search_key(&mut self.state, key) {
-                        if let Err(e) = self.load_current_exercise(conn) {
-                            eprintln!("[clings] erreur chargement exercice: {e}");
-                        }
-                        let cidx = self.state.current_index;
-                        self.save_checkpoint(conn, session_id, cidx);
-                    }
-                    return;
-                }
-
-                // Solution overlay — Esc or [s] closes
-                if Self::handle_solution_overlay(&mut self.state, key) {
-                    return;
-                }
-
-                // Visualizer mode — arrow keys / any key to close
-                if self.state.vis_active {
-                    Self::handle_vis_key(&mut self.state, key);
+                if self.handle_overlay_dispatch(key, conn, session_id) {
                     return;
                 }
 
@@ -683,130 +958,85 @@ impl App {
                         self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
-                    KeyCode::Char('h') | KeyCode::Char('H') => {
-                        let hints_len = self.state.exercises[self.state.current_index].hints.len();
-                        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
-                    }
+                    KeyCode::Char('h') | KeyCode::Char('H') => self.handle_hint_reveal(),
                     KeyCode::Char('s') | KeyCode::Char('S') => {
-                        let exercise = &self.state.exercises[self.state.current_index];
-                        let all_shown = exercise.hints.is_empty()
-                            || self.state.hint_index >= exercise.hints.len();
-                        let enough_failures =
-                            self.state.piscine_fail_count >= PISCINE_FAILURE_THRESHOLD;
-                        if all_shown || enough_failures {
-                            self.state.solution_active = !self.state.solution_active;
+                        if self.can_reveal_solution_piscine() {
+                            self.state.overlay.solution_active =
+                                !self.state.overlay.solution_active;
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => {
-                        if !self.state.exercises[self.state.current_index]
-                            .visualizer
-                            .steps
-                            .is_empty()
-                        {
-                            self.state.vis_active = true;
-                            self.state.vis_step = 0;
-                        }
-                    }
+                    KeyCode::Char('v') | KeyCode::Char('V') => self.handle_vis_toggle(),
                     KeyCode::Char('n')
                     | KeyCode::Char('N')
                     | KeyCode::Char('j')
                     | KeyCode::Char('J') => {
-                        let next = self.state.current_index + 1;
-                        if next < self.state.exercises.len() {
-                            self.state.current_index = next;
-                            if let Err(e) = self.load_current_exercise(conn) {
-                                eprintln!("[clings] erreur chargement exercice: {e}");
-                            }
-                            let idx = self.state.current_index;
-                            self.save_checkpoint(conn, session_id, idx);
-                        } else {
-                            // Reached end
-                            let idx = self.state.current_index;
-                            self.save_checkpoint(conn, session_id, idx);
+                        if !self.navigate_next(conn, session_id) {
                             self.state.should_quit = true;
                         }
                     }
                     KeyCode::Char('k') | KeyCode::Char('K') => {
-                        if self.state.current_index > 0 {
-                            self.state.current_index -= 1;
-                            if let Err(e) = self.load_current_exercise(conn) {
-                                eprintln!("[clings] erreur chargement exercice: {e}");
-                            }
-                            let idx = self.state.current_index;
-                            self.save_checkpoint(conn, session_id, idx);
-                        }
+                        self.navigate_prev(conn, session_id);
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
-                        if let Some(path) = self.state.source_path.as_deref() {
-                            self.state.compile_pending = true;
-                            let exercise = &self.state.exercises[self.state.current_index];
-                            let result = crate::runner::compile_and_run(path, exercise);
-                            self.state.compile_pending = false;
-                            let success = result.success;
-                            let compile_error = result.compile_error;
-                            self.state.run_result = Some(result);
+                        let Some(path) = self.state.source_path.as_deref() else {
+                            return;
+                        };
+                        self.state.compile_pending = true;
+                        let exercise = &self.state.exercises[self.state.current_index];
+                        let result = crate::runner::compile_and_run(path, exercise);
+                        self.state.compile_pending = false;
+                        let success = result.success;
+                        let compile_error = result.compile_error;
+                        self.state.run_result = Some(result);
 
-                            if success {
-                                self.state.piscine_fail_count = 0;
-                                if !self.state.already_recorded {
-                                    self.state.already_recorded = true;
-                                    if let Err(e) = crate::progress::record_attempt(
-                                        conn,
-                                        &exercise.subject,
-                                        &exercise.id,
-                                        true,
-                                    ) {
-                                        eprintln!("[clings] erreur enregistrement tentative: {e}");
-                                    }
-                                    Self::invalidate_header_cache(&mut self.state);
-                                }
-                                // Advance after short delay
-                                std::thread::sleep(std::time::Duration::from_secs(
-                                    crate::constants::SUCCESS_PAUSE_SECS,
-                                ));
-                                self.state.completed[self.state.current_index] = true;
-                                let next = self.state.current_index + 1;
-                                if next < self.state.exercises.len() {
-                                    self.state.current_index = next;
-                                    if let Err(e) = self.load_current_exercise(conn) {
-                                        eprintln!("[clings] erreur chargement exercice: {e}");
-                                    }
-                                    let idx = self.state.current_index;
-                                    self.save_checkpoint(conn, session_id, idx);
-                                } else {
-                                    // Reached end
-                                    let idx = self.state.current_index;
-                                    self.save_checkpoint(conn, session_id, idx);
-                                    self.state.should_quit = true;
-                                }
-                            } else {
-                                if !compile_error {
-                                    self.state.piscine_fail_count =
-                                        self.state.piscine_fail_count.saturating_add(1);
-                                    if self.state.piscine_fail_count >= PISCINE_FAILURE_THRESHOLD {
-                                        if let Some(cm) = &exercise.common_mistake {
-                                            self.state.status_msg =
-                                                Some(format!("⚠ Piège : {}", cm));
-                                            self.state.status_msg_at = Some(Instant::now());
-                                        }
-                                    }
-                                }
+                        if success {
+                            self.state.piscine_fail_count = 0;
+                            if !self.state.already_recorded {
+                                self.state.already_recorded = true;
                                 if let Err(e) = crate::progress::record_attempt(
                                     conn,
                                     &exercise.subject,
                                     &exercise.id,
-                                    false,
+                                    true,
                                 ) {
                                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                                 }
                                 Self::invalidate_header_cache(&mut self.state);
                             }
+                            std::thread::sleep(std::time::Duration::from_secs(
+                                crate::constants::SUCCESS_PAUSE_SECS,
+                            ));
+                            self.state.completed[self.state.current_index] = true;
+                            if !self.navigate_next(conn, session_id) {
+                                self.state.should_quit = true;
+                            }
+                        } else {
+                            if !compile_error {
+                                self.state.piscine_fail_count =
+                                    self.state.piscine_fail_count.saturating_add(1);
+                                if self.state.piscine_fail_count
+                                    >= crate::constants::PISCINE_FAILURE_THRESHOLD
+                                {
+                                    if let Some(cm) = &exercise.common_mistake {
+                                        self.state.status_msg = Some(format!("⚠ Piège : {}", cm));
+                                        self.state.status_msg_at = Some(Instant::now());
+                                    }
+                                }
+                            }
+                            let exercise = &self.state.exercises[self.state.current_index];
+                            if let Err(e) = crate::progress::record_attempt(
+                                conn,
+                                &exercise.subject,
+                                &exercise.id,
+                                false,
+                            ) {
+                                eprintln!("[clings] erreur enregistrement tentative: {e}");
+                            }
+                            Self::invalidate_header_cache(&mut self.state);
                         }
                     }
-                    KeyCode::Char('/') => {
-                        self.state.search_active = true;
-                        Self::rebuild_search(&mut self.state);
-                    }
+                    KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
+                    KeyCode::Char('/') => self.open_search_overlay(),
                     KeyCode::PageDown => {
                         self.state.description_scroll =
                             self.state.description_scroll.saturating_add(3);
@@ -834,9 +1064,9 @@ impl App {
                 // Mise à jour du cache timer elapsed (1 allocation/seconde max)
                 if let Some(start) = self.state.piscine_start {
                     let elapsed = start.elapsed().as_secs();
-                    if elapsed != self.state.piscine_last_elapsed_secs {
-                        self.state.piscine_last_elapsed_secs = elapsed;
-                        self.state.cached_piscine_elapsed_str =
+                    if elapsed != self.state.timer_cache.piscine_last_elapsed_secs {
+                        self.state.timer_cache.piscine_last_elapsed_secs = elapsed;
+                        self.state.timer_cache.cached_piscine_elapsed_str =
                             format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
                     }
                 }
@@ -847,9 +1077,10 @@ impl App {
                         .checked_duration_since(now)
                         .map(|d| d.as_secs())
                         .unwrap_or(0);
-                    if remaining != self.state.piscine_last_remaining_secs {
-                        self.state.piscine_last_remaining_secs = remaining;
-                        self.state.cached_piscine_remaining_str = format_remaining_secs(remaining);
+                    if remaining != self.state.timer_cache.piscine_last_remaining_secs {
+                        self.state.timer_cache.piscine_last_remaining_secs = remaining;
+                        self.state.timer_cache.cached_piscine_remaining_str =
+                            format_remaining_secs(remaining);
                     }
                     // Check deadline on tick (réutilise `now` — évite un second syscall)
                     if now >= deadline {
@@ -894,5 +1125,177 @@ fn format_remaining_secs(remaining: u64) -> String {
         format!("{}m{:02}s restantes", remaining / 60, remaining % 60)
     } else {
         format!("{}s restantes", remaining)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_exercise(hints: Vec<String>, has_vis: bool) -> crate::models::Exercise {
+        use crate::models::*;
+        Exercise {
+            id: "test_01".to_string(),
+            subject: "pointers".to_string(),
+            lang: Lang::C,
+            difficulty: Difficulty::Easy,
+            title: "Test Exercise".to_string(),
+            description: "desc".to_string(),
+            starter_code: String::new(),
+            solution_code: String::new(),
+            hints,
+            validation: ValidationConfig {
+                mode: ValidationMode::Output,
+                expected_output: Some("ok".to_string()),
+                max_duration_ms: None,
+                test_code: None,
+                expected_tests_pass: None,
+            },
+            prerequisites: vec![],
+            starter_code_stages: vec![],
+            files: vec![],
+            exercise_type: ExerciseType::Complete,
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            visualizer: if has_vis {
+                Visualizer {
+                    vis_type: String::new(),
+                    steps: vec![VisStep {
+                        step_label: "s1".to_string(),
+                        label: "l1".to_string(),
+                        explanation: "e1".to_string(),
+                        stack: vec![],
+                        heap: vec![],
+                    }],
+                }
+            } else {
+                Visualizer::default()
+            },
+        }
+    }
+
+    #[test]
+    fn overlay_state_defaults_inactive() {
+        let o = OverlayState::default();
+        assert!(!o.help_active);
+        assert!(!o.list_active);
+        assert!(!o.search_active);
+        assert!(!o.solution_active);
+        assert!(!o.vis_active);
+        assert_eq!(o.vis_step, 0);
+        assert!(o.search_query.is_empty());
+        assert!(o.search_results.is_empty());
+    }
+
+    #[test]
+    fn header_cache_defaults_empty() {
+        let h = HeaderCache::default();
+        assert!(h.cached_mini_map.is_empty());
+        assert_eq!(h.cached_header_left_len, 0);
+    }
+
+    #[test]
+    fn piscine_timer_cache_defaults_max() {
+        let t = PiscineTimerCache::default();
+        assert_eq!(t.piscine_last_elapsed_secs, u64::MAX);
+        assert_eq!(t.piscine_last_remaining_secs, u64::MAX);
+    }
+
+    #[test]
+    fn can_reveal_solution_all_hints_shown() {
+        let mut app = App::new();
+        let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        app.state.hint_index = 2; // all shown
+        app.state.consecutive_failures = 0;
+        assert!(app.can_reveal_solution(3));
+    }
+
+    #[test]
+    fn can_reveal_solution_enough_failures() {
+        let mut app = App::new();
+        let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        app.state.hint_index = 0; // none shown
+        app.state.consecutive_failures = 3;
+        assert!(app.can_reveal_solution(3));
+    }
+
+    #[test]
+    fn can_reveal_solution_not_enough() {
+        let mut app = App::new();
+        let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        app.state.hint_index = 1; // partial
+        app.state.consecutive_failures = 1;
+        assert!(!app.can_reveal_solution(3));
+    }
+
+    #[test]
+    fn can_reveal_solution_no_hints() {
+        let mut app = App::new();
+        let ex = make_exercise(vec![], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        app.state.hint_index = 0;
+        app.state.consecutive_failures = 0;
+        assert!(app.can_reveal_solution(3));
+    }
+
+    #[test]
+    fn handle_hint_reveal_increments() {
+        let mut app = App::new();
+        let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        assert_eq!(app.state.hint_index, 0);
+        app.handle_hint_reveal();
+        assert_eq!(app.state.hint_index, 1);
+        app.handle_hint_reveal();
+        assert_eq!(app.state.hint_index, 2);
+        // Should not exceed hints length
+        app.handle_hint_reveal();
+        assert_eq!(app.state.hint_index, 2);
+    }
+
+    #[test]
+    fn handle_vis_toggle_activates() {
+        let mut app = App::new();
+        let ex = make_exercise(vec![], true);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        assert!(!app.state.overlay.vis_active);
+        app.handle_vis_toggle();
+        assert!(app.state.overlay.vis_active);
+        assert_eq!(app.state.overlay.vis_step, 0);
+    }
+
+    #[test]
+    fn handle_vis_toggle_noop_without_steps() {
+        let mut app = App::new();
+        let ex = make_exercise(vec![], false);
+        app.state.exercises = vec![ex];
+        app.state.completed = vec![false];
+        app.handle_vis_toggle();
+        assert!(!app.state.overlay.vis_active);
+    }
+
+    #[test]
+    fn format_remaining_secs_zero() {
+        assert_eq!(format_remaining_secs(0), "Temps écoulé");
+    }
+
+    #[test]
+    fn format_remaining_secs_under_minute() {
+        assert_eq!(format_remaining_secs(42), "42s restantes");
+    }
+
+    #[test]
+    fn format_remaining_secs_over_minute() {
+        assert_eq!(format_remaining_secs(125), "2m05s restantes");
     }
 }

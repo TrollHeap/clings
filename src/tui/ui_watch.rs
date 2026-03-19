@@ -1,7 +1,5 @@
 //! Vue watch — rendu Ratatui pour le mode progression SRS.
 
-use std::borrow::Cow;
-
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -35,13 +33,15 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
     render_header(f, header_area, state);
 
-    if state.help_active {
+    if state.overlay.help_active {
         common::render_help_overlay(f, body_area);
-    } else if state.vis_active {
+    } else if state.overlay.list_active {
+        common::render_list_overlay(f, body_area, state);
+    } else if state.overlay.vis_active {
         common::render_visualizer_overlay(f, body_area, state);
-    } else if state.solution_active {
+    } else if state.overlay.solution_active {
         common::render_solution_overlay(f, body_area, &state.exercises[state.current_index]);
-    } else if state.search_active {
+    } else if state.overlay.search_active {
         common::render_search_overlay(f, body_area, state);
     } else {
         render_body(f, body_area, state);
@@ -270,6 +270,8 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
+    use crate::constants::STATUS_BAR_KEY_MIN_WIDTH;
+
     let exercise = &state.exercises[state.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
     let has_hints = !exercise.hints.is_empty();
@@ -283,64 +285,44 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     {
         prefix
     } else {
-        let mut spans: Vec<Span<'static>> = Vec::new();
-
-        macro_rules! push_key {
-            ($key:literal, $desc:literal) => {
-                if !spans.is_empty() {
-                    spans.push(Span::raw("  "));
-                }
-                spans.push(Span::styled($key, key_style));
-                spans.push(Span::styled($desc, dim));
-            };
-        }
-
+        let mut binds: Vec<(&str, &str)> = Vec::with_capacity(10);
         if has_hints {
-            if !spans.is_empty() {
-                spans.push(Span::raw("  "));
-            }
-            let hint_rest: Cow<'static, str> = if state.hint_index == 0 {
-                Cow::Borrowed(" hint")
-            } else {
-                Cow::Owned(format!(
-                    " hint ({}/{})",
-                    state.hint_index,
-                    exercise.hints.len()
-                ))
-            };
-            spans.push(Span::styled("[h]", key_style));
-            spans.push(Span::styled(hint_rest, dim));
+            binds.push(("[h]", " hint"));
         }
-        push_key!("[j]", " suiv");
-        push_key!("[k]", " préc");
-        push_key!("[n]", " skip");
-        push_key!("[r]", " run");
+        binds.push(("[j]", " suiv"));
+        binds.push(("[k]", " préc"));
+        binds.push(("[n]", " skip"));
+        binds.push(("[r]", " run"));
         if has_vis {
-            push_key!("[v]", " vis");
+            binds.push(("[v]", " vis"));
         }
-        push_key!("[/]", " search");
-        push_key!("[?]", " aide");
-        push_key!("[q]", " quit");
+        binds.push(("[l]", " list"));
+        binds.push(("[/]", " search"));
+        binds.push(("[?]", " aide"));
+        binds.push(("[q]", " quit"));
+
+        let mut spans = common::render_keybinds(&binds, key_style, dim);
+
+        // Hint counter overlay (dynamic, not static)
+        if has_hints && state.hint_index > 0 {
+            // Find and replace the hint desc span with counter
+            if let Some(pos) = spans.iter().position(|s| s.content == " hint") {
+                spans[pos] = Span::styled(
+                    format!(" hint ({}/{})", state.hint_index, exercise.hints.len()),
+                    dim,
+                );
+            }
+        }
         Line::from(spans)
     };
 
-    // Droite : failures ou révision
-    let (right_msg, right_style) = if state.consecutive_failures > 0 {
-        (
-            format!("✗ {}", state.consecutive_failures),
-            Style::default().fg(common::C_DANGER),
-        )
-    } else {
-        let due = state.due_count();
-        if due > 0 {
-            (
-                format!("révision: {}j", due),
-                Style::default().fg(common::C_WARNING),
-            )
-        } else {
-            (String::new(), Style::default())
-        }
-    };
-
-    common::render_split_status_bar(f, area, left_line, right_msg, right_style, 15);
+    let (right_msg, right_style) = common::render_status_right_watch(state);
+    common::render_split_status_bar(
+        f,
+        area,
+        left_line,
+        right_msg,
+        right_style,
+        STATUS_BAR_KEY_MIN_WIDTH,
+    );
 }

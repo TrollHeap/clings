@@ -335,13 +335,19 @@ pub fn status_bar_prefix_line(state: &AppState, has_help: bool) -> Option<Line<'
     if state.compile_pending {
         return Some(Line::styled("⏳ Compilation en cours…", dim));
     }
-    if has_help && state.help_active {
+    if has_help && state.overlay.help_active {
         return Some(Line::styled("[Esc/?] fermer", dim));
     }
-    if state.solution_active {
+    if state.overlay.solution_active {
         return Some(Line::styled("[Esc/s] fermer solution", dim));
     }
-    if state.search_active {
+    if state.overlay.list_active {
+        return Some(Line::styled(
+            "[↑↓/jk] nav  [Tab/S-Tab] chapitre  [Entrée] aller  [Esc/l/q] fermer",
+            dim,
+        ));
+    }
+    if state.overlay.search_active {
         return Some(Line::styled(
             "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer",
             dim,
@@ -512,7 +518,7 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         return;
     }
 
-    let step_idx = state.vis_step.min(steps.len() - 1);
+    let step_idx = state.overlay.vis_step.min(steps.len() - 1);
     let step = &steps[step_idx];
 
     let (w_pct, h_pct) = popup_size_for_vis(step);
@@ -620,8 +626,8 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         " "
     };
-    let query_display = format!("{}{}", state.search_query, cursor);
-    let overlay_title = if state.search_subject_filter {
+    let query_display = format!("{}{}", state.overlay.search_query, cursor);
+    let overlay_title = if state.overlay.search_subject_filter {
         let subject = state
             .exercises
             .get(state.current_index)
@@ -644,6 +650,7 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
 
     // Results list — iterate directly from indices, no intermediate Vec
     let items: Vec<ListItem> = state
+        .overlay
         .search_results
         .iter()
         .filter_map(|&idx| state.exercises.get(idx))
@@ -671,16 +678,16 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         })
         .collect();
 
-    let count = state.search_results.len();
-    let list_title = if state.search_query.is_empty() {
+    let count = state.overlay.search_results.len();
+    let list_title = if state.overlay.search_query.is_empty() {
         format!(" {count} exercices ")
     } else {
         format!(" {count} résultats ")
     };
 
     let mut list_state = ListState::default();
-    if !state.search_results.is_empty() {
-        list_state.select(Some(state.search_selected));
+    if !state.overlay.search_results.is_empty() {
+        list_state.select(Some(state.overlay.search_selected));
     }
 
     f.render_stateful_widget(
@@ -727,6 +734,150 @@ pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::mode
     );
 }
 
+/// Overlay liste d'exercices — navigation j/k, Tab/Shift-Tab chapitres, Enter pour jump.
+pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+    use crate::tui::app::ListDisplayItem;
+
+    let popup = centered_popup(area, 10, 8);
+    f.render_widget(Clear, popup);
+
+    // Split: list (fill) | hint bar (1 line)
+    let [list_area, hint_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(popup);
+
+    let items: Vec<ListItem> = state
+        .overlay
+        .list_display_items
+        .iter()
+        .map(|item| match item {
+            ListDisplayItem::ChapterHeader {
+                chapter_number,
+                title,
+                exercise_count,
+                done_count,
+            } => ListItem::new(line![
+                span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD);
+                    "── Ch.{} : {} [{}/{}] ──", chapter_number, title, done_count, exercise_count),
+            ]),
+            ListDisplayItem::Exercise { exercise_index } => {
+                let i = *exercise_index;
+                let ex = &state.exercises[i];
+                let stars = difficulty_stars(ex.difficulty);
+                let color = difficulty_color(ex.difficulty);
+                let done_marker = if state.completed.get(i).copied().unwrap_or(false) {
+                    "✓"
+                } else {
+                    " "
+                };
+                let current_marker = if i == state.current_index { "►" } else { " " };
+                let mastery = state.mastery_map.get(&ex.subject).copied().unwrap_or(0.0);
+                let title_end = ex
+                    .title
+                    .char_indices()
+                    .nth(30)
+                    .map(|(bi, _)| bi)
+                    .unwrap_or(ex.title.len());
+                let subj_end = ex
+                    .subject
+                    .char_indices()
+                    .nth(16)
+                    .map(|(bi, _)| bi)
+                    .unwrap_or(ex.subject.len());
+                ListItem::new(line![
+                    span!(C_SUCCESS; "{}", done_marker),
+                    span!(C_ACCENT; "{}", current_marker),
+                    span!(C_TEXT; " {:<32}", &ex.title[..title_end]),
+                    span!(C_SUBTEXT; "{:<18}", &ex.subject[..subj_end]),
+                    span!(Style::default().fg(color); "{}", stars),
+                    span!(C_OVERLAY; " [{:.1}]", mastery),
+                ])
+            }
+        })
+        .collect();
+
+    let total = state.exercises.len();
+    let done = state.completed.iter().filter(|&&c| c).count();
+    let list_title = format!(" Exercices [{}/{}] ", done, total);
+
+    let mut list_state = ListState::default();
+    list_state.select(Some(state.overlay.list_selected));
+
+    f.render_stateful_widget(
+        List::new(items)
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", list_title))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_BORDER)),
+            )
+            .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
+        list_area,
+        &mut list_state,
+    );
+
+    // Hint bar
+    f.render_widget(
+        Paragraph::new(
+            "[↑↓/jk] nav  [Tab/S-Tab] chapitre  [g/G] début/fin  [Entrée] aller  [Esc/l/q] fermer",
+        )
+        .style(Style::default().fg(C_TEXT_DIM)),
+        hint_area,
+    );
+}
+
+/// Construit un `Vec<Span>` pour une liste de keybinds `(key, desc)`.
+/// Espacement automatique entre chaque paire. Utilisé par les status bars watch et piscine.
+pub fn render_keybinds(
+    binds: &[(&'static str, &'static str)],
+    key_style: Style,
+    dim: Style,
+) -> Vec<Span<'static>> {
+    let mut spans: Vec<Span<'static>> = Vec::with_capacity(binds.len() * 3);
+    for (key, desc) in binds {
+        if !spans.is_empty() {
+            spans.push(Span::raw("  "));
+        }
+        spans.push(Span::styled(*key, key_style));
+        spans.push(Span::styled(*desc, dim));
+    }
+    spans
+}
+
+/// Construit le message droit de la status bar watch.
+/// Retourne `(message, style)`.
+pub fn render_status_right_watch(state: &AppState) -> (String, Style) {
+    if state.consecutive_failures > 0 {
+        (
+            format!("✗ {}", state.consecutive_failures),
+            Style::default().fg(C_DANGER),
+        )
+    } else {
+        let due = state.due_count();
+        if due > 0 {
+            (
+                format!("révision: {}j", due),
+                Style::default().fg(C_WARNING),
+            )
+        } else {
+            (String::new(), Style::default())
+        }
+    }
+}
+
+/// Construit le message droit de la status bar piscine.
+/// Retourne `(message, style)`.
+pub fn render_status_right_piscine(state: &AppState) -> (String, Style) {
+    if state.piscine_fail_count > 0 {
+        (
+            format!("✗ {}", state.piscine_fail_count),
+            Style::default().fg(C_DANGER),
+        )
+    } else {
+        (String::new(), Style::default())
+    }
+}
+
 /// Overlay d'aide — raccourcis clavier du mode watch.
 pub fn render_help_overlay(f: &mut Frame, area: Rect) {
     let popup = centered_popup(area, 15, 20);
@@ -738,6 +889,7 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
         ("[r]", "Compiler et vérifier"),
         ("[h]", "Afficher l'indice"),
         ("[v]", "Visualiseur mémoire"),
+        ("[l]", "Liste des exercices"),
         ("[/]", "Recherche fuzzy"),
         ("[Tab]", "Filtrer par sujet (en recherche)"),
         ("[←][→]", "Étape visualiseur"),
