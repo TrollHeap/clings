@@ -1,7 +1,12 @@
 //! SQLite persistence layer — mastery tracking, SRS state, and practice history.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
+
+/// Monotonic counter for unique practice_log IDs within a process.
+static LOG_SEQ: AtomicU64 = AtomicU64::new(0);
 
 use serde::Deserialize;
 
@@ -158,7 +163,8 @@ pub fn record_attempt(
     success: bool,
 ) -> Result<Subject> {
     let now = Utc::now().timestamp();
-    let log_id = uuid::Uuid::new_v4().to_string();
+    let seq = LOG_SEQ.fetch_add(1, Ordering::Relaxed);
+    let log_id = format!("{}-{}-{}", now, std::process::id(), seq);
 
     let tx = conn.unchecked_transaction()?;
 
