@@ -11,9 +11,8 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use crate::constants::{
-    CLINGS_DIR, CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS,
-    MAX_OUTPUT_BYTES, REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED,
-    TEST_SUMMARY_TESTS,
+    CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS, MAX_OUTPUT_BYTES,
+    REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED, TEST_SUMMARY_TESTS,
 };
 use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
@@ -556,13 +555,7 @@ fn normalize(s: &str) -> String {
 
 /// Get the working directory for exercises.
 pub fn work_dir() -> crate::error::Result<PathBuf> {
-    let home = std::env::var_os("HOME").ok_or_else(|| {
-        KfError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Variable $HOME non définie — impossible de localiser ~/.clings",
-        ))
-    })?;
-    let dir = PathBuf::from(home).join(CLINGS_DIR);
+    let dir = crate::constants::clings_data_dir();
     #[cfg(unix)]
     {
         use std::fs::DirBuilder;

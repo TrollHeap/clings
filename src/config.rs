@@ -81,12 +81,7 @@ impl Default for TmuxConfig {
 /// Load config from `~/.clings/clings.toml`, falling back to defaults.
 /// Silently ignores missing or malformed files.
 pub fn load() -> ClingConfig {
-    let path = match std::env::var_os("HOME") {
-        Some(h) => std::path::PathBuf::from(h)
-            .join(constants::CLINGS_DIR)
-            .join("clings.toml"),
-        None => return ClingConfig::default(),
-    };
+    let path = constants::clings_data_dir().join("clings.toml");
 
     if !path.exists() {
         return ClingConfig::default();
@@ -136,13 +131,7 @@ pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<
         )));
     }
 
-    let path = {
-        let home = std::env::var_os("HOME")
-            .ok_or_else(|| KfError::Config("$HOME non définie".to_string()))?;
-        std::path::PathBuf::from(home)
-            .join(constants::CLINGS_DIR)
-            .join("clings.toml")
-    };
+    let path = constants::clings_data_dir().join("clings.toml");
 
     // Load current TOML as a Value so we preserve unknown fields
     let mut doc: toml::Value = if path.exists() {

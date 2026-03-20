@@ -63,6 +63,17 @@ pub const CLINGS_DIR: &str = ".clings";
 pub const DB_FILENAME: &str = "progress.db";
 pub const CURRENT_C_FILENAME: &str = "current.c";
 pub const EXERCISES_ENV_VAR: &str = "CLINGS_EXERCISES";
+pub const CLINGS_HOME_ENV_VAR: &str = "CLINGS_HOME";
+
+/// Resolve the clings data directory.
+/// Priority: `CLINGS_HOME` env var > `$HOME/.clings`
+pub fn clings_data_dir() -> std::path::PathBuf {
+    if let Ok(custom) = std::env::var(CLINGS_HOME_ENV_VAR) {
+        return std::path::PathBuf::from(custom);
+    }
+    let home = std::env::var_os("HOME").expect("$HOME not set");
+    std::path::PathBuf::from(home).join(CLINGS_DIR)
+}
 pub const PISCINE_CHECKPOINT_KEY: &str = "piscine_checkpoint";
 pub const EXAM_CHECKPOINT_KEY: &str = "exam_checkpoint";
 pub const LAST_EXAM_SESSION_KEY: &str = "last_exam_session";

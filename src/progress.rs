@@ -11,7 +11,7 @@ static LOG_SEQ: AtomicU64 = AtomicU64::new(0);
 use serde::Deserialize;
 
 use crate::constants::{
-    CLINGS_DIR, DB_BUSY_TIMEOUT_MS, DB_FILENAME, DB_USER_VERSION_CURRENT, EXAM_CHECKPOINT_KEY,
+    clings_data_dir, DB_BUSY_TIMEOUT_MS, DB_FILENAME, DB_USER_VERSION_CURRENT, EXAM_CHECKPOINT_KEY,
     LAST_EXAM_SESSION_KEY, PISCINE_CHECKPOINT_KEY, SECS_PER_DAY,
 };
 use crate::error::Result;
@@ -60,12 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_subjects_next_review ON subjects(next_review_at A
 
 /// Open (or create) the progress database.
 pub fn open_db() -> Result<Connection> {
-    let home = std::env::var_os("HOME").ok_or_else(|| {
-        crate::error::KfError::Config(
-            "Variable $HOME non définie — impossible de localiser ~/.clings".to_string(),
-        )
-    })?;
-    let dir = std::path::PathBuf::from(home).join(CLINGS_DIR);
+    let dir = clings_data_dir();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
