@@ -1,5 +1,6 @@
 ---
 source: tests/snapshot_tui.rs
+assertion_line: 68
 expression: "format!(\"{buffer:#?}\")"
 ---
 Buffer {
