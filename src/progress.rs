@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS kv (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_practice_log_practiced_at ON practice_log(practiced_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subjects_next_review ON subjects(next_review_at ASC, mastery_score ASC);
 ";
 
 /// Open (or create) the progress database.
@@ -63,6 +66,15 @@ pub fn open_db() -> Result<Connection> {
         )
     })?;
     let dir = std::path::PathBuf::from(home).join(CLINGS_DIR);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&dir)?;
+    }
+    #[cfg(not(unix))]
     std::fs::create_dir_all(&dir)?;
 
     let db_path = dir.join(DB_FILENAME);
@@ -268,35 +280,36 @@ pub fn get_streak(conn: &Connection) -> Result<i64> {
          LIMIT 90",
     )?;
 
-    let days: Vec<String> = stmt
-        .query_map([], |row| row.get(0))?
+    let days: Vec<chrono::NaiveDate> = stmt
+        .query_map([], |row| {
+            let s: String = row.get(0)?;
+            chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })
+        })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     if days.is_empty() {
         return Ok(0);
     }
 
-    let today = Utc::now().format("%Y-%m-%d").to_string();
-    let yesterday = (Utc::now() - chrono::Duration::days(1))
-        .format("%Y-%m-%d")
-        .to_string();
+    let today = Utc::now().date_naive();
+    let yesterday = today - chrono::Duration::days(1);
 
-    // Streak must include today or yesterday
     if days[0] != today && days[0] != yesterday {
         return Ok(0);
     }
 
     let mut streak = 1i64;
     for window in days.windows(2) {
-        if let (Ok(current), Ok(prev)) = (
-            chrono::NaiveDate::parse_from_str(&window[0], "%Y-%m-%d"),
-            chrono::NaiveDate::parse_from_str(&window[1], "%Y-%m-%d"),
-        ) {
-            if (current - prev).num_days() == 1 {
-                streak += 1;
-            } else {
-                break;
-            }
+        if (window[0] - window[1]).num_days() == 1 {
+            streak += 1;
+        } else {
+            break;
         }
     }
 

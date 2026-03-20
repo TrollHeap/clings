@@ -15,10 +15,7 @@ pub fn view(f: &mut Frame, state: &AppState) {
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
-    f.render_widget(
-        Block::default().style(Style::default().bg(common::C_BG)),
-        area,
-    );
+    common::render_opaque_background(f, area);
 
     if state.exercises.is_empty() {
         f.render_widget(
@@ -330,14 +327,13 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
 
             let mut spans = common::render_keybinds(&binds, key_style, dim);
 
-            // Hint counter overlay (dynamic, not static)
             if has_hints && state.hint_index > 0 {
-                if let Some(pos) = spans.iter().position(|s| s.content == " indice") {
-                    spans[pos] = Span::styled(
-                        format!(" indice ({}/{})", state.hint_index, exercise.hints.len()),
-                        dim,
-                    );
-                }
+                common::update_hint_counter(
+                    &mut spans,
+                    " indice",
+                    state.hint_index,
+                    exercise.hints.len(),
+                );
             }
             Line::from(spans)
         };

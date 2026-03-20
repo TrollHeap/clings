@@ -51,7 +51,7 @@ pub fn run_list(
 
     loop {
         terminal.draw(|f| {
-            draw_list(f, &filtered, &subject_map, filter_subject, due_subjects);
+            draw_list(f, &filtered, &subject_map, due_subjects);
         })?;
 
         // Update selection position
@@ -92,16 +92,12 @@ fn draw_list(
     f: &mut ratatui::Frame,
     filtered: &[&Exercise],
     subject_map: &std::collections::HashMap<&str, &Subject>,
-    _filter_subject: Option<&str>,
     due_subjects: Option<&[String]>,
 ) {
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal
-    f.render_widget(
-        Block::default().style(Style::default().bg(common::C_BG)),
-        area,
-    );
+    common::render_opaque_background(f, area);
 
     // Layout: header (3) | list (fill) | footer (1)
     let [header_area, list_area, footer_area] = vertical![==3, *=1, ==1].areas(area);

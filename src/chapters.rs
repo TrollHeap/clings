@@ -107,7 +107,7 @@ pub const CHAPTERS: &[Chapter] = &[
     },
 ];
 
-/// Order exercises following NSY103 chapter progression.
+/// Orders exercises following NSY103 chapter progression, sorted by difficulty then SRS priority.
 /// Within each chapter: difficulty ascending, then SRS priority (lowest mastery first).
 pub fn order_by_chapters<'a>(
     exercises: &'a [Exercise],
@@ -176,7 +176,7 @@ pub struct ChapterBlock<'a> {
     pub exercises: Vec<&'a Exercise>,
 }
 
-/// Aplatit les blocs de chapitres en une liste linéaire pour le mode `watch`.
+/// Flattens chapter blocks into a linear exercise list for watch mode.
 pub fn flatten_chapters<'a>(blocks: &[ChapterBlock<'a>]) -> Vec<&'a Exercise> {
     blocks
         .iter()
@@ -184,7 +184,7 @@ pub fn flatten_chapters<'a>(blocks: &[ChapterBlock<'a>]) -> Vec<&'a Exercise> {
         .collect()
 }
 
-/// Filtre les blocs par numéro de chapitre. Retourne `false` si le résultat est vide.
+/// Retains only blocks matching the given chapter number. Returns false if result is empty.
 pub fn filter_by_chapter(blocks: &mut Vec<ChapterBlock<'_>>, chapter: Option<u8>) -> bool {
     if let Some(n) = chapter {
         blocks.retain(|b| b.chapter.number == n);

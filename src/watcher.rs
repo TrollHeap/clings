@@ -65,7 +65,7 @@ where
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {
-                return Err(KfError::Config("File watcher disconnected".to_string()));
+                return Err(KfError::Watch("File watcher disconnected".to_string()));
             }
         }
 

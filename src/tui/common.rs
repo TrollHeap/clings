@@ -359,6 +359,16 @@ pub fn status_bar_prefix_line(state: &AppState, has_help: bool) -> Option<Line<'
     None
 }
 
+/// Remplace le label d'un keybind par un compteur (ex: " hint" → " hint (2/3)").
+pub fn update_hint_counter(spans: &mut [Span<'static>], label: &str, index: usize, total: usize) {
+    if let Some(pos) = spans.iter().position(|s| s.content == label) {
+        spans[pos] = Span::styled(
+            format!("{} ({}/{})", label.trim(), index, total),
+            Style::default().fg(C_TEXT_DIM),
+        );
+    }
+}
+
 /// Barre de statut à deux colonnes — partagée entre watch et piscine.
 /// Si `right_msg` est vide ou la largeur < 40, affiche seulement `left_line`.
 pub fn render_split_status_bar(
@@ -928,6 +938,11 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
             .wrap(Wrap { trim: false }),
         popup,
     );
+}
+
+/// Renders an opaque background to prevent terminal transparency.
+pub fn render_opaque_background(f: &mut Frame, area: Rect) {
+    f.render_widget(Block::default().style(Style::default().bg(C_BG)), area);
 }
 
 #[cfg(test)]

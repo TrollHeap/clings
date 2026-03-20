@@ -15,7 +15,7 @@ pub enum KfError {
 
     /// Erreur du système de surveillance de fichiers (`notify`)
     #[error("watcher error: {0}")]
-    Watch(#[from] notify::Error),
+    Watch(String),
 
     /// L'identifiant d'exercice demandé est introuvable
     #[error("exercice introuvable : {0}")]
@@ -32,6 +32,12 @@ pub enum KfError {
 
 /// Alias de résultat avec `KfError` comme type d'erreur.
 pub type Result<T> = std::result::Result<T, KfError>;
+
+impl From<notify::Error> for KfError {
+    fn from(e: notify::Error) -> Self {
+        KfError::Watch(e.to_string())
+    }
+}
 
 #[cfg(test)]
 mod tests {

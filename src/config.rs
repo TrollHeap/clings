@@ -179,6 +179,17 @@ pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<
 
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
+        #[cfg(unix)]
+        {
+            use std::fs::DirBuilder;
+            use std::os::unix::fs::DirBuilderExt;
+            DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(parent)
+                .map_err(|e: std::io::Error| KfError::Config(e.to_string()))?;
+        }
+        #[cfg(not(unix))]
         std::fs::create_dir_all(parent).map_err(|e| KfError::Config(e.to_string()))?;
     }
 

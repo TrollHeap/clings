@@ -315,6 +315,19 @@ impl App {
             .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s, i)))
             .collect();
 
+        // Pass 1: count exercises per chapter
+        let mut chapter_counts: std::collections::HashMap<Option<usize>, (usize, usize)> =
+            std::collections::HashMap::new();
+        for (ex_idx, ex) in state.exercises.iter().enumerate() {
+            let ch_idx = subject_to_chapter.get(ex.subject.as_str()).copied();
+            let entry = chapter_counts.entry(ch_idx).or_insert((0, 0));
+            entry.0 += 1;
+            if state.completed.get(ex_idx).copied().unwrap_or(false) {
+                entry.1 += 1;
+            }
+        }
+
+        // Pass 2: build display items
         state.overlay.list_display_items.clear();
         let mut current_chapter: Option<usize> = None;
 
@@ -327,19 +340,7 @@ impl App {
                     Some(i) => (CHAPTERS[i].number, CHAPTERS[i].title),
                     None => (0, "Divers"),
                 };
-                // Count exercises in this chapter group
-                let mut count = 0;
-                let mut done = 0;
-                for (j, ejx) in state.exercises[ex_idx..].iter().enumerate() {
-                    let j_ch = subject_to_chapter.get(ejx.subject.as_str()).copied();
-                    if j > 0 && j_ch != ch_idx {
-                        break;
-                    }
-                    count += 1;
-                    if state.completed.get(ex_idx + j).copied().unwrap_or(false) {
-                        done += 1;
-                    }
-                }
+                let (count, done) = chapter_counts.get(&ch_idx).copied().unwrap_or((0, 0));
                 state
                     .overlay
                     .list_display_items
@@ -377,6 +378,51 @@ impl App {
             }
         }
         from
+    }
+
+    /// Find the first exercise of the next chapter, starting from `from`.
+    /// Returns None if no next chapter exists.
+    fn find_next_chapter_exercise(items: &[ListDisplayItem], from: usize) -> Option<usize> {
+        let mut found_next_header = false;
+        for (i, item) in items.iter().enumerate() {
+            if i > from && !found_next_header {
+                if matches!(item, ListDisplayItem::ChapterHeader { .. }) {
+                    found_next_header = true;
+                }
+            } else if found_next_header && matches!(item, ListDisplayItem::Exercise { .. }) {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Find the first exercise of the previous chapter, starting from `from`.
+    /// Returns None if no previous chapter exists.
+    fn find_prev_chapter_exercise(items: &[ListDisplayItem], from: usize) -> Option<usize> {
+        // Find current chapter header (scan backward from `from`)
+        let mut current_ch_header = None;
+        for i in (0..=from).rev() {
+            if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
+                current_ch_header = Some(i);
+                break;
+            }
+        }
+        // Find previous chapter header
+        if let Some(ch_pos) = current_ch_header {
+            if ch_pos > 0 {
+                for i in (0..ch_pos).rev() {
+                    if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
+                        // Jump to first exercise after this header
+                        if i + 1 < items.len()
+                            && matches!(items[i + 1], ListDisplayItem::Exercise { .. })
+                        {
+                            return Some(i + 1);
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Gère les touches de l'overlay liste.
@@ -430,50 +476,22 @@ impl App {
                 );
             }
             KeyCode::Tab => {
-                // Jump to first exercise of next chapter
                 let items = &state.overlay.list_display_items;
-                let mut found_next_header = false;
-                for (i, item) in items.iter().enumerate() {
-                    if i > state.overlay.list_selected && !found_next_header {
-                        if matches!(item, ListDisplayItem::ChapterHeader { .. }) {
-                            found_next_header = true;
-                        }
-                    } else if found_next_header && matches!(item, ListDisplayItem::Exercise { .. })
-                    {
-                        state.overlay.list_selected = i;
-                        return false;
-                    }
+                if let Some(pos) =
+                    Self::find_next_chapter_exercise(items, state.overlay.list_selected)
+                {
+                    state.overlay.list_selected = pos;
+                    return false;
                 }
-                // No next chapter → no-op (no confusing wrap)
             }
             KeyCode::BackTab => {
-                // Jump to first exercise of previous chapter
                 let items = &state.overlay.list_display_items;
-                // Find current chapter header (scan backward from list_selected)
-                let mut current_ch_header = None;
-                for i in (0..=state.overlay.list_selected).rev() {
-                    if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
-                        current_ch_header = Some(i);
-                        break;
-                    }
+                if let Some(pos) =
+                    Self::find_prev_chapter_exercise(items, state.overlay.list_selected)
+                {
+                    state.overlay.list_selected = pos;
+                    return false;
                 }
-                // Find previous chapter header
-                if let Some(ch_pos) = current_ch_header {
-                    if ch_pos > 0 {
-                        for i in (0..ch_pos).rev() {
-                            if matches!(items[i], ListDisplayItem::ChapterHeader { .. }) {
-                                // Jump to first exercise after this header
-                                if i + 1 < items.len()
-                                    && matches!(items[i + 1], ListDisplayItem::Exercise { .. })
-                                {
-                                    state.overlay.list_selected = i + 1;
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                }
-                // No previous chapter → no-op (no confusing wrap)
             }
             KeyCode::Char('G') => {
                 // Last exercise item
@@ -623,6 +641,21 @@ impl App {
         }
     }
 
+    /// Load exercise and save checkpoint if needed (shared between overlays).
+    fn load_exercise_and_checkpoint(
+        &mut self,
+        conn: &rusqlite::Connection,
+        session_id: Option<&str>,
+    ) {
+        if let Err(e) = self.load_current_exercise(conn) {
+            eprintln!("[clings] erreur chargement exercice: {e}");
+        }
+        if let Some(sid) = session_id {
+            let idx = self.state.current_index;
+            self.save_checkpoint(conn, Some(sid), idx);
+        }
+    }
+
     /// Dispatch overlay keys shared between watch and piscine.
     /// Returns `true` if the key was handled by an overlay (caller should `return`).
     /// If an overlay navigation triggers a jump, calls `load_current_exercise`.
@@ -634,25 +667,13 @@ impl App {
     ) -> bool {
         if self.state.overlay.list_active {
             if Self::handle_list_key(&mut self.state, key) {
-                if let Err(e) = self.load_current_exercise(conn) {
-                    eprintln!("[clings] erreur chargement exercice: {e}");
-                }
-                if let Some(sid) = session_id {
-                    let idx = self.state.current_index;
-                    self.save_checkpoint(conn, Some(sid), idx);
-                }
+                self.load_exercise_and_checkpoint(conn, session_id);
             }
             return true;
         }
         if self.state.overlay.search_active {
             if Self::handle_search_key(&mut self.state, key) {
-                if let Err(e) = self.load_current_exercise(conn) {
-                    eprintln!("[clings] erreur chargement exercice: {e}");
-                }
-                if let Some(sid) = session_id {
-                    let idx = self.state.current_index;
-                    self.save_checkpoint(conn, Some(sid), idx);
-                }
+                self.load_exercise_and_checkpoint(conn, session_id);
             }
             return true;
         }
@@ -761,9 +782,60 @@ impl App {
         all_shown || self.state.piscine_fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
     }
 
+    /// Handle compilation and test of current exercise (triggered by 'r' key).
+    /// Compiles the code, runs it, records attempt, and navigates on success.
+    fn handle_compile(&mut self, conn: &rusqlite::Connection) {
+        use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
+
+        let Some(path) = self.state.source_path.as_deref() else {
+            return;
+        };
+        self.state.compile_pending = true;
+        let exercise = &self.state.exercises[self.state.current_index];
+        let result = crate::runner::compile_and_run(path, exercise);
+        self.state.compile_pending = false;
+        let success = result.success;
+        self.state.run_result = Some(result);
+
+        if success {
+            self.state.consecutive_failures = 0;
+            if !self.state.already_recorded {
+                self.state.already_recorded = true;
+                if let Err(e) =
+                    crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, true)
+                {
+                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                }
+                Self::invalidate_header_cache(&mut self.state);
+            }
+            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
+            self.state.completed[self.state.current_index] = true;
+            if !self.navigate_next(conn, None) {
+                self.state.should_quit = true;
+            }
+        } else {
+            self.state.consecutive_failures = self.state.consecutive_failures.saturating_add(1);
+            if (self.state.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
+                && self.state.hint_index == 0
+            {
+                let hints_len = self.state.exercises[self.state.current_index].hints.len();
+                if hints_len > 0 {
+                    self.state.hint_index = 1;
+                }
+            }
+            let exercise = &self.state.exercises[self.state.current_index];
+            if let Err(e) =
+                crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
+            {
+                eprintln!("[clings] erreur enregistrement tentative: {e}");
+            }
+            Self::invalidate_header_cache(&mut self.state);
+        }
+    }
+
     /// Dispatch Watch messages → état
     pub fn update_watch(&mut self, msg: Msg, conn: &rusqlite::Connection) {
-        use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
+        use crate::constants::CONSECUTIVE_FAILURE_THRESHOLD;
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 
         match msg {
@@ -799,59 +871,7 @@ impl App {
                         self.navigate_prev(conn, None);
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
-                        let Some(path) = self.state.source_path.as_deref() else {
-                            return;
-                        };
-                        self.state.compile_pending = true;
-                        let exercise = &self.state.exercises[self.state.current_index];
-                        let result = crate::runner::compile_and_run(path, exercise);
-                        self.state.compile_pending = false;
-                        let success = result.success;
-                        self.state.run_result = Some(result);
-
-                        if success {
-                            self.state.consecutive_failures = 0;
-                            if !self.state.already_recorded {
-                                self.state.already_recorded = true;
-                                if let Err(e) = crate::progress::record_attempt(
-                                    conn,
-                                    &exercise.subject,
-                                    &exercise.id,
-                                    true,
-                                ) {
-                                    eprintln!("[clings] erreur enregistrement tentative: {e}");
-                                }
-                                Self::invalidate_header_cache(&mut self.state);
-                            }
-                            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
-                            self.state.completed[self.state.current_index] = true;
-                            if !self.navigate_next(conn, None) {
-                                self.state.should_quit = true;
-                            }
-                        } else {
-                            self.state.consecutive_failures =
-                                self.state.consecutive_failures.saturating_add(1);
-                            if (self.state.consecutive_failures as usize)
-                                >= CONSECUTIVE_FAILURE_THRESHOLD
-                                && self.state.hint_index == 0
-                            {
-                                let hints_len =
-                                    self.state.exercises[self.state.current_index].hints.len();
-                                if hints_len > 0 {
-                                    self.state.hint_index = 1;
-                                }
-                            }
-                            let exercise = &self.state.exercises[self.state.current_index];
-                            if let Err(e) = crate::progress::record_attempt(
-                                conn,
-                                &exercise.subject,
-                                &exercise.id,
-                                false,
-                            ) {
-                                eprintln!("[clings] erreur enregistrement tentative: {e}");
-                            }
-                            Self::invalidate_header_cache(&mut self.state);
-                        }
+                        self.handle_compile(conn);
                     }
                     KeyCode::PageDown => {
                         self.state.description_scroll =

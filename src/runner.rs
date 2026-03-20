@@ -270,6 +270,18 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     }
 }
 
+/// Constructs gcc command-line arguments for output-validation mode.
+fn build_output_gcc_args<'a>(
+    output_path: &'a str,
+    source_path: &'a str,
+    include_flag: &'a str,
+    linker_flags: &[&'a str],
+) -> Vec<&'a str> {
+    let mut args = vec!["-o", output_path, source_path, include_flag];
+    args.extend_from_slice(linker_flags);
+    args
+}
+
 /// Run output-validation mode: compile source, run, compare stdout.
 fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let output_path = work_dir.join("kf_run");
@@ -283,10 +295,8 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
     let include_flag = format!("-I{}", work_dir.display());
     let linker = linker_flags(&exercise.subject);
 
-    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &source_path_str, &include_flag];
-    for flag in &linker {
-        extra_args.push(flag);
-    }
+    let extra_args =
+        build_output_gcc_args(&output_path_str, &source_path_str, &include_flag, &linker);
 
     let timeout = exercise
         .validation

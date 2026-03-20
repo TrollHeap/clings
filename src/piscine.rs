@@ -124,7 +124,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     result
 }
 
-/// Lancer une session piscine avec une liste d'exercices préfiltrée (mode exam).
+/// Runs an exam-mode piscine from a specific annales session with timer.
 pub fn run_exam_piscine(
     exercises: Vec<crate::models::Exercise>,
     timed_minutes: Option<u64>,
