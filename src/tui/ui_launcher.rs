@@ -196,6 +196,10 @@ fn draw_mode_screen(
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
+            concat!(" v", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(common::C_TEXT_DIM),
+        ),
+        Span::styled(
             " — C Systems Programming Trainer",
             Style::default().fg(common::C_TEXT_DIM),
         ),

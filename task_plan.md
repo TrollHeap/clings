@@ -1,171 +1,149 @@
-# task_plan.md — v2.9.1 → v2.9.9
+# task_plan.md — Full Audit Remediation v3.1.1
 
-## Releases planifiées
+## Phase A — Sécurité + Quick Wins (4 tâches)
 
-### v2.9.1 — Fix: search overlay scrolling invisible [x] done
-**Bug :** `render_search_overlay` (common.rs:347) applique `.take(max_visible * 3)` sur les résultats avant de les passer à `List::new()`, mais `list_state.select(Some(state.search_selected))` utilise l'indice global. Si `search_selected = 20` et seulement 15 items sont rendus → sélection invisible.
-- **Fichier** : `src/tui/common.rs` (lignes 343–397)
-- **Fix** : supprimer le `.take(max_visible.max(1) * 3)`, passer TOUS les résultats à `List::new()`. Ratatui + `ListState` gère nativement le scroll. Garder seulement `filter_map` pour résoudre les indices → exercises.
-- **Contraintes** : ne pas changer la signature, ne pas toucher `app.rs`
+### T1 : Permissions répertoire ~/.clings/ — mode 0o700 [SEC-1]
+- **Fichiers à modifier** : `src/progress.rs` (ligne 66), `src/config.rs` (ligne 182)
+- **Pattern à suivre** : `runner.rs:work_dir()` utilise `DirBuilder::new().mode(0o700)`
+- **Contraintes** : Unix-only — conditionner avec `#[cfg(unix)]` pour portabilité
+- **Fichiers adjacents** : `src/runner.rs` (pattern correct existant)
+- **Statut** : [ ] pending
 
-### v2.9.2 — Fix: rebuild_search O(n²) → O(n) [x] done
-**Bug :** `rebuild_search` (app.rs:190) appelle `.iter().position(|e| e.id == ex.id)` pour chaque résultat retourné par `search_exercises` → O(n) par résultat = O(n²) total.
-- **Fichier** : `src/tui/app.rs` (lignes 183–194)
-- **Fix** : les références retournées par `search_exercises` viennent du même slice `state.exercises`. Calculer l'offset via pointeur : `(ex as *const Exercise).offset_from(state.exercises.as_ptr()) as usize`. Wrap dans `fn ptr_offset` locale avec `unsafe` + SAFETY comment.
-- **Contraintes** : résultat identique, aucun changement de comportement observable
+### T2 : Error variant watcher — Config → Watch [CONV-1]
+- **Fichiers à modifier** : `src/watcher.rs` (ligne 68)
+- **Pattern à suivre** : `KfError::Watch(String)` existe déjà dans `error.rs`
+- **Contraintes** : Changement 1 ligne, pas de breaking change (KfError est interne)
+- **Fichiers adjacents** : `src/error.rs`
+- **Statut** : [ ] pending
 
-### v2.9.3 — Feature: search overlay en mode piscine [x] done
-**Context :** `update_piscine` n'a pas de bloc search. `ui_piscine::view()` n'a pas de branche `search_active`.
-- **Fichiers** : `src/tui/app.rs` (update_piscine ~ligne 444), `src/tui/ui_piscine.rs` (view ~ligne 40)
-- **Plan** :
-  1. `update_piscine` : ajouter bloc `if self.state.search_active { ... return; }` avant `if self.state.vis_active` — copier le bloc de `update_watch` (lignes 204–247)
-  2. Ajouter `[/]` dans le match normal de piscine → `search_active = true + rebuild_search`
-  3. `ui_piscine::view()` : ajouter `else if state.search_active { common::render_search_overlay(...) }` entre vis et body
-  4. `render_piscine_status_bar()` : branche search_active comme dans watch
-- **Contraintes** : `rebuild_search` est `fn rebuild_search(state: &mut AppState)` — même appel depuis piscine
+### T3 : Index SQLite manquants [PERF-2, CONV-2]
+- **Fichiers à modifier** : `src/progress.rs` — ajouter dans `SCHEMA` (après ligne 56)
+- **Pattern à suivre** : Les CREATE TABLE existants dans SCHEMA
+- **Contraintes** : Utiliser `CREATE INDEX IF NOT EXISTS` pour idempotence
+- **Indexes** :
+  - `idx_practice_log_practiced_at ON practice_log(practiced_at DESC)`
+  - `idx_subjects_next_review ON subjects(next_review_at ASC, mastery_score ASC)`
+- **Fichiers adjacents** : `src/progress.rs` (schema + migrate_v1)
+- **Statut** : [ ] pending
 
-### v2.9.4 — UX: status_msg auto-clear [x] done
-**Context :** `Msg::Tick` handler est vide (app.rs:378-380). Le message "fichier sauvegardé" reste affiché jusqu'à la prochaine action.
-- **Fichier** : `src/tui/app.rs` (struct AppState + update_watch Tick handler)
-- **Plan** :
-  1. Ajouter `status_msg_at: Option<std::time::Instant>` dans `AppState`
-  2. Init : `status_msg_at: None`
-  3. Chaque fois que `status_msg` est set → set `status_msg_at = Some(Instant::now())`
-  4. `Msg::Tick` handler : si `status_msg_at` est Some ET `elapsed > 3s` → clear les deux
-- **Contraintes** : 2 sites de set status_msg (watch:376, piscine:616), setter les deux
+### T4 : Supprimer dev-deps inutilisées [DRY]
+- **Fichiers à modifier** : `Cargo.toml` (lignes 36-37)
+- **Contraintes** : Supprimer `insta` et `proptest` de `[dev-dependencies]`
+- **Statut** : [ ] pending
 
-### v2.9.5 — Feature: filtre sujet courant dans search (`[Tab]`) [x] done
-**Context :** La recherche porte sur tous les exercices. Utile de filtrer au sujet courant.
-- **Fichiers** : `src/tui/app.rs`, `src/tui/common.rs`
-- **Plan** :
-  1. `AppState` : ajouter `pub search_subject_filter: bool` (init false)
-  2. `rebuild_search` : si `search_subject_filter` → passer `Some(&state.exercises[state.current_index].subject)` à `search_exercises`
-  3. `update_watch` search block : `KeyCode::Tab` → toggle `search_subject_filter` + `rebuild_search`
-  4. `render_search_overlay` : titre devient `"/ Recherche (sujet: X)"` si filter actif, sinon `"/ Recherche"`; hint bar : ajouter `[Tab] filtre sujet`
-- **Contraintes** : `search_subject_filter` reset à `false` à l'ouverture de l'overlay
+## Phase B — Performance (2 tâches)
 
-### v2.9.6 — Perf: cache subject order dans AppState [x] done
-**Context :** `render_mastery_sidebar` (ui_watch.rs:259–276) reconstruit un `HashSet` + `Vec<&String>` de déduplication à chaque frame (50ms). Pour 300+ exercices, c'est ~300 iterations inutiles.
-- **Fichiers** : `src/tui/app.rs`, `src/tui/ui_watch.rs`, `src/commands/watch.rs`
-- **Plan** :
-  1. `AppState` : ajouter `pub subject_order: Vec<String>` (sujets uniques dans l'ordre d'apparition)
-  2. `commands/watch.rs` : remplir `subject_order` depuis la liste d'exercices après flatten (même algo que sidebar actuel)
-  3. `render_mastery_sidebar` : utiliser `state.subject_order` au lieu de reconstruire
-  4. Supprimer `seen: HashSet` et la boucle de déduplication de `render_mastery_sidebar`
-- **Contraintes** : comportement identique, même ordre, même priorité sujet courant
+### T5 : build_list_display_items O(n²) → O(n) [PERF-1, CLEAN-9]
+- **Fichiers à modifier** : `src/tui/app.rs` — fn `build_list_display_items()` (lignes 311-360)
+- **Algo actuel** : Pour chaque chapter header, boucle imbriquée `exercises[ex_idx..]` pour compter
+- **Algo cible** : Un seul pass avec compteurs : pré-calculer les positions de chaque chapter boundary, insérer les headers avec les counts rétroactivement (ou 2-pass: pass 1 calcule counts, pass 2 construit items)
+- **Pattern** : Même pattern que `order_by_chapters()` dans `chapters.rs:122-126` qui fait `subject_to_chapter` map en 1 pass
+- **Fichiers adjacents** : `src/chapters.rs` (CHAPTERS array), `src/tui/app.rs` (ListDisplayItem enum)
+- **Statut** : [ ] pending
 
-### v2.9.7 — Feature: overlay `[?]` help dans watch [x] done
-**Context :** Les keybinds sont visibles dans la status bar mais pas documentés en détail.
-- **Fichiers** : `src/tui/app.rs`, `src/tui/common.rs`, `src/tui/ui_watch.rs`
-- **Plan** :
-  1. `AppState` : ajouter `pub help_active: bool` (init false)
-  2. `update_watch` : avant vis_active block, ajouter `if help_active { Esc/tout → close }`. Dans normal keys : `[?]` → `help_active = true`
-  3. `common.rs` : `pub fn render_help_overlay(f: &mut Frame, area: Rect)` — popup 60%×70%, liste des keybinds avec descriptions, statique (pas besoin de AppState)
-  4. `ui_watch::view()` : `else if state.help_active { common::render_help_overlay(f, body_area); }`
-  5. Status bar : si `help_active` → `"[Esc/?] fermer"`; sinon ajouter `[?] aide` dans la liste
-- **Contraintes** : overlay statique, pas de navigation interne
+### T6 : get_streak() — NaiveDate au lieu de string parsing [PERF-3]
+- **Fichiers à modifier** : `src/progress.rs` — fn `get_streak()` (lignes 263-304)
+- **Actuel** : `Utc::now().format("%Y-%m-%d").to_string()` + parse dans boucle
+- **Cible** : Construire `NaiveDate` pour today/yesterday, comparer directement avec `NaiveDate::parse_from_str` une seule fois pour chaque entrée SQL, sans re-parse dans la boucle `windows(2)`
+- **Contraintes** : API chrono — `chrono::NaiveDate` déjà importable (dep `chrono = "0.4"`)
+- **Fichiers adjacents** : `src/progress.rs`
+- **Statut** : [ ] pending
 
-### v2.9.8 — Feature: `[g]`/`[G]` first/last dans search overlay [x] done
-**Context :** Navigation vim : `gg` → premier résultat, `G` → dernier. Améliore l'ergonomie.
-- **Fichier** : `src/tui/app.rs` (update_watch search block)
-- **Plan** :
-  1. `AppState` : ajouter `pub search_g_pending: bool` (init false — attend le second `g` pour `gg`)
-  2. `update_watch` search block :
-     - `KeyCode::Char('G')` → `search_selected = search_results.len().saturating_sub(1)`, reset `search_g_pending`
-     - `KeyCode::Char('g')` si `search_g_pending` → `search_selected = 0`, reset pending
-     - `KeyCode::Char('g')` sinon → `search_g_pending = true`
-     - Tout autre key : reset `search_g_pending`
-  3. `rebuild_search` : reset `search_g_pending = false`
-  4. Hint bar dans overlay : ajouter `[g/G] début/fin`
-- **Contraintes** : `search_g_pending` reset sur Esc, Backspace, tout Char non-`g`
+## Phase C — Clean Code : app.rs refactoring (3 tâches)
 
-### v2.9.9 — Chore: CHANGELOG + bump 2.9.8 → 2.9.9 + tests [x] done
-- **Fichiers** : `Cargo.toml`, `CHANGELOG.md`
-- **Tests à écrire** : `cargo test` doit passer à 153+ tests ; ajouter si coverage manque
-- **Tag** : `git tag v2.9.9`
+### T7 : Extraire handle_compile() depuis update_watch() [CLEAN-1]
+- **Fichiers à modifier** : `src/tui/app.rs` — fn `update_watch()` (lignes 801-854)
+- **Extraction** : Créer `fn handle_compile(&mut self, conn: &Connection)` qui encapsule:
+  - Lecture path, compile_and_run, gestion success/failure, record_attempt, navigate
+  - Le bloc `KeyCode::Char('r')` (lignes 801-855) entier
+- **Pattern** : Similaire à `handle_hint_reveal()`, `handle_vis_toggle()` — méthodes `&mut self`
+- **Fichiers adjacents** : `src/runner.rs` (compile_and_run), `src/progress.rs` (record_attempt)
+- **Statut** : [ ] pending
 
----
+### T8 : Dédupliquer logging dans handle_overlay_dispatch() [CLEAN-2]
+- **Fichiers à modifier** : `src/tui/app.rs` — fn `handle_overlay_dispatch()` (lignes 629-669)
+- **Actuel** : `load_current_exercise` + logging dupliqué aux lignes 637-643 et 649-655
+- **Extraction** : Créer `fn load_exercise_and_save_checkpoint(&mut self, conn, session_id)`
+- **Fichiers adjacents** : `src/tui/app.rs`
+- **Statut** : [ ] pending
 
-## Audit Remediation — full-audit 2026-03-13
+### T9 : Extraire navigation chapitres depuis handle_list_key() [CLEAN-3]
+- **Fichiers à modifier** : `src/tui/app.rs` — fn `handle_list_key()` (lignes 432-476)
+- **Extraction** : Créer 2 fonctions statiques :
+  - `fn find_next_chapter_exercise(items: &[ListDisplayItem], from: usize) -> Option<usize>`
+  - `fn find_prev_chapter_exercise(items: &[ListDisplayItem], from: usize) -> Option<usize>`
+- **Pattern** : Même style que `next_exercise_item()` déjà extrait (ligne 363)
+- **Fichiers adjacents** : `src/tui/app.rs`
+- **Statut** : [ ] pending
 
-### T1 — SEC: tmux.rs safe_chars — supprimer '=' [x] done
-- **Fichier** : `src/tmux.rs:77`
-- **Fix** : `matches!(c, '_' | '-' | '.' | '/' | '=')` → `matches!(c, '_' | '-' | '.' | '/')`
-- **Contrainte** : garder `'/'` (nécessaire pour les chemins absolus d'éditeur)
+## Phase D — Clean Code : modules backend (4 tâches)
 
-### T2 — DRY: supprimer mastery_bar() locale dans ui_watch.rs [x] done
-- **Fichier** : `src/tui/ui_watch.rs:57–68`
-- **Fonctions à réutiliser** : `common::mastery_bar_string(score, width)` + `common::mastery_color(score)`
-- **Fix** : supprimer `fn mastery_bar()` entière. Remplacer les 2 call sites (lignes ~82, ~213) :
-  ```rust
-  // AVANT
-  let (bar, bar_color) = mastery_bar(mastery, 10);
-  // APRÈS
-  let bar = common::mastery_bar_string(mastery, 10);
-  let bar_color = common::mastery_color(mastery);
-  ```
-- **Contraintes** : `FULL_BAR` dans common.rs supporte max width=10, OK pour width=8 et 10
+### T10 : Extraire build_gcc_args depuis run_output() [CLEAN-8]
+- **Fichiers à modifier** : `src/runner.rs` — fn `run_output()` (lignes 274-320)
+- **Extraction** : Créer `fn build_gcc_args(...)` pour la construction de `extra_args` (lignes 281-289)
+- **Pattern** : Même pattern que `run_test()` qui a une construction similaire
+- **Fichiers adjacents** : `src/runner.rs`
+- **Statut** : [ ] pending
 
-### T3 — DRY: mastery_bar_spans() → common::mastery_bar_string [x] done
-- **Fichier** : `src/tui/ui_stats.rs:22–31`
-- **Fix** : remplacer `format!("{}{}", "█".repeat(filled), "░".repeat(empty))` par `common::mastery_bar_string(score, 10)`
-- **Contraintes** : supprimer les calculs `filled`/`empty` redondants dans cette fonction
+### T11 : Doc comments sur fonctions pub [CONV-3]
+- **Fichiers à modifier** :
+  - `src/chapters.rs` — `order_by_chapters()` (112), `flatten_chapters()` (180), `filter_by_chapter()` (188)
+  - `src/piscine.rs` — `run_exam_piscine()` (128)
+- **Contraintes** : Doc comments `///` style, concis (1-2 phrases)
+- **Statut** : [ ] pending
 
-### T4 — DRY: extraire render_body_with_sidebar dans common.rs [x] done
-- **Fichiers** : `src/tui/common.rs`, `src/tui/ui_watch.rs:157–194`, `src/tui/ui_piscine.rs:180–217`
-- **Pattern** : voir findings.md section "Duplication de layout"
-- **Ajouter dans common.rs** : `pub fn render_body_with_sidebar(f, area, state, render_sidebar: fn(&mut Frame, Rect, &AppState))`
-- **Réduire** :
-  - `render_body` → `render_body_with_sidebar(f, area, state, render_mastery_sidebar)`
-  - `render_piscine_body` → `render_body_with_sidebar(f, area, state, render_piscine_sidebar)`
-- **Lire avant de coder** : `src/tui/common.rs` (imports, exports existants)
+### T12 : Supprimer paramètre mort _filter_subject [DRY]
+- **Fichiers à modifier** : `src/tui/ui_list.rs` — fn `draw_list()` (ligne 95)
+- **Contraintes** : Fonction privée, vérifier tous les call sites avec Grep
+- **Fichiers adjacents** : `src/tui/ui_list.rs` (appels internes)
+- **Statut** : [ ] pending
 
-### T5 — Dead code: AppMode + AppState.mode + Msg::Quit [x] done
-- **Fichier principal** : `src/tui/app.rs:14–40`
-- **Lire avant** : `src/commands/watch.rs`, `src/commands/piscine.rs` — call sites de `AppState::new()`
-- **Fix** :
-  - Supprimer `enum AppMode`
-  - Changer `AppState::new(mode: AppMode)` → `AppState::new()` (retirer le paramètre)
-  - Supprimer `pub mode: AppMode` + `#[allow(dead_code)]` correspondant
-  - Supprimer `Msg::Quit` + `#[allow(dead_code)]`
-  - Adapter les match arms `Msg::Quit` dans `update_watch` / `update_piscine` (les supprimer)
-- **Contraintes** : vérifier que `AppState::new(AppMode::Watch {...})` ne passe pas de données utiles
+### T13 : Extraire render_opaque_background helper [DRY]
+- **Fichiers à modifier** :
+  - `src/tui/common.rs` — ajouter `pub fn render_opaque_background(f: &mut Frame, area: Rect)`
+  - `src/tui/ui_watch.rs` (ligne 18-21), `src/tui/ui_piscine.rs` (17-21), `src/tui/ui_list.rs` (100-104) — remplacer par appel helper
+- **Pattern** : `Block::default().style(Style::default().bg(C_BG))`
+- **Fichiers adjacents** : `src/tui/common.rs`
+- **Statut** : [ ] pending
 
-### T6 — Dead code: WatchAction variants Skip/Next/Prev [x] done
-- **Fichier** : `src/watcher.rs:23–32`
-- **Lire avant** : `src/main.rs` — tous les `match` sur `WatchAction` (chercher `WatchAction::Skip`, `Next`, `Prev`)
-- **Fix** : supprimer les 3 variants + leurs `#[allow(dead_code)]` si aucun call site trouvé
-- **Contraintes** : si des match arms les référencent en main.rs → supprimer aussi ces bras
+## Phase E — Remaining Clean Code (optionnel, effort > valeur)
 
-### T7 — Constantes: ajouter MASTERY_BAR_WIDTH + PISCINE_PROGRESS_BAR_WIDTH [x] done
-- **Fichier** : `src/constants.rs`
-- **Ajouter** :
-  ```rust
-  pub const MASTERY_BAR_WIDTH: usize = 10;
-  pub const PISCINE_PROGRESS_BAR_WIDTH: usize = 20;
-  ```
-- **Faire avant T10** (T10 les utilise)
+### T14 : render_header() décomposition [CLEAN-6]
+- **Note** : 105 lignes mais très linéaire (3 sections L1/L2/L3). Effort de refactor > gain lisibilité. **Skip sauf si explicitement demandé.**
+- **Statut** : [ ] skipped — trade-off défavorable
 
-### T8 — Dead code: next_interval_days() + 3 tests [x] done
-- **Fichier** : `src/mastery.rs`
-- **Fix** : supprimer `pub(crate) fn next_interval_days(mastery: f32) -> u32` ET les 3 tests :
-  `next_interval_days_min_clamp`, `next_interval_days_max_clamp`, `next_interval_days_mid`
-- **Vérifier** : `grep -r "next_interval_days"` avant de supprimer
+### T15 : spawn_gcc_and_collect() décomposition [CLEAN-4]
+- **Note** : 99 lignes mais pipeline séquentiel (compile → spawn → collect → timeout). Découpage forcerait passage de nombreux paramètres. **Skip sauf si explicitement demandé.**
+- **Statut** : [ ] skipped — trade-off défavorable
 
-### T10 — Magic 20 → PISCINE_PROGRESS_BAR_WIDTH [x] done
-- **Fichier** : `src/tui/ui_piscine.rs:234`
-- **Après T7** (utilise la constante)
-- **Fix** : `let bar_width = 20usize;` → `let bar_width = constants::PISCINE_PROGRESS_BAR_WIDTH;`
-- **Ajouter** : `use crate::constants;` si absent
+### T16 : order_by_chapters() décomposition [CLEAN-7]
+- **Note** : Déjà refactoré avec map + buckets + sort. 56 lignes effectives. Bien structuré. **Skip.**
+- **Statut** : [ ] skipped — déjà propre
 
-### T_VERIFY — cargo test + clippy [x] done
-- `cargo test` — 152 tests passed ✓
-- `cargo clippy -- -D warnings` — 0 warnings ✓
+### T17 : record_attempt() décomposition [CLEAN-5]
+- **Note** : 74 lignes, transaction atomique. Découper casserait la cohérence transactionnelle. **Skip.**
+- **Statut** : [ ] skipped — transaction atomique
+
+## Phase F — Low findings (batch)
+
+### T18 : Batch de low findings actionnables
+- Hint counter duplication watch/piscine → helper dans common.rs
+- get_streak() déjà traité par T6
+- **Statut** : [ ] pending — faible priorité
 
 ---
 
-## Archivé
+## Résumé exécution
 
-### v2.9.0 — TUI fuzzy search `[/]` [x] done
-- AppState: search_active, search_query, search_results, search_selected
-- rebuild_search, update_watch search block, render_search_overlay, ui_watch T4
+| Phase | Tâches | Fichiers | Priorité |
+|-------|--------|----------|----------|
+| A — Sécurité + Quick Wins | T1-T4 | 4 | Haute |
+| B — Performance | T5-T6 | 2 | Haute |
+| C — Clean Code app.rs | T7-T9 | 1 | Moyenne |
+| D — Clean Code backend | T10-T13 | 5 | Moyenne |
+| E — Optionnel | T14-T17 | — | Skipped |
+| F — Low batch | T18 | 2 | Basse |
+
+**Total tâches actives** : 13 (T1-T13 + T18)
+**Fichiers modifiés** : ~10 fichiers
+**Tests à vérifier** : `cargo test` + `cargo clippy -- -D warnings` après chaque phase

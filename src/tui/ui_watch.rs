@@ -84,7 +84,9 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         .as_ref()
         .map(|sb| 3 + sb.content.chars().count()) // " · [S0]"
         .unwrap_or(0);
+    let version_tag = concat!(" v", env!("CARGO_PKG_VERSION"));
     let left2_len = 6 // "clings"
+        + version_tag.len()
         + 3 + counter_str.len()       // " · 1/61"
         + 3 + exercise.subject.chars().count() // " · pointers"
         + 3 + 5                        // " · ★★★★★"
@@ -96,7 +98,12 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let mut line2_spans: Vec<Span<'_>> = vec![
-        span!(Style::default().fg(common::C_MAUVE).add_modifier(Modifier::BOLD); "clings"),
+        Span::styled(
+            format!("clings v{}", env!("CARGO_PKG_VERSION")),
+            Style::default()
+                .fg(common::C_MAUVE)
+                .add_modifier(Modifier::BOLD),
+        ),
         span!(Style::default().fg(common::C_OVERLAY); " · "),
         span!(Style::default().fg(common::C_SUCCESS); "{}", counter_str),
         span!(Style::default().fg(common::C_OVERLAY); " · "),
