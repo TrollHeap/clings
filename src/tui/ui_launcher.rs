@@ -38,6 +38,7 @@ pub enum LaunchMode {
 enum Screen {
     Mode,
     Chapter(LaunchMode),
+    Help,
 }
 
 /// Ratatui-based launch selector. Shows mode selection, then chapter selection.
@@ -90,9 +91,18 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                             }
                         }
                     }
+                    Some(Action::Help) => {
+                        screen = Screen::Help;
+                    }
                     Some(Action::Quit) => break LaunchChoice::Quit,
                     Some(Action::Back) => break LaunchChoice::Quit,
                     None => {}
+                }
+            }
+            Screen::Help => {
+                let _ = terminal.draw(|f| draw_help_screen(f));
+                if let Some(_) = read_key() {
+                    screen = Screen::Mode;
                 }
             }
             Screen::Chapter(mode) => {
@@ -123,6 +133,9 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                         };
                         break LaunchChoice::Start { mode, chapter };
                     }
+                    Some(Action::Help) => {
+                        screen = Screen::Help;
+                    }
                     Some(Action::Quit) => break LaunchChoice::Quit,
                     Some(Action::Back) => {
                         screen = Screen::Mode;
@@ -145,6 +158,7 @@ enum Action {
     Select,
     Quit,
     Back,
+    Help,
 }
 
 fn read_key() -> Option<Action> {
@@ -160,6 +174,7 @@ fn read_key() -> Option<Action> {
                     KeyCode::Enter => Some(Action::Select),
                     KeyCode::Char('q') | KeyCode::Char('Q') => Some(Action::Quit),
                     KeyCode::Esc => Some(Action::Back),
+                    KeyCode::Char('?') => Some(Action::Help),
                     _ => None,
                 };
             }
@@ -255,7 +270,7 @@ fn draw_mode_screen(
     f.render_widget(list, chunks[1]);
 
     // Footer
-    let footer = Paragraph::new("[↑↓/jk] naviguer  [Entrée] lancer  [q] quitter")
+    let footer = Paragraph::new("[↑↓/jk] naviguer  [Entrée] lancer  [?] aide  [q] quitter")
         .style(Style::default().fg(common::C_TEXT_DIM))
         .alignment(HorizontalAlignment::Left);
     f.render_widget(footer, chunks[2]);
@@ -324,6 +339,122 @@ fn draw_chapter_screen(f: &mut Frame, cursor: usize, mode: LaunchMode) {
         .style(Style::default().fg(common::C_TEXT_DIM))
         .alignment(HorizontalAlignment::Left);
     f.render_widget(footer, chunks[2]);
+}
+
+fn draw_help_screen(f: &mut Frame) {
+    f.render_widget(
+        Block::default().style(Style::default().bg(common::C_BG)),
+        f.area(),
+    );
+
+    let area = f.area();
+    let popup_w = area.width.min(60);
+    let popup_h = area.height.min(30);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = ratatui::layout::Rect::new(x, y, popup_w, popup_h);
+
+    let bold_accent = Style::default()
+        .fg(common::C_ACCENT)
+        .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(common::C_TEXT_DIM);
+    let warn = Style::default().fg(common::C_WARNING);
+    let text = Style::default().fg(common::C_TEXT);
+    let success = Style::default().fg(common::C_SUCCESS);
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled("  MODES", bold_accent)),
+        Line::from(vec![
+            Span::styled("  Watch (SRS)   ", warn),
+            Span::styled("Progression adaptative par maîtrise.", text),
+        ]),
+        Line::from(Span::styled(
+            "                 Seuls les exercices débloqués sont visibles.",
+            dim,
+        )),
+        Line::from(Span::styled(
+            "                 Recommandé pour l'apprentissage quotidien.",
+            dim,
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Piscine        ", warn),
+            Span::styled("Linéaire, tout débloqué.", text),
+        ]),
+        Line::from(Span::styled(
+            "                 Idéal pour réviser en une seule session.",
+            dim,
+        )),
+        Line::from(""),
+        Line::from(Span::styled("  MAÎTRISE (SRS)", bold_accent)),
+        Line::from(vec![
+            Span::styled("  Score 0 → 5   ", warn),
+            Span::styled("Succès : +1.0  │  Échec : −0.5", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  Decay         ", warn),
+            Span::styled("−0.5 tous les 14 jours sans pratique", text),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("  DIFFICULTÉS (par sujet)", bold_accent)),
+        Line::from(vec![
+            Span::styled("  ★         D1  ", success),
+            Span::styled("Toujours disponible", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  ★★        D2  ", success),
+            Span::styled("Maîtrise ≥ 2.0", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  ★★★       D3  ", warn),
+            Span::styled("Maîtrise ≥ 4.0", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  ★★★★      D4  ", warn),
+            Span::styled("Maîtrise ≥ 4.5", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  ★★★★★     D5  ", Style::default().fg(common::C_DANGER)),
+            Span::styled("Maîtrise = 5.0", text),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("  TOUCHES (mode Watch)", bold_accent)),
+        Line::from(vec![
+            Span::styled("  [r] ", warn),
+            Span::styled("compiler    ", text),
+            Span::styled("[h] ", warn),
+            Span::styled("indice progressif    ", text),
+            Span::styled("[s] ", warn),
+            Span::styled("solution", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  [j/k] ", warn),
+            Span::styled("suivant/préc  ", text),
+            Span::styled("[l] ", warn),
+            Span::styled("liste    ", text),
+            Span::styled("[v] ", warn),
+            Span::styled("visualiseur", text),
+        ]),
+        Line::from(vec![
+            Span::styled("  [/] ", warn),
+            Span::styled("recherche fuzzy              ", text),
+            Span::styled("[q] ", warn),
+            Span::styled("quitter", text),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("         ↵ toute touche pour fermer", dim)),
+        Line::from(""),
+    ];
+
+    let help = Paragraph::new(lines).block(
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(common::C_ACCENT))
+            .style(Style::default().bg(common::C_BG))
+            .title(span!(Style::default().fg(common::C_ACCENT).add_modifier(Modifier::BOLD); " ? Aide ")),
+    );
+    f.render_widget(help, popup_area);
 }
 
 fn make_item(label: &str, selected: bool, color: ratatui::style::Color) -> ListItem<'static> {
