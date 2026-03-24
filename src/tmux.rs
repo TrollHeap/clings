@@ -1,7 +1,8 @@
-//! Optional tmux integration — opens the exercise file in a neovim split.
+//! Editor integration — opens the exercise file for editing.
 //!
-//! Activates only when running inside a tmux session (`$TMUX` is set).
-//! Editor binary is validated before use. Falls back gracefully if tmux is unavailable.
+//! Inside tmux (and `tmux.enabled = true`): splits a pane with the configured editor.
+//! Otherwise: launches the editor as a detached background process.
+//! Editor binary is validated before use.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -63,10 +64,72 @@ fn resolve_editor() -> String {
     }
 }
 
+/// Éditeurs GUI connus qui se détachent naturellement du terminal.
+const GUI_EDITORS: &[&str] = &[
+    "code",
+    "codium",
+    "subl",
+    "sublime_text",
+    "gedit",
+    "kate",
+    "xed",
+    "mousepad",
+    "pluma",
+    "atom",
+    "zed",
+    "lapce",
+    "lite-xl",
+    "gvim",
+];
+
+/// Vérifie si le binaire est un éditeur GUI (peut tourner en parallèle du TUI).
+/// Gère aussi les IDs Flatpak reverse-DNS (ex: `com.visualstudio.code` → `code`).
+fn is_gui_editor(bin: &str) -> bool {
+    let name = std::path::Path::new(bin)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(bin);
+    if GUI_EDITORS.contains(&name) {
+        return true;
+    }
+    // Flatpak reverse-DNS: extract last segment (e.g. "com.visualstudio.code" → "code")
+    if let Some(last) = name.rsplit('.').next() {
+        return GUI_EDITORS.contains(&last);
+    }
+    false
+}
+
+/// Lance l'éditeur en background (hors tmux).
+/// Retourne `true` si l'éditeur a été lancé, `false` si c'est un éditeur terminal
+/// (qui ne peut pas fonctionner sans TTY en parallèle du TUI).
+fn open_editor_standalone(file: &Path) -> bool {
+    let editor = resolve_editor();
+    let parts: Vec<&str> = editor.split_whitespace().collect();
+    let (bin, args) = match parts.split_first() {
+        Some(v) => v,
+        None => return false,
+    };
+    if !is_gui_editor(bin) {
+        return false;
+    }
+    let _ = Command::new(bin)
+        .args(args.iter().copied())
+        .arg(file)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    true
+}
+
 /// Open a tmux pane on the right with the configured editor editing the given file.
 /// Returns the pane ID for later cleanup.
+/// Falls back to `open_editor_standalone` when not in tmux or when `tmux.enabled = false`.
 pub fn open_editor_pane(file: &Path) -> Option<String> {
-    if !is_tmux() {
+    if !is_tmux() || !crate::config::get().tmux.enabled {
+        if !open_editor_standalone(file) {
+            eprintln!("  [clings] Ouvrez {} dans votre éditeur", file.display());
+        }
         return None;
     }
 
@@ -190,5 +253,27 @@ mod tests {
     #[test]
     fn test_is_valid_executable_absolute_nonexistent() {
         assert!(!is_valid_executable("/nonexistent/path/to/editor"));
+    }
+
+    #[test]
+    fn test_is_gui_editor() {
+        assert!(is_gui_editor("code"));
+        assert!(is_gui_editor("/usr/bin/code"));
+        assert!(is_gui_editor("subl"));
+        assert!(is_gui_editor("zed"));
+        assert!(is_gui_editor("gvim"));
+        assert!(!is_gui_editor("nvim"));
+        assert!(!is_gui_editor("vim"));
+        assert!(!is_gui_editor("nano"));
+        assert!(!is_gui_editor("emacs"));
+    }
+
+    #[test]
+    fn test_is_gui_editor_flatpak() {
+        assert!(is_gui_editor("com.visualstudio.code"));
+        assert!(is_gui_editor("org.kde.kate"));
+        assert!(is_gui_editor("org.codium.codium"));
+        assert!(!is_gui_editor("org.vim.Vim")); // "Vim" ≠ "vim" — case-sensitive
+        assert!(!is_gui_editor("org.neovim.nvim")); // nvim is terminal
     }
 }

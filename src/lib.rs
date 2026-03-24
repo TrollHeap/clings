@@ -20,6 +20,7 @@ mod piscine;
 mod progress;
 pub mod runner;
 mod search;
+pub mod sync;
 mod tmux;
 pub mod tui;
 mod watcher;

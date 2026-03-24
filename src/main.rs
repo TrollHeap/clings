@@ -14,6 +14,7 @@ mod piscine;
 mod progress;
 mod runner;
 mod search;
+mod sync;
 mod tmux;
 mod tui;
 mod watcher;
@@ -25,7 +26,8 @@ use colored::Colorize;
 
 use crate::commands::{
     cmd_annales, cmd_config, cmd_export, cmd_hint, cmd_import, cmd_list, cmd_new, cmd_progress,
-    cmd_reset, cmd_review, cmd_run, cmd_search, cmd_solution, cmd_stats, cmd_watch,
+    cmd_reset, cmd_review, cmd_run, cmd_search, cmd_solution, cmd_stats, cmd_sync_init,
+    cmd_sync_now, cmd_sync_status, cmd_watch,
 };
 
 #[derive(Parser)]
@@ -164,6 +166,22 @@ enum Commands {
         #[arg(long, short = 's')]
         subject: Option<String>,
     },
+    /// Synchroniser la progression entre machines via Git
+    #[command(subcommand)]
+    Sync(SyncCommand),
+}
+
+#[derive(Subcommand)]
+enum SyncCommand {
+    /// Initialiser le sync Git avec un remote (ex: git@github.com:user/clings-sync.git)
+    Init {
+        /// URL du remote Git (SSH ou HTTPS)
+        remote: String,
+    },
+    /// Afficher l'état du sync
+    Status,
+    /// Forcer un sync maintenant (pull + push)
+    Now,
 }
 
 fn main() {
@@ -206,6 +224,9 @@ fn main() {
             Ok(())
         }
         Some(Commands::Search { query, subject }) => cmd_search(&query, subject.as_deref()),
+        Some(Commands::Sync(SyncCommand::Init { remote })) => cmd_sync_init(&remote),
+        Some(Commands::Sync(SyncCommand::Status)) => cmd_sync_status(),
+        Some(Commands::Sync(SyncCommand::Now)) => cmd_sync_now(),
         None => (|| {
             let conn = progress::open_db()?;
             match tui::ui_launcher::select_launch(&conn) {

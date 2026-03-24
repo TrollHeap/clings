@@ -28,6 +28,10 @@ pub enum KfError {
     /// Erreur de configuration ou de chemin (message libre)
     #[error("{0}")]
     Config(String),
+
+    /// Erreur de synchronisation Git
+    #[error("sync error: {0}")]
+    Sync(String),
 }
 
 /// Alias de résultat avec `KfError` comme type d'erreur.

@@ -83,6 +83,12 @@ pub const DB_USER_VERSION_CURRENT: i32 = 1;
 pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";
 pub const TMUX_EDITOR: &str = "nvim";
 
+// === Sync ===
+pub const SYNC_SNAPSHOT_FILENAME: &str = "progress.json";
+pub const SYNC_GITIGNORE_CONTENT: &str = "# clings sync — seul progress.json est versionné\n*.db\n*.db-wal\n*.db-shm\n*.toml\n*.c\n*.h\n";
+pub const SYNC_DEFAULT_BRANCH: &str = "main";
+pub const SYNC_GIT_TIMEOUT_SECS: u64 = 10;
+
 // === ANSI escape sequences ===
 pub const ANSI_CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";
 
