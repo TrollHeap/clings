@@ -43,11 +43,24 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         .iter()
         .map(|s| (s.name.clone(), s.mastery_score.get()))
         .collect();
+    // Minimum difficulty per subject — ensures subjects with no D1 exercises
+    // (e.g. capstones starting at D3) are never fully locked out.
+    let min_difficulty_per_subject: std::collections::HashMap<&str, i32> = all_exercises
+        .iter()
+        .fold(std::collections::HashMap::new(), |mut acc, ex| {
+            let entry = acc.entry(ex.subject.as_str()).or_insert(5);
+            *entry = (*entry).min(ex.difficulty as i32);
+            acc
+        });
     let gated_exercises: Vec<crate::models::Exercise> = all_exercises
         .iter()
         .filter(|ex| {
             let unlocked = subject_map.get(ex.subject.as_str()).copied().unwrap_or(1);
-            (ex.difficulty as i32) <= unlocked
+            let min_d = min_difficulty_per_subject
+                .get(ex.subject.as_str())
+                .copied()
+                .unwrap_or(1);
+            (ex.difficulty as i32) <= unlocked.max(min_d)
         })
         .cloned()
         .collect();
