@@ -1,141 +1,141 @@
 # clings
 
-**Entraîneur interactif de programmation systèmes C, aligné sur le cursus NSY103 — Linux : noyau et programmation système.**
+**Interactive C systems programming trainer, aligned with the NSY103 — Linux: kernel and system programming curriculum.**
 
-Résolvez 283 exercices C directement dans votre éditeur. `clings` surveille vos sauvegardes, compile avec `gcc`, valide la sortie, et mesure votre maîtrise via un algorithme de répétition espacée (SRS).
+Solve 283 C exercises directly in your editor. `clings` watches your saves, compiles with `gcc`, validates output, and measures your mastery via a spaced repetition algorithm (SRS).
 
 ---
 
 ## Installation
 
-**Prérequis :** Rust (toolchain stable), `gcc` installé sur le système.
+**Prerequisites:** Rust (stable toolchain), `gcc` installed on the system.
 
 ```bash
-# Depuis les sources
+# From source
 git clone https://github.com/trollheap/clings
 cd clings
 cargo build --release
-# Binaire : target/release/clings
+# Binary: target/release/clings
 
-# Ou directement dans ~/.cargo/bin/
+# Or directly into ~/.cargo/bin/
 cargo install --path .
 ```
 
 ---
 
-## Commandes
+## Commands
 
-| Commande                    | Description                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------ |
-| `clings` ou `clings watch`  | Mode surveillance SRS : exercices priorisés par niveau de maîtrise, avancement automatique |
-| `clings list`               | Liste tous les exercices (filtre possible : `--subject <sujet>`)                           |
-| `clings run <id>`           | Lance un exercice précis en mode surveillance (ex : `clings run ptr-deref-01`)             |
-| `clings progress`           | Tableau de bord : maîtrise par sujet, série de jours consécutifs                           |
-| `clings hint <id>`          | Affiche les indices de l'exercice                                                          |
-| `clings solution <id>`      | Affiche la solution (nécessite au moins une tentative)                                     |
-| `clings reset`              | Réinitialise toute la progression (confirmation requise)                                   |
-| `clings piscine`            | Mode piscine : parcours linéaire intégral, tous les exercices déverrouillés d'emblée       |
-| `clings review`             | Révision SRS : exercices dus selon les intervalles de répétition espacée                   |
-| `clings stats`              | Statistiques globales : taux de réussite, distribution de maîtrise                         |
-| `clings annales`            | Correspondance exercices ↔ sujets des annales NSY103/UTC502                                |
-| `clings exam`               | Mode exam simulé : reproduit une annale NSY103/UTC502 avec timer                           |
-| `clings export`             | Exporte la progression vers un fichier JSON                                                |
-| `clings import <fichier>`   | Importe une progression depuis un fichier JSON                                             |
-| `clings config <clé> <val>` | Modifie la configuration utilisateur (`~/.clings/clings.toml`)                             |
-| `clings new`                | Génère un squelette d'exercice ou valide un fichier JSON existant                          |
-| `clings search <requête>`   | Recherche fuzzy dans les exercices (titre, ID, sujet, concepts-clés)                       |
-| `clings sync`               | Synchronise la progression entre machines via Git (`init`, `status`, `now`)                |
+| Command                     | Description                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `clings` or `clings watch`  | SRS watch mode: exercises prioritized by mastery level, automatic progression |
+| `clings list`               | List all exercises (optional filter: `--subject <subject>`)                   |
+| `clings run <id>`           | Run a specific exercise in watch mode (e.g. `clings run ptr-deref-01`)        |
+| `clings progress`           | Dashboard: mastery by subject, consecutive-day streak                         |
+| `clings hint <id>`          | Display exercise hints                                                        |
+| `clings solution <id>`      | Display the solution (requires at least one attempt)                          |
+| `clings reset`              | Reset all progress (confirmation required)                                    |
+| `clings piscine`            | Piscine mode: full linear walkthrough, all exercises unlocked from the start  |
+| `clings review`             | SRS review: exercises due according to spaced repetition intervals            |
+| `clings stats`              | Global statistics: success rate, mastery distribution                         |
+| `clings annales`            | Exercise ↔ NSY103/UTC502 past exam topic mapping                              |
+| `clings exam`               | Simulated exam mode: reproduces an NSY103/UTC502 past paper with a timer      |
+| `clings export`             | Export progress to a JSON file                                                |
+| `clings import <file>`      | Import progress from a JSON file                                              |
+| `clings config <key> <val>` | Modify user configuration (`~/.clings/clings.toml`)                           |
+| `clings new`                | Generate an exercise skeleton or validate an existing JSON file               |
+| `clings search <query>`     | Fuzzy search over exercises (title, ID, subject, key concepts)                |
+| `clings sync`               | Sync progress between machines via Git (`init`, `status`, `now`)              |
 
-### Raccourcis clavier (mode watch)
+### Keyboard shortcuts (watch mode)
 
-| Touche | Action                                            |
-| ------ | ------------------------------------------------- |
-| `h`    | Afficher un indice                                |
-| `s`    | Overlay solution (tous hints révélés ou 3 échecs) |
-| `j`    | Exercice suivant (ordre curriculum)               |
-| `n`    | Passer (skip) l'exercice courant                  |
-| `k`    | Revenir à l'exercice précédent                    |
-| `r`    | Compiler et vérifier maintenant                   |
-| `l`    | Afficher la liste des exercices                   |
-| `v`    | Ouvrir le visualiseur mémoire                     |
-| `?`    | Afficher l'aide                                   |
-| `/`    | Overlay recherche fuzzy                           |
-| `q`    | Quitter                                           |
-
----
-
-## Fonctionnement
-
-1. `clings watch` sélectionne l'exercice suivant selon l'algorithme SRS (maîtrise la plus faible en priorité).
-2. Le code de départ est écrit dans `~/.clings/current.c`.
-3. Ouvrez ce fichier dans votre éditeur et modifiez-le.
-4. À chaque sauvegarde, `clings` compile avec `gcc -Wall -Wextra -std=c11` et compare la sortie à la valeur attendue.
-5. En cas de succès, la maîtrise du sujet augmente (+1,0) et l'exercice suivant est chargé.
-6. En cas d'échec d'exécution (pas d'erreur de compilation), la maîtrise diminue (−0,5).
-
-### Algorithme SRS
-
-- Score de maîtrise : 0,0 à 5,0 par sujet
-- Difficulté D2 déverrouillée à 2,0 — D3 à 4,0
-- Décroissance de 14 jours en cas d'inactivité
-- Intervalles de révision multipliés par 2,5
-
-### Modes de validation
-
-Les exercices supportent plusieurs modes de validation :
-
-- **`output`** — valide la sortie stdout du programme (mode par défaut)
-- **`test`** — valide via des tests unitaires C (harness `test.h` avec macros `RUN_TEST`)
-- **`both`** — valide à la fois la sortie stdout ET les tests unitaires C (sortie d'abord, puis tests)
-
-### Contenu
-
-- **283+ exercices** répartis sur **21 sujets**
-- **16 chapitres NSY103** : Fondamentaux C → Chaînes & bits → Allocation mémoire → E/S → Système de fichiers → Ordonnancement → Processus → Signaux → Tubes → Files de messages → Mémoire partagée → Sémaphores → Threads POSIX → Sockets → Mémoire virtuelle → Projets intégrateurs
-- Niveaux de difficulté D1 à D5
-- Code de départ adaptatif par stades (S0–S4) selon la maîtrise
+| Key | Action                                              |
+| --- | --------------------------------------------------- |
+| `h` | Show a hint                                         |
+| `s` | Solution overlay (all hints revealed or 3 failures) |
+| `j` | Next exercise (curriculum order)                    |
+| `n` | Skip the current exercise                           |
+| `k` | Go back to the previous exercise                    |
+| `r` | Compile and check now                               |
+| `l` | Show exercise list                                  |
+| `v` | Open memory visualizer                              |
+| `?` | Show help                                           |
+| `/` | Fuzzy search overlay                                |
+| `q` | Quit                                                |
 
 ---
 
-## Curricula couverts
+## How it works
 
-### NSY103 — Linux : noyau et programmation système (Cnam)
+1. `clings watch` selects the next exercise based on the SRS algorithm (lowest mastery first).
+2. The starter code is written to `~/.clings/current.c`.
+3. Open this file in your editor and modify it.
+4. On each save, `clings` compiles with `gcc -Wall -Wextra -std=c11` and compares output to the expected value.
+5. On success, the subject's mastery increases (+1.0) and the next exercise is loaded.
+6. On a runtime failure (no compilation error), mastery decreases (−0.5).
 
-Curriculum principal. Couvre les 16 chapitres du cours NSY103 : processus, signaux, tubes, IPC POSIX (files de messages, mémoire partagée, sémaphores), threads POSIX, sockets, système de fichiers, mémoire virtuelle.
+### SRS Algorithm
 
-### UTC502 — Gestion des ressources informatiques
+- Mastery score: 0.0 to 5.0 per subject
+- Difficulty D2 unlocked at 2.0 — D3 at 4.0
+- 14-day decay for inactivity
+- Review intervals multiplied by 2.5
 
-Exercices supplémentaires alignés sur UTC502 : algorithmes de remplacement de pages, politiques d'ordonnancement CPU, mémoire virtuelle avancée.
+### Validation modes
 
-| Sujet                                                       | Curriculum      | Chapitre |
-| ----------------------------------------------------------- | --------------- | -------- |
-| `processes`, `signals`, `pipes`, `file_io`                  | NSY103          | 7–10     |
-| `pthreads`, `semaphores`, `shared_memory`, `message_queues` | NSY103          | 11–13    |
-| `sockets`                                                   | NSY103          | 14       |
-| `virtual_memory` (mmap, cow, tlb, brk…)                     | NSY103 + UTC502 | 15       |
-| `virtual_memory` (page_replacement_fifo/lru/opt)            | UTC502          | 15       |
-| `scheduling` (fifo, rr, sjf, priority)                      | UTC502          | 6        |
+Exercises support several validation modes:
+
+- **`output`** — validates the program's stdout (default mode)
+- **`test`** — validates via C unit tests (`test.h` harness with `RUN_TEST` macros)
+- **`both`** — validates both stdout AND C unit tests (output first, then tests)
+
+### Content
+
+- **283+ exercises** across **21 subjects**
+- **16 NSY103 chapters**: C Fundamentals → Strings & Bitwise → Memory Allocation → I/O → Filesystem → Scheduling → Processes → Signals → Pipes → Message Queues → Shared Memory → Semaphores → POSIX Threads → Sockets → Virtual Memory → Integrative Projects
+- Difficulty levels D1 to D5
+- Adaptive starter code by stage (S0–S4) based on mastery
+
+---
+
+## Curricula covered
+
+### NSY103 — Linux: kernel and system programming (Cnam)
+
+Primary curriculum. Covers the 16 chapters of the NSY103 course: processes, signals, pipes, POSIX IPC (message queues, shared memory, semaphores), POSIX threads, sockets, filesystem, virtual memory.
+
+### UTC502 — Computer resource management
+
+Additional exercises aligned with UTC502: page replacement algorithms, CPU scheduling policies, advanced virtual memory.
+
+| Subject                                                     | Curriculum      | Chapter |
+| ----------------------------------------------------------- | --------------- | ------- |
+| `processes`, `signals`, `pipes`, `file_io`                  | NSY103          | 7–10    |
+| `pthreads`, `semaphores`, `shared_memory`, `message_queues` | NSY103          | 11–13   |
+| `sockets`                                                   | NSY103          | 14      |
+| `virtual_memory` (mmap, cow, tlb, brk…)                     | NSY103 + UTC502 | 15      |
+| `virtual_memory` (page_replacement_fifo/lru/opt)            | UTC502          | 15      |
+| `scheduling` (fifo, rr, sjf, priority)                      | UTC502          | 6       |
 
 ---
 
 ## Configuration
 
-| Paramètre             | Valeur par défaut | Description                                              |
-| --------------------- | ----------------- | -------------------------------------------------------- |
-| Répertoire de travail | `~/.clings/`      | Fichier courant, base de données SQLite                  |
-| `CLINGS_EXERCISES`    | _(non défini)_    | Chemin alternatif vers le dossier `exercises/`           |
-| Intégration tmux      | automatique       | Si `clings` tourne dans tmux, ouvre neovim dans un split |
+| Parameter          | Default value | Description                                                |
+| ------------------ | ------------- | ---------------------------------------------------------- |
+| Working directory  | `~/.clings/`  | Current file, SQLite database                              |
+| `CLINGS_EXERCISES` | _(unset)_     | Alternative path to the `exercises/` directory             |
+| tmux integration   | automatic     | If `clings` runs inside tmux, opens neovim in a split pane |
 
-La base de données de progression se trouve dans `~/.clings/progress.db`.
-
----
-
-## Contribuer
-
-Voir [CONTRIBUTING.md](CONTRIBUTING.md).
+The progress database is located at `~/.clings/progress.db`.
 
 ---
 
-## Licence
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## License
 
 MIT

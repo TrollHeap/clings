@@ -1,26 +1,26 @@
-# Contribuer à clings
+# Contributing to clings
 
-## Prérequis
+## Prerequisites
 
-- Rust (toolchain stable, `rustup` recommandé)
-- `gcc` installé (`gcc --version` doit fonctionner)
-- `sqlite3` (optionnel, pour inspecter la base de données)
+- Rust (stable toolchain, `rustup` recommended)
+- `gcc` installed (`gcc --version` must work)
+- `sqlite3` (optional, for inspecting the database)
 
 ## Build & test
 
 ```bash
-cargo build                    # Compilation debug (binaire : target/debug/clings)
-cargo build --release          # Compilation optimisée
-cargo clippy -- -D warnings    # Lint — doit passer sans erreur
-cargo test                     # Tests unitaires
-cargo test <nom_du_test>       # Un test précis
+cargo build                    # Debug build (binary: target/debug/clings)
+cargo build --release          # Optimized build
+cargo clippy -- -D warnings    # Lint — must pass clean
+cargo test                     # Unit tests
+cargo test <test_name>         # A specific test
 ```
 
-Toute contribution doit passer `cargo clippy -- -D warnings` et `cargo test` sans régression.
+All contributions must pass `cargo clippy -- -D warnings` and `cargo test` without regression.
 
-## Format des exercices
+## Exercise format
 
-Les exercices sont des fichiers JSON dans `exercises/<sujet>/`. Chaque fichier définit :
+Exercises are JSON files in `exercises/<subject>/`. Each file defines:
 
 ```jsonc
 {
@@ -33,23 +33,23 @@ Les exercices sont des fichiers JSON dans `exercises/<sujet>/`. Chaque fichier d
   "starter_code": "...",
   "solution_code": "...",
   "hints": ["...", "..."],
-  "validation": { "mode": "output", "expected_output": "..." }
+  "validation": { "mode": "output", "expected_output": "..." },
 }
 ```
 
-Le champ `starter_code_stages` (optionnel) permet un échafaudage adaptatif S0–S4.
-Nommage des fichiers : `<sujet>_<num>.json` (ex : `ptr_deref_01.json`).
+The optional `starter_code_stages` field enables adaptive scaffolding S0–S4.
+File naming: `<subject>_<num>.json` (e.g. `ptr_deref_01.json`).
 
-## Convention de commit
+## Commit convention
 
 ```
-<type>(<périmètre>): <description courte en impératif>
+<type>(<scope>): <short description in imperative mood>
 
-# Types : feat | fix | refactor | test | docs | chore
-# Exemples :
+# Types: feat | fix | refactor | test | docs | chore
+# Examples:
 feat(exercises): add vm_mmap_01 virtual memory exercise
 fix(runner): correct linker flags for semaphore exercises
 docs(readme): update installation instructions
 ```
 
-Un commit par changement logique. Pas de `git push --force` sur `main`.
+One commit per logical change. No `git push --force` on `main`.
