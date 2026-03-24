@@ -1,4 +1,4 @@
-.PHONY: stable dev setup build release install install-release install-sync test lint check fmt clean help
+.PHONY: stable dev setup build release install install-release install-sync sync-init sync-status sync-now test lint check fmt clean help
 
 STABLE_BIN  := $(HOME)/.local/bin/clings-v1.0.1
 STABLE_HOME := $(HOME)/.clings
@@ -44,6 +44,22 @@ install-sync:
 
 install: install-release install-sync
 
+# ── Sync Git ─────────────────────────────────
+sync-init:
+ifndef REMOTE
+	$(error REMOTE est requis — ex: make sync-init REMOTE=git@github.com:user/clings-sync.git)
+endif
+	@echo "▶ Initialisation sync Git → $(REMOTE)"
+	CLINGS_HOME=$(DEV_HOME) cargo run -- sync init $(REMOTE)
+
+sync-status:
+	@echo "▶ État du sync Git"
+	CLINGS_HOME=$(DEV_HOME) cargo run -- sync status
+
+sync-now:
+	@echo "▶ Sync Git (pull + push)"
+	CLINGS_HOME=$(DEV_HOME) cargo run -- sync now
+
 # ── Qualité ───────────────────────────────────
 test:
 	@echo "▶ Tests unitaires"
@@ -78,6 +94,11 @@ help:
 	@echo "    setup         — build debug + symlink clings-dev"
 	@echo "    install       — build release + cargo install + sync"
 	@echo "    install-sync  — installe clings-sync dans ~/.local/bin/"
+	@echo ""
+	@echo "  Sync Git:"
+	@echo "    sync-init     — initialiser le sync (REMOTE=git@...)"
+	@echo "    sync-status   — afficher l'état du sync"
+	@echo "    sync-now      — forcer pull + push"
 	@echo ""
 	@echo "  Qualité:"
 	@echo "    test          — cargo test"

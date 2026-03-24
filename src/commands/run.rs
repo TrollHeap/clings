@@ -5,6 +5,7 @@ use colored::Colorize;
 use crate::error::{KfError, Result};
 use crate::{exercises, progress};
 
+/// Run a single exercise interactively in TUI. Compiles, validates output, and updates SRS state.
 pub fn cmd_run(exercise_id: &str) -> Result<()> {
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let exercise = exercises::find_exercise(&all_exercises, exercise_id)
@@ -17,6 +18,8 @@ pub fn cmd_run(exercise_id: &str) -> Result<()> {
     crate::tui::ui_run::run_exercise(exercise, subject_mastery)
 }
 
+/// Run mastery review session: loop through due subjects (weakest and most-overdue first), one exercise each.
+/// Requires at least one subject due for review.
 pub fn cmd_review() -> Result<()> {
     let mut conn = progress::open_db()?;
     progress::apply_all_decay(&mut conn)?;

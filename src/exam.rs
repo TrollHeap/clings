@@ -30,6 +30,8 @@ fn collect_unique_ids(questions: &[AnnaleQuestion]) -> Vec<String> {
     ids
 }
 
+/// Launch exam simulation: select an annales session, display exam info, and run a timed piscine with exam exercises.
+/// If list_sessions=true, prints available sessions and exits. Otherwise opens interactive session selector if no session_id provided.
 pub fn cmd_exam(session_id: Option<&str>, list_sessions: bool) -> Result<()> {
     // 1. Charger annales_map.json
     let sessions: Vec<AnnaleSession> = exercises::load_annales_map()?;

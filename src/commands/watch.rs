@@ -4,15 +4,30 @@
 
 use colored::Colorize;
 
-use crate::constants::SECS_PER_DAY;
+use crate::constants::{clings_data_dir, SECS_PER_DAY};
 use crate::error::Result;
 use crate::tui::app::App;
-use crate::{chapters, exercises, progress, tmux};
+use crate::{chapters, config, exercises, progress, sync, tmux};
 
+/// Start watch mode — interactive SRS-based exercise progression by chapter.
+/// Launches Ratatui TUI. Optionally filters by chapter; enables file-watching auto-compile and SRS decay.
+/// Calls sync pull/push if configured. Saves session state for "Continue" in launcher.
 pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
+    // ── 0. Sync pull (si activé) ───────────────────────────────────────
+    let clings_dir = clings_data_dir();
+    let sync_cfg = config::get().sync.clone();
+
     // ── 1. Chargement exercices + données SRS ──────────────────────────
     let (all_exercises, _) = exercises::load_all_exercises()?;
     let mut conn = progress::open_db()?;
+
+    if sync_cfg.enabled {
+        match sync::pull_and_merge(&clings_dir, &mut conn) {
+            Ok(Some(n)) => println!("  {} {n} sujet(s) mis à jour depuis le remote.", "↪".bold()),
+            Ok(None) => {}
+            Err(e) => eprintln!("  {} sync pull: {e} (mode hors-ligne)", "⚠".yellow()),
+        }
+    }
 
     progress::apply_all_decay(&mut conn)?;
     progress::ensure_subjects_batch(&mut conn, &all_exercises)?;
@@ -110,7 +125,28 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
 
     result?;
 
-    // ── 5. Summary post-session ────────────────────────────────────────
+    // ── 5. Sync push (si activé) — export synchrone, commit+push en background ─
+    if sync_cfg.enabled {
+        match progress::export_progress(&conn) {
+            Ok(json_str) => {
+                let snapshot = clings_dir.join(crate::constants::SYNC_SNAPSHOT_FILENAME);
+                if let Err(e) = std::fs::write(&snapshot, &json_str) {
+                    eprintln!("  {} écriture snapshot: {e}", "⚠".yellow());
+                } else {
+                    let dir = clings_dir.clone();
+                    let cfg = sync_cfg.clone();
+                    std::thread::spawn(move || {
+                        if let Err(e) = sync::commit_and_push(&dir, &cfg) {
+                            eprintln!("  {} sync push: {e}", "⚠".yellow());
+                        }
+                    });
+                }
+            }
+            Err(e) => eprintln!("  {} export progression: {e}", "⚠".yellow()),
+        }
+    }
+
+    // ── 6. Summary post-session ────────────────────────────────────────
     let done = app.state.completed.iter().filter(|&&c| c).count();
     if done == total && total > 0 {
         println!(
