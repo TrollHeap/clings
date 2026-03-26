@@ -52,7 +52,7 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
                     Ok(exercise) => exercises.push(exercise),
                     Err(e) => eprintln!(
                         "Avertissement : échec d'analyse de {} : {}",
-                        path.display(),
+                        path.file_name().and_then(|n| n.to_str()).unwrap_or("?"),
                         e
                     ),
                 }
