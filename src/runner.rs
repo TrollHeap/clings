@@ -15,16 +15,20 @@ use crate::constants::{
     REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED, TEST_SUMMARY_TESTS,
 };
 use crate::error::KfError;
-use crate::models::{Exercise, ValidationMode};
+use crate::models::Exercise;
 
 /// Préfixe des messages de timeout — utilisé pour la création du message et les pattern matches.
 const TIMEOUT_MSG_PREFIX: &str = "Délai d'exécution dépassé";
 
+// v1.1 : mode test désactivé — fonctions et constantes conservées pour v1.2
+#[allow(dead_code)]
 /// Nom du fichier de harnais de tests C copié dans le répertoire de travail.
 const TEST_H_FILENAME: &str = "test.h";
+#[allow(dead_code)]
 /// Nom du fichier C généré qui inclut current.c + le code du harnais.
 const TEST_C_FILENAME: &str = "test_current.c";
 
+#[allow(dead_code)]
 /// Patterns C interdits dans `test_code` — prévient l'injection de code via exercices externes.
 const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
     "system(",
@@ -49,6 +53,41 @@ const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
     "ptrace(",
 ];
 
+/// Supprime la fonction `main()` du code C utilisateur pour éviter la redéfinition
+/// lors de la compilation du harness de tests (test_current.c intègre le code utilisateur).
+///
+/// Trouve le premier `int main`, localise la `{` ouvrante, et retire le bloc entier
+/// jusqu'à la `}` correspondante (profondeur d'accolades). Si `main` est absent,
+/// retourne le code inchangé.
+fn strip_main_function(code: &str) -> String {
+    let Some(main_pos) = code.find("int main") else {
+        return code.to_string();
+    };
+    let after_main = &code[main_pos..];
+    let Some(brace_offset) = after_main.find('{') else {
+        return code.to_string();
+    };
+    let brace_start = main_pos + brace_offset;
+    let mut depth = 0usize;
+    let mut end_pos = None;
+    for (i, ch) in code[brace_start..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    end_pos = Some(brace_start + i + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let end = end_pos.unwrap_or(code.len());
+    format!("{}{}", &code[..main_pos], &code[end..])
+}
+
+#[allow(dead_code)]
 /// Valide `test_code` avant d'écrire le fichier C généré.
 /// Retourne `Some(pattern)` si un pattern interdit est trouvé, `None` sinon.
 fn validate_test_code(code: &str) -> Option<&'static str> {
@@ -256,17 +295,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         fallback_work_dir.as_path()
     });
 
-    match exercise.validation.mode {
-        ValidationMode::Test => run_tests(source_path, work_dir, exercise),
-        ValidationMode::Both => {
-            let output_result = run_output(source_path, work_dir, exercise);
-            if !output_result.success {
-                return output_result;
-            }
-            run_tests(source_path, work_dir, exercise)
-        }
-        ValidationMode::Output => run_output(source_path, work_dir, exercise),
-    }
+    // v1.1 : mode output uniquement — tous les exercices utilisent la comparaison stdout
+    run_output(source_path, work_dir, exercise)
 }
 
 /// Constructs gcc command-line arguments for output-validation mode.
@@ -337,6 +367,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
     )
 }
 
+#[allow(dead_code)]
 /// Run test-harness mode: write test.h + test_current.c, compile, run, parse summary.
 fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let test_code = match &exercise.validation.test_code {
@@ -361,22 +392,23 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
         return make_compile_error(format!("Impossible d'écrire test.h : {e}"));
     }
 
-    // Write test_current.c = #include "current.c" + test_code
+    // Write test_current.c = user code (sans main) + test.h + test_code
+    // On inline le contenu de current.c plutôt qu'un #include pour pouvoir supprimer
+    // le main() utilisateur qui entrerait en conflit avec le main() du harness.
     let test_c_path = work_dir.join(TEST_C_FILENAME);
     let source_filename = source_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
-    if !source_filename
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
-    {
-        return make_compile_error(format!(
-            "Nom de fichier source invalide : {source_filename:?}"
-        ));
-    }
-    let test_c_content =
-        format!("#include \"{source_filename}\"\n#include \"test.h\"\n\n{test_code}\n");
+    let user_code = match std::fs::read_to_string(source_path) {
+        Ok(c) => c,
+        Err(e) => return make_compile_error(format!("Impossible de lire {source_filename} : {e}")),
+    };
+    let user_code_no_main = strip_main_function(&user_code);
+    // #line préserve les numéros de ligne dans les messages d'erreur gcc
+    let test_c_content = format!(
+        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"test.h\"\n\n{test_code}\n"
+    );
     if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {
         return make_compile_error(format!("Impossible d'écrire test_current.c : {e}"));
     }
@@ -449,6 +481,7 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
     )
 }
 
+#[allow(dead_code)]
 /// Parse the test summary line: "N Tests N Failures 0 Ignored".
 /// Returns `(found_summary, failures_count)`.
 fn parse_test_summary(stdout: &str) -> (bool, usize) {
@@ -1073,6 +1106,29 @@ mod tests {
             }
         "#;
         assert_eq!(validate_test_code(safe_code), None);
+    }
+
+    #[test]
+    fn test_strip_main_function_basic() {
+        let code = "void swap(int *a, int *b) { int t = *a; *a = *b; *b = t; }\nint main(void) {\n    return 0;\n}\n";
+        let result = strip_main_function(code);
+        assert!(!result.contains("int main"), "main() should be removed");
+        assert!(result.contains("void swap"), "swap() should remain");
+    }
+
+    #[test]
+    fn test_strip_main_function_nested_braces() {
+        let code = "int foo(void) { return 1; }\nint main(void) {\n    if (1) { int x = 0; }\n    return 0;\n}\n";
+        let result = strip_main_function(code);
+        assert!(!result.contains("int main"), "main() should be removed");
+        assert!(result.contains("int foo"), "foo() should remain");
+    }
+
+    #[test]
+    fn test_strip_main_function_no_main() {
+        let code = "void helper(void) { }\n";
+        let result = strip_main_function(code);
+        assert_eq!(result, code, "code without main should be unchanged");
     }
 
     #[test]

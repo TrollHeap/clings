@@ -355,25 +355,19 @@ mod tests {
         Ok(())
     }
 
-    /// Vérifie que les exercices Test et Both sont présents dans la liste chargée
-    /// (garantit qu'aucun filtre silencieux ne les exclut de la navigation).
+    /// Vérifie que tous les exercices sont en mode Output (v1.1 : output-only).
     #[test]
-    fn test_test_and_both_exercises_are_loaded() -> crate::error::Result<()> {
+    fn test_all_exercises_output_mode() -> crate::error::Result<()> {
         use crate::models::ValidationMode;
         let (exercises, _) = load_all_exercises()?;
-        let has_test = exercises
+        let non_output: Vec<&str> = exercises
             .iter()
-            .any(|ex| matches!(ex.validation.mode, ValidationMode::Test));
-        let has_both = exercises
-            .iter()
-            .any(|ex| matches!(ex.validation.mode, ValidationMode::Both));
+            .filter(|ex| !matches!(ex.validation.mode, ValidationMode::Output))
+            .map(|ex| ex.id.as_str())
+            .collect();
         assert!(
-            has_test,
-            "Aucun exercice ValidationMode::Test dans la liste chargée"
-        );
-        assert!(
-            has_both,
-            "Aucun exercice ValidationMode::Both dans la liste chargée"
+            non_output.is_empty(),
+            "Exercices non-output en v1.1 : {non_output:?}"
         );
         Ok(())
     }

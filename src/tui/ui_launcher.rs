@@ -100,8 +100,8 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 }
             }
             Screen::Help => {
-                let _ = terminal.draw(|f| draw_help_screen(f));
-                if let Some(_) = read_key() {
+                let _ = terminal.draw(draw_help_screen);
+                if read_key().is_some() {
                     screen = Screen::Mode;
                 }
             }

@@ -13,7 +13,7 @@ pub mod config;
 pub mod constants;
 mod error;
 mod exam;
-mod exercises;
+pub mod exercises;
 pub mod mastery;
 pub mod models;
 mod piscine;
