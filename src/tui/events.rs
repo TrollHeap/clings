@@ -21,6 +21,9 @@ pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
     std::thread::spawn(move || {
         let tick = Duration::from_millis(100);
         loop {
+            // event::poll() can fail if terminal is invalid (e.g., pipe redirected).
+            // In this background thread context, we cannot propagate the error —
+            // fallback to false (ignore this tick) to avoid panicking the app.
             if event::poll(tick).unwrap_or_else(|e| {
                 eprintln!("[clings/events] erreur poll clavier: {e}");
                 false

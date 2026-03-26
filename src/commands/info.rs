@@ -148,38 +148,6 @@ pub fn cmd_search(query: &str, filter_subject: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode,
-    };
-
-    fn create_test_exercise(id: &str, subject: &str, title: &str) -> Exercise {
-        Exercise {
-            id: id.to_string(),
-            subject: subject.to_string(),
-            lang: Lang::C,
-            difficulty: Difficulty::Easy,
-            title: title.to_string(),
-            description: "Test description".to_string(),
-            starter_code: "int main() {}".to_string(),
-            solution_code: "int main() { return 0; }".to_string(),
-            hints: vec!["Hint 1".to_string()],
-            validation: ValidationConfig {
-                mode: ValidationMode::Output,
-                expected_output: Some("0".to_string()),
-                max_duration_ms: None,
-                test_code: None,
-                expected_tests_pass: None,
-            },
-            prerequisites: vec![],
-            files: vec![],
-            exercise_type: ExerciseType::Complete,
-            key_concept: None,
-            common_mistake: None,
-            kc_ids: vec![],
-            starter_code_stages: vec![],
-            visualizer: Default::default(),
-        }
-    }
 
     #[test]
     fn test_cmd_hint_exercise_not_found() {

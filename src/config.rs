@@ -124,7 +124,7 @@ impl Default for SyncConfig {
 /// Load config from `~/.clings/clings.toml`, falling back to defaults.
 /// Silently ignores missing or malformed files.
 pub fn load() -> ClingConfig {
-    let path = constants::clings_data_dir().join("clings.toml");
+    let path = constants::clings_data_dir().join(constants::CONFIG_TOML_FILENAME);
 
     if !path.exists() {
         return ClingConfig::default();
@@ -178,7 +178,7 @@ pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<
         )));
     }
 
-    let path = constants::clings_data_dir().join("clings.toml");
+    let path = constants::clings_data_dir().join(constants::CONFIG_TOML_FILENAME);
 
     // Load current TOML as a Value so we preserve unknown fields
     let mut doc: toml::Value = if path.exists() {

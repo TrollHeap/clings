@@ -247,8 +247,8 @@ fn render_frame_card(
                 Style::default().fg(C_SUBTEXT)
             };
             Row::new(vec![
-                Span::styled(v.name.clone(), Style::default().fg(C_TEXT)),
-                Span::styled(v.value.clone(), val_style),
+                Span::styled(v.name.as_str(), Style::default().fg(C_TEXT)),
+                Span::styled(v.value.as_str(), val_style),
             ])
         })
         .collect();

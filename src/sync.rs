@@ -176,7 +176,9 @@ pub fn commit_and_push(clings_dir: &Path, cfg: &SyncConfig) -> Result<()> {
     }
 
     // Commit
-    let hostname = resolve_hostname(cfg);
+    let mut hostname = resolve_hostname(cfg);
+    // Sanitize hostname to prevent injection via commit message
+    hostname = hostname.replace(['\n', '\0', '"', '\''], "_");
     let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let msg = format!("sync: {hostname} {timestamp}");
     git(clings_dir, &["commit", "-m", &msg])
@@ -186,6 +188,7 @@ pub fn commit_and_push(clings_dir: &Path, cfg: &SyncConfig) -> Result<()> {
     let branch = if cfg.branch.is_empty() {
         SYNC_DEFAULT_BRANCH
     } else {
+        validate_branch_name(&cfg.branch)?;
         &cfg.branch
     };
     let push_result = git_timeout(
@@ -347,6 +350,17 @@ fn file_hash(path: &Path) -> Option<u64> {
             acc.wrapping_add((b as u64).wrapping_mul(i as u64 + 1))
         });
     Some(size.wrapping_add(sample))
+}
+
+/// Valide le nom de branche Git.
+/// Rejette les branches vides, commençant par `-`, ou contenant espaces/caractères nuls.
+fn validate_branch_name(branch: &str) -> Result<()> {
+    if branch.is_empty() || branch.starts_with('-') || branch.contains([' ', '\n', '\0']) {
+        return Err(KfError::Config(format!(
+            "Nom de branche invalide : '{branch}'"
+        )));
+    }
+    Ok(())
 }
 
 /// Résout le hostname pour le message de commit.
