@@ -9,6 +9,15 @@ use crate::constants::clings_data_dir;
 use crate::error::{KfError, Result};
 use crate::{authoring, config, exercises, progress, sync};
 
+/// Prompt user for confirmation. Returns true if input equals "yes".
+pub fn confirm_prompt(msg: &str) -> Result<bool> {
+    print!("{}", msg);
+    io::stdout().flush().ok(); // best-effort flush — non-critique
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim() == "yes")
+}
+
 /// Export progress data (subjects + SRS state) to JSON. Outputs to file or stdout.
 pub fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
     let conn = progress::open_db()?;
@@ -58,15 +67,12 @@ pub fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
 /// Requires user confirmation (type 'yes').
 pub fn cmd_reset(subject: Option<&str>) -> Result<()> {
     if let Some(name) = subject {
-        print!(
+        let confirmed = confirm_prompt(&format!(
             "  {} Supprimer la progression de '{}'. Taper 'yes' pour confirmer : ",
             "Attention !".bold().red(),
             name
-        );
-        io::stdout().flush().ok(); // best-effort flush — non-critique
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        if input.trim() == "yes" {
+        ))?;
+        if confirmed {
             let conn = progress::open_db()?;
             progress::reset_subject(&conn, name)?;
             println!("  {} Progression de '{}' réinitialisée.", "✓".green(), name);
@@ -74,14 +80,11 @@ pub fn cmd_reset(subject: Option<&str>) -> Result<()> {
             println!("  {}", "Annulé.".dimmed());
         }
     } else {
-        print!(
+        let confirmed = confirm_prompt(&format!(
             "  {} Ceci supprimera TOUTE la progression. Tapez 'yes' pour confirmer : ",
             "Attention !".bold().red()
-        );
-        io::stdout().flush().ok(); // best-effort flush — non-critique
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        if input.trim() == "yes" {
+        ))?;
+        if confirmed {
             let conn = progress::open_db()?;
             progress::reset_progress(&conn)?;
             println!("  {}", "Progression réinitialisée.".green());
