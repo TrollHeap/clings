@@ -67,10 +67,10 @@
     "KC-C08"
   ],
   "starter_code_stages": [
-    "#include <signal.h>\n\n/* Test mode: signal constants are pre-defined */\n",
-    "#include <signal.h>\n\n/* SIGHUP=1, SIGINT=2, SIGKILL=9, SIGTERM=15 */\n",
-    "#include <signal.h>\n\n/* Signals have numeric values defined in signal.h */\n",
-    "#include <signal.h>\n\n/* Understand signal constants */\n",
-    "#include <signal.h>\n"
+    "#include <signal.h>\n\n/* Test mode: signal constants are pre-defined */\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(SIGHUP));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGINT));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGKILL));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGTERM));\n    }\n    return 0;\n}\n",
+    "#include <signal.h>\n\n/* SIGHUP=1, SIGINT=2, SIGKILL=9, SIGTERM=15 */\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(SIGHUP));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGINT));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGKILL));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGTERM));\n    }\n    return 0;\n}\n",
+    "#include <signal.h>\n\n/* Signals have numeric values defined in signal.h */\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(SIGHUP));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGINT));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGKILL));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGTERM));\n    }\n    return 0;\n}\n",
+    "#include <signal.h>\n\n/* Understand signal constants */\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(SIGHUP));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGINT));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGKILL));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGTERM));\n    }\n    return 0;\n}\n",
+    "#include <signal.h>\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(SIGHUP));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGINT));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGKILL));\n    }\n    {\n        printf(\"%d\\n\", (int)(SIGTERM));\n    }\n    return 0;\n}\n"
   ]
 }

@@ -48,6 +48,7 @@ pub struct OverlayState {
     pub solution_active: bool,
     pub vis_active: bool,
     pub vis_step: usize,
+    pub success_overlay: bool,
 }
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
@@ -665,6 +666,16 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) -> bool {
+        if self.state.overlay.success_overlay {
+            use ratatui::crossterm::event::KeyCode;
+            self.state.overlay.success_overlay = false;
+            if matches!(key.code, KeyCode::Enter) {
+                if !self.navigate_next(conn, session_id) {
+                    self.state.should_quit = true;
+                }
+            }
+            return true;
+        }
         if self.state.overlay.list_active {
             if Self::handle_list_key(&mut self.state, key) {
                 self.load_exercise_and_checkpoint(conn, session_id);
@@ -785,7 +796,7 @@ impl App {
     /// Handle compilation and test of current exercise (triggered by 'r' key).
     /// Compiles the code, runs it, records attempt, and navigates on success.
     fn handle_compile(&mut self, conn: &rusqlite::Connection) {
-        use crate::constants::{CONSECUTIVE_FAILURE_THRESHOLD, SUCCESS_PAUSE_SECS};
+        use crate::constants::CONSECUTIVE_FAILURE_THRESHOLD;
 
         let Some(path) = self.state.source_path.as_deref() else {
             return;
@@ -808,11 +819,8 @@ impl App {
                 }
                 Self::invalidate_header_cache(&mut self.state);
             }
-            std::thread::sleep(std::time::Duration::from_secs(SUCCESS_PAUSE_SECS));
             self.state.completed[self.state.current_index] = true;
-            if !self.navigate_next(conn, None) {
-                self.state.should_quit = true;
-            }
+            self.state.overlay.success_overlay = true;
         } else {
             self.state.consecutive_failures = self.state.consecutive_failures.saturating_add(1);
             if (self.state.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
@@ -1023,13 +1031,8 @@ impl App {
                                 }
                                 Self::invalidate_header_cache(&mut self.state);
                             }
-                            std::thread::sleep(std::time::Duration::from_secs(
-                                crate::constants::SUCCESS_PAUSE_SECS,
-                            ));
                             self.state.completed[self.state.current_index] = true;
-                            if !self.navigate_next(conn, session_id) {
-                                self.state.should_quit = true;
-                            }
+                            self.state.overlay.success_overlay = true;
                         } else {
                             if !compile_error {
                                 self.state.piscine_fail_count =

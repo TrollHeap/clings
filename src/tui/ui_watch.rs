@@ -30,7 +30,10 @@ pub fn view(f: &mut Frame, state: &AppState) {
 
     render_header(f, header_area, state);
 
-    if state.overlay.help_active {
+    if state.overlay.success_overlay {
+        render_body(f, body_area, state);
+        common::render_success_overlay(f, body_area);
+    } else if state.overlay.help_active {
         common::render_help_overlay(f, body_area);
     } else if state.overlay.list_active {
         common::render_list_overlay(f, body_area, state);

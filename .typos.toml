@@ -1,0 +1,33 @@
+[files]
+# Contenu en français et fichiers générés — exclus de la vérification orthographique
+extend-exclude = [
+    "exercises/",
+    "docs/",
+    "assets/",
+    "scripts/",
+    "logs/",
+    "target/",
+    "task_plan.md",
+    "findings.md",
+    "tests/snapshots/",
+    "tests/integration_exercises.rs",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "src/",
+]
+
+[default.extend-words]
+# Noms propres de bibliothèques
+"Ratatui" = "Ratatui"
+"ratatui" = "ratatui"
+"Catppuccin" = "Catppuccin"
+"catppuccin" = "catppuccin"
+"nucleo" = "nucleo"
+# Termes C/POSIX
+"sbrk" = "sbrk"
+"sigmask" = "sigmask"
+"sigset" = "sigset"
+# Français dans Makefile/scripts/build.rs
+"installe" = "installe"
+"exercice" = "exercice"
+"exercices" = "exercices"

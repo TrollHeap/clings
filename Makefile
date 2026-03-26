@@ -1,14 +1,8 @@
-.PHONY: stable dev setup build release install install-release install-sync sync-init sync-status sync-now test lint check fmt clean help
+.PHONY: dev setup build release install install-release install-sync sync-init sync-status sync-now test lint check fmt clean help
 
-STABLE_BIN  := $(HOME)/.local/bin/clings-v1.0.1
-STABLE_HOME := $(HOME)/.clings
-DEV_HOME    := $(HOME)/.clings-dev
+DEV_HOME := $(HOME)/.clings-dev
 
 # ── Lancer ────────────────────────────────────
-stable:
-	@echo "▶ Lancement de clings v1.0.1 stable (DB $(STABLE_HOME))"
-	CLINGS_HOME=$(STABLE_HOME) $(STABLE_BIN) watch
-
 dev:
 	@echo "▶ Lancement cargo run watch (DB $(DEV_HOME))"
 	CLINGS_HOME=$(DEV_HOME) cargo run -- watch
@@ -33,8 +27,7 @@ setup: build
 	@echo "  clings-dev → $(CURDIR)/target/debug/clings"
 
 install-release:
-	@echo "▶ Build release + cargo install"
-	cargo build --release
+	@echo "▶ cargo install (release)"
 	cargo install --path .
 
 install-sync:
@@ -84,7 +77,6 @@ help:
 	@echo "Cibles disponibles:"
 	@echo ""
 	@echo "  Lancer:"
-	@echo "    stable        — v1.0.1 figé (DB ~/.clings)"
 	@echo "    dev           — cargo run watch (DB ~/.clings-dev)"
 	@echo "    dev-<cmd>     — cargo run <cmd> (DB ~/.clings-dev)"
 	@echo ""
@@ -92,7 +84,7 @@ help:
 	@echo "    build         — cargo build (debug)"
 	@echo "    release       — cargo build --release"
 	@echo "    setup         — build debug + symlink clings-dev"
-	@echo "    install       — build release + cargo install + sync"
+	@echo "    install       — cargo install (release) + install-sync"
 	@echo "    install-sync  — installe clings-sync dans ~/.local/bin/"
 	@echo ""
 	@echo "  Sync Git:"

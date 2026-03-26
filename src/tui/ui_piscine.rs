@@ -46,7 +46,10 @@ pub fn view(f: &mut Frame, state: &AppState) {
         render_piscine_timer(f, timer_area, state);
     }
 
-    if state.overlay.list_active {
+    if state.overlay.success_overlay {
+        render_piscine_body(f, body_rest, state);
+        common::render_success_overlay(f, body_rest);
+    } else if state.overlay.list_active {
         common::render_list_overlay(f, body_rest, state);
     } else if state.overlay.vis_active {
         common::render_visualizer_overlay(f, body_rest, state);

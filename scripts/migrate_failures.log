@@ -1,0 +1,19 @@
+exercises/pointers/ptr_generic_02.json: auto-gen compile error: /tmp/tmp_fjnscs0/ex.c: In function ‘main’:
+/tmp/tmp_fjnscs0/ex.c:20:35: error: subscripted value is pointer to function
+   20 |         printf("%d\n", (int)(table[OP_ADD](10, 3)));
+      |                                   ^
+/tmp/tmp_fjnscs0/ex.c:24:
+exercises/pthreads/pthread_mutex_01.json: auto-gen compile error: /tmp/tmp77q77l7x/ex.c: In function ‘main’:
+/tmp/tmp77q77l7x/ex.c:9:9: error: ‘test_lock’ undeclared (first use in this function)
+    9 |         test_lock = PTHREAD_MUTEX_INITIALIZER;
+      |         ^~~~~~~~~
+/tmp/tmp77q77l7x/ex.c:9:9: note: each un
+exercises/signals/signal_table_01.json: auto-gen compile error: /tmp/tmp03pat3hn/ex.c: In function ‘main’:
+/tmp/tmp03pat3hn/ex.c:11:29: error: implicit declaration of function ‘find_by_num’ [-Wimplicit-function-declaration]
+   11 |         const SigEntry *e = find_by_num(SIGINT);
+      |                          
+exercises/string_formatting/snprintf_safe_01.json: auto-gen compile error: /tmp/tmpllqxxqkk/ex.c: In function ‘main’:
+/tmp/tmpllqxxqkk/ex.c:28:24: error: ‘clings’ undeclared (first use in this function)
+   28 |         printf("%s\n", clings! Score=100", big);
+      |                        ^~~~~~
+/tmp/tmpllqxxqkk/ex.c:28:24

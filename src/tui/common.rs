@@ -407,7 +407,9 @@ pub fn render_body_with_sidebar(
     };
 
     let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
-        let h = run_result_height(result);
+        let exercise = &state.exercises[state.current_index];
+        let expected = exercise.validation.expected_output.as_deref();
+        let h = run_result_height(result, expected);
         let [desc, res] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(h)]).areas(content_area);
         (desc, Some(res))
@@ -430,13 +432,18 @@ pub fn render_body_with_sidebar(
 }
 
 /// Hauteur dynamique du panneau run_result.
-pub fn run_result_height(result: &RunResult) -> u16 {
+pub fn run_result_height(result: &RunResult, expected: Option<&str>) -> u16 {
     if result.success || result.timeout {
         3
     } else if result.compile_error {
         7
     } else {
-        9
+        const MAX: usize = 5;
+        let exp_n = expected.unwrap_or("").trim().lines().count();
+        let got_n = result.stdout.trim().lines().count();
+        let content_n = exp_n.max(got_n);
+        let content_h = content_n.min(MAX) + usize::from(content_n > MAX);
+        (4 + content_h) as u16
     }
 }
 
@@ -480,27 +487,74 @@ pub fn render_run_result(
     } else if result.timeout {
         lines.push(Line::from("Dépassement de 10s — boucle infinie ?"));
     } else if let Some(expected) = &exercise.validation.expected_output {
+        const MAX: usize = 5;
         let exp_lines: Vec<&str> = expected.trim().lines().collect();
         let got_lines: Vec<&str> = result.stdout.trim().lines().collect();
-        let max_len = exp_lines.len().max(got_lines.len());
-        for i in 0..max_len.min(4) {
-            match (exp_lines.get(i), got_lines.get(i)) {
-                (Some(e), Some(g)) if *e == *g => {
-                    lines.push(Line::from(span!(C_SUCCESS; "  {}", e)));
-                }
-                (Some(e), Some(g)) => {
-                    lines.push(Line::from(span!(C_DANGER; "- {}", e)));
-                    lines.push(Line::from(span!(C_WARNING; "+ {}", g)));
-                }
-                (Some(e), None) => {
-                    lines.push(Line::from(span!(C_DANGER; "- {}", e)));
-                }
-                (None, Some(g)) => {
-                    lines.push(Line::from(span!(C_WARNING; "+ {}", g)));
-                }
-                (None, None) => {}
-            }
-        }
+
+        // Outer frame (titre seulement)
+        let outer = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .style(Style::default().bg(C_BG))
+            .title(span!(Style::default().fg(color).add_modifier(Modifier::BOLD); "{}", title))
+            .border_style(Style::default().fg(color));
+        let inner = outer.inner(area);
+        f.render_widget(outer, area);
+
+        // Split côte à côte
+        let [left_area, right_area] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Fill(1)]).areas(inner);
+
+        // Card "attendu"
+        let exp_content: Vec<Line> = exp_lines
+            .iter()
+            .take(MAX)
+            .map(|l| Line::from(span!(C_SUCCESS; "{}", l)))
+            .chain(if exp_lines.len() > MAX {
+                vec![Line::from(
+                    span!(C_TEXT_DIM; "… +{}", exp_lines.len() - MAX),
+                )]
+            } else {
+                vec![]
+            })
+            .collect();
+        f.render_widget(
+            Paragraph::new(exp_content).block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(C_BG))
+                    .title(span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "attendu"))
+                    .border_style(Style::default().fg(C_SUCCESS)),
+            ),
+            left_area,
+        );
+
+        // Card "actuel"
+        let got_content: Vec<Line> = got_lines
+            .iter()
+            .take(MAX)
+            .map(|l| Line::from(span!(C_DANGER; "{}", l)))
+            .chain(if got_lines.len() > MAX {
+                vec![Line::from(
+                    span!(C_TEXT_DIM; "… +{}", got_lines.len() - MAX),
+                )]
+            } else {
+                vec![]
+            })
+            .collect();
+        f.render_widget(
+            Paragraph::new(got_content).block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(C_BG))
+                    .title(
+                        span!(Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD); "actuel"),
+                    )
+                    .border_style(Style::default().fg(C_DANGER)),
+            ),
+            right_area,
+        );
+
+        return;
     }
 
     let block = Block::bordered()
@@ -936,6 +990,40 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
                     .border_style(Style::default().fg(C_BORDER)),
             )
             .wrap(Wrap { trim: false }),
+        popup,
+    );
+}
+
+/// Modal de succès — affiché après validation correcte, attend confirmation avant d'avancer.
+pub fn render_success_overlay(f: &mut Frame, area: Rect) {
+    let popup = centered_popup(area, 35, 28);
+    f.render_widget(Clear, popup);
+
+    let lines = vec![
+        Line::raw(""),
+        Line::from(
+            span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "  ✓  L'exercice est validé !"),
+        ),
+        Line::raw(""),
+        line![
+            span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  [Entrée]"),
+            span!(C_TEXT_DIM; "   Exercice suivant →"),
+        ],
+        line![
+            span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  [Échap] "),
+            span!(C_TEXT_DIM; "   Rester ici"),
+        ],
+        Line::raw(""),
+    ];
+
+    f.render_widget(
+        Paragraph::new(lines).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .title(span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "Succès"))
+                .style(Style::default().bg(C_SURFACE))
+                .border_style(Style::default().fg(C_SUCCESS)),
+        ),
         popup,
     );
 }
