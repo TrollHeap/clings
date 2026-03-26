@@ -49,6 +49,10 @@ pub struct OverlayState {
     pub vis_active: bool,
     pub vis_step: usize,
     pub success_overlay: bool,
+    /// Modal de confirmation avant de changer d'exercice (évite reset accidentel).
+    pub nav_confirm_active: bool,
+    /// true = aller au suivant, false = aller au précédent.
+    pub nav_confirm_next: bool,
 }
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
@@ -601,11 +605,12 @@ impl App {
     fn handle_vis_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) {
         use ratatui::crossterm::event::KeyCode;
         match key.code {
-            KeyCode::Right => {
+            // Vim : l / → = step suivant ; h / ← = step précédent ; j/k aussi intuitifs
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Char('j') => {
                 let total = state.exercises[state.current_index].visualizer.steps.len();
                 state.overlay.vis_step = (state.overlay.vis_step + 1).min(total.saturating_sub(1));
             }
-            KeyCode::Left => {
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('k') => {
                 state.overlay.vis_step = state.overlay.vis_step.saturating_sub(1);
             }
             _ => {
@@ -671,6 +676,23 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) -> bool {
+        if self.state.overlay.nav_confirm_active {
+            use ratatui::crossterm::event::KeyCode;
+            self.state.overlay.nav_confirm_active = false;
+            if matches!(
+                key.code,
+                KeyCode::Char('o') | KeyCode::Char('O') | KeyCode::Enter
+            ) {
+                if self.state.overlay.nav_confirm_next {
+                    if !self.navigate_next(conn, session_id) {
+                        self.state.should_quit = true;
+                    }
+                } else {
+                    self.navigate_prev(conn, session_id);
+                }
+            }
+            return true;
+        }
         if self.state.overlay.success_overlay {
             use ratatui::crossterm::event::KeyCode;
             self.state.overlay.success_overlay = false;
@@ -914,10 +936,12 @@ impl App {
                     | KeyCode::Char('J')
                     | KeyCode::Char('n')
                     | KeyCode::Char('N') => {
-                        self.navigate_next(conn, None);
+                        self.state.overlay.nav_confirm_active = true;
+                        self.state.overlay.nav_confirm_next = true;
                     }
                     KeyCode::Char('k') | KeyCode::Char('K') => {
-                        self.navigate_prev(conn, None);
+                        self.state.overlay.nav_confirm_active = true;
+                        self.state.overlay.nav_confirm_next = false;
                     }
                     KeyCode::Char('r') | KeyCode::Char('R') => {
                         self.handle_compile(conn);
@@ -1231,6 +1255,8 @@ mod tests {
                         explanation: "e1".to_string(),
                         stack: vec![],
                         heap: vec![],
+                        arrows: vec![],
+                        call_frames: vec![],
                     }],
                 }
             } else {

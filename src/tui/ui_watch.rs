@@ -47,6 +47,11 @@ pub fn view(f: &mut Frame, state: &AppState) {
         render_body(f, body_area, state);
     }
 
+    // Nav confirm s'affiche par-dessus tout (y compris les autres overlays).
+    if state.overlay.nav_confirm_active {
+        common::render_nav_confirm_overlay(f, body_area, state.overlay.nav_confirm_next);
+    }
+
     render_status_bar(f, status_area, state);
 }
 

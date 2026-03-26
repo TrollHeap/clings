@@ -571,21 +571,34 @@ pub fn render_run_result(
 /// Calcule la taille du popup visualiseur en fonction du contenu.
 pub fn popup_size_for_vis(step: &crate::models::VisStep) -> (u16, u16) {
     let max_rows = step.stack.len().max(step.heap.len()).max(1) as u16;
-    let h_pct = (max_rows * 7 + 25).clamp(40, 72);
+    // Table: n_rows + 3 lignes (border top + header + border bottom)
+    // Overhead overlay: ~12 lignes (dots, label, explication, nav, spacers)
+    let expl_lines: u16 = if step.explanation.is_empty() {
+        0
+    } else {
+        step.explanation
+            .split(". ")
+            .filter(|s| !s.is_empty())
+            .count() as u16
+    };
+    // inner_needed = fixed(7) + frame_h(max_rows+3) + expl(n+1 si n>0) + popup_border(2)
+    let inner_h = 12 + max_rows + if expl_lines > 0 { expl_lines + 1 } else { 0 };
+    // Échelle en %, référence ~32 lignes terminal
+    let h_pct = (inner_h * 100 / 32).clamp(45, 82);
     let is_dual = !step.heap.is_empty() || (step.call_frames.len() >= 2 && !step.arrows.is_empty());
-    let w_pct = if is_dual { 78u16 } else { 65u16 };
+    let w_pct = if is_dual { 82u16 } else { 65u16 };
     (w_pct, h_pct)
 }
 
-// ── Helpers rendu ASCII box-drawing pour le visualiseur ───────────────────────
+// ── Helpers visualiseur mémoire ───────────────────────────────────────────────
 
 /// Détecte si une valeur représente un pointeur (pour le style C_ACCENT).
-fn is_pointer_value(val: &str) -> bool {
+pub(crate) fn is_pointer_value(val: &str) -> bool {
     val.starts_with("──▶") || val.starts_with("→") || val.starts_with("0x")
 }
 
 /// Calcule les largeurs de colonnes nom/valeur. Min 4, cap valeur à 20.
-fn vis_col_widths(vars: &[crate::models::VisVar]) -> (usize, usize) {
+pub(crate) fn vis_col_widths(vars: &[crate::models::VisVar]) -> (usize, usize) {
     let name_w = vars
         .iter()
         .map(|v| v.name.chars().count())
@@ -597,293 +610,14 @@ fn vis_col_widths(vars: &[crate::models::VisVar]) -> (usize, usize) {
         .map(|v| v.value.chars().count())
         .max()
         .unwrap_or(0)
-        .max(4)
-        .min(20);
+        .clamp(4, 20);
     (name_w, val_w)
-}
-
-/// Remplit `s` à droite jusqu'à `w` caractères d'affichage.
-fn pad_to(s: String, w: usize) -> String {
-    let n = s.chars().count();
-    if n >= w {
-        s
-    } else {
-        let mut r = s;
-        for _ in n..w {
-            r.push(' ');
-        }
-        r
-    }
-}
-
-/// Tronque `s` à `w` caractères (ajoute … si tronqué).
-fn trunc_to(s: &str, w: usize) -> String {
-    if s.chars().count() > w {
-        let mut r: String = s.chars().take(w.saturating_sub(1)).collect();
-        r.push('…');
-        r
-    } else {
-        s.to_string()
-    }
-}
-
-/// Header d'une section : ╭─ TITLE ───────────────────╮
-fn vis_section_header(
-    title: &str,
-    title_color: Color,
-    name_w: usize,
-    val_w: usize,
-) -> Line<'static> {
-    // Largeur totale ligne : name_w + val_w + 11
-    // Inner (entre ╭ et ╮) : name_w + val_w + 9
-    // ╭─ (2) + " TITLE " (title_len) + ─×n + ╮ (1) = name_w + val_w + 11
-    // n = name_w + val_w + 8 - title_len
-    let title_display = format!(" {} ", title);
-    let title_len = title_display.chars().count();
-    let inner_w = name_w + val_w + 9;
-    let n_dashes = inner_w.saturating_sub(1 + title_len);
-    Line::from(vec![
-        Span::styled("╭─".to_string(), Style::default().fg(C_BORDER)),
-        Span::styled(
-            title_display,
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!("{}╮", "─".repeat(n_dashes)),
-            Style::default().fg(C_BORDER),
-        ),
-    ])
-}
-
-/// Ligne de données : │  name     │  value     │
-fn vis_section_data_row(var: &crate::models::VisVar, name_w: usize, val_w: usize) -> Line<'static> {
-    let name_d = pad_to(trunc_to(&var.name, name_w), name_w);
-    let val_d = pad_to(trunc_to(&var.value, val_w), val_w);
-    let val_color = if is_pointer_value(&var.value) {
-        C_ACCENT
-    } else {
-        C_SUBTEXT
-    };
-    Line::from(vec![
-        Span::styled("│  ".to_string(), Style::default().fg(C_BORDER)),
-        Span::styled(name_d, Style::default().fg(C_TEXT)),
-        Span::styled("  │  ".to_string(), Style::default().fg(C_BORDER)),
-        Span::styled(val_d, Style::default().fg(val_color)),
-        Span::styled("  │".to_string(), Style::default().fg(C_BORDER)),
-    ])
-}
-
-/// Ligne vide (padding dans le layout côte-à-côte).
-fn vis_section_empty_row(name_w: usize, val_w: usize) -> Line<'static> {
-    Line::from(vec![
-        Span::styled("│  ".to_string(), Style::default().fg(C_BORDER)),
-        Span::raw(" ".repeat(name_w)),
-        Span::styled("  │  ".to_string(), Style::default().fg(C_BORDER)),
-        Span::raw(" ".repeat(val_w)),
-        Span::styled("  │".to_string(), Style::default().fg(C_BORDER)),
-    ])
-}
-
-/// Séparateur entre deux lignes de données : ├──────┼──────┤
-fn vis_section_sep(name_w: usize, val_w: usize) -> Line<'static> {
-    Line::from(Span::styled(
-        format!("├{}┼{}┤", "─".repeat(name_w + 4), "─".repeat(val_w + 4)),
-        Style::default().fg(C_BORDER),
-    ))
-}
-
-/// Footer de section : ╰──────┴──────╯
-fn vis_section_footer(name_w: usize, val_w: usize) -> Line<'static> {
-    Line::from(Span::styled(
-        format!("╰{}┴{}╯", "─".repeat(name_w + 4), "─".repeat(val_w + 4)),
-        Style::default().fg(C_BORDER),
-    ))
-}
-
-/// Construit les lignes d'une section mémoire (header + n_rows + footer).
-fn render_vis_section(
-    title: &str,
-    title_color: Color,
-    vars: &[crate::models::VisVar],
-    name_w: usize,
-    val_w: usize,
-    n_rows: usize,
-) -> Vec<Line<'static>> {
-    let mut lines = Vec::with_capacity(2 * n_rows + 2);
-    lines.push(vis_section_header(title, title_color, name_w, val_w));
-    for i in 0..n_rows {
-        if i > 0 {
-            lines.push(vis_section_sep(name_w, val_w));
-        }
-        if let Some(var) = vars.get(i) {
-            lines.push(vis_section_data_row(var, name_w, val_w));
-        } else {
-            lines.push(vis_section_empty_row(name_w, val_w));
-        }
-    }
-    lines.push(vis_section_footer(name_w, val_w));
-    lines
-}
-
-/// Section alignée avec `Option<&VisVar>` — les `None` produisent des lignes vides.
-fn build_aligned_section(
-    title: &str,
-    title_color: Color,
-    vars: &[Option<&crate::models::VisVar>],
-    name_w: usize,
-    val_w: usize,
-) -> Vec<Line<'static>> {
-    let n_rows = vars.len().max(1);
-    let mut lines = Vec::with_capacity(2 * n_rows + 2);
-    lines.push(vis_section_header(title, title_color, name_w, val_w));
-    for (i, opt) in vars.iter().enumerate() {
-        if i > 0 {
-            lines.push(vis_section_sep(name_w, val_w));
-        }
-        match opt {
-            Some(var) => lines.push(vis_section_data_row(var, name_w, val_w)),
-            None => lines.push(vis_section_empty_row(name_w, val_w)),
-        }
-    }
-    lines.push(vis_section_footer(name_w, val_w));
-    lines
-}
-
-/// Layout multi-frames : frame appelée (gauche) ──▶ frame appelante (droite).
-/// Activé quand `call_frames.len() >= 2` ET `arrows.len() > 0`.
-/// Les vars de `stack` sont partitionnées en :
-///   - `called_vars` : vars sources des flèches (frame active, ex. swap)
-///   - `calling_vars` : vars cibles des flèches (frame appelante, ex. main)
-fn render_vis_frames(step: &crate::models::VisStep) -> Vec<Line<'static>> {
-    use std::collections::{HashMap, HashSet};
-
-    let target_names: HashSet<&str> = step.arrows.iter().map(|a| a.to.as_str()).collect();
-    let arrow_map: HashMap<&str, &str> = step
-        .arrows
-        .iter()
-        .map(|a| (a.from.as_str(), a.to.as_str()))
-        .collect();
-
-    let called_vars: Vec<&crate::models::VisVar> = step
-        .stack
-        .iter()
-        .filter(|v| !target_names.contains(v.name.as_str()))
-        .collect();
-    let calling_vars: Vec<&crate::models::VisVar> = step
-        .stack
-        .iter()
-        .filter(|v| target_names.contains(v.name.as_str()))
-        .collect();
-
-    let called_label = step
-        .call_frames
-        .last()
-        .map(|f| f.function_name.as_str())
-        .unwrap_or("swap");
-    let calling_label = step
-        .call_frames
-        .first()
-        .map(|f| f.function_name.as_str())
-        .unwrap_or("main");
-
-    let sn_w = called_vars
-        .iter()
-        .map(|v| v.name.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(4);
-    let sv_w = called_vars
-        .iter()
-        .map(|v| v.value.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(4)
-        .min(20);
-    let hn_w = calling_vars
-        .iter()
-        .map(|v| v.name.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(4);
-    let hv_w = calling_vars
-        .iter()
-        .map(|v| v.value.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(4)
-        .min(20);
-
-    let n_rows = called_vars.len().max(calling_vars.len()).max(1);
-
-    // Pour chaque ligne de called_vars, trouver la var cible dans calling_vars (ou None).
-    let right_aligned: Vec<Option<&crate::models::VisVar>> = (0..n_rows)
-        .map(|i| {
-            called_vars
-                .get(i)
-                .and_then(|cv| arrow_map.get(cv.name.as_str()))
-                .and_then(|tgt| calling_vars.iter().find(|v| v.name == *tgt).copied())
-        })
-        .collect();
-    let arrow_rows: Vec<bool> = right_aligned.iter().map(|o| o.is_some()).collect();
-
-    let called_owned: Vec<crate::models::VisVar> =
-        called_vars.iter().map(|v| (*v).clone()).collect();
-    let left = render_vis_section(called_label, C_WARNING, &called_owned, sn_w, sv_w, n_rows);
-    let right = build_aligned_section(calling_label, C_SUCCESS, &right_aligned, hn_w, hv_w);
-
-    let total_lines = 2 * n_rows + 1;
-    left.into_iter()
-        .zip(right)
-        .enumerate()
-        .map(|(i, (l, r))| {
-            let has_arrow = i > 0
-                && i < total_lines
-                && i % 2 == 1
-                && arrow_rows.get((i - 1) / 2).copied().unwrap_or(false);
-            let gap: Span<'static> = if has_arrow {
-                Span::styled(" ──▶ ", Style::default().fg(C_ACCENT))
-            } else {
-                Span::raw("     ")
-            };
-            let mut spans = l.spans;
-            spans.push(gap);
-            spans.extend(r.spans);
-            Line::from(spans)
-        })
-        .collect()
-}
-
-/// Génère les lignes du tableau mémoire ASCII pour un step.
-/// Dispatch : multi-frames > stack+heap côte-à-côte > stack seul.
-fn render_vis_table(step: &crate::models::VisStep) -> Vec<Line<'static>> {
-    if step.call_frames.len() >= 2 && !step.arrows.is_empty() {
-        return render_vis_frames(step);
-    }
-    let (sn_w, sv_w) = vis_col_widths(&step.stack);
-    if step.heap.is_empty() {
-        let n_rows = step.stack.len().max(1);
-        render_vis_section("STACK", C_SUCCESS, &step.stack, sn_w, sv_w, n_rows)
-    } else {
-        let (hn_w, hv_w) = vis_col_widths(&step.heap);
-        let n_rows = step.stack.len().max(step.heap.len()).max(1);
-        let left = render_vis_section("STACK", C_SUCCESS, &step.stack, sn_w, sv_w, n_rows);
-        let right = render_vis_section("HEAP", C_TEAL, &step.heap, hn_w, hv_w, n_rows);
-        left.into_iter()
-            .zip(right)
-            .map(|(l, r)| {
-                let mut spans = l.spans;
-                spans.push(Span::raw("     "));
-                spans.extend(r.spans);
-                Line::from(spans)
-            })
-            .collect()
-    }
 }
 
 /// Overlay visualiseur mémoire (partagé entre watch et piscine).
 pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+    use crate::tui::ui_visualizer::MemVisualizer;
+
     let exercise = &state.exercises[state.current_index];
     let steps = &exercise.visualizer.steps;
 
@@ -900,58 +634,12 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     let popup = centered_popup(area, margin_v, margin_h);
 
     f.render_widget(Clear, popup);
-
-    let mut lines: Vec<Line> = Vec::new();
-
-    // "● " = 4 bytes max — allocation exacte, zéro Vec intermédiaire
-    let mut dots = String::with_capacity(steps.len() * 4);
-    for i in 0..steps.len() {
-        if i > 0 {
-            dots.push(' ');
-        }
-        dots.push_str(if i == step_idx { "●" } else { "○" });
-    }
-    lines.push(Line::styled(dots, Style::default().fg(C_WARNING)));
-    lines.push(Line::raw(""));
-
-    let label = if !step.step_label.is_empty() {
-        &step.step_label
-    } else {
-        &step.label
-    };
-    lines.push(Line::styled(
-        label.as_str(),
-        Style::default().add_modifier(Modifier::BOLD),
-    ));
-    lines.push(Line::raw(""));
-
-    lines.extend(render_vis_table(step));
-
-    lines.push(Line::raw(""));
-
-    if !step.explanation.is_empty() {
-        for part in step.explanation.split(". ") {
-            lines.push(Line::styled(part, Style::default().fg(C_TEXT_DIM)));
-        }
-    }
-
-    lines.push(Line::raw(""));
-    lines.push(Line::styled(
-        "[←] préc   [→] suiv   [v] fermer",
-        Style::default().fg(C_TEXT_DIM),
-    ));
-
-    let title = format!("Visualiseur {}/{}", step_idx + 1, steps.len());
     f.render_widget(
-        Paragraph::new(lines)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", title))
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_BORDER)),
-            )
-            .wrap(Wrap { trim: false }),
+        MemVisualizer {
+            step,
+            step_idx,
+            total_steps: steps.len(),
+        },
         popup,
     );
 }
@@ -1311,6 +999,54 @@ pub fn render_success_overlay(f: &mut Frame, area: Rect) {
 /// Renders an opaque background to prevent terminal transparency.
 pub fn render_opaque_background(f: &mut Frame, area: Rect) {
     f.render_widget(Block::default().style(Style::default().bg(C_BG)), area);
+}
+
+/// Modal de confirmation avant de changer d'exercice.
+///
+/// `going_next` : true = suivant, false = précédent.
+pub fn render_nav_confirm_overlay(f: &mut Frame, area: Rect, going_next: bool) {
+    let popup = centered_popup(area, 38, 32);
+    f.render_widget(Clear, popup);
+
+    let direction = if going_next { "suivant" } else { "précédent" };
+    let lines = vec![
+        Line::raw(""),
+        Line::styled(
+            format!("→ exercice {direction}"),
+            Style::default().fg(C_WARNING).add_modifier(Modifier::BOLD),
+        ),
+        Line::raw(""),
+        Line::styled(
+            "Votre code actuel sera remplacé.",
+            Style::default().fg(C_TEXT_DIM),
+        ),
+        Line::raw(""),
+        Line::from(vec![
+            Span::styled(
+                "[o] ",
+                Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("confirmer   ", Style::default().fg(C_TEXT)),
+            Span::styled(
+                "[autre] ",
+                Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("rester", Style::default().fg(C_TEXT)),
+        ]),
+    ];
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Changer d'exercice ?"))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_WARNING)),
+            )
+            .alignment(ratatui::layout::Alignment::Center),
+        popup,
+    );
 }
 
 #[cfg(test)]
