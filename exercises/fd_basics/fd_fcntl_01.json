@@ -12,23 +12,88 @@
     "F_SETFL modifie les flags du fichier",
     "F_GETFD/F_SETFD pour le flag FD_CLOEXEC (close-on-exec)"
   ],
-  "validation": {"mode": "output", "expected_output": "O_WRONLY set: 1\nO_APPEND set: 1\nFD_CLOEXEC: 0\nFD_CLOEXEC after set: 1\n", "test_code": null},
+  "validation": {
+    "mode": "output",
+    "expected_output": "O_WRONLY set: 1\nO_APPEND set: 1\nFD_CLOEXEC: 0\nFD_CLOEXEC after set: 1\n",
+    "test_code": null
+  },
   "visualizer": {
     "type": "stack_heap",
     "steps": [
-      {"label": "F_GETFL → flags actuels", "stack": [{"name": "flags", "value": "O_WRONLY"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "F_GETFL retourne les flags d'ouverture", "step_label": "Étape 1"},
-      {"label": "F_SETFL → ajout O_APPEND", "stack": [{"name": "flags", "value": "O_WRONLY | O_APPEND"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "O_APPEND ajouté via OR", "step_label": "Étape 2"},
-      {"label": "F_GETFD → FD_CLOEXEC", "stack": [{"name": "fdflags", "value": "FD_CLOEXEC"}], "heap": [], "arrows": [], "call_frames": [{"function_name": "main", "args": "void", "is_active": true}], "explanation": "FD_CLOEXEC ferme le fd après exec()", "step_label": "Étape 3"}
+      {
+        "label": "F_GETFL → flags actuels",
+        "stack": [
+          {
+            "name": "flags",
+            "value": "O_WRONLY"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "F_GETFL retourne les flags d'ouverture",
+        "step_label": "Étape 1"
+      },
+      {
+        "label": "F_SETFL → ajout O_APPEND",
+        "stack": [
+          {
+            "name": "flags",
+            "value": "O_WRONLY | O_APPEND"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "O_APPEND ajouté via OR",
+        "step_label": "Étape 2"
+      },
+      {
+        "label": "F_GETFD → FD_CLOEXEC",
+        "stack": [
+          {
+            "name": "fdflags",
+            "value": "FD_CLOEXEC"
+          }
+        ],
+        "heap": [],
+        "arrows": [],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
+        "explanation": "FD_CLOEXEC ferme le fd après exec()",
+        "step_label": "Étape 3"
+      }
     ]
   },
-  "prerequisites": ["fd-dup-01"],
+  "prerequisites": [
+    "fd-dup-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "fcntl: F_GETFL/F_SETFL pour flags fichier, F_GETFD/F_SETFD pour flags fd",
   "common_mistake": "Confondre F_GETFL (file flags) et F_GETFD (fd flags)",
-  "kc_ids": ["KC-C16"],
+  "kc_ids": [
+    "KC-C16"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\n/* == EXEMPLE: lire les flags d'stdin ==================== */\nvoid example_stdin_flags(void) {\n    int f = fcntl(STDIN_FILENO, F_GETFL);\n    printf(\"stdin readable: %d\\n\", (f & O_ACCMODE) == O_RDONLY);\n}\n\nint main(void) {\n    const char *path = \"/tmp/kf_fcntl_test.txt\";\n    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);\n    int flags = fcntl(fd, F_GETFL);\n    printf(\"O_WRONLY set: %d\\n\", (flags & O_ACCMODE) == O_WRONLY);\n    flags |= O_APPEND; fcntl(fd, F_SETFL, flags);\n    int new_flags = fcntl(fd, F_GETFL);\n    printf(\"O_APPEND set: %d\\n\", (new_flags & O_APPEND) != 0);\n    int fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    fcntl(fd, F_SETFD, fdflags | FD_CLOEXEC);\n    fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC after set: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    close(fd); unlink(path);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    const char *path = \"/tmp/kf_fcntl_test.txt\";\n    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);\n    int flags = fcntl(fd, F_GETFL);\n    printf(\"O_WRONLY set: %d\\n\", (flags & O_ACCMODE) == O_WRONLY);\n    flags |= O_APPEND; fcntl(fd, F_SETFL, flags);\n    int new_flags = fcntl(fd, F_GETFL);\n    printf(\"O_APPEND set: %d\\n\", (new_flags & O_APPEND) != 0);\n    int fdflags = fcntl(fd, ____);\n    printf(\"FD_CLOEXEC: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    fcntl(fd, F_SETFD, fdflags | FD_CLOEXEC);\n    fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC after set: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    close(fd); unlink(path);\n    return 0;\n}",
+    "/* == VOTRE EXERCICE ====================================== */\nint main(void) {\n    const char *path = \"/tmp/kf_fcntl_test.txt\";\n    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);\n    int flags = /* TODO: lire les flags avec F_GETFL */ 0;\n    printf(\"O_WRONLY set: %d\\n\", (flags & O_ACCMODE) == O_WRONLY);\n    flags |= O_APPEND;\n    /* TODO: écrire les flags modifiés avec F_SETFL */\n    int new_flags = fcntl(fd, F_GETFL);\n    printf(\"O_APPEND set: %d\\n\", (new_flags & O_APPEND) != 0);\n    int fdflags = /* TODO: lire FD_CLOEXEC avec F_GETFD */ 0;\n    printf(\"FD_CLOEXEC: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    fcntl(fd, F_SETFD, fdflags | FD_CLOEXEC);\n    fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC after set: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    close(fd); unlink(path);\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <string.h>\n\nint main(void) {\n    const char *path = \"/tmp/kf_fcntl_test.txt\";\n    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);\n    int flags = fcntl(fd, ____);\n    printf(\"O_WRONLY set: %d\\n\", (flags & O_ACCMODE) == O_WRONLY);\n    flags |= O_APPEND;\n    fcntl(fd, ____, flags);\n    int new_flags = fcntl(fd, F_GETFL);\n    printf(\"O_APPEND set: %d\\n\", (new_flags & O_APPEND) != 0);\n    int fdflags = fcntl(fd, ____);\n    printf(\"FD_CLOEXEC: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    fcntl(fd, F_SETFD, fdflags | FD_CLOEXEC);\n    fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC after set: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    close(fd); unlink(path);\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    const char *path = \"/tmp/kf_fcntl_test.txt\";\n    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);\n    int flags = fcntl(fd, ____);\n    printf(\"O_WRONLY set: %d\\n\", (flags & O_ACCMODE) == O_WRONLY);\n    flags |= O_APPEND; fcntl(fd, ____, flags);\n    int new_flags = fcntl(fd, F_GETFL);\n    printf(\"O_APPEND set: %d\\n\", (new_flags & O_APPEND) != 0);\n    int fdflags = fcntl(fd, ____);\n    printf(\"FD_CLOEXEC: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    fcntl(fd, F_SETFD, fdflags | FD_CLOEXEC);\n    fdflags = fcntl(fd, F_GETFD);\n    printf(\"FD_CLOEXEC after set: %d\\n\", (fdflags & FD_CLOEXEC) != 0);\n    close(fd); unlink(path);\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    // Ouvrez fichier, lisez flags avec F_GETFL, ajoutez O_APPEND\n    // Vérifiez FD_CLOEXEC avec F_GETFD/F_SETFD\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint main(void) {\n    return 0;\n}"

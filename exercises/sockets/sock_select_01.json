@@ -14,49 +14,7 @@
   ],
   "validation": {
     "mode": "output",
-    "expected_output": "Ready: 2\nsv1: MSG1\nsv2: MSG2\n",
-    "test_code": null
-  },
-  "visualizer": {
-    "type": "stack_heap",
-    "steps": [
-      {
-        "label": "FD_SET — ajout des fd à surveiller",
-        "stack": [
-          {"name": "readfds", "value": "{sv1[0], sv2[0]}"},
-          {"name": "maxfd", "value": "max(fd) + 1"}
-        ],
-        "heap": [],
-        "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
-        "explanation": "On ajoute les deux fd de lecture à l'ensemble",
-        "step_label": "1. Setup"
-      },
-      {
-        "label": "select() retourne — 2 fd prêts",
-        "stack": [
-          {"name": "ready", "value": "2"},
-          {"name": "readfds", "value": "{sv1[0]✓, sv2[0]✓}"}
-        ],
-        "heap": [],
-        "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
-        "explanation": "Les deux sockets ont des données, select retourne 2",
-        "step_label": "2. Select"
-      },
-      {
-        "label": "FD_ISSET → lecture des données",
-        "stack": [
-          {"name": "sv1 buf", "value": "\"MSG1\""},
-          {"name": "sv2 buf", "value": "\"MSG2\""}
-        ],
-        "heap": [],
-        "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
-        "explanation": "On teste chaque fd avec FD_ISSET et on lit les données",
-        "step_label": "3. Lecture"
-      }
-    ]
+    "expected_output": "Ready: 2\nsv1: MSG1\nsv2: MSG2\n"
   },
   "prerequisites": ["sock-nonblock-01"],
   "exercise_type": "complete",
@@ -64,10 +22,10 @@
   "common_mistake": "Oublier maxfd+1 comme premier argument → select ne surveille pas tous les fd",
   "kc_ids": ["KC-C14"],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\n/* == VOTRE EXERCICE ========================================\n * select() pour surveiller 2 socketpairs\n * ========================================================= */\n\nint main(void) {\n    int sv1[2], sv2[2];\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);\n    send(sv1[1], \"MSG1\", 4, 0);\n    send(sv2[1], \"MSG2\", 4, 0);\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    /* TODO: FD_SET les deux fd */\n    FD_SET(sv1[0], &readfds);\n    FD_SET(sv2[0], &readfds);\n    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;\n    struct timeval tv = {1, 0};\n    int ready = select(maxfd, &readfds, NULL, NULL, &tv);\n    printf(\"Ready: %d\\n\", ready);\n    char buf[64];\n    if (FD_ISSET(sv1[0], &readfds)) {\n        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv1: %s\\n\", buf);\n    }\n    if (FD_ISSET(sv2[0], &readfds)) {\n        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv2: %s\\n\", buf);\n    }\n    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    int sv1[2], sv2[2];\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);\n    send(sv1[1], \"MSG1\", 4, 0);\n    send(sv2[1], \"MSG2\", 4, 0);\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    FD_SET(sv1[0], &readfds);\n    FD_SET(sv2[0], &readfds);\n    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;\n    struct timeval tv = {1, 0};\n    int ready = select(maxfd, &readfds, NULL, NULL, &tv);\n    printf(\"Ready: %d\\n\", ready);\n    char buf[64];\n    if (____(sv1[0], &readfds)) {\n        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv1: %s\\n\", buf);\n    }\n    if (____(sv2[0], &readfds)) {\n        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv2: %s\\n\", buf);\n    }\n    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    int sv1[2], sv2[2];\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);\n    send(sv1[1], \"MSG1\", 4, 0);\n    send(sv2[1], \"MSG2\", 4, 0);\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    ____(sv1[0], &readfds);\n    ____(sv2[0], &readfds);\n    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;\n    struct timeval tv = {1, 0};\n    int ready = select(maxfd, &readfds, NULL, NULL, &tv);\n    printf(\"Ready: %d\\n\", ready);\n    char buf[64];\n    if (FD_ISSET(sv1[0], &readfds)) {\n        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv1: %s\\n\", buf);\n    }\n    if (FD_ISSET(sv2[0], &readfds)) {\n        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv2: %s\\n\", buf);\n    }\n    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\n// 2 socketpairs, envoyer MSG1 et MSG2\n// select() pour détecter lesquels sont prêts\n// Sortie: Ready: 2, sv1: MSG1, sv2: MSG2\n\nint main(void) {\n    return 0;\n}",
-    "#include <stdio.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    return 0;\n}"
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\n/* == EXEMPLE ===============================================\n * select() simple : créer ensemble fd vide\n * ========================================================= */\n\nint main(void) {\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    printf(\"FD set initialized\\n\");\n    int test_fd = 5;\n    FD_SET(test_fd, &readfds);\n    printf(\"FD %d added to set\\n\", test_fd);\n    printf(\"FD %d in set: %d\\n\", test_fd, FD_ISSET(test_fd, &readfds));\n    return 0;\n}\n",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    int sv1[2], sv2[2];\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);\n    send(sv1[1], \"MSG1\", 4, 0);\n    send(sv2[1], \"MSG2\", 4, 0);\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    FD_SET(sv1[0], &readfds);\n    FD_SET(sv2[0], &readfds);\n    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;\n    struct timeval tv = {1, 0};\n    int ready = select(maxfd, &readfds, NULL, NULL, &tv);\n    printf(\"Ready: %d\\n\", ready);\n    char buf[64];\n    if (____(sv1[0], &readfds)) {\n        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv1: %s\\n\", buf);\n    }\n    if (____(sv2[0], &readfds)) {\n        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv2: %s\\n\", buf);\n    }\n    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);\n    return 0;\n}\n",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    int sv1[2], sv2[2];\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);\n    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);\n    send(sv1[1], \"MSG1\", 4, 0);\n    send(sv2[1], \"MSG2\", 4, 0);\n    fd_set readfds;\n    FD_ZERO(&readfds);\n    ____(sv1[0], &readfds);\n    ____(sv2[0], &readfds);\n    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;\n    struct timeval tv = {1, 0};\n    int ready = select(maxfd, &readfds, NULL, NULL, &tv);\n    printf(\"Ready: %d\\n\", ready);\n    char buf[64];\n    if (FD_ISSET(sv1[0], &readfds)) {\n        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv1: %s\\n\", buf);\n    }\n    if (FD_ISSET(sv2[0], &readfds)) {\n        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\\0';\n        printf(\"sv2: %s\\n\", buf);\n    }\n    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);\n    return 0;\n}\n",
+    "#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\n// 2 socketpairs, envoyer MSG1 et MSG2\n// select() pour détecter lesquels sont prêts\n// Sortie: Ready: 2, sv1: MSG1, sv2: MSG2\n\nint main(void) {\n    return 0;\n}\n",
+    "#include <stdio.h>\n#include <sys/socket.h>\n#include <sys/select.h>\n\nint main(void) {\n    return 0;\n}\n"
   ]
 }
