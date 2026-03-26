@@ -228,6 +228,60 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
     Ok(())
 }
 
+/// Wait for a child process to complete or timeout, handling process group termination.
+/// Returns the exit status if successful, or an error if timeout or wait fails.
+fn wait_for_process_with_timeout(
+    child: &mut std::process::Child,
+    timeout: Duration,
+) -> crate::error::Result<std::process::ExitStatus> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    kill_process_group(child);
+                    // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
+                    if let Err(e) = child.wait() {
+                        if e.raw_os_error() != Some(libc::ECHILD) {
+                            eprintln!("[clings/runner] avertissement : reap zombie échoué : {e}");
+                        }
+                    }
+                    return Err(KfError::Config(format!(
+                        "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
+                        timeout.as_secs_f64()
+                    )));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(e) => {
+                kill_process_group(child);
+                // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
+                if let Err(we) = child.wait() {
+                    if we.raw_os_error() != Some(libc::ECHILD) {
+                        eprintln!("[clings/runner] avertissement : reap zombie échoué : {we}");
+                    }
+                }
+                return Err(KfError::Io(e));
+            }
+        }
+    }
+}
+
+/// Collect stdout and stderr from drain threads, converting panics to errors.
+fn drain_stdio(
+    stdout_thread: std::thread::JoinHandle<String>,
+    stderr_thread: std::thread::JoinHandle<String>,
+) -> crate::error::Result<(String, String)> {
+    let stdout = stdout_thread
+        .join()
+        .map_err(|_| KfError::Config("stdout reader thread paniqué".to_owned()))?;
+    let stderr = stderr_thread
+        .join()
+        .map_err(|_| KfError::Config("stderr reader thread paniqué".to_owned()))?;
+    Ok((stdout, stderr))
+}
+
 /// Compile `source_path` with gcc `extra_args`, run the resulting binary from
 /// `work_dir`, and collect stdout + stderr within `timeout`.
 /// Returns `(stdout, stderr, exit_status)` or a `KfError`.
@@ -291,44 +345,8 @@ fn spawn_gcc_and_collect(
     };
     let (stdout_thread, stderr_thread) = spawn_drain_threads(stdout, stderr);
 
-    let deadline = std::time::Instant::now() + timeout;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => {
-                if std::time::Instant::now() >= deadline {
-                    kill_and_drain(&child, stdout_thread, stderr_thread);
-                    // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
-                    if let Err(e) = child.wait() {
-                        if e.raw_os_error() != Some(libc::ECHILD) {
-                            eprintln!("[clings/runner] avertissement : reap zombie échoué : {e}");
-                        }
-                    }
-                    return Err(KfError::Config(format!(
-                        "{TIMEOUT_MSG_PREFIX} ({:.1}s limite)",
-                        timeout.as_secs_f64()
-                    )));
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Err(e) => {
-                kill_and_drain(&child, stdout_thread, stderr_thread);
-                // reap zombie — ECHILD = déjà récolté (attendu après kill), autres erreurs loguées
-                if let Err(we) = child.wait() {
-                    if we.raw_os_error() != Some(libc::ECHILD) {
-                        eprintln!("[clings/runner] avertissement : reap zombie échoué : {we}");
-                    }
-                }
-                return Err(KfError::Io(e));
-            }
-        }
-    };
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| KfError::Config("stdout reader thread paniqué".to_owned()))?;
-    let stderr = stderr_thread
-        .join()
-        .map_err(|_| KfError::Config("stderr reader thread paniqué".to_owned()))?;
+    let status = wait_for_process_with_timeout(&mut child, timeout)?;
+    let (stdout, stderr) = drain_stdio(stdout_thread, stderr_thread)?;
     Ok((stdout, stderr, status))
 }
 
