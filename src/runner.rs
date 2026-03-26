@@ -809,20 +809,6 @@ fn make_compile_error(stderr: String) -> RunResult {
 
 /// Kill the process group and join drain threads, logging any thread panics.
 /// Used in error arms of `spawn_gcc_and_collect` where the collected output is discarded.
-fn kill_and_drain(
-    child: &std::process::Child,
-    stdout_thread: std::thread::JoinHandle<String>,
-    stderr_thread: std::thread::JoinHandle<String>,
-) {
-    kill_process_group(child);
-    if let Err(e) = stdout_thread.join() {
-        eprintln!("Avertissement : thread lecteur stdout a paniqué : {e:?}");
-    }
-    if let Err(e) = stderr_thread.join() {
-        eprintln!("Avertissement : thread lecteur stderr a paniqué : {e:?}");
-    }
-}
-
 /// Kill the entire process group of a child to avoid zombie fork-bombs.
 fn kill_process_group(child: &std::process::Child) {
     let pid = child.id();
