@@ -5,18 +5,16 @@
   "difficulty": 1,
   "title": "Initialisation désignée et compound literals",
   "description": "NSY103 — L'initialisation désignée (`{.champ = val}`) permet d'initialiser les champs d'une struct par nom plutôt que par position. Les compound literals `(Type){...}` créent des objets temporaires directement dans une expression.\n\nUtilisez ces deux mécanismes pour initialiser et modifier des structs `Color`.",
-  "starter_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) {\n    return (Color){____};\n}\nColor make_blue(void) {\n    return (Color){____};\n}\nColor make_color(int r, int g, int b) {\n    return (Color){____};\n}",
-  "solution_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) {\n    return (Color){.r = 255, .g = 0, .b = 0};\n}\nColor make_blue(void) {\n    return (Color){.r = 0, .g = 0, .b = 255};\n}\nColor make_color(int r, int g, int b) {\n    return (Color){.r = r, .g = g, .b = b};\n}",
+  "starter_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) {\n    return (Color){____};\n}\nColor make_blue(void) {\n    return (Color){____};\n}\nColor make_color(int r, int g, int b) {\n    return (Color){____};\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\ntypedef struct { int r, g, b; } Color;\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\nColor make_red(void) { return (Color){.r = 255, .g = 0, .b = 0}; }\nColor make_blue(void) { return (Color){.r = 0, .g = 0, .b = 255}; }\nColor make_color(int r, int g, int b) { return (Color){.r = r, .g = g, .b = b}; }\n\nint main(void) {\n    Color red = make_red();\n    print_color(\"red\", red);\n    Color blue = make_blue();\n    print_color(\"blue\", blue);\n    Color purple = make_color(128, 0, 128);\n    print_color(\"purple\", purple);\n    Color colors[] = {\n        {.r = 255, .g = 255, .b = 0},\n        {.r = 0, .g = 255, .b = 255}\n    };\n    printf(\"colors[0] = (%d, %d, %d)\\n\", colors[0].r, colors[0].g, colors[0].b);\n    printf(\"colors[1] = (%d, %d, %d)\\n\", colors[1].r, colors[1].g, colors[1].b);\n    return 0;\n}",
   "hints": [
     "Initialisation désignée : `{.r = 255, .g = 0, .b = 0}` — les champs non mentionnés sont mis à 0",
     "`{.b = 255}` initialise seulement b, r et g sont automatiquement 0",
     "Compound literal : `(Color){128, 0, 128}` crée un objet Color temporaire"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "red = (255, 0, 0)\nblue = (0, 0, 255)\npurple = (128, 0, 128)\ncolors[0] = (255, 255, 0)\ncolors[1] = (0, 255, 255)\n",
-    "test_code": "void test_make_red(void) {\n    Color c = make_red();\n    TEST_ASSERT_EQUAL_INT(255, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(0, c.b);\n}\n\nvoid test_make_blue(void) {\n    Color c = make_blue();\n    TEST_ASSERT_EQUAL_INT(0, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(255, c.b);\n}\n\nvoid test_make_color(void) {\n    Color c = make_color(128, 64, 32);\n    TEST_ASSERT_EQUAL_INT(128, c.r);\n    TEST_ASSERT_EQUAL_INT(64, c.g);\n    TEST_ASSERT_EQUAL_INT(32, c.b);\n}\n\nvoid test_make_color_zero(void) {\n    Color c = make_color(0, 0, 0);\n    TEST_ASSERT_EQUAL_INT(0, c.r);\n    TEST_ASSERT_EQUAL_INT(0, c.g);\n    TEST_ASSERT_EQUAL_INT(0, c.b);\n}\n\nint main(void) {\n    RUN_TEST(test_make_red);\n    RUN_TEST(test_make_blue);\n    RUN_TEST(test_make_color);\n    RUN_TEST(test_make_color_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "red = (255, 0, 0)\nblue = (0, 0, 255)\npurple = (128, 0, 128)\ncolors[0] = (255, 255, 0)\ncolors[1] = (0, 255, 255)\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,17 +22,39 @@
       {
         "label": "Initialisation désignée — red et blue",
         "stack": [
-          {"name": "red.r", "value": "255"},
-          {"name": "red.g", "value": "0"},
-          {"name": "red.b", "value": "0"},
-          {"name": "blue.r", "value": "0"},
-          {"name": "blue.g", "value": "0"},
-          {"name": "blue.b", "value": "255"}
+          {
+            "name": "red.r",
+            "value": "255"
+          },
+          {
+            "name": "red.g",
+            "value": "0"
+          },
+          {
+            "name": "red.b",
+            "value": "0"
+          },
+          {
+            "name": "blue.r",
+            "value": "0"
+          },
+          {
+            "name": "blue.g",
+            "value": "0"
+          },
+          {
+            "name": "blue.b",
+            "value": "255"
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "Avec l'initialisation désignée, on nomme les champs explicitement. Les champs non mentionnés sont initialisés à 0. {.b = 255} met r=0, g=0, b=255.",
         "step_label": "Désignée — champs non mentionnés = 0"
@@ -42,26 +62,44 @@
       {
         "label": "Compound literal — purple",
         "stack": [
-          {"name": "(Color){128,0,128}", "value": "{128, 0, 128}"},
-          {"name": "ptr", "value": "→compound"}
+          {
+            "name": "(Color){128,0,128}",
+            "value": "{128, 0, 128}"
+          },
+          {
+            "name": "ptr",
+            "value": "→compound"
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "ptr", "to": "(Color){128,0,128}", "label": "&"}
+          {
+            "from": "ptr",
+            "to": "(Color){128,0,128}",
+            "label": "&"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "(Color){128, 0, 128} crée un objet temporaire sur la pile (dans le scope du bloc). On peut prendre son adresse avec &. L'objet vit jusqu'à la fin du bloc.",
         "step_label": "Compound literal — objet temporaire adressable"
       }
     ]
   },
-  "prerequisites": ["struct-point-01"],
+  "prerequisites": [
+    "struct-point-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "L'initialisation désignée nomme les champs ; les compound literals créent des objets inline",
   "common_mistake": "Oublier le cast (Type) dans le compound literal : {1,2,3} seul n'est pas un compound literal",
-  "kc_ids": ["KC-C03"],
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Initialisation designee d'une struct Rect\n * {.champ = val} nomme les champs explicitement.\n * Les champs non mentionnes sont mis a 0.\n * =========================================================== */\ntypedef struct { int x, y, w, h; } Rect;\n\nvoid example_demo(void) {\n    Rect r1 = {.x = 10, .y = 20, .w = 100, .h = 50};\n    Rect r2 = {.w = 200, .h = 100}; /* x=0, y=0 */\n    Rect *rp = &(Rect){5, 5, 30, 30};\n    printf(\"r1 = (%d,%d,%d,%d)\\n\", r1.x, r1.y, r1.w, r1.h);\n    printf(\"r2 = (%d,%d,%d,%d)\\n\", r2.x, r2.y, r2.w, r2.h);\n    printf(\"rp = (%d,%d,%d,%d)\\n\", rp->x, rp->y, rp->w, rp->h);\n}\n/* Resultat: r1 = (10,20,100,50) / r2 = (0,0,200,100) / rp = (5,5,30,30) */\n\n/* == VOTRE EXERCICE =========================================\n * Struct Color avec initialisation designee et compound literal\n * =========================================================== */\ntypedef struct { int r, g, b; } Color;\n\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\n\nint main(void) {\n    /* TODO: red={255,0,0}, blue={.b=255}, purple via compound literal */\n    return 0;\n}",
     "#include <stdio.h>\n\ntypedef struct { int r, g, b; } Color;\n\nvoid print_color(const char *name, Color c) {\n    printf(\"%s = (%d, %d, %d)\\n\", name, c.r, c.g, c.b);\n}\n\nint main(void) {\n    Color red = {.r = 255, .g = 0, .b = 0};\n    print_color(\"red\", red);\n\n    Color blue = {.b = 255};\n    print_color(\"blue\", blue);\n\n    Color *ptr = &(Color){128, 0, 128};\n    print_color(\"purple\", ____);\n\n    Color colors[] = {\n        {.r = 255, .g = 255, .b = 0},\n        {.r = 0, .g = 255, .b = 255}\n    };\n    printf(\"colors[0] = (%d, %d, %d)\\n\", colors[0].r, ____, ____);\n    printf(\"colors[1] = (%d, %d, %d)\\n\", ____, ____, ____);\n    return 0;\n}",

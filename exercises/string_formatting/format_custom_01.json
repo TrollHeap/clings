@@ -5,17 +5,16 @@
   "difficulty": 4,
   "title": "Mini-printf personnalisé",
   "description": "NSY103 — Comprendre printf de l'intérieur en implémentant une version simplifiée. Utiliser va_list, va_start, va_arg, va_end pour traiter un nombre variable d'arguments. Supporter %d, %s, %x, %% et les caractères littéraux.\n\nImplémentez my_printf qui supporte %d, %s, %x et %%.",
-  "starter_code": "#include <stdio.h>\n#include <stdarg.h>\n#include <string.h>\n\nint my_sprintf(char *buf, size_t sz, const char *fmt, ...) {\n    va_list args;\n    ____(args, fmt);\n    size_t pos = 0;\n    while (*fmt && pos < sz - 1) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = ____(args, int);\n                pos += snprintf(buf + pos, sz - pos, \"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                pos += snprintf(buf + pos, sz - pos, \"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                pos += snprintf(buf + pos, sz - pos, \"%x\", val);\n                break;\n            }\n            case '%':\n                buf[pos++] = '%';\n                break;\n            }\n        } else {\n            buf[pos++] = *fmt;\n        }\n        fmt++;\n    }\n    buf[pos] = '\\0';\n    ____(args);\n    return pos;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdarg.h>\n#include <string.h>\n\nint my_sprintf(char *buf, size_t sz, const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    size_t pos = 0;\n    while (*fmt && pos < sz - 1) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = va_arg(args, int);\n                pos += snprintf(buf + pos, sz - pos, \"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                pos += snprintf(buf + pos, sz - pos, \"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                pos += snprintf(buf + pos, sz - pos, \"%x\", val);\n                break;\n            }\n            case '%':\n                buf[pos++] = '%';\n                break;\n            }\n        } else {\n            buf[pos++] = *fmt;\n        }\n        fmt++;\n    }\n    buf[pos] = '\\0';\n    va_end(args);\n    return pos;\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdarg.h>\n#include <string.h>\n\nint my_sprintf(char *buf, size_t sz, const char *fmt, ...) {\n    va_list args;\n    ____(args, fmt);\n    size_t pos = 0;\n    while (*fmt && pos < sz - 1) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = ____(args, int);\n                pos += snprintf(buf + pos, sz - pos, \"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                pos += snprintf(buf + pos, sz - pos, \"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                pos += snprintf(buf + pos, sz - pos, \"%x\", val);\n                break;\n            }\n            case '%':\n                buf[pos++] = '%';\n                break;\n            }\n        } else {\n            buf[pos++] = *fmt;\n        }\n        fmt++;\n    }\n    buf[pos] = '\\0';\n    ____(args);\n    return pos;\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdarg.h>\n#include <string.h>\n\nint my_sprintf(char *buf, size_t sz, const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    size_t pos = 0;\n    while (*fmt && pos < sz - 1) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': {\n                int val = va_arg(args, int);\n                pos += snprintf(buf + pos, sz - pos, \"%d\", val);\n                break;\n            }\n            case 's': {\n                char *val = va_arg(args, char *);\n                pos += snprintf(buf + pos, sz - pos, \"%s\", val);\n                break;\n            }\n            case 'x': {\n                unsigned int val = va_arg(args, unsigned int);\n                pos += snprintf(buf + pos, sz - pos, \"%x\", val);\n                break;\n            }\n            case '%':\n                buf[pos++] = '%';\n                break;\n            }\n        } else {\n            buf[pos++] = *fmt;\n        }\n        fmt++;\n    }\n    buf[pos] = '\\0';\n    va_end(args);\n    return pos;\n}\n\nint main(void) {\n    {\n        char buf[64];\n        my_sprintf(buf, sizeof(buf), \"%d\", 42);\n        printf(\"%s\\n\", buf);\n    }\n    {\n        char buf[64];\n        my_sprintf(buf, sizeof(buf), \"Hello %s\", \"world\");\n        printf(\"%s\\n\", buf);\n    }\n    {\n        char buf[64];\n        my_sprintf(buf, sizeof(buf), \"0x%x\", 255);\n        printf(\"%s\\n\", buf);\n    }\n    {\n        char buf[64];\n        my_sprintf(buf, sizeof(buf), \"100%%\");\n        printf(\"%s\\n\", buf);\n    }\n    {\n        char buf[128];\n        my_sprintf(buf, sizeof(buf), \"n=%d s=%s x=%x %%\", 10, \"test\", 255);\n        printf(\"%d\\n\", (strstr(buf, \"n=10\") != NULL) ? 1 : 0);\n        printf(\"%d\\n\", (strstr(buf, \"s=test\") != NULL) ? 1 : 0);\n        printf(\"%d\\n\", (strstr(buf, \"x=ff\") != NULL) ? 1 : 0);\n    }\n    return 0;\n}\n",
   "hints": [
     "va_start(args, last_named_param) initialise la liste d'arguments variables",
     "va_arg(args, type) extrait le prochain argument du type spécifié",
     "va_end(args) termine le parcours — toujours l'appeler avant de retourner"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_int_format(void) {\n    char buf[64];\n    my_sprintf(buf, sizeof(buf), \"%d\", 42);\n    TEST_ASSERT_EQUAL_STRING(\"42\", buf);\n}\n\nvoid test_string_format(void) {\n    char buf[64];\n    my_sprintf(buf, sizeof(buf), \"Hello %s\", \"world\");\n    TEST_ASSERT_EQUAL_STRING(\"Hello world\", buf);\n}\n\nvoid test_hex_format(void) {\n    char buf[64];\n    my_sprintf(buf, sizeof(buf), \"0x%x\", 255);\n    TEST_ASSERT_EQUAL_STRING(\"0xff\", buf);\n}\n\nvoid test_percent_escape(void) {\n    char buf[64];\n    my_sprintf(buf, sizeof(buf), \"100%%\");\n    TEST_ASSERT_EQUAL_STRING(\"100%\", buf);\n}\n\nvoid test_mixed_format(void) {\n    char buf[128];\n    my_sprintf(buf, sizeof(buf), \"n=%d s=%s x=%x %%\", 10, \"test\", 255);\n    TEST_ASSERT_TRUE(strstr(buf, \"n=10\") != NULL);\n    TEST_ASSERT_TRUE(strstr(buf, \"s=test\") != NULL);\n    TEST_ASSERT_TRUE(strstr(buf, \"x=ff\") != NULL);\n}\n\nint main(void) {\n    RUN_TEST(test_int_format);\n    RUN_TEST(test_string_format);\n    RUN_TEST(test_hex_format);\n    RUN_TEST(test_percent_escape);\n    RUN_TEST(test_mixed_format);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 5
+    "mode": "output",
+    "expected_output": "42\nHello world\n0xff\n100%\n1\n1\n1"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,47 +22,90 @@
       {
         "label": "va_start initialise la liste",
         "stack": [
-          {"name": "fmt", "value": "\"Hello %s! num=%d...\""},
-          {"name": "args", "value": "→ {\"world\", 42, 255}"}
+          {
+            "name": "fmt",
+            "value": "\"Hello %s! num=%d...\""
+          },
+          {
+            "name": "args",
+            "value": "→ {\"world\", 42, 255}"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "my_printf",
+            "args": "fmt, ...",
+            "is_active": true
+          }
+        ],
         "explanation": "va_start positionne args sur le premier argument variable",
         "step_label": "1. Init"
       },
       {
         "label": "va_arg extrait séquentiellement",
         "stack": [
-          {"name": "%s → va_arg(char*)", "value": "\"world\""},
-          {"name": "%d → va_arg(int)", "value": "42"},
-          {"name": "%x → va_arg(uint)", "value": "255 → \"ff\""}
+          {
+            "name": "%s → va_arg(char*)",
+            "value": "\"world\""
+          },
+          {
+            "name": "%d → va_arg(int)",
+            "value": "42"
+          },
+          {
+            "name": "%x → va_arg(uint)",
+            "value": "255 → \"ff\""
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "my_printf",
+            "args": "fmt, ...",
+            "is_active": true
+          }
+        ],
         "explanation": "Chaque va_arg avance au prochain argument dans la pile",
         "step_label": "2. Extraction"
       },
       {
         "label": "Parcours du format complet",
         "stack": [
-          {"name": "sortie", "value": "\"Hello world! num=42 hex=0xff %done\""},
-          {"name": "va_end", "value": "nettoyage de args"}
+          {
+            "name": "sortie",
+            "value": "\"Hello world! num=42 hex=0xff %done\""
+          },
+          {
+            "name": "va_end",
+            "value": "nettoyage de args"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "my_printf", "args": "fmt, ...", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "my_printf",
+            "args": "fmt, ...",
+            "is_active": true
+          }
+        ],
         "explanation": "%% produit un littéral %, les autres chars sont copiés tels quels",
         "step_label": "3. Résultat"
       }
     ]
   },
-  "prerequisites": ["snprintf-safe-01"],
+  "prerequisites": [
+    "snprintf-safe-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "va_list/va_start/va_arg/va_end — le mécanisme C pour les fonctions variadiques comme printf",
   "common_mistake": "Mauvais type dans va_arg (ex: float au lieu de double) → comportement indéfini",
-  "kc_ids": ["KC-C05"],
+  "kc_ids": [
+    "KC-C05"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdarg.h>\n\n/* == EXEMPLE ================================================\n * Fonction variadique simple avec va_list\n * =========================================================== */\nvoid print_ints(int count, ...) {\n    va_list args;\n    va_start(args, count);\n    for (int i = 0; i < count; i++)\n        printf(\"%d \", va_arg(args, int));\n    printf(\"\\n\");\n    va_end(args);\n}\n\n/* == VOTRE EXERCICE =========================================\n * Implémenter my_printf avec %d, %s, %x, %%\n * =========================================================== */\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': printf(\"%d\", va_arg(args, int)); break;\n            case 's': printf(\"%s\", va_arg(args, char *)); break;\n            case 'x': printf(\"%x\", va_arg(args, unsigned int)); break;\n            case '%': putchar('%'); break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    va_end(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdarg.h>\n\nvoid my_printf(const char *fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    while (*fmt) {\n        if (*fmt == '%') {\n            fmt++;\n            switch (*fmt) {\n            case 'd': printf(\"%d\", va_arg(args, int)); break;\n            case 's': printf(\"%s\", ____(args, ____)); break;\n            case 'x': printf(\"%x\", ____(args, ____)); break;\n            case '%': putchar('%'); break;\n            }\n        } else {\n            putchar(*fmt);\n        }\n        fmt++;\n    }\n    va_end(args);\n}\n\nint main(void) {\n    my_printf(\"Hello %s! num=%d hex=0x%x %%done\\n\", \"world\", 42, 255);\n    my_printf(\"%d + %d = %d\\n\", 10, 20, 30);\n    my_printf(\"name=%s code=%x\\n\", \"KF\", 48879);\n    return 0;\n}",

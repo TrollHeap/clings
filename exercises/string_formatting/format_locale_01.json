@@ -5,17 +5,16 @@
   "difficulty": 5,
   "title": "Formatage sensible aux locales",
   "description": "NSY103 — Le formatage numérique varie selon les locales : séparateurs de milliers, décimales (virgule vs point). En C, setlocale + printf avec le flag apostrophe (%'d) active les séparateurs. Cet exercice implémente un formatage personnalisé sans dépendre de la locale système.\n\nImplémentez un formateur qui ajoute des séparateurs de milliers et des unités human-readable.",
-  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / ____;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == 3 && src >= 0) {\n            buf[dst--] = ',';\n            count = ____;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= ____;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}",
-  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / 3;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == 3 && src >= 0) {\n            buf[dst--] = ',';\n            count = 0;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= 1024.0;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / ____;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == 3 && src >= 0) {\n            buf[dst--] = ',';\n            count = ____;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= ____;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}\n\nint main(void) {\n    char buf[64];\n    format_thousands(buf, sizeof(buf), 1234567);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 42);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 1000000000);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1536);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 2621440);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1073741824);\n    printf(\"%s\\n\", buf);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / 3;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == 3 && src >= 0) {\n            buf[dst--] = ',';\n            count = 0;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= 1024.0;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}\n\nint main(void) {\n    char buf[64];\n    format_thousands(buf, sizeof(buf), 1234567);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 42);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 1000000000);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1536);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 2621440);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1073741824);\n    printf(\"%s\\n\", buf);\n    return 0;\n}\n",
   "hints": [
     "Séparateur tous les 3 chiffres: (len-1)/3 donne le nombre de virgules",
     "Remettre count à 0 après chaque virgule insérée",
     "1 KB = 1024 B, 1 MB = 1024 KB, 1 GB = 1024 MB"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_thousands_simple(void) {\n    char buf[32];\n    format_thousands(buf, sizeof(buf), 42);\n    TEST_ASSERT_EQUAL_STRING(\"42\", buf);\n}\n\nvoid test_thousands_four_digits(void) {\n    char buf[32];\n    format_thousands(buf, sizeof(buf), 1000);\n    TEST_ASSERT_EQUAL_STRING(\"1,000\", buf);\n}\n\nvoid test_thousands_large(void) {\n    char buf[32];\n    format_thousands(buf, sizeof(buf), 1234567);\n    TEST_ASSERT_EQUAL_STRING(\"1,234,567\", buf);\n}\n\nvoid test_size_bytes(void) {\n    char buf[32];\n    format_size(buf, sizeof(buf), 512);\n    TEST_ASSERT_EQUAL_STRING(\"512.0 B\", buf);\n}\n\nvoid test_size_kb(void) {\n    char buf[32];\n    format_size(buf, sizeof(buf), 1536);\n    TEST_ASSERT_EQUAL_STRING(\"1.5 KB\", buf);\n}\n\nvoid test_size_mb(void) {\n    char buf[32];\n    format_size(buf, sizeof(buf), 2621440);\n    TEST_ASSERT_EQUAL_STRING(\"2.5 MB\", buf);\n}\n\nint main(void) {\n    RUN_TEST(test_thousands_simple);\n    RUN_TEST(test_thousands_four_digits);\n    RUN_TEST(test_thousands_large);\n    RUN_TEST(test_size_bytes);\n    RUN_TEST(test_size_kb);\n    RUN_TEST(test_size_mb);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 6
+    "mode": "output",
+    "expected_output": "1,234,567\n42\n1,000,000,000\n1.5 KB\n2.5 MB\n1.0 GB"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,38 +22,78 @@
       {
         "label": "format_thousands: insertion des virgules",
         "stack": [
-          {"name": "tmp", "value": "\"1234567\" (7 chars)"},
-          {"name": "commas", "value": "(7-1)/3 = 2"},
-          {"name": "total", "value": "7 + 2 = 9"},
-          {"name": "buf", "value": "\"1,234,567\""}
+          {
+            "name": "tmp",
+            "value": "\"1234567\" (7 chars)"
+          },
+          {
+            "name": "commas",
+            "value": "(7-1)/3 = 2"
+          },
+          {
+            "name": "total",
+            "value": "7 + 2 = 9"
+          },
+          {
+            "name": "buf",
+            "value": "\"1,234,567\""
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "format_thousands", "args": "buf, 64, 1234567", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "format_thousands",
+            "args": "buf, 64, 1234567",
+            "is_active": true
+          }
+        ],
         "explanation": "Parcours inverse: copie 3 chiffres, insère virgule, recommence",
         "step_label": "1. Milliers"
       },
       {
         "label": "format_size: conversion human-readable",
         "stack": [
-          {"name": "bytes", "value": "2621440"},
-          {"name": "÷1024", "value": "2560.0 (KB)"},
-          {"name": "÷1024", "value": "2.5 (MB)"},
-          {"name": "résultat", "value": "\"2.5 MB\""}
+          {
+            "name": "bytes",
+            "value": "2621440"
+          },
+          {
+            "name": "÷1024",
+            "value": "2560.0 (KB)"
+          },
+          {
+            "name": "÷1024",
+            "value": "2.5 (MB)"
+          },
+          {
+            "name": "résultat",
+            "value": "\"2.5 MB\""
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "format_size", "args": "buf, 64, 2621440", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "format_size",
+            "args": "buf, 64, 2621440",
+            "is_active": true
+          }
+        ],
         "explanation": "Diviser par 1024 jusqu'à < 1024, incrémenter l'unité",
         "step_label": "2. Taille"
       }
     ]
   },
-  "prerequisites": ["format-custom-01"],
+  "prerequisites": [
+    "format-custom-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Formatage personnalisé: séparateurs de milliers par parcours inverse, unités human-readable par division successive",
   "common_mistake": "Off-by-one dans le calcul des virgules: (len-1)/3 et non len/3 (sinon virgule avant le premier chiffre)",
-  "kc_ids": ["KC-C05"],
+  "kc_ids": [
+    "KC-C05"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Formatage de nombres avec séparateurs\n * =========================================================== */\nvoid example_fmt(long val) {\n    char buf[32];\n    snprintf(buf, sizeof(buf), \"%ld\", val);\n    printf(\"brut: %s\\n\", buf);\n}\n\n/* == VOTRE EXERCICE =========================================\n * format_thousands: ajouter des virgules tous les 3 chiffres\n * format_size: convertir bytes en KB/MB/GB human-readable\n * =========================================================== */\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / 3;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == 3 && src >= 0) {\n            buf[dst--] = ',';\n            count = 0;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= 1024.0;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}\n\nint main(void) {\n    char buf[64];\n    format_thousands(buf, sizeof(buf), 1234567);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 42);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 1000000000);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1536);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 2621440);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1073741824);\n    printf(\"%s\\n\", buf);\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\nvoid format_thousands(char *buf, size_t size, long val) {\n    char tmp[32];\n    snprintf(tmp, sizeof(tmp), \"%ld\", val);\n    int len = strlen(tmp);\n    int commas = (len - 1) / 3;\n    int total = len + commas;\n    if ((size_t)total >= size) { snprintf(buf, size, \"%ld\", val); return; }\n    buf[total] = '\\0';\n    int src = len - 1, dst = total - 1, count = 0;\n    while (src >= 0) {\n        buf[dst--] = tmp[src--];\n        count++;\n        if (count == ____ && src >= 0) {\n            buf[dst--] = ',';\n            count = ____;\n        }\n    }\n}\n\nvoid format_size(char *buf, size_t size, long bytes) {\n    const char *units[] = {\"B\", \"KB\", \"MB\", \"GB\"};\n    double val = bytes;\n    int u = 0;\n    while (val >= 1024.0 && u < 3) {\n        val /= ____;\n        u++;\n    }\n    snprintf(buf, size, \"%.1f %s\", val, units[u]);\n}\n\nint main(void) {\n    char buf[64];\n    format_thousands(buf, sizeof(buf), 1234567);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 42);\n    printf(\"%s\\n\", buf);\n    format_thousands(buf, sizeof(buf), 1000000000);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1536);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 2621440);\n    printf(\"%s\\n\", buf);\n    format_size(buf, sizeof(buf), 1073741824);\n    printf(\"%s\\n\", buf);\n    return 0;\n}",

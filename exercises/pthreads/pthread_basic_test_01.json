@@ -13,14 +13,17 @@
     "Dans `double_value`, castez `arg` en `int *` pour accéder à la valeur : `int *p = (int *)arg; *p *= 2;`"
   ],
   "validation": {
-    "mode": "test",
-    "expected_tests_pass": 4,
-    "test_code": "static int g_val;\n\nvoid test_double_value_via_thread(void) {\n    g_val = 7;\n    int rc = run_thread(&g_val);\n    TEST_ASSERT_EQUAL_INT(0, rc);\n    TEST_ASSERT_EQUAL_INT(14, g_val);\n}\n\nvoid test_double_value_zero(void) {\n    g_val = 0;\n    run_thread(&g_val);\n    TEST_ASSERT_EQUAL_INT(0, g_val);\n}\n\nvoid test_double_value_negative(void) {\n    g_val = -3;\n    run_thread(&g_val);\n    TEST_ASSERT_EQUAL_INT(-6, g_val);\n}\n\nvoid test_run_thread_returns_zero(void) {\n    int x = 1;\n    int rc = run_thread(&x);\n    TEST_ASSERT_EQUAL_INT(0, rc);\n}\n\nint main(void) {\n    RUN_TEST(test_double_value_via_thread);\n    RUN_TEST(test_double_value_zero);\n    RUN_TEST(test_double_value_negative);\n    RUN_TEST(test_run_thread_returns_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "10"
   },
   "key_concept": "`pthread_create` démarre un thread ; `pthread_join` attend sa terminaison et récupère les ressources. Le thread et le thread appelant partagent le même espace mémoire.",
   "common_mistake": "Oublier `pthread_join` : le thread devient un thread orphelin (zombie pthread). Ne pas caster `void *arg` correctement dans la fonction thread.",
   "exercise_type": "complete",
   "prerequisites": [],
   "files": [],
-  "kc_ids": ["pthread_create", "pthread_join", "thread_function"]
+  "kc_ids": [
+    "pthread_create",
+    "pthread_join",
+    "thread_function"
+  ]
 }

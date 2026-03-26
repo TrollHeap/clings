@@ -5,17 +5,16 @@
   "difficulty": 2,
   "title": "Pointeur vers fonction callback",
   "description": "NSY103 — Un pointeur de fonction stocke l'adresse d'une fonction. Sa syntaxe est `type_retour (*nom)(params)`. On peut passer une fonction en argument d'une autre pour créer des callbacks.\n\nImplémentez une fonction `apply` qui applique une fonction callback à chaque élément d'un tableau.",
-  "starter_code": "#include <stdio.h>\n\nint double_val(int x) { return x * 2; }\nint square_val(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n}\n",
-  "solution_code": "#include <stdio.h>\n\nint double_val(int x) { return x * 2; }\nint square_val(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = fn(arr[i]);\n    }\n}\n",
+  "starter_code": "#include <stdio.h>\n\nint double_val(int x) { return x * 2; }\nint square_val(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint double_val(int x) { return x * 2; }\nint square_val(int x) { return x * x; }\n\nvoid apply(int *arr, int n, int (*fn)(int)) {\n    for (int i = 0; i < n; i++) {\n        arr[i] = fn(arr[i]);\n    }\n}\n\nstatic int negate(int x) { return -x; }\n\nint main(void) {\n    {\n        int arr[] = {1, 2, 3};\n        apply(arr, 3, double_val);\n        printf(\"%d\\n\", (int)(arr[0]));\n        printf(\"%d\\n\", (int)(arr[1]));\n        printf(\"%d\\n\", (int)(arr[2]));\n    }\n    {\n        int arr[] = {2, 3, 4};\n        apply(arr, 3, square_val);\n        printf(\"%d\\n\", (int)(arr[0]));\n        printf(\"%d\\n\", (int)(arr[1]));\n        printf(\"%d\\n\", (int)(arr[2]));\n    }\n    {\n        int arr[] = {-5, 0, 10};\n        apply(arr, 3, negate);\n        printf(\"%d\\n\", (int)(arr[0]));\n        printf(\"%d\\n\", (int)(arr[1]));\n        printf(\"%d\\n\", (int)(arr[2]));\n    }\n    {\n        int arr[] = {7};\n        apply(arr, 1, double_val);\n        printf(\"%d\\n\", (int)(arr[0]));\n    }\n    return 0;\n}\n",
   "hints": [
     "Syntaxe pointeur de fonction : `int (*fn)(int)` — fn est un pointeur vers une fonction prenant int et retournant int",
     "Appeler via pointeur : `fn(arr[i])` — pas besoin de `*` pour appeler",
     "Passer le nom de la fonction directement : `apply(a, 4, doubler)` — le nom se convertit automatiquement en pointeur"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "static int double_val(int x) { return x * 2; }\nstatic int square_val(int x) { return x * x; }\nstatic int negate(int x) { return -x; }\n\nvoid test_apply_double(void) {\n    int arr[] = {1, 2, 3};\n    apply(arr, 3, double_val);\n    TEST_ASSERT_EQUAL_INT(2, arr[0]);\n    TEST_ASSERT_EQUAL_INT(4, arr[1]);\n    TEST_ASSERT_EQUAL_INT(6, arr[2]);\n}\n\nvoid test_apply_square(void) {\n    int arr[] = {2, 3, 4};\n    apply(arr, 3, square_val);\n    TEST_ASSERT_EQUAL_INT(4, arr[0]);\n    TEST_ASSERT_EQUAL_INT(9, arr[1]);\n    TEST_ASSERT_EQUAL_INT(16, arr[2]);\n}\n\nvoid test_apply_negate(void) {\n    int arr[] = {-5, 0, 10};\n    apply(arr, 3, negate);\n    TEST_ASSERT_EQUAL_INT(5, arr[0]);\n    TEST_ASSERT_EQUAL_INT(0, arr[1]);\n    TEST_ASSERT_EQUAL_INT(-10, arr[2]);\n}\n\nvoid test_apply_single(void) {\n    int arr[] = {7};\n    apply(arr, 1, double_val);\n    TEST_ASSERT_EQUAL_INT(14, arr[0]);\n}\n\nint main(void) {\n    RUN_TEST(test_apply_double);\n    RUN_TEST(test_apply_square);\n    RUN_TEST(test_apply_negate);\n    RUN_TEST(test_apply_single);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "2\n4\n6\n4\n9\n16\n5\n0\n-10\n14"
   },
   "visualizer": {
     "type": "stack_heap",

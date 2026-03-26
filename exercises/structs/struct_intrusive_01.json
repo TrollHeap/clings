@@ -4,68 +4,118 @@
   "lang": "c",
   "difficulty": 5,
   "title": "Liste intrusive style noyau (container_of)",
-  "description": "NSY103 — Dans le noyau Linux, les listes cha\u00een\u00e9es sont intrusives : le n\u0153ud de liste est imbriqu\u00e9 dans la struct de donn\u00e9es. La macro `container_of` retrouve la struct englobante \u00e0 partir de l'adresse du n\u0153ud, en utilisant `offsetof`.\n\nImpl\u00e9mentez une liste intrusive simplifi\u00e9e avec `container_of`, `list_add` et un parcours.",
+  "description": "NSY103 — Dans le noyau Linux, les listes chaînées sont intrusives : le nœud de liste est imbriqué dans la struct de données. La macro `container_of` retrouve la struct englobante à partir de l'adresse du nœud, en utilisant `offsetof`.\n\nImplémentez une liste intrusive simplifiée avec `container_of`, `list_add` et un parcours.",
   "starter_code": "#include <stdio.h>\n#include <stddef.h>\n#include <stdlib.h>\n\n#define container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(____, ____)))\n\ntypedef struct ListNode {\n    struct ListNode *next;\n} ListNode;\n\ntypedef struct {\n    int pid;\n    char name[16];\n    ListNode ____;\n} Task;\n\nvoid list_add(ListNode *head, ListNode *node) {\n    node->next = head->____;\n    head->next = ____;\n}\n\nint main(void) {\n    ListNode head = {NULL};\n\n    Task t1 = {100, \"init\", {NULL}};\n    Task t2 = {200, \"bash\", {NULL}};\n    Task t3 = {300, \"vim\", {NULL}};\n\n    list_add(&head, &t1.link);\n    list_add(&head, &t2.link);\n    list_add(&head, &t3.link);\n\n    printf(\"Task list:\\n\");\n    for (ListNode *n = head.next; n; n = n->next) {\n        Task *t = container_of(n, Task, ____);\n        printf(\"  pid=%d name=%s\\n\", t->pid, t->name);\n    }\n\n    printf(\"offsetof(Task, link) = %zu\\n\", offsetof(Task, link));\n    printf(\"sizeof(Task) = %zu\\n\", sizeof(Task));\n    return 0;\n}",
   "solution_code": "#include <stdio.h>\n#include <stddef.h>\n#include <stdlib.h>\n\n#define container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(type, member)))\n\ntypedef struct ListNode {\n    struct ListNode *next;\n} ListNode;\n\ntypedef struct {\n    int pid;\n    char name[16];\n    ListNode link;\n} Task;\n\nvoid list_add(ListNode *head, ListNode *node) {\n    node->next = head->next;\n    head->next = node;\n}\n\nint main(void) {\n    ListNode head = {NULL};\n\n    Task t1 = {100, \"init\", {NULL}};\n    Task t2 = {200, \"bash\", {NULL}};\n    Task t3 = {300, \"vim\", {NULL}};\n\n    list_add(&head, &t1.link);\n    list_add(&head, &t2.link);\n    list_add(&head, &t3.link);\n\n    printf(\"Task list:\\n\");\n    for (ListNode *n = head.next; n; n = n->next) {\n        Task *t = container_of(n, Task, link);\n        printf(\"  pid=%d name=%s\\n\", t->pid, t->name);\n    }\n\n    printf(\"offsetof(Task, link) = %zu\\n\", offsetof(Task, link));\n    printf(\"sizeof(Task) = %zu\\n\", sizeof(Task));\n    return 0;\n}",
   "hints": [
-    "`container_of(ptr, type, member)` soustrait offsetof(type, member) \u00e0 l'adresse ptr pour remonter au d\u00e9but de la struct",
-    "Le n\u0153ud de liste `ListNode link` est un champ de Task, pas un wrapper autour de Task",
-    "list_add ins\u00e8re en t\u00eate : `node->next = head->next; head->next = node;`"
+    "`container_of(ptr, type, member)` soustrait offsetof(type, member) à l'adresse ptr pour remonter au début de la struct",
+    "Le nœud de liste `ListNode link` est un champ de Task, pas un wrapper autour de Task",
+    "list_add insère en tête : `node->next = head->next; head->next = node;`"
   ],
   "validation": {
-    "mode": "test",
-    "expected_output": "Task list:\n  pid=300 name=vim\n  pid=200 name=bash\n  pid=100 name=init\noffsetof(Task, link) = 24\nsizeof(Task) = 32\n",
-    "test_code": "void test_container_of_basic(void) {\n    Task t = {100, \"init\", {NULL}};\n    ListNode *node = &t.link;\n    Task *recovered = container_of(node, Task, link);\n    TEST_ASSERT_EQUAL_INT(100, recovered->pid);\n}\n\nvoid test_list_add_single(void) {\n    ListNode head = {NULL};\n    Task t1 = {100, \"init\", {NULL}};\n    list_add(&head, &t1.link);\n    TEST_ASSERT_NOT_NULL(head.next);\n    Task *t = container_of(head.next, Task, link);\n    TEST_ASSERT_EQUAL_INT(100, t->pid);\n}\n\nvoid test_list_add_multiple(void) {\n    ListNode head = {NULL};\n    Task t1 = {100, \"init\", {NULL}};\n    Task t2 = {200, \"bash\", {NULL}};\n    Task t3 = {300, \"vim\", {NULL}};\n    list_add(&head, &t1.link);\n    list_add(&head, &t2.link);\n    list_add(&head, &t3.link);\n    int pids[3] = {300, 200, 100};\n    int i = 0;\n    for (ListNode *n = head.next; n; n = n->next) {\n        Task *t = container_of(n, Task, link);\n        TEST_ASSERT_EQUAL_INT(pids[i], t->pid);\n        i++;\n    }\n    TEST_ASSERT_EQUAL_INT(3, i);\n}\n\nvoid test_container_of_offset(void) {\n    Task t = {999, \"test\", {NULL}};\n    size_t offset = offsetof(Task, link);\n    ListNode *node = &t.link;\n    Task *recovered = (Task *)((char *)node - offset);\n    TEST_ASSERT_EQUAL_INT(999, recovered->pid);\n}\n\nint main(void) {\n    RUN_TEST(test_container_of_basic);\n    RUN_TEST(test_list_add_single);\n    RUN_TEST(test_list_add_multiple);\n    RUN_TEST(test_container_of_offset);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Task list:\n  pid=300 name=vim\n  pid=200 name=bash\n  pid=100 name=init\noffsetof(Task, link) = 24\nsizeof(Task) = 32\n"
   },
   "visualizer": {
     "type": "stack_heap",
     "steps": [
       {
-        "label": "3 Tasks avec n\u0153uds intrusifs",
+        "label": "3 Tasks avec nœuds intrusifs",
         "stack": [
-          {"name": "head.next", "value": "\u2192t3.link"},
-          {"name": "t3 {300,vim}", "value": "link.next \u2192 t2.link"},
-          {"name": "t2 {200,bash}", "value": "link.next \u2192 t1.link"},
-          {"name": "t1 {100,init}", "value": "link.next = NULL"}
+          {
+            "name": "head.next",
+            "value": "→t3.link"
+          },
+          {
+            "name": "t3 {300,vim}",
+            "value": "link.next → t2.link"
+          },
+          {
+            "name": "t2 {200,bash}",
+            "value": "link.next → t1.link"
+          },
+          {
+            "name": "t1 {100,init}",
+            "value": "link.next = NULL"
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "head.next", "to": "t3 {300,vim}", "label": "next"},
-          {"from": "t3 {300,vim}", "to": "t2 {200,bash}", "label": "next"},
-          {"from": "t2 {200,bash}", "to": "t1 {100,init}", "label": "next"}
+          {
+            "from": "head.next",
+            "to": "t3 {300,vim}",
+            "label": "next"
+          },
+          {
+            "from": "t3 {300,vim}",
+            "to": "t2 {200,bash}",
+            "label": "next"
+          },
+          {
+            "from": "t2 {200,bash}",
+            "to": "t1 {100,init}",
+            "label": "next"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
-        "explanation": "Les Tasks sont sur la pile, chacune contient un ListNode `link` \u00e0 l'offset 24. La liste passe par les champs link, pas par les Tasks elles-m\u00eames. C'est l'inversion cl\u00e9 : la donn\u00e9e contient le n\u0153ud, pas l'inverse.",
-        "step_label": "Liste intrusive \u2014 le n\u0153ud est DANS la donn\u00e9e"
+        "explanation": "Les Tasks sont sur la pile, chacune contient un ListNode `link` à l'offset 24. La liste passe par les champs link, pas par les Tasks elles-mêmes. C'est l'inversion clé : la donnée contient le nœud, pas l'inverse.",
+        "step_label": "Liste intrusive — le nœud est DANS la donnée"
       },
       {
         "label": "container_of retrouve Task depuis ListNode",
         "stack": [
-          {"name": "n", "value": "\u2192t3.link (offset 24)"},
-          {"name": "(char*)n - 24", "value": "\u2192t3 (d\u00e9but)"},
-          {"name": "t->pid", "value": "300"},
-          {"name": "t->name", "value": "\"vim\""}
+          {
+            "name": "n",
+            "value": "→t3.link (offset 24)"
+          },
+          {
+            "name": "(char*)n - 24",
+            "value": "→t3 (début)"
+          },
+          {
+            "name": "t->pid",
+            "value": "300"
+          },
+          {
+            "name": "t->name",
+            "value": "\"vim\""
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "n", "to": "t3 {300,vim}", "label": "container_of"}
+          {
+            "from": "n",
+            "to": "t3 {300,vim}",
+            "label": "container_of"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
-        "explanation": "container_of soustrait offsetof(Task, link)=24 de l'adresse de n. On recule de 24 octets pour passer du champ link au d\u00e9but de la struct Task. C'est de l'arithm\u00e9tique de pointeurs pure \u2014 aucune allocation suppl\u00e9mentaire.",
-        "step_label": "container_of \u2014 remonter de 24 octets"
+        "explanation": "container_of soustrait offsetof(Task, link)=24 de l'adresse de n. On recule de 24 octets pour passer du champ link au début de la struct Task. C'est de l'arithmétique de pointeurs pure — aucune allocation supplémentaire.",
+        "step_label": "container_of — remonter de 24 octets"
       }
     ]
   },
-  "prerequisites": ["struct-padding-01"],
+  "prerequisites": [
+    "struct-padding-01"
+  ],
   "exercise_type": "complete",
-  "key_concept": "container_of utilise offsetof pour retrouver la struct englobante \u2014 c'est le fondement des listes intrusives du noyau Linux",
-  "common_mistake": "Oublier le cast (char*) dans container_of \u2014 sans lui, l'arithm\u00e9tique de pointeurs utilise sizeof(*ptr) au lieu d'octets",
-  "kc_ids": ["KC-C03"],
+  "key_concept": "container_of utilise offsetof pour retrouver la struct englobante — c'est le fondement des listes intrusives du noyau Linux",
+  "common_mistake": "Oublier le cast (char*) dans container_of — sans lui, l'arithmétique de pointeurs utilise sizeof(*ptr) au lieu d'octets",
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stddef.h>\n#include <stdlib.h>\n\n/* == EXEMPLE ================================================\n * container_of simplifie : retrouver un Employee depuis son badge\n * Le badge (struct Badge) est imbrique dans Employee.\n * =========================================================== */\ntypedef struct Badge { int id; } Badge;\ntypedef struct { char name[20]; Badge badge; } Employee;\n\n#define example_container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(type, member)))\n\nvoid example_demo(void) {\n    Employee emp = {\"Alice\", {42}};\n    Badge *b = &emp.badge;\n    Employee *e = example_container_of(b, Employee, badge);\n    printf(\"%s (badge %d)\\n\", e->name, e->badge.id);\n    printf(\"offsetof(Employee, badge) = %zu\\n\", offsetof(Employee, badge));\n}\n/* Resultat: Alice (badge 42) / offsetof = 20 */\n\n/* == VOTRE EXERCICE =========================================\n * Liste intrusive de Tasks avec container_of\n * Chaque Task contient un ListNode link.\n * =========================================================== */\n#define container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(type, member)))\n\ntypedef struct ListNode { struct ListNode *next; } ListNode;\ntypedef struct { int pid; char name[16]; ListNode link; } Task;\n\nvoid list_add(ListNode *head, ListNode *node) {\n    node->next = head->next; head->next = node;\n}\n\nint main(void) {\n    /* TODO: creer 3 tasks, les ajouter, parcourir avec container_of */\n    return 0;\n}",
     "#include <stdio.h>\n#include <stddef.h>\n#include <stdlib.h>\n\n#define container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(type, member)))\n\ntypedef struct ListNode { struct ListNode *next; } ListNode;\ntypedef struct { int pid; char name[16]; ListNode link; } Task;\n\nvoid list_add(ListNode *head, ListNode *node) {\n    node->next = head->next; head->next = node;\n}\n\nint main(void) {\n    ListNode head = {NULL};\n    Task t1 = {100, \"init\", {NULL}};\n    Task t2 = {200, \"bash\", {NULL}};\n    Task t3 = {300, \"vim\", {NULL}};\n    list_add(&head, &t1.link);\n    list_add(&head, &t2.link);\n    list_add(&head, &t3.link);\n    printf(\"Task list:\\n\");\n    for (ListNode *n = head.next; n; n = n->next) {\n        Task *t = container_of(n, Task, ____);\n        printf(\"  pid=%d name=%s\\n\", t->____, t->____);\n    }\n    printf(\"offsetof(Task, link) = %zu\\n\", offsetof(Task, link));\n    printf(\"sizeof(Task) = %zu\\n\", sizeof(Task));\n    return 0;\n}",

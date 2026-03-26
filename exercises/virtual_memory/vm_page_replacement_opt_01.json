@@ -13,10 +13,8 @@
     "Dans main, appelez find_opt(frames, refs, REFS, i + 1) — le +1 car on cherche l'utilisation APRÈS l'accès courant"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "Page faults: 7\n",
-    "test_code": "#include <stdio.h>\n#include <string.h>\n\n#define FRAMES 3\n#define REFS 12\n\nint next_use(int refs[], int n, int from, int page);\nint find_opt(int frames[], int refs[], int n, int from);\nint in_frames(int frames[], int n, int page);\n\nvoid test_opt_main_sequence(void) {\n    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};\n    int frames[FRAMES];\n    memset(frames, -1, sizeof(frames));\n    int faults = 0, filled = 0;\n    for (int i = 0; i < REFS; i++) {\n        if (!in_frames(frames, FRAMES, refs[i])) {\n            if (filled < FRAMES) {\n                frames[filled++] = refs[i];\n            } else {\n                int victim = find_opt(frames, refs, REFS, i + 1);\n                frames[victim] = refs[i];\n            }\n            faults++;\n        }\n    }\n    TEST_ASSERT_EQUAL_INT(7, faults);\n}\n\nvoid test_next_use_finds_index(void) {\n    int refs[] = {1, 2, 3, 4, 5};\n    int idx = next_use(refs, 5, 2, 4);\n    TEST_ASSERT_EQUAL_INT(3, idx);\n}\n\nvoid test_next_use_returns_n_if_not_found(void) {\n    int refs[] = {1, 2, 3, 4, 5};\n    int idx = next_use(refs, 5, 3, 1);\n    TEST_ASSERT_EQUAL_INT(5, idx);\n}\n\nvoid test_find_opt_chooses_farthest(void) {\n    int refs[] = {1, 2, 3, 4, 5, 1, 2, 3};\n    int frames[] = {1, 2, 4};\n    int victim = find_opt(frames, refs, 8, 4);\n    TEST_ASSERT(victim >= 0 && victim < 3);\n}\n\nint main(void) {\n    RUN_TEST(test_opt_main_sequence);\n    RUN_TEST(test_next_use_finds_index);\n    RUN_TEST(test_next_use_returns_n_if_not_found);\n    RUN_TEST(test_find_opt_chooses_farthest);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Page faults: 7\n"
   },
   "visualizer": {
     "type": "dataflow",

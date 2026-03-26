@@ -13,10 +13,8 @@
     "Le parent doit fermer les deux extrémités du pipe avant d'attendre, sinon le lecteur ne recevra jamais EOF"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "REGEX:(?s)shell> producer \\| counter\\n.*Lines: \\d+\\n.*child1 exit=0\\nchild2 exit=0\\nshell> done",
-    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/wait.h>\n\nvoid test_pipe_creates_two_fds(void) {\n    int pipefd[2];\n    int ret = pipe(pipefd);\n    TEST_ASSERT(ret == 0, \"pipe() reussi\");\n    TEST_ASSERT(pipefd[0] > 0, \"fd lecture valide\");\n    TEST_ASSERT(pipefd[1] > 0, \"fd ecriture valide\");\n    close(pipefd[0]); close(pipefd[1]);\n}\n\nvoid test_fork_child_exits_zero(void) {\n    pid_t pid = fork();\n    if (pid == 0) { exit(0); }\n    int status;\n    waitpid(pid, &status, 0);\n    TEST_ASSERT(WIFEXITED(status), \"enfant termine normalement\");\n    TEST_ASSERT(WEXITSTATUS(status) == 0, \"code sortie enfant = 0\");\n}\n\nvoid test_string_split_on_pipe(void) {\n    char cmd[] = \"producer | consumer\";\n    char *pipe_pos = strchr(cmd, '|');\n    TEST_ASSERT(pipe_pos != NULL, \"pipe '|' trouve dans la commande\");\n}\n\nvoid run_tests(void) {\n    test_pipe_creates_two_fds();\n    test_fork_child_exits_zero();\n    test_string_split_on_pipe();\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "REGEX:(?s)shell> producer \\| counter\\n.*Lines: \\d+\\n.*child1 exit=0\\nchild2 exit=0\\nshell> done"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,60 +22,137 @@
       {
         "label": "Création du pipe et du premier fork",
         "stack": [
-          {"name": "pipefd[0]", "value": "3 (lecture)"},
-          {"name": "pipefd[1]", "value": "4 (écriture)"},
-          {"name": "pid1", "value": "fork()"}
+          {
+            "name": "pipefd[0]",
+            "value": "3 (lecture)"
+          },
+          {
+            "name": "pipefd[1]",
+            "value": "4 (écriture)"
+          },
+          {
+            "name": "pid1",
+            "value": "fork()"
+          }
         ],
         "heap": [],
-        "arrows": [{"from": "pipefd[1]", "to": "pipefd[0]", "label": "kernel buffer"}],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "arrows": [
+          {
+            "from": "pipefd[1]",
+            "to": "pipefd[0]",
+            "label": "kernel buffer"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le pipe crée deux fd. Le premier enfant redirigera son stdout vers pipefd[1].",
         "step_label": "pipe+fork1"
       },
       {
         "label": "Enfant 1 : redirection stdout vers pipe",
         "stack": [
-          {"name": "STDOUT_FILENO", "value": "-> pipefd[1]"},
-          {"name": "pipefd[0]", "value": "fermé"}
+          {
+            "name": "STDOUT_FILENO",
+            "value": "-> pipefd[1]"
+          },
+          {
+            "name": "pipefd[0]",
+            "value": "fermé"
+          }
         ],
         "heap": [],
-        "arrows": [{"from": "STDOUT_FILENO", "to": "pipefd[1]", "label": "dup2"}],
-        "call_frames": [{"function_name": "cmd_producer", "args": "void", "is_active": true}],
+        "arrows": [
+          {
+            "from": "STDOUT_FILENO",
+            "to": "pipefd[1]",
+            "label": "dup2"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "cmd_producer",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "dup2(pipefd[1], STDOUT_FILENO) fait que printf écrit dans le pipe.",
         "step_label": "dup2 stdout"
       },
       {
         "label": "Enfant 2 : redirection stdin depuis pipe",
         "stack": [
-          {"name": "STDIN_FILENO", "value": "-> pipefd[0]"},
-          {"name": "pipefd[1]", "value": "fermé"}
+          {
+            "name": "STDIN_FILENO",
+            "value": "-> pipefd[0]"
+          },
+          {
+            "name": "pipefd[1]",
+            "value": "fermé"
+          }
         ],
         "heap": [],
-        "arrows": [{"from": "pipefd[0]", "to": "STDIN_FILENO", "label": "dup2"}],
-        "call_frames": [{"function_name": "cmd_upper_count", "args": "void", "is_active": true}],
+        "arrows": [
+          {
+            "from": "pipefd[0]",
+            "to": "STDIN_FILENO",
+            "label": "dup2"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "cmd_upper_count",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "dup2(pipefd[0], STDIN_FILENO) fait que fgets lit depuis le pipe.",
         "step_label": "dup2 stdin"
       },
       {
         "label": "Parent attend les deux enfants",
         "stack": [
-          {"name": "status", "value": "0"},
-          {"name": "pipefd[0]", "value": "fermé"},
-          {"name": "pipefd[1]", "value": "fermé"}
+          {
+            "name": "status",
+            "value": "0"
+          },
+          {
+            "name": "pipefd[0]",
+            "value": "fermé"
+          },
+          {
+            "name": "pipefd[1]",
+            "value": "fermé"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le parent ferme ses copies du pipe et attend avec waitpid.",
         "step_label": "waitpid"
       }
     ]
   },
-  "prerequisites": ["pipe-01", "process-state-01"],
+  "prerequisites": [
+    "pipe-01",
+    "process-state-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Un pipeline shell = pipe() + fork() x2 + dup2() pour rediriger stdin/stdout entre processus",
   "common_mistake": "Oublier de fermer les fd du pipe dans le parent — le processus lecteur ne recevra jamais EOF et bloquera",
-  "kc_ids": ["KC-CAP"],
+  "kc_ids": [
+    "KC-CAP"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <signal.h>\n\n/* == EXEMPLE =======================================\n * Pipeline simple : un ecrivain et un lecteur via pipe\n * Pattern : pipe() -> fork() x2 -> dup2() -> waitpid()\n * ================================================= */\nvoid example_echo_wc(void) {\n    int fd[2];\n    pipe(fd);\n\n    pid_t p1 = fork();\n    if (p1 == 0) {\n        close(fd[0]);\n        dup2(fd[1], STDOUT_FILENO);\n        close(fd[1]);\n        printf(\"alpha\\nbeta\\ngamma\\n\");\n        fflush(stdout);\n        exit(0);\n    }\n\n    pid_t p2 = fork();\n    if (p2 == 0) {\n        close(fd[1]);\n        dup2(fd[0], STDIN_FILENO);\n        close(fd[0]);\n        char buf[64];\n        int n = 0;\n        while (fgets(buf, sizeof(buf), stdin)) n++;\n        printf(\"Total: %d\\n\", n);\n        exit(0);\n    }\n\n    close(fd[0]);\n    close(fd[1]);\n    int s;\n    waitpid(p1, &s, 0);\n    waitpid(p2, &s, 0);\n}\n/* Resultat: Total: 3 */\n\n/* == VOTRE EXERCICE ================================\n * Mini-shell avec fork+exec+pipe+signal\n * Inspirez-vous de example_echo_wc ci-dessus.\n * Ajoutez un handler SIGCHLD et affichez les codes de sortie.\n * ================================================= */\n\nvolatile sig_atomic_t child_exited = 0;\n\nvoid sigchld_handler(int sig) {\n    (void)sig;\n    child_exited = 1;\n}\n\nvoid cmd_producer(void) {\n    printf(\"HELLO\\n\");\n    printf(\"WORLD\\n\");\n    fflush(stdout);\n}\n\nvoid cmd_upper_count(void) {\n    char buf[64];\n    int count = 0;\n    while (fgets(buf, sizeof(buf), stdin)) count++;\n    printf(\"Lines: %d\\n\", count);\n}\n\nint main(void) {\n    struct sigaction sa;\n    sa.sa_handler = sigchld_handler;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = SA_RESTART;\n    sigaction(SIGCHLD, &sa, NULL);\n\n    printf(\"shell> producer | counter\\n\");\n\n    int pipefd[2];\n    pipe(pipefd);\n    /* TODO: fork enfant 1 -> dup2 stdout -> cmd_producer */\n    /* TODO: fork enfant 2 -> dup2 stdin -> cmd_upper_count */\n    /* TODO: close pipe dans parent, waitpid x2, afficher exit codes */\n    (void)pipefd;\n    printf(\"shell> done\\n\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <string.h>\n#include <sys/wait.h>\n#include <signal.h>\n\nvolatile sig_atomic_t child_exited = 0;\n\nvoid sigchld_handler(int sig) {\n    (void)sig;\n    child_exited = 1;\n}\n\nvoid cmd_producer(void) {\n    printf(\"HELLO\\n\");\n    printf(\"WORLD\\n\");\n    fflush(stdout);\n}\n\nvoid cmd_upper_count(void) {\n    char buf[64];\n    int count = 0;\n    while (fgets(buf, sizeof(buf), stdin)) count++;\n    printf(\"Lines: %d\\n\", count);\n}\n\nint main(void) {\n    struct sigaction sa;\n    sa.sa_handler = sigchld_handler;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = SA_RESTART;\n    sigaction(SIGCHLD, &sa, NULL);\n\n    printf(\"shell> producer | counter\\n\");\n\n    int pipefd[2];\n    pipe(pipefd);\n\n    pid_t pid1 = fork();\n    if (pid1 == 0) {\n        close(pipefd[0]);\n        dup2(pipefd[____], STDOUT_FILENO); /* quel fd pour ecrire ? */\n        close(pipefd[1]);\n        cmd_producer();\n        exit(0);\n    }\n\n    pid_t pid2 = fork();\n    if (pid2 == 0) {\n        close(pipefd[1]);\n        dup2(pipefd[____], STDIN_FILENO); /* quel fd pour lire ? */\n        close(pipefd[0]);\n        cmd_upper_count();\n        exit(0);\n    }\n\n    close(pipefd[0]);\n    close(pipefd[1]);\n    int status;\n    waitpid(pid1, &status, 0);\n    printf(\"child1 exit=%d\\n\", WEXITSTATUS(status));\n    waitpid(pid2, &status, 0);\n    printf(\"child2 exit=%d\\n\", WEXITSTATUS(status));\n    printf(\"shell> done\\n\");\n    return 0;\n}",

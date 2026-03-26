@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Décalages gauche/droite",
   "description": "NSY103 — Les décalages bit-à-bit multiplient (<< par 2^n) ou divisent (>> par 2^n). Fondamentaux pour l'optimisation, la manipulation de registres et l'extraction de champs.\n\nCalculez des décalages et vérifiez l'équivalence avec la multiplication/division.",
-  "starter_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int power_of_two(int n) {\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}",
+  "starter_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return 0;\n}\n\nunsigned int power_of_two(int n) {\n    return 0;\n}\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(shift_left(0x15, 1)));\n        printf(\"%d\\n\", (int)(shift_left(0x15, 4)));\n        printf(\"%d\\n\", (int)(shift_left(0x50, 1)));\n        printf(\"%d\\n\", (int)(shift_left(2, 2)));\n    }\n    {\n        printf(\"%d\\n\", (int)(shift_right(0x15, 1)));\n        printf(\"%d\\n\", (int)(shift_right(0x15, 3)));\n        printf(\"%d\\n\", (int)(shift_right(0xFF, 1)));\n        printf(\"%d\\n\", (int)(shift_right(0x01, 2)));\n    }\n    {\n        printf(\"%d\\n\", (int)(power_of_two(0)));\n        printf(\"%d\\n\", (int)(power_of_two(3)));\n        printf(\"%d\\n\", (int)(power_of_two(7)));\n        printf(\"%d\\n\", (int)(power_of_two(8)));\n    }\n    return 0;\n}\n",
   "hints": [
     "<< décale les bits vers la gauche (multiplie par 2^n)",
     ">> décale les bits vers la droite (divise par 2^n)",
     "1 << n donne 2^n — utile pour créer des masques de bit"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_shift_left(void) {\n    TEST_ASSERT_EQUAL_INT(42, shift_left(0x15, 1));\n    TEST_ASSERT_EQUAL_INT(336, shift_left(0x15, 4));\n    TEST_ASSERT_EQUAL_INT(160, shift_left(0x50, 1));\n    TEST_ASSERT_EQUAL_INT(8, shift_left(2, 2));\n}\n\nvoid test_shift_right(void) {\n    TEST_ASSERT_EQUAL_INT(10, shift_right(0x15, 1));\n    TEST_ASSERT_EQUAL_INT(2, shift_right(0x15, 3));\n    TEST_ASSERT_EQUAL_INT(127, shift_right(0xFF, 1));\n    TEST_ASSERT_EQUAL_INT(0, shift_right(0x01, 2));\n}\n\nvoid test_power_of_two(void) {\n    TEST_ASSERT_EQUAL_INT(1, power_of_two(0));\n    TEST_ASSERT_EQUAL_INT(8, power_of_two(3));\n    TEST_ASSERT_EQUAL_INT(128, power_of_two(7));\n    TEST_ASSERT_EQUAL_INT(256, power_of_two(8));\n}\n\nint main(void) {\n    RUN_TEST(test_shift_left);\n    RUN_TEST(test_shift_right);\n    RUN_TEST(test_power_of_two);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "42\n336\n160\n8\n10\n2\n127\n0\n1\n8\n128\n256"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,49 +22,98 @@
       {
         "label": "Décalage gauche (multiplication)",
         "stack": [
-          {"name": "val (0x15)", "value": "00010101b = 21"},
-          {"name": "val << 1", "value": "00101010b = 42 (×2)"},
-          {"name": "val << 4", "value": "101010000b = 336 (×16)"}
+          {
+            "name": "val (0x15)",
+            "value": "00010101b = 21"
+          },
+          {
+            "name": "val << 1",
+            "value": "00101010b = 42 (×2)"
+          },
+          {
+            "name": "val << 4",
+            "value": "101010000b = 336 (×16)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "shift_left", "args": "0x15, 1", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "shift_left",
+            "args": "0x15, 1",
+            "is_active": true
+          }
+        ],
         "explanation": "<< N multiplie par 2^N — les bits sortent par la gauche",
         "step_label": "1. Gauche"
       },
       {
         "label": "Décalage droite (division)",
         "stack": [
-          {"name": "val (0x15)", "value": "00010101b = 21"},
-          {"name": "val >> 1", "value": "00001010b = 10 (÷2)"},
-          {"name": "val >> 3", "value": "00000010b = 2 (÷8)"}
+          {
+            "name": "val (0x15)",
+            "value": "00010101b = 21"
+          },
+          {
+            "name": "val >> 1",
+            "value": "00001010b = 10 (÷2)"
+          },
+          {
+            "name": "val >> 3",
+            "value": "00000010b = 2 (÷8)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "shift_right", "args": "0x15, 1", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "shift_right",
+            "args": "0x15, 1",
+            "is_active": true
+          }
+        ],
         "explanation": ">> N divise par 2^N — les bits sortent par la droite (tronqué)",
         "step_label": "2. Droite"
       },
       {
         "label": "1 << N = puissance de 2",
         "stack": [
-          {"name": "1 << 0", "value": "1 (bit 0)"},
-          {"name": "1 << 3", "value": "8 (bit 3)"},
-          {"name": "1 << 7", "value": "128 (bit 7)"}
+          {
+            "name": "1 << 0",
+            "value": "1 (bit 0)"
+          },
+          {
+            "name": "1 << 3",
+            "value": "8 (bit 3)"
+          },
+          {
+            "name": "1 << 7",
+            "value": "128 (bit 7)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "power_of_two", "args": "3", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "power_of_two",
+            "args": "3",
+            "is_active": true
+          }
+        ],
         "explanation": "Pattern fondamental: 1 << N positionne un seul bit à la position N",
         "step_label": "3. Puissances"
       }
     ]
   },
-  "prerequisites": ["bitwise-ops-01"],
+  "prerequisites": [
+    "bitwise-ops-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "<< multiplie par 2^n, >> divise par 2^n, 1<<n donne 2^n — base du masquage de bits",
   "common_mistake": "Décaler un signed int à droite → extension de signe (arithmetic shift) au lieu de zero-fill",
-  "kc_ids": ["KC-C04"],
+  "kc_ids": [
+    "KC-C04"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Décalages: << gauche (×2^n), >> droite (÷2^n)\n * =========================================================== */\nvoid example_shifts(void) {\n    unsigned int x = 0x0A; /* 00001010b = 10 */\n    printf(\"x << 2 = %u\\n\", x << 2); /* 40 */\n    printf(\"x >> 1 = %u\\n\", x >> 1); /* 5 */\n    printf(\"1 << 4 = %u\\n\", 1 << 4); /* 16 */\n}\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 << n;\n}",
     "#include <stdio.h>\n\nunsigned int shift_left(unsigned int val, int n) {\n    return val << n;\n}\n\nunsigned int shift_right(unsigned int val, int n) {\n    return val >> n;\n}\n\nunsigned int power_of_two(int n) {\n    return 1 ____ n;\n}",

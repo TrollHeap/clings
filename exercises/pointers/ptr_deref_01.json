@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Déclarer et déréférencer un pointeur",
   "description": "NSY103 — Un pointeur est une variable qui stocke une adresse mémoire. L'opérateur `&` donne l'adresse d'une variable, `*` accède à la valeur pointée.\n\nDéclarez un entier `x = 42`, un pointeur `p` vers `x`, puis affichez la valeur via le pointeur.",
-  "starter_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return 0;\n}\n\nvoid set_value(int *p, int val) {\n}\n",
-  "solution_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return *p;\n}\n\nvoid set_value(int *p, int val) {\n    *p = val;\n}\n",
+  "starter_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return 0;\n}\n\nvoid set_value(int *p, int val) {\n}\n\nint main(void) {\n    // Déclarez x=42, un pointeur p vers x\n    // Affichez: \"Valeur de x : 42\", \"Valeur via *p : 42\", \"Adresses egales : 1\"\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint get_value(int *p) {\n    return *p;\n}\n\nvoid set_value(int *p, int val) {\n    *p = val;\n}\n\nint main(void) {\n    {\n        int x = 42;\n        printf(\"%d\\n\", (int)(get_value(&x)));\n    }\n    {\n        int x = 0;\n        set_value(&x, 99);\n        printf(\"%d\\n\", (int)(x));\n    }\n    {\n        int x = 10;\n        set_value(&x, 20);\n        printf(\"%d\\n\", (int)(get_value(&x)));\n    }\n    {\n        int x = -50;\n        printf(\"%d\\n\", (int)(get_value(&x)));\n    }\n    return 0;\n}\n",
   "hints": [
     "Pour déclarer un pointeur vers int : `int *p;`",
     "Pour obtenir l'adresse de x : `p = &x;`",
     "Pour lire la valeur via le pointeur : `printf(\"%d\", *p);`"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_get_value(void) {\n    int x = 42;\n    TEST_ASSERT_EQUAL_INT(42, get_value(&x));\n}\n\nvoid test_set_value(void) {\n    int x = 0;\n    set_value(&x, 99);\n    TEST_ASSERT_EQUAL_INT(99, x);\n}\n\nvoid test_get_after_set(void) {\n    int x = 10;\n    set_value(&x, 20);\n    TEST_ASSERT_EQUAL_INT(20, get_value(&x));\n}\n\nvoid test_negative_value(void) {\n    int x = -50;\n    TEST_ASSERT_EQUAL_INT(-50, get_value(&x));\n}\n\nint main(void) {\n    RUN_TEST(test_get_value);\n    RUN_TEST(test_set_value);\n    RUN_TEST(test_get_after_set);\n    RUN_TEST(test_negative_value);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "42\n99\n20\n-50"
   },
   "visualizer": {
     "type": "stack_heap",

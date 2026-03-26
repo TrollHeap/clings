@@ -13,10 +13,8 @@
     "L'initialisation imbriquée utilise des accolades imbriquées : `.adresse = { .rue = ... }`"
   ],
   "validation": {
-    "mode": "test",
-    "expected_output": "Nom : Alice Dupont\nAge : 28\nRue : 12 rue de la Paix\nVille : Paris (75001)\n",
-    "test_code": "void test_nested_struct_init(void) {\n    Personne p = {\n        .nom = \"Alice Dupont\",\n        .age = 28,\n        .adresse = {\n            .rue = \"12 rue de la Paix\",\n            .ville = \"Paris\",\n            .code_postal = 75001\n        }\n    };\n    TEST_ASSERT_EQUAL_INT(28, p.age);\n    TEST_ASSERT_EQUAL_INT(75001, p.adresse.code_postal);\n}\n\nvoid test_nested_access_via_pointer(void) {\n    Personne p = {\n        .nom = \"Bob Martin\",\n        .age = 35,\n        .adresse = {\n            .rue = \"42 rue de Lyon\",\n            .ville = \"Lyon\",\n            .code_postal = 69000\n        }\n    };\n    Personne *ptr = &p;\n    TEST_ASSERT_EQUAL_INT(35, ptr->age);\n    TEST_ASSERT_EQUAL_INT(69000, ptr->adresse.code_postal);\n}\n\nvoid test_nested_string_access(void) {\n    Personne p = {\n        .nom = \"Charlie\",\n        .age = 42,\n        .adresse = {\n            .rue = \"100 rue de Marseille\",\n            .ville = \"Marseille\",\n            .code_postal = 13000\n        }\n    };\n    Personne *ptr = &p;\n    TEST_ASSERT_EQUAL_STRING(\"Marseille\", ptr->adresse.ville);\n}\n\nvoid test_modify_nested_field(void) {\n    Personne p = {\n        .nom = \"Diana\",\n        .age = 30,\n        .adresse = {\n            .rue = \"1 rue de Bretagne\",\n            .ville = \"Brest\",\n            .code_postal = 29200\n        }\n    };\n    p.adresse.code_postal = 29000;\n    p.age = 31;\n    TEST_ASSERT_EQUAL_INT(31, p.age);\n    TEST_ASSERT_EQUAL_INT(29000, p.adresse.code_postal);\n}\n\nint main(void) {\n    RUN_TEST(test_nested_struct_init);\n    RUN_TEST(test_nested_access_via_pointer);\n    RUN_TEST(test_nested_string_access);\n    RUN_TEST(test_modify_nested_field);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Nom : Alice Dupont\nAge : 28\nRue : 12 rue de la Paix\nVille : Paris (75001)\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,16 +22,35 @@
       {
         "label": "Personne alice sur la pile",
         "stack": [
-          {"name": "alice.nom", "value": "\"Alice Dupont\""},
-          {"name": "alice.age", "value": "28"},
-          {"name": "alice.adresse.rue", "value": "\"12 rue de la Paix\""},
-          {"name": "alice.adresse.ville", "value": "\"Paris\""},
-          {"name": "alice.adresse.code_postal", "value": "75001"}
+          {
+            "name": "alice.nom",
+            "value": "\"Alice Dupont\""
+          },
+          {
+            "name": "alice.age",
+            "value": "28"
+          },
+          {
+            "name": "alice.adresse.rue",
+            "value": "\"12 rue de la Paix\""
+          },
+          {
+            "name": "alice.adresse.ville",
+            "value": "\"Paris\""
+          },
+          {
+            "name": "alice.adresse.code_postal",
+            "value": "75001"
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "alice est une Personne qui contient une Adresse inline (pas un pointeur). Tous les champs sont contigus en mémoire — la taille totale est sizeof(Personne) qui inclut sizeof(Adresse).",
         "step_label": "Struct imbriquée — tout sur la pile"
@@ -41,28 +58,53 @@
       {
         "label": "Accès via pointeur p->adresse.rue",
         "stack": [
-          {"name": "p", "value": "→alice"},
-          {"name": "p->nom", "value": "\"Alice Dupont\""},
-          {"name": "p->adresse.rue", "value": "\"12 rue de la Paix\""}
+          {
+            "name": "p",
+            "value": "→alice"
+          },
+          {
+            "name": "p->nom",
+            "value": "\"Alice Dupont\""
+          },
+          {
+            "name": "p->adresse.rue",
+            "value": "\"12 rue de la Paix\""
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "p", "to": "alice.nom", "label": "→"}
+          {
+            "from": "p",
+            "to": "alice.nom",
+            "label": "→"
+          }
         ],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": false},
-          {"function_name": "print_personne", "args": "&alice", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": false
+          },
+          {
+            "function_name": "print_personne",
+            "args": "&alice",
+            "is_active": true
+          }
         ],
         "explanation": "p->adresse.rue : p-> accède à la struct Personne, .adresse descend dans le champ Adresse, .rue accède au champ char[]. Pas d'allocation supplémentaire — tout est imbriqué.",
         "step_label": "p->adresse.rue — chaînage d'accès"
       }
     ]
   },
-  "prerequisites": ["struct-init-02"],
+  "prerequisites": [
+    "struct-init-02"
+  ],
   "exercise_type": "complete",
   "key_concept": "Une struct imbriquée est stockée inline — accès par chaînage de . et ->",
   "common_mistake": "Confondre `p->adresse->rue` (si adresse était un pointeur) avec `p->adresse.rue` (adresse inline)",
-  "kc_ids": ["KC-C03"],
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Struct imbriquee : Date dans Evenement\n * L'acces se fait par chainons : evt.date.jour\n * =========================================================== */\ntypedef struct { int jour, mois, annee; } Date;\ntypedef struct { char titre[40]; Date date; } Evenement;\n\nvoid example_demo(void) {\n    Evenement evt = {\n        .titre = \"Conference\",\n        .date = {.jour = 15, .mois = 3, .annee = 2024}\n    };\n    printf(\"%s : %02d/%02d/%d\\n\",\n           evt.titre, evt.date.jour, evt.date.mois, evt.date.annee);\n}\n/* Resultat: Conference : 15/03/2024 */\n\n/* == VOTRE EXERCICE =========================================\n * Struct Personne avec Adresse imbriquee\n * Definissez les structs, initialisez et affichez.\n * =========================================================== */\ntypedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;\ntypedef struct { char nom[30]; int age; Adresse adresse; } Personne;\n\nvoid print_personne(const Personne *p) {\n    (void)p; /* TODO */\n}\n\nint main(void) {\n    Personne alice = {\n        .nom = \"Alice Dupont\", .age = 28,\n        .adresse = {.rue = \"12 rue de la Paix\", .ville = \"Paris\", .code_postal = 75001}\n    };\n    print_personne(&alice);\n    return 0;\n}",
     "#include <stdio.h>\n\ntypedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;\ntypedef struct { char nom[30]; int age; Adresse adresse; } Personne;\n\nvoid print_personne(const Personne *p) {\n    printf(\"Nom : %s\\n\", p->nom);\n    printf(\"Age : %d\\n\", p->age);\n    printf(\"Rue : %s\\n\", p->adresse.____);\n    printf(\"Ville : %s (%d)\\n\", p->adresse.____, p->adresse.____);\n}\n\nint main(void) {\n    Personne alice = {\n        .nom = \"Alice Dupont\", .age = 28,\n        .adresse = {.rue = \"12 rue de la Paix\", .ville = \"Paris\", .code_postal = 75001}\n    };\n    print_personne(&alice);\n    return 0;\n}",

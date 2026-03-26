@@ -5,17 +5,16 @@
   "difficulty": 2,
   "title": "Manipulation de sigset_t",
   "description": "NSY103 — sigset_t est un ensemble de signaux (bitmask). Les fonctions sigemptyset, sigfullset, sigaddset, sigdelset, sigismember permettent de manipuler cet ensemble.\n\nConstituez un masque incluant SIGINT, SIGTERM, SIGCHLD, puis testez sigismember.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
-  "starter_code": "#include <signal.h>\n\n/* Test mode: no main() needed */",
-  "solution_code": "#include <signal.h>\n\n/* Test mode: sigset operations are tested directly */",
+  "starter_code": "#include <signal.h>\n\n/* Test mode: no main() needed */\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <signal.h>\n\n/* Test mode: sigset operations are tested directly */\n\nint main(void) {\n    {\n        sigset_t s;\n        sigemptyset(&s);\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGINT)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGTERM)));\n    }\n    {\n        sigset_t s;\n        sigemptyset(&s);\n        sigaddset(&s, SIGINT);\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGINT)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGTERM)));\n    }\n    {\n        sigset_t s;\n        sigemptyset(&s);\n        sigaddset(&s, SIGINT);\n        sigaddset(&s, SIGTERM);\n        sigaddset(&s, SIGCHLD);\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGINT)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGTERM)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGCHLD)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGKILL)));\n    }\n    {\n        sigset_t s;\n        sigemptyset(&s);\n        sigaddset(&s, SIGINT);\n        sigaddset(&s, SIGTERM);\n        sigdelset(&s, SIGTERM);\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGINT)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGTERM)));\n    }\n    {\n        sigset_t s;\n        sigemptyset(&s);\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGUSR1)));\n        printf(\"%d\\n\", (int)(sigismember(&s, SIGKILL)));\n    }\n    return 0;\n}\n",
   "hints": [
     "sigemptyset(&set); // initialise à vide — TOUJOURS faire en premier",
     "sigaddset(&set, SIGINT); // ajoute SIGINT",
     "sigismember(&set, SIGTERM) retourne 1 si présent, 0 sinon"
   ],
   "validation": {
-    "mode": "test",
-    "expected_tests_pass": 5,
-    "test_code": "void test_sigemptyset_makes_empty(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigaddset_adds_signal(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigaddset_multiple(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    sigaddset(&s, SIGTERM);\n    sigaddset(&s, SIGCHLD);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGTERM));\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGCHLD));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGKILL));\n}\n\nvoid test_sigdelset_removes_signal(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    sigaddset(&s, SIGINT);\n    sigaddset(&s, SIGTERM);\n    sigdelset(&s, SIGTERM);\n    TEST_ASSERT_EQUAL_INT(1, sigismember(&s, SIGINT));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGTERM));\n}\n\nvoid test_sigismember_not_in_empty_set(void) {\n    sigset_t s;\n    sigemptyset(&s);\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGUSR1));\n    TEST_ASSERT_EQUAL_INT(0, sigismember(&s, SIGKILL));\n}\n\nint main(void) {\n    RUN_TEST(test_sigemptyset_makes_empty);\n    RUN_TEST(test_sigaddset_adds_signal);\n    RUN_TEST(test_sigaddset_multiple);\n    RUN_TEST(test_sigdelset_removes_signal);\n    RUN_TEST(test_sigismember_not_in_empty_set);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "0\n0\n1\n0\n1\n1\n1\n0\n1\n0\n0\n0"
   },
   "visualizer": {
     "type": "stack_heap",

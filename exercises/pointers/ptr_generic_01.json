@@ -5,17 +5,16 @@
   "difficulty": 4,
   "title": "void* et cast générique (qsort)",
   "description": "NSY103 — `void *` est un pointeur générique qui peut pointer vers n'importe quel type. Il ne peut pas être déréférencé directement — il faut le caster. La fonction standard `qsort` utilise ce mécanisme pour trier n'importe quel type.\n\nImplémentez des fonctions de comparaison pour trier des entiers et des chaînes avec `qsort`.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint cmp_int(const void *a, const void *b) {\n    return 0;\n}\n\nint cmp_str(const void *a, const void *b) {\n    return 0;\n}\n",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint cmp_int(const void *a, const void *b) {\n    int ia = *(const int *)a;\n    int ib = *(const int *)b;\n    return (ia > ib) - (ia < ib);\n}\n\nint cmp_str(const void *a, const void *b) {\n    const char *sa = *(const char **)a;\n    const char *sb = *(const char **)b;\n    return strcmp(sa, sb);\n}\n",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint cmp_int(const void *a, const void *b) {\n    return 0;\n}\n\nint cmp_str(const void *a, const void *b) {\n    return 0;\n}\n\nint main(void) {\n    // TODO: trier nums[] et mots[] avec qsort\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint cmp_int(const void *a, const void *b) {\n    int ia = *(const int *)a;\n    int ib = *(const int *)b;\n    return (ia > ib) - (ia < ib);\n}\n\nint cmp_str(const void *a, const void *b) {\n    const char *sa = *(const char **)a;\n    const char *sb = *(const char **)b;\n    return strcmp(sa, sb);\n}\n\nint main(void) {\n    int nums[] = {42, 7, 99, 3, 15};\n    qsort(nums, 5, sizeof(int), cmp_int);\n    printf(\"Entiers : \");\n    for (int i = 0; i < 5; i++) printf(\"%d \", nums[i]);\n    printf(\"\\n\");\n    char *mots[] = {\"delta\", \"alpha\", \"charlie\", \"bravo\"};\n    qsort(mots, 4, sizeof(char *), cmp_str);\n    printf(\"Mots : \");\n    for (int i = 0; i < 4; i++) printf(\"%s \", mots[i]);\n    printf(\"\\n\");\n    return 0;\n}\n",
   "hints": [
     "Pour cmp_int : caster `const void *` en `const int *` puis déréférencer",
     "Pour cmp_str : qsort passe l'adresse de chaque élément — un élément est `char *`, donc le paramètre est `char **`",
     "Pattern safe pour comparer des entiers sans overflow : `(a > b) - (a < b)`"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "int cmp_int(const void *a, const void *b);\nint cmp_str(const void *a, const void *b);\n\nvoid test_cmp_int_ascending(void) {\n    int a = 1, b = 2;\n    TEST_ASSERT_TRUE(cmp_int(&a, &b) < 0);\n}\n\nvoid test_cmp_int_descending(void) {\n    int a = 5, b = 3;\n    TEST_ASSERT_TRUE(cmp_int(&a, &b) > 0);\n}\n\nvoid test_cmp_int_equal(void) {\n    int a = 7, b = 7;\n    TEST_ASSERT_EQUAL_INT(0, cmp_int(&a, &b));\n}\n\nvoid test_cmp_str_order(void) {\n    const char *s1 = \"alpha\", *s2 = \"beta\";\n    TEST_ASSERT_TRUE(cmp_str(&s1, &s2) < 0);\n}\n\nint main(void) {\n    RUN_TEST(test_cmp_int_ascending);\n    RUN_TEST(test_cmp_int_descending);\n    RUN_TEST(test_cmp_int_equal);\n    RUN_TEST(test_cmp_str_order);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Entiers : 3 7 15 42 99\nMots : alpha bravo charlie delta"
   },
   "visualizer": {
     "type": "stack_heap",

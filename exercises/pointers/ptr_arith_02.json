@@ -5,17 +5,16 @@
   "difficulty": 2,
   "title": "Différence de pointeurs et sizeof",
   "description": "NSY103 — La différence entre deux pointeurs du même type donne le nombre d'éléments entre eux (pas le nombre d'octets). `sizeof` donne la taille en octets d'un type ou d'une variable.\n\nUtilisez la soustraction de pointeurs et sizeof pour calculer le nombre d'éléments et la taille en octets d'un tableau.",
-  "starter_code": "#include <stdio.h>\n\nlong array_distance(int *begin, int *end) {\n    return 0;\n}\n\nint *array_middle(int *begin, int *end) {\n    return begin;\n}\n",
-  "solution_code": "#include <stdio.h>\n\nlong array_distance(int *begin, int *end) {\n    return end - begin;\n}\n\nint *array_middle(int *begin, int *end) {\n    return begin + (end - begin) / 2;\n}\n",
+  "starter_code": "#include <stdio.h>\n\nlong array_distance(int *begin, int *end) {\n    return 0;\n}\n\nint *array_middle(int *begin, int *end) {\n    return begin;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nlong array_distance(int *begin, int *end) {\n    return end - begin;\n}\n\nint *array_middle(int *begin, int *end) {\n    return begin + (end - begin) / 2;\n}\n\nint main(void) {\n    {\n        int arr[] = {1, 2, 3};\n        printf(\"%d\\n\", (int)(array_distance(arr, arr)));\n    }\n    {\n        int arr[] = {10, 20, 30, 40, 50, 60};\n        printf(\"%d\\n\", (int)(array_distance(arr, arr + 6)));\n    }\n    {\n        int arr[] = {1, 2, 3, 4};\n        int *mid = array_middle(arr, arr + 4);\n        printf(\"%d\\n\", (int)(*mid));\n    }\n    {\n        int arr[] = {10, 20, 30, 40, 50};\n        int *mid = array_middle(arr, arr + 5);\n        printf(\"%d\\n\", (int)(*mid));\n    }\n    return 0;\n}\n",
   "hints": [
     "`end - begin` donne le nombre d'éléments, pas d'octets",
     "`sizeof(arr)` donne la taille totale du tableau en octets",
     "`sizeof(arr) / sizeof(arr[0])` donne le nombre d'éléments"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_distance_empty(void) {\n    int arr[] = {1, 2, 3};\n    TEST_ASSERT_EQUAL_INT(0, array_distance(arr, arr));\n}\n\nvoid test_distance_full(void) {\n    int arr[] = {10, 20, 30, 40, 50, 60};\n    TEST_ASSERT_EQUAL_INT(6, array_distance(arr, arr + 6));\n}\n\nvoid test_middle_even(void) {\n    int arr[] = {1, 2, 3, 4};\n    int *mid = array_middle(arr, arr + 4);\n    TEST_ASSERT_EQUAL_INT(3, *mid);\n}\n\nvoid test_middle_odd(void) {\n    int arr[] = {10, 20, 30, 40, 50};\n    int *mid = array_middle(arr, arr + 5);\n    TEST_ASSERT_EQUAL_INT(30, *mid);\n}\n\nint main(void) {\n    RUN_TEST(test_distance_empty);\n    RUN_TEST(test_distance_full);\n    RUN_TEST(test_middle_even);\n    RUN_TEST(test_middle_odd);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "0\n6\n3\n30"
   },
   "visualizer": {
     "type": "stack_heap",

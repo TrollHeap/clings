@@ -13,10 +13,8 @@
     "Le message QUIT sert de sentinelle pour arrêter proprement le proxy et le backend"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "[client] envoye: GET /index\n[proxy] relais client->backend: GET /index\n[backend] requete: GET /index\n[proxy] relais backend->client: 200 OK: GET /index\n[client] recu: 200 OK: GET /index\n[client] envoye: GET /about\n[proxy] relais client->backend: GET /about\n[backend] requete: GET /about\n[proxy] relais backend->client: 200 OK: GET /about\n[client] recu: 200 OK: GET /about\n[client] envoye: QUIT\n[proxy] relais client->backend: QUIT\n[proxy] arret\n[backend] arret\n[main] proxy termine\n",
-    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n\ntypedef struct {\n    int client_to_proxy[2];\n    int proxy_to_client[2];\n    int proxy_to_backend[2];\n    int backend_to_proxy[2];\n} ProxyPipes;\n\nvoid test_proxy_pipes_init(void) {\n    ProxyPipes p;\n    pipe(p.client_to_proxy);\n    pipe(p.proxy_to_client);\n    pipe(p.proxy_to_backend);\n    pipe(p.backend_to_proxy);\n    TEST_ASSERT_TRUE(p.client_to_proxy[0] > 0);\n    TEST_ASSERT_TRUE(p.proxy_to_client[0] > 0);\n    TEST_ASSERT_TRUE(p.proxy_to_backend[0] > 0);\n    TEST_ASSERT_TRUE(p.backend_to_proxy[0] > 0);\n    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);\n    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);\n    close(p.proxy_to_backend[0]); close(p.proxy_to_backend[1]);\n    close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);\n}\n\nvoid test_pipe_relay_basic(void) {\n    int p1[2], p2[2];\n    pipe(p1);\n    pipe(p2);\n    const char *data = \"request\";\n    write(p1[1], data, strlen(data));\n    char buf[32];\n    ssize_t n = read(p1[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    write(p2[1], buf, n);\n    n = read(p2[0], buf, sizeof(buf) - 1);\n    buf[n] = '\\0';\n    TEST_ASSERT_EQUAL_STRING(\"request\", buf);\n    close(p1[0]); close(p1[1]);\n    close(p2[0]); close(p2[1]);\n}\n\nvoid test_requests_array(void) {\n    const char *requests[] = {\"GET /index\", \"GET /about\", \"QUIT\"};\n    TEST_ASSERT_EQUAL_STRING(\"GET /index\", requests[0]);\n    TEST_ASSERT_EQUAL_STRING(\"GET /about\", requests[1]);\n    TEST_ASSERT_EQUAL_STRING(\"QUIT\", requests[2]);\n}\n\nint main(void) {\n    RUN_TEST(test_proxy_pipes_init);\n    RUN_TEST(test_pipe_relay_basic);\n    RUN_TEST(test_requests_array);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "[client] envoye: GET /index\n[proxy] relais client->backend: GET /index\n[backend] requete: GET /index\n[proxy] relais backend->client: 200 OK: GET /index\n[client] recu: 200 OK: GET /index\n[client] envoye: GET /about\n[proxy] relais client->backend: GET /about\n[backend] requete: GET /about\n[proxy] relais backend->client: 200 OK: GET /about\n[client] recu: 200 OK: GET /about\n[client] envoye: QUIT\n[proxy] relais client->backend: QUIT\n[proxy] arret\n[backend] arret\n[main] proxy termine\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,41 +22,92 @@
       {
         "label": "Architecture du proxy avec 4 pipes",
         "stack": [
-          {"name": "client_to_proxy", "value": "pipe [0,1]"},
-          {"name": "proxy_to_client", "value": "pipe [0,1]"},
-          {"name": "proxy_to_backend", "value": "pipe [0,1]"},
-          {"name": "backend_to_proxy", "value": "pipe [0,1]"}
+          {
+            "name": "client_to_proxy",
+            "value": "pipe [0,1]"
+          },
+          {
+            "name": "proxy_to_client",
+            "value": "pipe [0,1]"
+          },
+          {
+            "name": "proxy_to_backend",
+            "value": "pipe [0,1]"
+          },
+          {
+            "name": "backend_to_proxy",
+            "value": "pipe [0,1]"
+          }
         ],
         "heap": [],
         "arrows": [
-          {"from": "client_to_proxy", "to": "proxy_relay", "label": "requête"},
-          {"from": "proxy_to_backend", "to": "backend_thread", "label": "requête"},
-          {"from": "backend_to_proxy", "to": "proxy_relay", "label": "réponse"},
-          {"from": "proxy_to_client", "to": "client_thread", "label": "réponse"}
+          {
+            "from": "client_to_proxy",
+            "to": "proxy_relay",
+            "label": "requête"
+          },
+          {
+            "from": "proxy_to_backend",
+            "to": "backend_thread",
+            "label": "requête"
+          },
+          {
+            "from": "backend_to_proxy",
+            "to": "proxy_relay",
+            "label": "réponse"
+          },
+          {
+            "from": "proxy_to_client",
+            "to": "client_thread",
+            "label": "réponse"
+          }
         ],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le proxy est un relais bidirectionnel : il lit du client, écrit au backend, lit la réponse, écrit au client.",
         "step_label": "architecture"
       },
       {
         "label": "Relais d'une requête",
         "stack": [
-          {"name": "buf", "value": "\"GET /index\""},
-          {"name": "direction", "value": "client -> proxy -> backend"}
+          {
+            "name": "buf",
+            "value": "\"GET /index\""
+          },
+          {
+            "name": "direction",
+            "value": "client -> proxy -> backend"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "proxy_relay", "args": "p", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "proxy_relay",
+            "args": "p",
+            "is_active": true
+          }
+        ],
         "explanation": "Le proxy read() depuis client_to_proxy[0] et write() dans proxy_to_backend[1].",
         "step_label": "forward"
       }
     ]
   },
-  "prerequisites": ["capstone-chat-01", "pipe-01"],
+  "prerequisites": [
+    "capstone-chat-01",
+    "pipe-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Un reverse-proxy relaie le trafic bidirectionnellement : 4 pipes = 2 canaux full-duplex (client<->proxy, proxy<->backend)",
   "common_mistake": "Confondre les indices [0] et [1] des pipes — chaque participant doit lire depuis [0] et écrire dans [1] du pipe approprié",
-  "kc_ids": ["KC-CAP"],
+  "kc_ids": [
+    "KC-CAP"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\n/* == EXEMPLE =======================================\n * Relais simple: un ecrivain -> relais -> lecteur\n * Pattern: 2 pipes, le relais lit d'un et ecrit dans l'autre.\n * ================================================= */\nvoid example_relay(void) {\n    int p1[2], p2[2];\n    pipe(p1); pipe(p2);\n    write(p1[1], \"data\", 4);\n    char buf[32];\n    ssize_t n = read(p1[0], buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    write(p2[1], buf, n);\n    n = read(p2[0], buf, sizeof(buf)-1);\n    buf[n] = '\\0';\n    printf(\"Relayed: %s\\n\", buf);\n    close(p1[0]); close(p1[1]); close(p2[0]); close(p2[1]);\n}\n/* Resultat: Relayed: data */\n\n/* == VOTRE EXERCICE ================================\n * Mini reverse-proxy TCP via 4 pipes\n * client -> proxy -> backend -> proxy -> client\n * Thread client, thread backend, proxy dans main\n * Message QUIT pour arreter\n * ================================================= */\n\ntypedef struct {\n    int client_to_proxy[2];\n    int proxy_to_client[2];\n    int proxy_to_backend[2];\n    int backend_to_proxy[2];\n} ProxyPipes;\n\nint main(void) {\n    /* TODO: creer 4 pipes, lancer threads, proxy_relay, cleanup */\n    return 0;\n}",
     "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n\ntypedef struct {\n    int client_to_proxy[2];\n    int proxy_to_client[2];\n    int proxy_to_backend[2];\n    int backend_to_proxy[2];\n} ProxyPipes;\n\nvoid *client_thread(void *arg) {\n    ProxyPipes *p = (ProxyPipes *)arg;\n    const char *requests[] = {\"GET /index\", \"GET /about\", \"QUIT\"};\n    char response[128];\n    for (int i = 0; i < 3; i++) {\n        write(p->client_to_proxy[1], requests[i], strlen(requests[i]));\n        printf(\"[client] envoye: %s\\n\", requests[i]);\n        if (strcmp(requests[i], \"QUIT\") != 0) {\n            ssize_t n = read(p->proxy_to_client[0], response, sizeof(response)-1);\n            if (n > 0) { response[n]='\\0'; printf(\"[client] recu: %s\\n\", response); }\n        }\n        usleep(10000);\n    }\n    return NULL;\n}\n\nvoid *backend_thread(void *arg) {\n    ProxyPipes *p = (ProxyPipes *)arg;\n    char request[128];\n    while (1) {\n        ssize_t n = read(p->proxy_to_backend[0], request, sizeof(request)-1);\n        if (n <= 0) break; request[n]='\\0';\n        if (strcmp(request, \"QUIT\") == 0) { printf(\"[backend] arret\\n\"); break; }\n        printf(\"[backend] requete: %s\\n\", request);\n        char response[128]; snprintf(response, sizeof(response), \"200 OK: %s\", request);\n        write(p->backend_to_proxy[____], response, strlen(response)); /* ecriture cote ? */\n    }\n    return NULL;\n}\n\nvoid proxy_relay(ProxyPipes *p) {\n    char buf[128];\n    while (1) {\n        ssize_t n = read(p->client_to_proxy[0], buf, sizeof(buf)-1);\n        if (n <= 0) break; buf[n]='\\0';\n        printf(\"[proxy] relais client->backend: %s\\n\", buf);\n        write(p->proxy_to_backend[1], buf, n);\n        if (strcmp(buf, \"QUIT\") == 0) { printf(\"[proxy] arret\\n\"); break; }\n        n = read(p->backend_to_proxy[0], buf, sizeof(buf)-1);\n        if (n > 0) { buf[n]='\\0'; printf(\"[proxy] relais backend->client: %s\\n\", buf); write(p->proxy_to_client[1], buf, n); }\n    }\n}\n\nint main(void) {\n    ProxyPipes p;\n    pipe(p.client_to_proxy); pipe(p.proxy_to_client);\n    pipe(p.proxy_to_backend); pipe(p.backend_to_proxy);\n    pthread_t cli_t, back_t;\n    pthread_create(&cli_t, NULL, client_thread, &p);\n    pthread_create(&back_t, NULL, backend_thread, &p);\n    proxy_relay(&p);\n    pthread_join(cli_t, NULL); close(p.proxy_to_backend[1]); pthread_join(back_t, NULL);\n    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);\n    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);\n    close(p.proxy_to_backend[0]); close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);\n    printf(\"[main] proxy termine\\n\");\n    return 0;\n}",

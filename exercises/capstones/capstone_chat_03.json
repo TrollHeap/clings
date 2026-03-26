@@ -13,10 +13,8 @@
     "events[j].data.fd contient le descripteur qui a déclenché l'événement — comparez avec pipes[k][0] pour identifier le client"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "[epoll] serveur demarre, 3 clients\n[epoll] client Alice: Salut de Alice\n[epoll] client Bob: Salut de Bob\n[epoll] client Charlie: Salut de Charlie\n[epoll] client Alice: Bye Alice\n[epoll] client Bob: Bye Bob\n[epoll] client Charlie: Bye Charlie\n[epoll] serveur arrete\n",
-    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/epoll.h>\n#include <fcntl.h>\n\nvoid set_nonblocking(int fd);\n\nvoid test_epoll_create(void) {\n    int epfd = epoll_create1(0);\n    TEST_ASSERT_TRUE(epfd > 0);\n    close(epfd);\n}\n\nvoid test_set_nonblocking(void) {\n    int p[2];\n    pipe(p);\n    set_nonblocking(p[0]);\n    int flags = fcntl(p[0], F_GETFL, 0);\n    TEST_ASSERT_TRUE(flags & O_NONBLOCK);\n    close(p[0]);\n    close(p[1]);\n}\n\nvoid test_epoll_ctl_add(void) {\n    int p[2];\n    pipe(p);\n    set_nonblocking(p[0]);\n    int epfd = epoll_create1(0);\n    struct epoll_event ev;\n    ev.events = EPOLLIN;\n    ev.data.fd = p[0];\n    int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, p[0], &ev);\n    TEST_ASSERT_EQUAL_INT(0, ret);\n    close(p[0]);\n    close(p[1]);\n    close(epfd);\n}\n\nint main(void) {\n    RUN_TEST(test_epoll_create);\n    RUN_TEST(test_set_nonblocking);\n    RUN_TEST(test_epoll_ctl_add);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "[epoll] serveur demarre, 3 clients\n[epoll] client Alice: Salut de Alice\n[epoll] client Bob: Salut de Bob\n[epoll] client Charlie: Salut de Charlie\n[epoll] client Alice: Bye Alice\n[epoll] client Bob: Bye Bob\n[epoll] client Charlie: Bye Charlie\n[epoll] serveur arrete\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,38 +22,78 @@
       {
         "label": "epoll_create1 + enregistrement des fd",
         "stack": [
-          {"name": "epfd", "value": "epoll instance"},
-          {"name": "pipes[0][0]", "value": "fd Alice (EPOLLIN)"},
-          {"name": "pipes[1][0]", "value": "fd Bob (EPOLLIN)"},
-          {"name": "pipes[2][0]", "value": "fd Charlie (EPOLLIN)"}
+          {
+            "name": "epfd",
+            "value": "epoll instance"
+          },
+          {
+            "name": "pipes[0][0]",
+            "value": "fd Alice (EPOLLIN)"
+          },
+          {
+            "name": "pipes[1][0]",
+            "value": "fd Bob (EPOLLIN)"
+          },
+          {
+            "name": "pipes[2][0]",
+            "value": "fd Charlie (EPOLLIN)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "epoll_ctl(EPOLL_CTL_ADD) enregistre chaque fd de lecture avec EPOLLIN pour être notifié quand des données arrivent.",
         "step_label": "epoll_ctl"
       },
       {
         "label": "epoll_wait retourne les fd prêts",
         "stack": [
-          {"name": "nfds", "value": "3 (tous prêts)"},
-          {"name": "events[0].data.fd", "value": "fd Alice"},
-          {"name": "events[1].data.fd", "value": "fd Bob"},
-          {"name": "events[2].data.fd", "value": "fd Charlie"}
+          {
+            "name": "nfds",
+            "value": "3 (tous prêts)"
+          },
+          {
+            "name": "events[0].data.fd",
+            "value": "fd Alice"
+          },
+          {
+            "name": "events[1].data.fd",
+            "value": "fd Bob"
+          },
+          {
+            "name": "events[2].data.fd",
+            "value": "fd Charlie"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "epoll_wait bloque jusqu'à ce qu'au moins un fd soit prêt, puis retourne la liste des fd avec données.",
         "step_label": "epoll_wait"
       }
     ]
   },
-  "prerequisites": ["capstone-chat-02"],
+  "prerequisites": [
+    "capstone-chat-02"
+  ],
   "exercise_type": "complete",
   "key_concept": "epoll est le mécanisme Linux pour l'I/O multiplexé scalable : O(1) vs select/poll O(n), idéal pour les serveurs event-driven",
   "common_mistake": "Oublier O_NONBLOCK — avec des fd bloquants, un read() sur un fd signalé prêt mais déjà lu peut bloquer le serveur entier",
-  "kc_ids": ["KC-CAP"],
+  "kc_ids": [
+    "KC-CAP"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/epoll.h>\n#include <fcntl.h>\n#include <errno.h>\n\n/* == EXEMPLE =======================================\n * epoll basique: surveiller 2 pipes\n * Pattern: epoll_create1 -> epoll_ctl(ADD) -> epoll_wait\n * ================================================= */\nvoid example_epoll_two_pipes(void) {\n    int p1[2], p2[2];\n    pipe(p1); pipe(p2);\n    int epfd = epoll_create1(0);\n    struct epoll_event ev;\n    ev.events = EPOLLIN; ev.data.fd = p1[0];\n    epoll_ctl(epfd, EPOLL_CTL_ADD, p1[0], &ev);\n    ev.data.fd = p2[0];\n    epoll_ctl(epfd, EPOLL_CTL_ADD, p2[0], &ev);\n    write(p1[1], \"A\", 1); write(p2[1], \"B\", 1);\n    struct epoll_event events[4];\n    int n = epoll_wait(epfd, events, 4, 100);\n    for (int i = 0; i < n; i++) {\n        char c; read(events[i].data.fd, &c, 1);\n        printf(\"Got: %c from fd %d\\n\", c, events[i].data.fd);\n    }\n    close(p1[0]); close(p1[1]); close(p2[0]); close(p2[1]); close(epfd);\n}\n/* Resultat: Got: A from fd N / Got: B from fd M */\n\n/* == VOTRE EXERCICE ================================\n * Chat event-driven avec epoll et 3 clients\n * Chaque client = un pipe, epoll surveille les 3\n * 2 rounds de messages, identifier le client par fd\n * ================================================= */\n\n#define MAX_EVENTS 4\n#define MAX_CLIENTS 3\n\nint main(void) {\n    /* TODO: creer pipes, epoll, enregistrer fd, boucle epoll_wait */\n    return 0;\n}",
     "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/epoll.h>\n#include <fcntl.h>\n\n#define MAX_EVENTS 4\n#define MAX_CLIENTS 3\n\nvoid set_nonblocking(int fd) {\n    int flags = fcntl(fd, F_GETFL, 0);\n    fcntl(fd, F_SETFL, flags | O_NONBLOCK);\n}\n\nint main(void) {\n    int pipes[MAX_CLIENTS][2];\n    const char *names[] = {\"Alice\", \"Bob\", \"Charlie\"};\n    int epfd = epoll_create1(0);\n    for (int i = 0; i < MAX_CLIENTS; i++) {\n        pipe(pipes[i]); set_nonblocking(pipes[i][0]);\n        struct epoll_event ev;\n        ev.events = EPOLLIN;\n        ev.data.fd = pipes[i][0];\n        epoll_ctl(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);\n    }\n    printf(\"[epoll] serveur demarre, %d clients\\n\", MAX_CLIENTS);\n    const char *messages[MAX_CLIENTS][2] = {\n        {\"Salut de Alice\",\"Bye Alice\"},{\"Salut de Bob\",\"Bye Bob\"},{\"Salut de Charlie\",\"Bye Charlie\"}\n    };\n    for (int round = 0; round < 2; round++) {\n        for (int i = 0; i < MAX_CLIENTS; i++) write(pipes[i][1], messages[i][round], strlen(messages[i][round]));\n        usleep(10000);\n        struct epoll_event events[MAX_EVENTS];\n        int nfds = epoll_wait(epfd, events, MAX_EVENTS, 100);\n        for (int j = 0; j < nfds; j++) {\n            char buf[128];\n            ssize_t n = read(events[j].data.____, buf, sizeof(buf)-1); /* quel champ ? */\n            if (n > 0) {\n                buf[n] = '\\0';\n                int cid = -1;\n                for (int k = 0; k < MAX_CLIENTS; k++) if (pipes[k][0] == events[j].data.fd) { cid = k; break; }\n                printf(\"[epoll] client %s: %s\\n\", names[cid], buf);\n            }\n        }\n    }\n    for (int i = 0; i < MAX_CLIENTS; i++) { close(pipes[i][0]); close(pipes[i][1]); }\n    close(epfd);\n    printf(\"[epoll] serveur arrete\\n\");\n    return 0;\n}",

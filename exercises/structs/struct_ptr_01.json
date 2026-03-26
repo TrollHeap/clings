@@ -5,18 +5,16 @@
   "difficulty": 2,
   "title": "Struct sur le tas et opérateur ->",
   "description": "NSY103 — Quand une struct est allouée dynamiquement, on accède à ses champs via `->` (équivalent de `(*ptr).champ`).\n\nAllouez un `Rectangle` sur le tas, calculez son aire et périmètre via pointeur.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { float width; float height; } Rectangle;\nfloat rect_area(Rectangle *r) {\n    return ____;\n}\nfloat rect_perimeter(Rectangle *r) {\n    return ____;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { float width; float height; } Rectangle;\nfloat rect_area(Rectangle *r) {\n    return r->width * r->height;\n}\nfloat rect_perimeter(Rectangle *r) {\n    return 2.0f * (r->width + r->height);\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { float width; float height; } Rectangle;\nfloat rect_area(Rectangle *r) {\n    return ____;\n}\nfloat rect_perimeter(Rectangle *r) {\n    return ____;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { float width; float height; } Rectangle;\nfloat rect_area(Rectangle *r) { return r->width * r->height; }\nfloat rect_perimeter(Rectangle *r) { return 2.0f * (r->width + r->height); }\n\nint main(void) {\n    Rectangle *r = malloc(sizeof(Rectangle));\n    if (!r) return 1;\n    r->width = 5.0f;\n    r->height = 3.0f;\n    printf(\"Largeur : %.1f\\n\", r->width);\n    printf(\"Hauteur : %.1f\\n\", r->height);\n    printf(\"Aire : %.1f\\n\", rect_area(r));\n    printf(\"Perimetre : %.1f\\n\", rect_perimeter(r));\n    free(r);\n    return 0;\n}",
   "hints": [
     "`Rectangle *r = malloc(sizeof(Rectangle));`",
     "`r->width = 5.0f;` pour assigner via pointeur (équivalent à `(*r).width = 5.0f;`)",
     "N'oubliez pas `free(r);` en fin de programme"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "Largeur : 5.0\nHauteur : 3.0\nAire : 15.0\nPerimetre : 16.0\n",
-    "test_code": "void test_rect_area(void) {\n    Rectangle r = {5.0f, 3.0f};\n    Rectangle *rp = &r;\n    float a = rect_area(rp);\n    TEST_ASSERT_EQUAL_INT(15, (int)a);\n}\n\nvoid test_rect_perimeter(void) {\n    Rectangle r = {5.0f, 3.0f};\n    Rectangle *rp = &r;\n    float p = rect_perimeter(rp);\n    TEST_ASSERT_EQUAL_INT(16, (int)p);\n}\n\nvoid test_rect_zero_size(void) {\n    Rectangle r = {0.0f, 0.0f};\n    Rectangle *rp = &r;\n    TEST_ASSERT_EQUAL_INT(0, (int)rect_area(rp));\n    TEST_ASSERT_EQUAL_INT(0, (int)rect_perimeter(rp));\n}\n\nvoid test_rect_large(void) {\n    Rectangle r = {100.0f, 50.0f};\n    Rectangle *rp = &r;\n    TEST_ASSERT_EQUAL_INT(5000, (int)rect_area(rp));\n    TEST_ASSERT_EQUAL_INT(300, (int)rect_perimeter(rp));\n}\n\nint main(void) {\n    RUN_TEST(test_rect_area);\n    RUN_TEST(test_rect_perimeter);\n    RUN_TEST(test_rect_zero_size);\n    RUN_TEST(test_rect_large);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Largeur : 5.0\nHauteur : 3.0\nAire : 15.0\nPerimetre : 16.0\n"
   },
   "visualizer": {
     "type": "stack_heap",

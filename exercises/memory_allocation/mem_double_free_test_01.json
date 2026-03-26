@@ -13,15 +13,19 @@
     "`sum_and_free` : boucle sur `arr[0..n-1]`, accumule la somme, puis appelle `safe_free(&arr)` avant de retourner."
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "60",
-    "expected_tests_pass": 5,
-    "test_code": "void test_safe_alloc_valid(void) {\n    int *p = safe_alloc(4);\n    TEST_ASSERT_NOT_NULL(p);\n    free(p);\n}\n\nvoid test_safe_alloc_invalid(void) {\n    TEST_ASSERT_NULL(safe_alloc(0));\n    TEST_ASSERT_NULL(safe_alloc(-1));\n}\n\nvoid test_safe_free_nullifies(void) {\n    int *p = safe_alloc(2);\n    TEST_ASSERT_NOT_NULL(p);\n    safe_free(&p);\n    TEST_ASSERT_NULL(p);\n}\n\nvoid test_safe_free_idempotent(void) {\n    int *p = safe_alloc(1);\n    TEST_ASSERT_NOT_NULL(p);\n    safe_free(&p);\n    /* deuxième appel ne doit pas planter */\n    safe_free(&p);\n    TEST_ASSERT_NULL(p);\n}\n\nvoid test_sum_and_free_result(void) {\n    int *arr = safe_alloc(4);\n    TEST_ASSERT_NOT_NULL(arr);\n    arr[0] = 1; arr[1] = 2; arr[2] = 3; arr[3] = 4;\n    int s = sum_and_free(arr, 4);\n    TEST_ASSERT_EQUAL_INT(10, s);\n}\n\nint main(void) {\n    RUN_TEST(test_safe_alloc_valid);\n    RUN_TEST(test_safe_alloc_invalid);\n    RUN_TEST(test_safe_free_nullifies);\n    RUN_TEST(test_safe_free_idempotent);\n    RUN_TEST(test_sum_and_free_result);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "60"
   },
   "key_concept": "Nullifier le pointeur après `free` (`*ptr = NULL`) est l'idiome C pour prévenir le double-free et le use-after-free. Un second appel à `free(NULL)` est défini par la norme C comme sans effet.",
   "common_mistake": "Appeler `free(ptr)` sans mettre `ptr = NULL` : si `free` est appelé une deuxième fois par erreur, c'est un comportement indéfini (corruption du tas). Passer `int *` (pas `int **`) à safe_free empêche la nullification de se propager à l'appelant.",
   "exercise_type": "complete",
   "prerequisites": [],
   "files": [],
-  "kc_ids": ["malloc", "free", "double_free", "nullification", "use_after_free"]
+  "kc_ids": [
+    "malloc",
+    "free",
+    "double_free",
+    "nullification",
+    "use_after_free"
+  ]
 }

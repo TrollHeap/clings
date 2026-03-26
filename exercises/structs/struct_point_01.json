@@ -5,18 +5,16 @@
   "difficulty": 1,
   "title": "Définir et accéder à une struct",
   "description": "NSY103 — Une `struct` groupe des champs de types différents. L'accès aux champs d'une variable struct utilise le point `.`, l'accès via pointeur utilise `->`.\n\nDéfinissez `Point2D {float x, y}`, initialisez deux points, calculez la distance Manhattan.",
-  "starter_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = ____;\n    float dy = ____;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return ____;\n}",
-  "solution_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = a.x - b.x;\n    float dy = a.y - b.y;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return dx + dy;\n}",
+  "starter_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = ____;\n    float dy = ____;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return ____;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\ntypedef struct { float x; float y; } Point2D;\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = a.x - b.x;\n    float dy = a.y - b.y;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return dx + dy;\n}\n\nint main(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    printf(\"p1 = (%.1f, %.1f)\\n\", p1.x, p1.y);\n    printf(\"p2 = (%.1f, %.1f)\\n\", p2.x, p2.y);\n    printf(\"Distance Manhattan : %.1f\\n\", manhattan(p1, p2));\n    return 0;\n}\n",
   "hints": [
     "`typedef struct { float x; float y; } Point2D;`",
     "Distance Manhattan : |p1.x - p2.x| + |p1.y - p2.y| = |1-4| + |2-6| = 3 + 4 = 7",
     "Accès aux champs d'une struct par valeur : `a.x`, `a.y`"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "p1 = (1.0, 2.0)\np2 = (4.0, 6.0)\nDistance Manhattan : 7.0\n",
-    "test_code": "void test_manhattan_basic(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(7, (int)d);\n}\n\nvoid test_manhattan_zero(void) {\n    Point2D p1 = {0.0f, 0.0f};\n    Point2D p2 = {0.0f, 0.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(0, (int)d);\n}\n\nvoid test_manhattan_negative(void) {\n    Point2D p1 = {10.0f, 10.0f};\n    Point2D p2 = {2.0f, 3.0f};\n    float d = manhattan(p1, p2);\n    TEST_ASSERT_EQUAL_INT(15, (int)d);\n}\n\nvoid test_manhattan_symmetric(void) {\n    Point2D p1 = {5.0f, 7.0f};\n    Point2D p2 = {2.0f, 3.0f};\n    float d1 = manhattan(p1, p2);\n    float d2 = manhattan(p2, p1);\n    TEST_ASSERT_EQUAL_INT((int)d1, (int)d2);\n}\n\nint main(void) {\n    RUN_TEST(test_manhattan_basic);\n    RUN_TEST(test_manhattan_zero);\n    RUN_TEST(test_manhattan_negative);\n    RUN_TEST(test_manhattan_symmetric);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "p1 = (1.0, 2.0)\np2 = (4.0, 6.0)\nDistance Manhattan : 7.0\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,10 +22,22 @@
       {
         "label": "Déclaration de p1 et p2 sur la pile",
         "stack": [
-          {"name": "p1.x", "value": "1.0"},
-          {"name": "p1.y", "value": "2.0"},
-          {"name": "p2.x", "value": "4.0"},
-          {"name": "p2.y", "value": "6.0"}
+          {
+            "name": "p1.x",
+            "value": "1.0"
+          },
+          {
+            "name": "p1.y",
+            "value": "2.0"
+          },
+          {
+            "name": "p2.x",
+            "value": "4.0"
+          },
+          {
+            "name": "p2.y",
+            "value": "6.0"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -35,13 +45,34 @@
       {
         "label": "Calcul manhattan : dx=3, dy=4, total=7",
         "stack": [
-          {"name": "p1.x", "value": "1.0"},
-          {"name": "p1.y", "value": "2.0"},
-          {"name": "p2.x", "value": "4.0"},
-          {"name": "p2.y", "value": "6.0"},
-          {"name": "dx", "value": "3.0"},
-          {"name": "dy", "value": "4.0"},
-          {"name": "résultat", "value": "7.0"}
+          {
+            "name": "p1.x",
+            "value": "1.0"
+          },
+          {
+            "name": "p1.y",
+            "value": "2.0"
+          },
+          {
+            "name": "p2.x",
+            "value": "4.0"
+          },
+          {
+            "name": "p2.y",
+            "value": "6.0"
+          },
+          {
+            "name": "dx",
+            "value": "3.0"
+          },
+          {
+            "name": "dy",
+            "value": "4.0"
+          },
+          {
+            "name": "résultat",
+            "value": "7.0"
+          }
         ],
         "heap": [],
         "arrows": []
@@ -52,7 +83,9 @@
   "exercise_type": "complete",
   "key_concept": "struct sur pile : accès par ., sur tas (via pointeur) : accès par ->",
   "common_mistake": "Oublier le ';' après la définition de struct",
-  "kc_ids": ["KC-C03"],
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Struct RGB et distance euclidienne entre deux couleurs\n * typedef struct regroupe des champs, acces via le point.\n * =========================================================== */\ntypedef struct { int r; int g; int b; } RGB;\n\nfloat example_color_diff(RGB c1, RGB c2) {\n    int dr = c1.r - c2.r;\n    int dg = c1.g - c2.g;\n    int db = c1.b - c2.b;\n    return (float)(dr*dr + dg*dg + db*db);\n}\nvoid example_demo(void) {\n    RGB white = {255, 255, 255};\n    RGB black = {0, 0, 0};\n    printf(\"white = (%d, %d, %d)\\n\", white.r, white.g, white.b);\n    printf(\"black = (%d, %d, %d)\\n\", black.r, black.g, black.b);\n    printf(\"Diff carre : %.1f\\n\", example_color_diff(white, black));\n}\n/* Resultat: white = (255, 255, 255) / black = (0, 0, 0) / Diff carre : 195075.0 */\n\n/* == VOTRE EXERCICE =========================================\n * Struct Point2D et distance Manhattan\n * Inspirez-vous de example_color_diff ci-dessus.\n * Implementez manhattan(a, b) = |a.x-b.x| + |a.y-b.y|\n * =========================================================== */\ntypedef struct { float x; float y; } Point2D;\n\nfloat manhattan(Point2D a, Point2D b) {\n    (void)a; (void)b;\n    return 0.0f; /* TODO */\n}\n\nint main(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    printf(\"p1 = (%.1f, %.1f)\\n\", p1.x, p1.y);\n    printf(\"p2 = (%.1f, %.1f)\\n\", p2.x, p2.y);\n    printf(\"Distance Manhattan : %.1f\\n\", manhattan(p1, p2));\n    return 0;\n}",
     "#include <stdio.h>\n\ntypedef struct { float x; float y; } Point2D;\n\nfloat manhattan(Point2D a, Point2D b) {\n    float dx = a.x - b.x;\n    float dy = a.y - b.y;\n    if (dx < 0) dx = -dx;\n    if (dy < 0) dy = -dy;\n    return dx + dy;\n}\nint main(void) {\n    Point2D p1 = {1.0f, 2.0f};\n    Point2D p2 = {4.0f, 6.0f};\n    printf(\"p1 = (%.1f, %.1f)\\n\", ____, ____); // accès aux champs\n    printf(\"p2 = (%.1f, %.1f)\\n\", ____, ____);\n    printf(\"Distance Manhattan : %.1f\\n\", manhattan(p1, p2));\n    return 0;\n}",

@@ -5,17 +5,16 @@
   "difficulty": 3,
   "title": "Allocation dynamique via double pointeur",
   "description": "NSY103 — Un double pointeur `int **pp` permet à une fonction d'allouer de la mémoire et de renvoyer le résultat via un paramètre de sortie. C'est un pattern courant dans les API C (ex: `getline`).\n\nImplémentez `alloc_sequence(int **out, int n)` qui alloue un tableau de n entiers et le remplit avec la séquence 0, 1, 4, 9, ... (carrés).",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    return -1;\n}\n",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    *out = malloc(n * sizeof(int));\n    if (!*out) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = i * i;\n    }\n    return 0;\n}\n",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    return -1;\n}\n\nint main(void) {\n    int *data = NULL;\n    // TODO: appeler alloc_sequence, afficher, free\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint alloc_sequence(int **out, int n) {\n    *out = malloc(n * sizeof(int));\n    if (!*out) return -1;\n    for (int i = 0; i < n; i++) {\n        (*out)[i] = i * i;\n    }\n    return 0;\n}\n\nint main(void) {\n    int *data = NULL;\n    int n = 6;\n    if (alloc_sequence(&data, n) != 0) {\n        fprintf(stderr, \"Erreur allocation\\n\");\n        return 1;\n    }\n    for (int i = 0; i < n; i++) printf(\"%d \", data[i]);\n    printf(\"\\n\");\n    free(data);\n    return 0;\n}\n",
   "hints": [
     "Le double pointeur permet de modifier data dans main : `*out = malloc(...)`",
     "Pour accéder aux éléments : `(*out)[i]` — les parenthèses sont obligatoires",
     "Appeler avec `alloc_sequence(&data, n)` — passer l'adresse du pointeur"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_alloc_sequence_basic(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 3));\n    TEST_ASSERT_NOT_NULL(seq);\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    TEST_ASSERT_EQUAL_INT(1, seq[1]);\n    TEST_ASSERT_EQUAL_INT(4, seq[2]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_larger(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 5));\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    TEST_ASSERT_EQUAL_INT(9, seq[3]);\n    TEST_ASSERT_EQUAL_INT(16, seq[4]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_single(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 1));\n    TEST_ASSERT_EQUAL_INT(0, seq[0]);\n    free(seq);\n}\n\nvoid test_alloc_sequence_zero(void) {\n    int *seq = NULL;\n    TEST_ASSERT_EQUAL_INT(0, alloc_sequence(&seq, 0));\n    free(seq);\n}\n\nint main(void) {\n    RUN_TEST(test_alloc_sequence_basic);\n    RUN_TEST(test_alloc_sequence_larger);\n    RUN_TEST(test_alloc_sequence_single);\n    RUN_TEST(test_alloc_sequence_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "0 1 4 9 16 25"
   },
   "visualizer": {
     "type": "stack_heap",

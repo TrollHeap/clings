@@ -5,17 +5,16 @@
   "difficulty": 3,
   "title": "Inversion de l'ordre des bits",
   "description": "NSY103 — Inverser l'ordre des bits d'un octet (MSB↔LSB) est utile pour les protocoles série (LSB-first vs MSB-first). L'algorithme parcourt chaque bit source et le place à la position miroir dans le résultat.\n\nImplémentez reverse_bits pour un octet et un entier 32 bits.",
-  "starter_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    return 0;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    return 0;\n}",
-  "solution_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & 1);\n        val >>= 1;\n    }\n    return result;\n}",
+  "starter_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    return 0;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    return 0;\n}\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & 1);\n        val >>= 1;\n    }\n    return result;\n}\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(reverse_byte(0xA5)));\n        printf(\"%d\\n\", (int)(reverse_byte(0x0F)));\n        printf(\"%d\\n\", (int)(reverse_byte(0x80)));\n        printf(\"%d\\n\", (int)(reverse_byte(0x01)));\n    }\n    {\n        printf(\"%d\\n\", (int)(reverse_32(0x12345678)));\n        printf(\"%d\\n\", (int)(reverse_32(0x00000000)));\n        printf(\"%d\\n\", (int)(reverse_32(0xFFFFFFFF)));\n        printf(\"%d\\n\", (int)(reverse_32(0x00000001)));\n    }\n    return 0;\n}\n",
   "hints": [
     "result <<= 1 fait de la place pour le prochain bit",
     "b & 1 extrait le bit de poids faible de la source",
     "result |= (b & 1) ajoute ce bit au résultat"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_reverse_byte(void) {\n    TEST_ASSERT_EQUAL_INT(0xA5, reverse_byte(0xA5));\n    TEST_ASSERT_EQUAL_INT(0xF0, reverse_byte(0x0F));\n    TEST_ASSERT_EQUAL_INT(0x01, reverse_byte(0x80));\n    TEST_ASSERT_EQUAL_INT(0x80, reverse_byte(0x01));\n}\n\nvoid test_reverse_32(void) {\n    TEST_ASSERT_EQUAL_INT(0x1E6A2C48, reverse_32(0x12345678));\n    TEST_ASSERT_EQUAL_INT(0x00000000, reverse_32(0x00000000));\n    TEST_ASSERT_EQUAL_INT(0xFFFFFFFF, reverse_32(0xFFFFFFFF));\n    TEST_ASSERT_EQUAL_INT(0x80000000, reverse_32(0x00000001));\n}\n\nint main(void) {\n    RUN_TEST(test_reverse_byte);\n    RUN_TEST(test_reverse_32);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 2
+    "mode": "output",
+    "expected_output": "165\n240\n1\n128\n510274632\n0\n-1\n-2147483648\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,36 +22,70 @@
       {
         "label": "reverse_byte(0x0F)",
         "stack": [
-          {"name": "b", "value": "00001111b (0x0F)"},
-          {"name": "i=0", "value": "result=0, b&1=1, result=1"},
-          {"name": "i=1", "value": "result=10, b&1=1, result=11"},
-          {"name": "i=7", "value": "result=11110000b (0xF0)"}
+          {
+            "name": "b",
+            "value": "00001111b (0x0F)"
+          },
+          {
+            "name": "i=0",
+            "value": "result=0, b&1=1, result=1"
+          },
+          {
+            "name": "i=1",
+            "value": "result=10, b&1=1, result=11"
+          },
+          {
+            "name": "i=7",
+            "value": "result=11110000b (0xF0)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "reverse_byte", "args": "0x0F", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "reverse_byte",
+            "args": "0x0F",
+            "is_active": true
+          }
+        ],
         "explanation": "Chaque bit est extrait de droite et placé à gauche dans result",
         "step_label": "1. Byte"
       },
       {
         "label": "Cas symétrique: 0xA5 → 0xA5",
         "stack": [
-          {"name": "0xA5", "value": "10100101b"},
-          {"name": "reversed", "value": "10100101b (palindrome!)"}
+          {
+            "name": "0xA5",
+            "value": "10100101b"
+          },
+          {
+            "name": "reversed",
+            "value": "10100101b (palindrome!)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "reverse_byte", "args": "0xA5", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "reverse_byte",
+            "args": "0xA5",
+            "is_active": true
+          }
+        ],
         "explanation": "0xA5 est un palindrome binaire — il se lit pareil dans les deux sens",
         "step_label": "2. Palindrome"
       }
     ]
   },
-  "prerequisites": ["bit-count-01"],
+  "prerequisites": [
+    "bit-count-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Reversal bit par bit: result <<= 1; result |= (val & 1); val >>= 1 — pattern applicable à toute taille",
   "common_mistake": "Oublier result <<= 1 avant le OR → tous les bits s'accumulent sur le bit 0",
-  "kc_ids": ["KC-C04"],
+  "kc_ids": [
+    "KC-C04"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & 1);\n        val >>= 1;\n    }\n    return result;\n}",
     "#include <stdio.h>\n\nunsigned char reverse_byte(unsigned char b) {\n    unsigned char result = 0;\n    for (int i = 0; i < 8; i++) {\n        result <<= 1;\n        result |= (b & 1);\n        b >>= 1;\n    }\n    return result;\n}\n\nunsigned int reverse_32(unsigned int val) {\n    unsigned int result = 0;\n    for (int i = 0; i < 32; i++) {\n        result <<= 1;\n        result |= (val & ____);\n        val ____ 1;\n    }\n    return result;\n}",

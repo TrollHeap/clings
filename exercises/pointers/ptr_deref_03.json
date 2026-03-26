@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Parcours de tableau par pointeur",
   "description": "NSY103 — Un tableau se décompose en pointeur vers son premier élément. On peut parcourir le tableau en incrémentant un pointeur au lieu d'utiliser un indice.\n\nParcourez un tableau de 5 entiers avec un pointeur `p` qui avance à chaque itération, et affichez chaque élément.",
-  "starter_code": "#include <stdio.h>\n\nint count_elements(int *begin, int *end) {\n    return 0;\n}\n",
-  "solution_code": "#include <stdio.h>\n\nint count_elements(int *begin, int *end) {\n    return (int)(end - begin);\n}\n",
+  "starter_code": "#include <stdio.h>\n\nint count_elements(int *begin, int *end) {\n    return 0;\n}\n\nint main(void) {\n    int nums[] = {3, 7, 1, 9, 4};\n    print_array(nums, 5);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint count_elements(int *begin, int *end) {\n    return (int)(end - begin);\n}\n\nint main(void) {\n    {\n        int arr[] = {1, 2, 3};\n        printf(\"%d\\n\", (int)(count_elements(arr, arr)));\n    }\n    {\n        int arr[] = {42};\n        printf(\"%d\\n\", (int)(count_elements(arr, arr + 1)));\n    }\n    {\n        int arr[] = {10, 20, 30, 40, 50};\n        printf(\"%d\\n\", (int)(count_elements(arr, arr + 5)));\n    }\n    {\n        int arr[] = {1, 2, 3, 4, 5, 6, 7};\n        printf(\"%d\\n\", (int)(count_elements(arr + 2, arr + 5)));\n    }\n    return 0;\n}\n",
   "hints": [
     "Initialisez `p = arr` pour pointer vers le premier élément",
     "La borne de fin est `end = arr + n` (un élément après le dernier)",
     "Avancez le pointeur avec `p++` et lisez avec `*p`"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_count_empty(void) {\n    int arr[] = {1, 2, 3};\n    TEST_ASSERT_EQUAL_INT(0, count_elements(arr, arr));\n}\n\nvoid test_count_single(void) {\n    int arr[] = {42};\n    TEST_ASSERT_EQUAL_INT(1, count_elements(arr, arr + 1));\n}\n\nvoid test_count_multiple(void) {\n    int arr[] = {10, 20, 30, 40, 50};\n    TEST_ASSERT_EQUAL_INT(5, count_elements(arr, arr + 5));\n}\n\nvoid test_count_partial(void) {\n    int arr[] = {1, 2, 3, 4, 5, 6, 7};\n    TEST_ASSERT_EQUAL_INT(3, count_elements(arr + 2, arr + 5));\n}\n\nint main(void) {\n    RUN_TEST(test_count_empty);\n    RUN_TEST(test_count_single);\n    RUN_TEST(test_count_multiple);\n    RUN_TEST(test_count_partial);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "0\n1\n5\n3"
   },
   "visualizer": {
     "type": "stack_heap",

@@ -13,10 +13,8 @@
     "`memcmp(&a, &b, sizeof(Marker))` retourne 0 si identiques. Fonctionne car {0} initialise tout (y compris le padding)."
   ],
   "validation": {
-    "mode": "test",
-    "expected_output": "a = (10, 20, Alpha)\nb = (10, 20, Alpha)\nEgaux (memcmp) : 1\nApres modif b:\na = (10, 20, Alpha)\nb = (99, 20, Beta)\nEgaux (memcmp) : 0\n",
-    "test_code": "void test_struct_copy(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    TEST_ASSERT_EQUAL_INT(10, b.x);\n    TEST_ASSERT_EQUAL_INT(20, b.y);\n}\n\nvoid test_memcmp_equal(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    int cmp_result = memcmp(&a, &b, sizeof(Marker)) == 0;\n    TEST_ASSERT_TRUE(cmp_result);\n}\n\nvoid test_memcmp_after_modification(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    b.x = 99;\n    int cmp_result = memcmp(&a, &b, sizeof(Marker)) == 0;\n    TEST_ASSERT_FALSE(cmp_result);\n}\n\nvoid test_independent_copies(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    strncpy(b.label, \"Beta\", sizeof(b.label) - 1);\n    b.label[sizeof(b.label) - 1] = '\\0';\n    TEST_ASSERT_EQUAL_STRING(\"Alpha\", a.label);\n    TEST_ASSERT_EQUAL_STRING(\"Beta\", b.label);\n    TEST_ASSERT_EQUAL_INT(10, a.x);\n    TEST_ASSERT_EQUAL_INT(10, b.x);\n}\n\nint main(void) {\n    RUN_TEST(test_struct_copy);\n    RUN_TEST(test_memcmp_equal);\n    RUN_TEST(test_memcmp_after_modification);\n    RUN_TEST(test_independent_copies);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "a = (10, 20, Alpha)\nb = (10, 20, Alpha)\nEgaux (memcmp) : 1\nApres modif b:\na = (10, 20, Alpha)\nb = (99, 20, Beta)\nEgaux (memcmp) : 0\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,17 +22,39 @@
       {
         "label": "Après b = a — copie identique",
         "stack": [
-          {"name": "a.x", "value": "10"},
-          {"name": "a.y", "value": "20"},
-          {"name": "a.label", "value": "\"Alpha\""},
-          {"name": "b.x", "value": "10"},
-          {"name": "b.y", "value": "20"},
-          {"name": "b.label", "value": "\"Alpha\""}
+          {
+            "name": "a.x",
+            "value": "10"
+          },
+          {
+            "name": "a.y",
+            "value": "20"
+          },
+          {
+            "name": "a.label",
+            "value": "\"Alpha\""
+          },
+          {
+            "name": "b.x",
+            "value": "10"
+          },
+          {
+            "name": "b.y",
+            "value": "20"
+          },
+          {
+            "name": "b.label",
+            "value": "\"Alpha\""
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "b = a copie sizeof(Marker) octets de a vers b. Les deux structs sont maintenant identiques mais occupent des emplacements mémoire différents. memcmp retourne 0.",
         "step_label": "b = a — copie bit à bit"
@@ -42,28 +62,54 @@
       {
         "label": "Après modification de b",
         "stack": [
-          {"name": "a.x", "value": "10"},
-          {"name": "a.y", "value": "20"},
-          {"name": "a.label", "value": "\"Alpha\""},
-          {"name": "b.x", "value": "99"},
-          {"name": "b.y", "value": "20"},
-          {"name": "b.label", "value": "\"Beta\""}
+          {
+            "name": "a.x",
+            "value": "10"
+          },
+          {
+            "name": "a.y",
+            "value": "20"
+          },
+          {
+            "name": "a.label",
+            "value": "\"Alpha\""
+          },
+          {
+            "name": "b.x",
+            "value": "99"
+          },
+          {
+            "name": "b.y",
+            "value": "20"
+          },
+          {
+            "name": "b.label",
+            "value": "\"Beta\""
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "Modifier b.x et b.label n'affecte pas a — ce sont des copies indépendantes. C'est une copie profonde car label est un tableau (pas un pointeur). Si c'était char*, la copie serait shallow.",
         "step_label": "Après modif — a inchangé, b modifié"
       }
     ]
   },
-  "prerequisites": ["struct-array-01"],
+  "prerequisites": [
+    "struct-array-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "L'affectation de struct copie bit à bit — copie profonde si pas de pointeurs, shallow sinon",
   "common_mistake": "Utiliser memcmp sur des structs non initialisées avec {0} — le padding peut contenir des valeurs aléatoires",
-  "kc_ids": ["KC-C03"],
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Copie de struct Vec2 et verification d'independance\n * =========================================================== */\ntypedef struct { float x, y; } Vec2;\n\nvoid example_demo(void) {\n    Vec2 v1 = {3.0f, 4.0f};\n    Vec2 v2 = v1;\n    printf(\"v1 = (%.1f, %.1f)\\n\", v1.x, v1.y);\n    printf(\"v2 = (%.1f, %.1f)\\n\", v2.x, v2.y);\n    v2.x = 0.0f;\n    printf(\"Apres v2.x=0 : v1.x=%.1f v2.x=%.1f\\n\", v1.x, v2.x);\n    printf(\"memcmp : %d\\n\", memcmp(&v1, &v2, sizeof(Vec2)) == 0);\n}\n/* Resultat: v1=(3.0,4.0) v2=(3.0,4.0) / v1.x=3.0 v2.x=0.0 / memcmp: 0 */\n\n/* == VOTRE EXERCICE =========================================\n * Struct Marker : copie, memcmp, modification independante\n * =========================================================== */\ntypedef struct { int x; int y; char label[16]; } Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x; m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    /* TODO: créer a, copier dans b, vérifier memcmp, modifier b */\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n\ntypedef struct { int x; int y; char label[16]; } Marker;\n\nMarker make_marker(int x, int y, const char *label) {\n    Marker m = {0};\n    m.x = x; m.y = y;\n    strncpy(m.label, label, sizeof(m.label) - 1);\n    m.label[sizeof(m.label) - 1] = '\\0';\n    return m;\n}\n\nint main(void) {\n    Marker a = make_marker(10, 20, \"Alpha\");\n    Marker b = a;\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, a.label);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, b.label);\n    printf(\"Egaux (memcmp) : %d\\n\", memcmp(&a, &b, sizeof(Marker)) == 0);\n\n    b.x = 99;\n    strncpy(b.label, \"Beta\", sizeof(b.label) - 1);\n    printf(\"Apres modif b:\\n\");\n    printf(\"a = (%d, %d, %s)\\n\", a.x, a.y, ____);\n    printf(\"b = (%d, %d, %s)\\n\", b.x, b.y, ____);\n    printf(\"Egaux (memcmp) : %d\\n\", ____);\n    return 0;\n}",

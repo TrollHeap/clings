@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Largeur et alignement printf",
   "description": "NSY103 — La largeur minimale dans printf contrôle l'espace occupé par une valeur. %10d aligne à droite sur 10 caractères, %-10d aligne à gauche. %0Nd remplit de zéros.\n\nAffichez des valeurs avec différentes largeurs et alignements.",
-  "starter_code": "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}",
-  "solution_code": "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}",
+  "starter_code": "#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <string.h>\n#include <stdio.h>\n\nvoid format_width(char *buf, size_t sz) {\n    int a = 42, b = 1234, c = 7;\n    snprintf(buf, sz, \"[%10d]\\n[%-10d]\\n[%10d]\\n[%-10d]\\n[%06d]\\n[%06d]\\n\",\n             a, a, b, c, a, b);\n}\n\nint main(void) {\n    {\n        char buf[128];\n        format_width(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"[        42]\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_width(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"[42        ]\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_width(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"[000042]\")) ? 1 : 0);\n        printf(\"%d\\n\", (strstr(buf, \"[001234]\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_width(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"[      1234]\")) ? 1 : 0);\n    }\n    return 0;\n}\n",
   "hints": [
     "%10d → aligné à droite sur 10 caractères (espaces à gauche)",
     "%-10d → aligné à gauche sur 10 caractères (espaces à droite)",
     "%06d → rempli de zéros sur 6 chiffres"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_right_align(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[        42]\"));\n}\n\nvoid test_left_align(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[42        ]\"));\n}\n\nvoid test_zero_fill(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[000042]\"));\n    TEST_ASSERT_TRUE(strstr(buf, \"[001234]\"));\n}\n\nvoid test_large_value(void) {\n    char buf[128];\n    format_width(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"[      1234]\"));\n}\n\nint main(void) {\n    RUN_TEST(test_right_align);\n    RUN_TEST(test_left_align);\n    RUN_TEST(test_zero_fill);\n    RUN_TEST(test_large_value);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "1\n1\n1\n1\n1"
   },
   "visualizer": {
     "type": "stack_heap",

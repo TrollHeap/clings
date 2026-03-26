@@ -4,71 +4,119 @@
   "lang": "c",
   "difficulty": 4,
   "title": "Arena allocator avec free en bloc",
-  "description": "NSY103 — Un arena allocator alloue s\u00e9quentiellement dans un grand buffer pr\u00e9-allou\u00e9. Les allocations individuelles ne sont pas lib\u00e9r\u00e9es \u2014 on lib\u00e8re tout d'un coup en r\u00e9initialisant le curseur. Tr\u00e8s rapide (pas de free list) et utilis\u00e9 dans les compilateurs et parsers.\n\nImpl\u00e9mentez un arena avec alloc, reset et stats.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\n\ntypedef struct {\n    char buf[ARENA_SIZE];\n    size_t offset;\n    int alloc_count;\n} Arena;\n\nvoid arena_init(Arena *a) {\n    /* TODO: initialize offset to 0 and alloc_count to 0 */\n}\n\nvoid *arena_alloc(Arena *a, size_t size) {\n    /* TODO: check offset+size <= ARENA_SIZE, return pointer to buf[offset], advance offset, increment alloc_count */\n    return NULL;\n}\n\nvoid arena_reset(Arena *a) {\n    /* TODO: reset offset to 0 and alloc_count to 0 */\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\n\ntypedef struct {\n    char buf[ARENA_SIZE];\n    size_t offset;\n    int alloc_count;\n} Arena;\n\nvoid arena_init(Arena *a) {\n    a->offset = 0;\n    a->alloc_count = 0;\n}\n\nvoid *arena_alloc(Arena *a, size_t size) {\n    if (a->offset + size > ARENA_SIZE) return NULL;\n    void *ptr = &a->buf[a->offset];\n    a->offset += size;\n    a->alloc_count++;\n    return ptr;\n}\n\nvoid arena_reset(Arena *a) {\n    a->offset = 0;\n    a->alloc_count = 0;\n}",
+  "description": "NSY103 — Un arena allocator alloue séquentiellement dans un grand buffer pré-alloué. Les allocations individuelles ne sont pas libérées — on libère tout d'un coup en réinitialisant le curseur. Très rapide (pas de free list) et utilisé dans les compilateurs et parsers.\n\nImplémentez un arena avec alloc, reset et stats.",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\n\ntypedef struct {\n    char buf[ARENA_SIZE];\n    size_t offset;\n    int alloc_count;\n} Arena;\n\nvoid arena_init(Arena *a) {\n    /* TODO: initialize offset to 0 and alloc_count to 0 */\n}\n\nvoid *arena_alloc(Arena *a, size_t size) {\n    /* TODO: check offset+size <= ARENA_SIZE, return pointer to buf[offset], advance offset, increment alloc_count */\n    return NULL;\n}\n\nvoid arena_reset(Arena *a) {\n    /* TODO: reset offset to 0 and alloc_count to 0 */\n}\n\nint main(void) {\n    // TODO: alloc ints, string, double dans l'arena, afficher stats, reset\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\n\ntypedef struct {\n    char buf[ARENA_SIZE];\n    size_t offset;\n    int alloc_count;\n} Arena;\n\nvoid arena_init(Arena *a) {\n    a->offset = 0;\n    a->alloc_count = 0;\n}\n\nvoid *arena_alloc(Arena *a, size_t size) {\n    if (a->offset + size > ARENA_SIZE) return NULL;\n    void *ptr = &a->buf[a->offset];\n    a->offset += size;\n    a->alloc_count++;\n    return ptr;\n}\n\nvoid arena_reset(Arena *a) {\n    a->offset = 0;\n    a->alloc_count = 0;\n}\n\nint main(void) {\n    Arena arena;\n    arena_init(&arena);\n\n    int *nums = arena_alloc(&arena, 4 * sizeof(int));\n    char *msg = arena_alloc(&arena, 32);\n    double *val = arena_alloc(&arena, sizeof(double));\n\n    if (!nums || !msg || !val) return 1;\n\n    for (int i = 0; i < 4; i++) nums[i] = (i + 1) * 10;\n    strcpy(msg, \"arena alloc\");\n    *val = 3.14;\n\n    printf(\"nums:\");\n    for (int i = 0; i < 4; i++) printf(\" %d\", nums[i]);\n    printf(\"\\n\");\n    printf(\"msg: %s\\n\", msg);\n    printf(\"val: %.2f\\n\", *val);\n    printf(\"used: %zu/%d octets\\n\", arena.offset, ARENA_SIZE);\n    printf(\"allocs: %d\\n\", arena.alloc_count);\n\n    arena_reset(&arena);\n    printf(\"Apres reset: used=%zu allocs=%d\\n\", arena.offset, arena.alloc_count);\n    return 0;\n}\n",
   "hints": [
-    "arena_alloc avance simplement le curseur `offset` \u2014 pas de m\u00e9tadonn\u00e9es, pas de free list",
-    "V\u00e9rifier `offset + size > ARENA_SIZE` avant d'allouer",
-    "arena_reset remet offset \u00e0 0 \u2014 tout l'espace est r\u00e9utilisable d'un coup"
+    "arena_alloc avance simplement le curseur `offset` — pas de métadonnées, pas de free list",
+    "Vérifier `offset + size > ARENA_SIZE` avant d'allouer",
+    "arena_reset remet offset à 0 — tout l'espace est réutilisable d'un coup"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "#define ARENA_SIZE 256\ntypedef struct { char buf[ARENA_SIZE]; size_t offset; int alloc_count; } Arena;\nvoid arena_init(Arena *a);\nvoid *arena_alloc(Arena *a, size_t size);\nvoid arena_reset(Arena *a);\n\nvoid test_arena_init(void) {\n    Arena a;\n    arena_init(&a);\n    TEST_ASSERT_EQUAL_INT(0, a.alloc_count);\n}\n\nvoid test_arena_alloc_not_null(void) {\n    Arena a;\n    arena_init(&a);\n    int *nums = arena_alloc(&a, 16);\n    TEST_ASSERT_NOT_NULL(nums);\n}\n\nvoid test_arena_alloc_multiple(void) {\n    Arena a;\n    arena_init(&a);\n    int *nums = arena_alloc(&a, 16);\n    char *msg = arena_alloc(&a, 32);\n    double *val = arena_alloc(&a, 8);\n    TEST_ASSERT_NOT_NULL(nums);\n    TEST_ASSERT_NOT_NULL(msg);\n    TEST_ASSERT_NOT_NULL(val);\n    TEST_ASSERT_EQUAL_INT(3, a.alloc_count);\n}\n\nvoid test_arena_reset(void) {\n    Arena a;\n    arena_init(&a);\n    int *nums = arena_alloc(&a, 16);\n    char *msg = arena_alloc(&a, 32);\n    TEST_ASSERT_NOT_NULL(nums);\n    TEST_ASSERT_NOT_NULL(msg);\n    arena_reset(&a);\n    TEST_ASSERT_EQUAL_INT(0, a.alloc_count);\n}\n\nint main(void) {\n    RUN_TEST(test_arena_init);\n    RUN_TEST(test_arena_alloc_not_null);\n    RUN_TEST(test_arena_alloc_multiple);\n    RUN_TEST(test_arena_reset);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "nums: 10 20 30 40\nmsg: arena alloc\nval: 3.14\nused: 56/256 octets\nallocs: 3\nApres reset: used=0 allocs=0"
   },
   "visualizer": {
     "type": "stack_heap",
     "steps": [
       {
-        "label": "Apr\u00e8s 3 allocations dans l'arena",
+        "label": "Après 3 allocations dans l'arena",
         "stack": [
-          {"name": "arena.offset", "value": "56"},
-          {"name": "arena.alloc_count", "value": "3"},
-          {"name": "nums", "value": "\u2192buf[0]"},
-          {"name": "msg", "value": "\u2192buf[16]"},
-          {"name": "val", "value": "\u2192buf[48]"}
+          {
+            "name": "arena.offset",
+            "value": "56"
+          },
+          {
+            "name": "arena.alloc_count",
+            "value": "3"
+          },
+          {
+            "name": "nums",
+            "value": "→buf[0]"
+          },
+          {
+            "name": "msg",
+            "value": "→buf[16]"
+          },
+          {
+            "name": "val",
+            "value": "→buf[48]"
+          }
         ],
         "heap": [
-          {"address": "buf[0..15]", "value": "4 ints: 10,20,30,40"},
-          {"address": "buf[16..47]", "value": "\"arena alloc\\0\" + padding"},
-          {"address": "buf[48..55]", "value": "double: 3.14"},
-          {"address": "buf[56..255]", "value": "(libre)"}
+          {
+            "address": "buf[0..15]",
+            "value": "4 ints: 10,20,30,40"
+          },
+          {
+            "address": "buf[16..47]",
+            "value": "\"arena alloc\\0\" + padding"
+          },
+          {
+            "address": "buf[48..55]",
+            "value": "double: 3.14"
+          },
+          {
+            "address": "buf[56..255]",
+            "value": "(libre)"
+          }
         ],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
-        "explanation": "Toutes les allocations sont contigu\u00ebs dans buf[]. Pas de m\u00e9tadonn\u00e9es, pas de headers malloc \u2014 100% de l'espace pour les donn\u00e9es. 56 octets utilis\u00e9s sur 256.",
-        "step_label": "Allocation s\u00e9quentielle \u2014 bump allocator"
+        "explanation": "Toutes les allocations sont contiguës dans buf[]. Pas de métadonnées, pas de headers malloc — 100% de l'espace pour les données. 56 octets utilisés sur 256.",
+        "step_label": "Allocation séquentielle — bump allocator"
       },
       {
-        "label": "Apr\u00e8s reset \u2014 tout lib\u00e9r\u00e9 d'un coup",
+        "label": "Après reset — tout libéré d'un coup",
         "stack": [
-          {"name": "arena.offset", "value": "0"},
-          {"name": "arena.alloc_count", "value": "0"}
+          {
+            "name": "arena.offset",
+            "value": "0"
+          },
+          {
+            "name": "arena.alloc_count",
+            "value": "0"
+          }
         ],
         "heap": [
-          {"address": "buf[0..255]", "value": "(tout libre)"}
+          {
+            "address": "buf[0..255]",
+            "value": "(tout libre)"
+          }
         ],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
-        "explanation": "Un seul reset lib\u00e8re toutes les allocations. Les anciens pointeurs (nums, msg, val) sont maintenant invalides. Ce pattern est id\u00e9al pour les allocations par frame (jeux) ou par requ\u00eate (serveurs).",
-        "step_label": "Reset = free all \u2014 O(1)"
+        "explanation": "Un seul reset libère toutes les allocations. Les anciens pointeurs (nums, msg, val) sont maintenant invalides. Ce pattern est idéal pour les allocations par frame (jeux) ou par requête (serveurs).",
+        "step_label": "Reset = free all — O(1)"
       }
     ]
   },
-  "prerequisites": ["malloc-leak-01"],
+  "prerequisites": [
+    "malloc-leak-01"
+  ],
   "exercise_type": "complete",
-  "key_concept": "L'arena alloue s\u00e9quentiellement (bump pointer) et lib\u00e8re tout d'un coup \u2014 O(1) alloc et O(1) free total",
-  "common_mistake": "Utiliser un pointeur apr\u00e8s arena_reset \u2014 la m\u00e9moire n'est pas effac\u00e9e mais sera \u00e9cras\u00e9e par les prochaines allocations",
-  "kc_ids": ["KC-C02"],
+  "key_concept": "L'arena alloue séquentiellement (bump pointer) et libère tout d'un coup — O(1) alloc et O(1) free total",
+  "common_mistake": "Utiliser un pointeur après arena_reset — la mémoire n'est pas effacée mais sera écrasée par les prochaines allocations",
+  "kc_ids": [
+    "KC-C02"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* == EXEMPLE ================================================\n * Mini bump allocator avec un buffer de 64 octets\n * Alloc = avancer un curseur. Reset = remettre a zero.\n * =========================================================== */\ntypedef struct { char buf[64]; size_t off; } MiniArena;\n\nvoid *mini_alloc(MiniArena *a, size_t s) {\n    if (a->off + s > 64) return NULL;\n    void *p = &a->buf[a->off];\n    a->off += s;\n    return p;\n}\nvoid example_demo(void) {\n    MiniArena a = {{0}, 0};\n    int *x = mini_alloc(&a, sizeof(int));\n    int *y = mini_alloc(&a, sizeof(int));\n    *x = 42; *y = 99;\n    printf(\"x=%d y=%d used=%zu\\n\", *x, *y, a.off);\n    a.off = 0; /* reset */\n    printf(\"apres reset: used=%zu\\n\", a.off);\n}\n/* Resultat: x=42 y=99 used=8 / apres reset: used=0 */\n\n/* == VOTRE EXERCICE =========================================\n * Arena de 256 octets avec init, alloc, reset, stats\n * =========================================================== */\n#define ARENA_SIZE 256\ntypedef struct { char buf[ARENA_SIZE]; size_t offset; int alloc_count; } Arena;\n\nvoid arena_init(Arena *a) { (void)a; }\nvoid *arena_alloc(Arena *a, size_t size) { (void)a; (void)size; return NULL; }\nvoid arena_reset(Arena *a) { (void)a; }\n\nint main(void) {\n    /* TODO */\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\ntypedef struct { char buf[ARENA_SIZE]; size_t offset; int alloc_count; } Arena;\n\nvoid arena_init(Arena *a) { a->offset = 0; a->alloc_count = 0; }\nvoid *arena_alloc(Arena *a, size_t size) {\n    if (a->offset + size > ARENA_SIZE) return NULL;\n    void *ptr = &a->buf[a->offset];\n    a->offset += size; a->alloc_count++;\n    return ptr;\n}\nvoid arena_reset(Arena *a) { a->offset = 0; a->alloc_count = 0; }\n\nint main(void) {\n    Arena arena; arena_init(&arena);\n    int *nums = arena_alloc(&arena, 4 * sizeof(int));\n    char *msg = arena_alloc(&arena, 32);\n    double *val = arena_alloc(&arena, sizeof(double));\n    if (!nums || !msg || !val) return 1;\n    for (int i = 0; i < 4; i++) nums[i] = (i+1)*10;\n    strcpy(msg, \"arena alloc\"); *val = 3.14;\n    printf(\"nums:\"); for (int i = 0; i < 4; i++) printf(\" %d\", nums[i]); printf(\"\\n\");\n    printf(\"msg: %s\\n\", msg);\n    printf(\"val: %.2f\\n\", *val);\n    printf(\"used: %zu/%d octets\\n\", arena.____, ARENA_SIZE);\n    printf(\"allocs: %d\\n\", arena.____);\n    arena_reset(&arena);\n    printf(\"Apres reset: used=%zu allocs=%d\\n\", arena.offset, arena.alloc_count);\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\n\ntypedef struct {\n    char buf[ARENA_SIZE];\n    size_t offset;\n    int alloc_count;\n} Arena;\n\nvoid arena_init(Arena *a) {\n    a->offset = ____;\n    a->alloc_count = 0;\n}\n\nvoid *arena_alloc(Arena *a, size_t size) {\n    if (a->offset + size > ____) return NULL;\n    void *ptr = &a->buf[a->____];\n    a->offset += size;\n    a->alloc_count++;\n    return ptr;\n}\n\nvoid arena_reset(Arena *a) {\n    a->offset = 0;\n    a->____ = 0;\n}\n\nint main(void) {\n    Arena arena;\n    arena_init(&arena);\n\n    int *nums = arena_alloc(&arena, 4 * sizeof(int));\n    char *msg = arena_alloc(&arena, 32);\n    double *val = arena_alloc(&arena, sizeof(double));\n\n    if (!nums || !msg || !val) return 1;\n\n    for (int i = 0; i < 4; i++) nums[i] = (i + 1) * 10;\n    strcpy(msg, \"arena alloc\");\n    *val = 3.14;\n\n    printf(\"nums:\");\n    for (int i = 0; i < 4; i++) printf(\" %d\", nums[i]);\n    printf(\"\\n\");\n    printf(\"msg: %s\\n\", msg);\n    printf(\"val: %.2f\\n\", *val);\n    printf(\"used: %zu/%d octets\\n\", arena.offset, ARENA_SIZE);\n    printf(\"allocs: %d\\n\", arena.alloc_count);\n\n    arena_reset(&arena);\n    printf(\"Apres reset: used=%zu allocs=%d\\n\", arena.offset, arena.alloc_count);\n    return 0;\n}",
-    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\ntypedef struct { char buf[ARENA_SIZE]; size_t offset; int alloc_count; } Arena;\n\n// Impl\u00e9mentez arena_init, arena_alloc (bump pointer), arena_reset\nint main(void) {\n    // TODO: alloc ints, string, double dans l'arena, afficher stats, reset\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define ARENA_SIZE 256\ntypedef struct { char buf[ARENA_SIZE]; size_t offset; int alloc_count; } Arena;\n\n// Implémentez arena_init, arena_alloc (bump pointer), arena_reset\nint main(void) {\n    // TODO: alloc ints, string, double dans l'arena, afficher stats, reset\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    return 0;\n}"
   ]
 }

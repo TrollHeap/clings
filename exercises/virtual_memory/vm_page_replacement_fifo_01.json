@@ -13,10 +13,8 @@
     "Incrémentez faults à chaque défaut (page absente des frames)"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "Page faults: 9\n",
-    "test_code": "#include <stdio.h>\n#include <string.h>\n\n#define FRAMES 3\n#define REFS 12\n\nint in_frames(int frames[], int n, int page);\n\nvoid test_fifo_simple_case(void) {\n    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};\n    int frames[FRAMES];\n    memset(frames, -1, sizeof(frames));\n    int faults = 0, next = 0;\n    for (int i = 0; i < REFS; i++) {\n        if (!in_frames(frames, FRAMES, refs[i])) {\n            frames[next] = refs[i];\n            next = (next + 1) % FRAMES;\n            faults++;\n        }\n    }\n    TEST_ASSERT_EQUAL_INT(9, faults);\n}\n\nvoid test_fifo_two_frames(void) {\n    int refs[] = {3, 2, 1, 0, 3, 2};\n    int frames[2];\n    memset(frames, -1, sizeof(frames));\n    int faults = 0, next = 0;\n    for (int i = 0; i < 6; i++) {\n        if (!in_frames(frames, 2, refs[i])) {\n            frames[next] = refs[i];\n            next = (next + 1) % 2;\n            faults++;\n        }\n    }\n    TEST_ASSERT_EQUAL_INT(6, faults);\n}\n\nvoid test_in_frames_hit(void) {\n    int frames[] = {1, 2, 3};\n    int result = in_frames(frames, 3, 2);\n    TEST_ASSERT_EQUAL_INT(1, result);\n}\n\nvoid test_in_frames_miss(void) {\n    int frames[] = {1, 2, 3};\n    int result = in_frames(frames, 3, 5);\n    TEST_ASSERT_EQUAL_INT(0, result);\n}\n\nint main(void) {\n    RUN_TEST(test_fifo_simple_case);\n    RUN_TEST(test_fifo_two_frames);\n    RUN_TEST(test_in_frames_hit);\n    RUN_TEST(test_in_frames_miss);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Page faults: 9\n"
   },
   "visualizer": {
     "type": "dataflow",

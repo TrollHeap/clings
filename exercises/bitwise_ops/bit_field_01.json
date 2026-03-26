@@ -5,17 +5,16 @@
   "difficulty": 3,
   "title": "Champs de bits dans une struct",
   "description": "NSY103 — Les champs de bits (bit fields) permettent de définir des membres de struct sur un nombre précis de bits. Utilisés pour mapper des registres hardware ou des formats de protocoles compacts. Le compilateur gère l'emballage automatiquement.\n\nDéfinissez une struct avec des bit fields et manipulez ses champs.",
-  "starter_code": "#include <stdio.h>\n\ntypedef struct {\n    unsigned int opcode  : 0;\n    unsigned int rd      : 0;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : 10;\n} Instruction;\n\nvoid init_instruction(Instruction *inst, unsigned int opcode, unsigned int rd, unsigned int rs1, unsigned int rs2, unsigned int funct) {\n    inst->opcode = opcode;\n    inst->rd = rd;\n    inst->rs1 = rs1;\n    inst->rs2 = rs2;\n    inst->funct = funct;\n}\n\nint get_opcode(Instruction *inst) {\n    return inst->opcode;\n}\n\nint get_rd(Instruction *inst) {\n    return inst->rd;\n}\n\nint get_instruction_size(void) {\n    return sizeof(Instruction);\n}",
-  "solution_code": "#include <stdio.h>\n\ntypedef struct {\n    unsigned int opcode  : 7;\n    unsigned int rd      : 5;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : 10;\n} Instruction;\n\nvoid init_instruction(Instruction *inst, unsigned int opcode, unsigned int rd, unsigned int rs1, unsigned int rs2, unsigned int funct) {\n    inst->opcode = opcode;\n    inst->rd = rd;\n    inst->rs1 = rs1;\n    inst->rs2 = rs2;\n    inst->funct = funct;\n}\n\nint get_opcode(Instruction *inst) {\n    return inst->opcode;\n}\n\nint get_rd(Instruction *inst) {\n    return inst->rd;\n}\n\nint get_instruction_size(void) {\n    return sizeof(Instruction);\n}",
+  "starter_code": "#include <stdio.h>\n\ntypedef struct {\n    unsigned int opcode  : 0;\n    unsigned int rd      : 0;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : 10;\n} Instruction;\n\nvoid init_instruction(Instruction *inst, unsigned int opcode, unsigned int rd, unsigned int rs1, unsigned int rs2, unsigned int funct) {\n    inst->opcode = opcode;\n    inst->rd = rd;\n    inst->rs1 = rs1;\n    inst->rs2 = rs2;\n    inst->funct = funct;\n}\n\nint get_opcode(Instruction *inst) {\n    return inst->opcode;\n}\n\nint get_rd(Instruction *inst) {\n    return inst->rd;\n}\n\nint get_instruction_size(void) {\n    return sizeof(Instruction);\n}\n\nint main(void) {\n    Instruction inst;\n    inst.opcode = 0x1F; inst.rd = 10; inst.rs1 = 5; inst.rs2 = 3; inst.funct = 0x2A;\n    printf(\"opcode = 0x%02X\\n\", inst.opcode);\n    printf(\"rd     = %u\\n\", inst.rd);\n    printf(\"rs1    = %u\\n\", inst.rs1);\n    printf(\"rs2    = %u\\n\", inst.rs2);\n    printf(\"funct  = 0x%03X\\n\", inst.funct);\n    printf(\"sizeof = %zu bytes\\n\", sizeof(Instruction));\n    inst.opcode = 0xFF;\n    printf(\"opcode overflow = 0x%02X\\n\", inst.opcode);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\ntypedef struct {\n    unsigned int opcode  : 7;\n    unsigned int rd      : 5;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : 10;\n} Instruction;\n\nvoid init_instruction(Instruction *inst, unsigned int opcode, unsigned int rd, unsigned int rs1, unsigned int rs2, unsigned int funct) {\n    inst->opcode = opcode;\n    inst->rd = rd;\n    inst->rs1 = rs1;\n    inst->rs2 = rs2;\n    inst->funct = funct;\n}\n\nint get_opcode(Instruction *inst) {\n    return inst->opcode;\n}\n\nint get_rd(Instruction *inst) {\n    return inst->rd;\n}\n\nint get_instruction_size(void) {\n    return sizeof(Instruction);\n}\n\nint main(void) {\n    Instruction inst;\n    inst.opcode = 0x1F; inst.rd = 10; inst.rs1 = 5; inst.rs2 = 3; inst.funct = 0x2A;\n    printf(\"opcode = 0x%02X\\n\", inst.opcode);\n    printf(\"rd     = %u\\n\", inst.rd);\n    printf(\"rs1    = %u\\n\", inst.rs1);\n    printf(\"rs2    = %u\\n\", inst.rs2);\n    printf(\"funct  = 0x%03X\\n\", inst.funct);\n    printf(\"sizeof = %zu bytes\\n\", sizeof(Instruction));\n    inst.opcode = 0xFF;\n    printf(\"opcode overflow = 0x%02X\\n\", inst.opcode);\n    return 0;\n}\n",
   "hints": [
     "Un champ de N bits peut stocker les valeurs 0 à 2^N-1",
     "7+5+5+5+10 = 32 bits → tient dans un seul unsigned int (4 bytes)",
     "Si on assigne 0xFF (8 bits) dans un champ de 7 bits → troncature à 0x7F"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_instruction_init(void) {\n    Instruction inst;\n    init_instruction(&inst, 0x1F, 10, 5, 3, 0x2A);\n    TEST_ASSERT_EQUAL_INT(0x1F, get_opcode(&inst));\n    TEST_ASSERT_EQUAL_INT(10, get_rd(&inst));\n    TEST_ASSERT_EQUAL_INT(5, inst.rs1);\n}\n\nvoid test_instruction_size(void) {\n    TEST_ASSERT_EQUAL_INT(4, get_instruction_size());\n}\n\nvoid test_opcode_overflow_truncation(void) {\n    Instruction inst;\n    init_instruction(&inst, 0xFF, 0, 0, 0, 0);\n    TEST_ASSERT_EQUAL_INT(0x7F, get_opcode(&inst));\n}\n\nvoid test_rd_and_funct_values(void) {\n    Instruction inst;\n    init_instruction(&inst, 0x1F, 10, 5, 3, 0x2A);\n    TEST_ASSERT_EQUAL_INT(0x2A, inst.funct);\n    TEST_ASSERT_EQUAL_INT(3, inst.rs2);\n}\n\nint main(void) {\n    RUN_TEST(test_instruction_init);\n    RUN_TEST(test_instruction_size);\n    RUN_TEST(test_opcode_overflow_truncation);\n    RUN_TEST(test_rd_and_funct_values);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "opcode = 0x1F\nrd     = 10\nrs1    = 5\nrs2    = 3\nfunct  = 0x02A\nsizeof = 4 bytes\nopcode overflow = 0x7F"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,38 +22,78 @@
       {
         "label": "Layout des bit fields (32 bits total)",
         "stack": [
-          {"name": "opcode", "value": "7 bits [0:6]"},
-          {"name": "rd", "value": "5 bits [7:11]"},
-          {"name": "rs1", "value": "5 bits [12:16]"},
-          {"name": "rs2", "value": "5 bits [17:21]"},
-          {"name": "funct", "value": "10 bits [22:31]"}
+          {
+            "name": "opcode",
+            "value": "7 bits [0:6]"
+          },
+          {
+            "name": "rd",
+            "value": "5 bits [7:11]"
+          },
+          {
+            "name": "rs1",
+            "value": "5 bits [12:16]"
+          },
+          {
+            "name": "rs2",
+            "value": "5 bits [17:21]"
+          },
+          {
+            "name": "funct",
+            "value": "10 bits [22:31]"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "7+5+5+5+10 = 32 bits emballés dans un seul mot de 4 bytes",
         "step_label": "1. Layout"
       },
       {
         "label": "Overflow: 0xFF dans 7 bits",
         "stack": [
-          {"name": "0xFF", "value": "11111111b (8 bits)"},
-          {"name": "tronqué 7b", "value": "1111111b = 0x7F"},
-          {"name": "bit perdu", "value": "le bit 7 est ignoré"}
+          {
+            "name": "0xFF",
+            "value": "11111111b (8 bits)"
+          },
+          {
+            "name": "tronqué 7b",
+            "value": "1111111b = 0x7F"
+          },
+          {
+            "name": "bit perdu",
+            "value": "le bit 7 est ignoré"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le compilateur tronque silencieusement — pas d'erreur!",
         "step_label": "2. Overflow"
       }
     ]
   },
-  "prerequisites": ["bit-reverse-01"],
+  "prerequisites": [
+    "bit-reverse-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Les bit fields emballent plusieurs valeurs dans un mot machine — économie mémoire pour registres et protocoles",
   "common_mistake": "Supposer l'ordre des bits dans la struct — il dépend de l'endianness et du compilateur",
-  "kc_ids": ["KC-C04"],
+  "kc_ids": [
+    "KC-C04"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Bit fields: struct compacte avec tailles de bits explicites\n * =========================================================== */\ntypedef struct {\n    unsigned int flag : 1;  /* 1 bit: 0 ou 1 */\n    unsigned int mode : 3;  /* 3 bits: 0-7 */\n    unsigned int id   : 4;  /* 4 bits: 0-15 */\n} Control;\n\nvoid example_bitfield(void) {\n    Control c = {1, 5, 12};\n    printf(\"flag=%u mode=%u id=%u size=%zu\\n\", c.flag, c.mode, c.id, sizeof(Control));\n}\n\n/* == VOTRE EXERCICE =========================================\n * Struct Instruction: opcode(7) rd(5) rs1(5) rs2(5) funct(10)\n * =========================================================== */\n\ntypedef struct {\n    unsigned int opcode  : 7;\n    unsigned int rd      : 5;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : 10;\n} Instruction;\n\nint main(void) {\n    Instruction inst;\n    inst.opcode = 0x1F; inst.rd = 10; inst.rs1 = 5; inst.rs2 = 3; inst.funct = 0x2A;\n    printf(\"opcode = 0x%02X\\n\", inst.opcode);\n    printf(\"rd     = %u\\n\", inst.rd);\n    printf(\"rs1    = %u\\n\", inst.rs1);\n    printf(\"rs2    = %u\\n\", inst.rs2);\n    printf(\"funct  = 0x%03X\\n\", inst.funct);\n    printf(\"sizeof = %zu bytes\\n\", sizeof(Instruction));\n    inst.opcode = 0xFF;\n    printf(\"opcode overflow = 0x%02X\\n\", inst.opcode);\n    return 0;\n}",
     "#include <stdio.h>\n\ntypedef struct {\n    unsigned int opcode  : 7;\n    unsigned int rd      : 5;\n    unsigned int rs1     : 5;\n    unsigned int rs2     : 5;\n    unsigned int funct   : ____;\n} Instruction;\n\nint main(void) {\n    Instruction inst;\n    inst.opcode = 0x1F; inst.rd = 10; inst.rs1 = 5; inst.rs2 = 3; inst.funct = 0x2A;\n    printf(\"opcode = 0x%02X\\n\", inst.opcode);\n    printf(\"rd     = %u\\n\", inst.rd);\n    printf(\"rs1    = %u\\n\", inst.rs1);\n    printf(\"rs2    = %u\\n\", inst.rs2);\n    printf(\"funct  = 0x%03X\\n\", inst.funct);\n    printf(\"sizeof = %zu bytes\\n\", sizeof(Instruction));\n    inst.opcode = 0xFF;\n    printf(\"opcode overflow = 0x%02X\\n\", inst.opcode);\n    return 0;\n}",

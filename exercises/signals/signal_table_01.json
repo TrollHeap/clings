@@ -5,17 +5,16 @@
   "difficulty": 3,
   "title": "Table de disposition des signaux",
   "description": "NSY103 — Chaque signal a une disposition par défaut : DFL (défaut), IGN (ignoré), ou un handler custom. Un processus peut modifier la disposition avec signal()/sigaction(), sauf SIGKILL et SIGSTOP.\n\nImplémentez une table de disposition avec struct, recherche par numéro/nom, et affichage.\n\n⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.",
-  "starter_code": "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: no main() needed */",
-  "solution_code": "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: test harness validates directly */",
+  "starter_code": "#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\n/* Test mode: no main() needed */\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n#include <signal.h>\n\ntypedef struct { int num; char name[12]; char disp[8]; int catchable; } SigEntry;\n\nstatic const SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nint main(void) {\n    const SigEntry *e;\n    e = find_by_num(SIGINT);\n    printf(\"%s %s %d\\n\", e->name, e->disp, e->catchable);\n    e = find_by_num(SIGKILL);\n    printf(\"%s %s %d\\n\", e->name, e->disp, e->catchable);\n    e = find_by_num(SIGCHLD);\n    printf(\"%s %s %d\\n\", e->name, e->disp, e->catchable);\n    e = find_by_num(9999);\n    printf(\"%d\\n\", e == NULL ? 1 : 0);\n    return 0;\n}\n",
   "hints": [
     "struct SigEntry { int num; char name[12]; char disp[8]; int catchable; }",
     "catchable=0 pour SIGKILL(9) et SIGSTOP(19)",
     "Recherche linéaire dans tableau de N éléments"
   ],
   "validation": {
-    "mode": "test",
-    "expected_tests_pass": 4,
-    "test_code": "static SigEntry table[] = {\n    {SIGINT,  \"SIGINT\",  \"TERM\", 1},\n    {SIGQUIT, \"SIGQUIT\", \"CORE\", 1},\n    {SIGKILL, \"SIGKILL\", \"TERM\", 0},\n    {SIGSTOP, \"SIGSTOP\", \"STOP\", 0},\n    {SIGCHLD, \"SIGCHLD\", \"IGN\",  1},\n};\n\n#define TABLE_SIZE (sizeof(table)/sizeof(table[0]))\n\nconst SigEntry *find_by_num(int num) {\n    for (size_t i = 0; i < TABLE_SIZE; i++)\n        if (table[i].num == num) return &table[i];\n    return NULL;\n}\n\nvoid test_find_by_num_sigint(void) {\n    const SigEntry *e = find_by_num(SIGINT);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGINT, e->num);\n    TEST_ASSERT_EQUAL_INT(1, e->catchable);\n}\n\nvoid test_find_by_num_sigkill(void) {\n    const SigEntry *e = find_by_num(SIGKILL);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGKILL, e->num);\n    TEST_ASSERT_EQUAL_INT(0, e->catchable);\n}\n\nvoid test_find_by_num_sigstop(void) {\n    const SigEntry *e = find_by_num(SIGSTOP);\n    TEST_ASSERT_NOT_NULL(e);\n    TEST_ASSERT_EQUAL_INT(SIGSTOP, e->num);\n    TEST_ASSERT_EQUAL_INT(0, e->catchable);\n}\n\nvoid test_find_by_num_not_found(void) {\n    const SigEntry *e = find_by_num(99999);\n    TEST_ASSERT_NULL(e);\n}\n\nint main(void) {\n    RUN_TEST(test_find_by_num_sigint);\n    RUN_TEST(test_find_by_num_sigkill);\n    RUN_TEST(test_find_by_num_sigstop);\n    RUN_TEST(test_find_by_num_not_found);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "SIGINT TERM 1\nSIGKILL TERM 0\nSIGCHLD IGN 1\n1"
   },
   "visualizer": {
     "type": "stack_heap",

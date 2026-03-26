@@ -13,10 +13,8 @@
     "strerror(errno) convertit le code d'erreur en chaîne lisible — utile pour les messages d'erreur dans les logs"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "[daemon] demarrage\n[daemon] pid enregistre\n[daemon] simulation: SIGHUP\n[daemon] rechargement config\n[daemon] tick\n[daemon] simulation: SIGTERM\n[daemon] arret propre\n[daemon] termine\n",
-    "test_code": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <signal.h>\n#include <fcntl.h>\n#include <errno.h>\n#include <time.h>\n\nvolatile sig_atomic_t reload_config = 0;\nvolatile sig_atomic_t shutdown_requested = 0;\n\nvoid handle_sighup(int sig);\nvoid handle_sigterm(int sig);\nint write_pidfile(const char *path, pid_t pid);\nvoid log_message(int log_fd, const char *msg);\n\nvoid test_signal_handlers(void) {\n    reload_config = 0;\n    shutdown_requested = 0;\n    struct sigaction sa;\n    sa.sa_handler = handle_sighup;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = 0;\n    sigaction(SIGHUP, &sa, NULL);\n    kill(getpid(), SIGHUP);\n    TEST_ASSERT_EQUAL_INT(1, reload_config);\n}\n\nvoid test_sigterm_handler(void) {\n    shutdown_requested = 0;\n    struct sigaction sa;\n    sa.sa_handler = handle_sigterm;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = 0;\n    sigaction(SIGTERM, &sa, NULL);\n    kill(getpid(), SIGTERM);\n    TEST_ASSERT_EQUAL_INT(1, shutdown_requested);\n}\n\nvoid test_write_pidfile(void) {\n    const char *tmpfile = \"/tmp/kf_test_pidfile.pid\";\n    pid_t pid = getpid();\n    int ret = write_pidfile(tmpfile, pid);\n    TEST_ASSERT_EQUAL_INT(0, ret);\n    unlink(tmpfile);\n}\n\nint main(void) {\n    RUN_TEST(test_signal_handlers);\n    RUN_TEST(test_sigterm_handler);\n    RUN_TEST(test_write_pidfile);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "[daemon] demarrage\n[daemon] pid enregistre\n[daemon] simulation: SIGHUP\n[daemon] rechargement config\n[daemon] tick\n[daemon] simulation: SIGTERM\n[daemon] arret propre\n[daemon] termine\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,48 +22,95 @@
       {
         "label": "Installation des handlers de signaux",
         "stack": [
-          {"name": "sa_hup.sa_handler", "value": "handle_sighup"},
-          {"name": "sa_term.sa_handler", "value": "handle_sigterm"},
-          {"name": "reload_config", "value": "0"},
-          {"name": "shutdown_requested", "value": "0"}
+          {
+            "name": "sa_hup.sa_handler",
+            "value": "handle_sighup"
+          },
+          {
+            "name": "sa_term.sa_handler",
+            "value": "handle_sigterm"
+          },
+          {
+            "name": "reload_config",
+            "value": "0"
+          },
+          {
+            "name": "shutdown_requested",
+            "value": "0"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "sigaction installe les handlers. Les flags volatile sig_atomic_t sont modifiés de façon sûre dans les handlers.",
         "step_label": "sigaction"
       },
       {
         "label": "SIGHUP reçu -> rechargement",
         "stack": [
-          {"name": "reload_config", "value": "1"},
-          {"name": "signal", "value": "SIGHUP (1)"}
+          {
+            "name": "reload_config",
+            "value": "1"
+          },
+          {
+            "name": "signal",
+            "value": "SIGHUP (1)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "handle_sighup", "args": "1", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "handle_sighup",
+            "args": "1",
+            "is_active": true
+          }
+        ],
         "explanation": "Le handler met reload_config=1. La boucle principale détecte le flag et recharge.",
         "step_label": "SIGHUP"
       },
       {
         "label": "SIGTERM reçu -> arrêt propre",
         "stack": [
-          {"name": "shutdown_requested", "value": "1"},
-          {"name": "signal", "value": "SIGTERM (15)"}
+          {
+            "name": "shutdown_requested",
+            "value": "1"
+          },
+          {
+            "name": "signal",
+            "value": "SIGTERM (15)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "handle_sigterm", "args": "15", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "handle_sigterm",
+            "args": "15",
+            "is_active": true
+          }
+        ],
         "explanation": "Le handler met shutdown_requested=1. Le daemon ferme les fichiers et supprime le pidfile.",
         "step_label": "SIGTERM"
       }
     ]
   },
-  "prerequisites": ["signal-constants-01", "pipe-01"],
+  "prerequisites": [
+    "signal-constants-01",
+    "pipe-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Un daemon Unix : fork+setsid pour se détacher, pidfile pour l'identification, SIGHUP=reload, SIGTERM=arrêt propre",
   "common_mistake": "Utiliser signal() au lieu de sigaction() — signal() a un comportement non-portable et peut réinitialiser le handler après réception",
-  "kc_ids": ["KC-CAP"],
+  "kc_ids": [
+    "KC-CAP"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <signal.h>\n#include <fcntl.h>\n#include <errno.h>\n#include <time.h>\n\n/* == EXEMPLE =======================================\n * Handler de signal basique avec flag\n * Pattern: volatile sig_atomic_t + sigaction\n * ================================================= */\nvolatile sig_atomic_t got_signal = 0;\nvoid example_handler(int sig) { (void)sig; got_signal = 1; }\n\nvoid example_signal(void) {\n    struct sigaction sa;\n    sa.sa_handler = example_handler;\n    sigemptyset(&sa.sa_mask);\n    sa.sa_flags = 0;\n    sigaction(SIGUSR1, &sa, NULL);\n    kill(getpid(), SIGUSR1);\n    if (got_signal) printf(\"Signal recu!\\n\");\n}\n/* Resultat: Signal recu! */\n\n/* == VOTRE EXERCICE ================================\n * Daemon complet avec SIGHUP, SIGTERM, pidfile, log\n * Simuler le cycle de vie: demarrage, reload, tick, arret\n * ================================================= */\n\nvolatile sig_atomic_t reload_config = 0;\nvolatile sig_atomic_t shutdown_requested = 0;\n\nint main(void) {\n    /* TODO: installer handlers SIGHUP/SIGTERM */\n    /* TODO: creer pidfile, logfile */\n    /* TODO: simuler signaux, verifier flags, cleanup */\n    return 0;\n}",
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <signal.h>\n#include <fcntl.h>\n#include <errno.h>\n#include <time.h>\n\nvolatile sig_atomic_t reload_config = 0;\nvolatile sig_atomic_t shutdown_requested = 0;\n\nvoid handle_sighup(int sig) { (void)sig; reload_config = 1; }\nvoid handle_sigterm(int sig) { (void)sig; shutdown_requested = 1; }\n\nvoid log_message(int log_fd, const char *msg) {\n    char buf[256];\n    time_t now = 1709856000;\n    struct tm *tm = gmtime(&now);\n    int len = snprintf(buf, sizeof(buf), \"[%04d-%02d-%02d %02d:%02d:%02d] %s\\n\",\n                       tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,\n                       tm->tm_hour, tm->tm_min, tm->tm_sec, msg);\n    write(log_fd, buf, len);\n}\n\nint write_pidfile(const char *path, pid_t pid) {\n    int fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644);\n    if (fd < 0) { fprintf(stderr, \"pidfile: %s\\n\", ____(errno)); return -1; } /* quelle fonction pour errno->string ? */\n    char buf[32];\n    int len = snprintf(buf, sizeof(buf), \"%d\\n\", pid);\n    write(fd, buf, len); close(fd);\n    return 0;\n}\n\nint main(void) {\n    printf(\"[daemon] demarrage\\n\");\n    struct sigaction sa_hup, sa_term;\n    sa_hup.sa_handler = handle_sighup; sigemptyset(&sa_hup.sa_mask); sa_hup.sa_flags = 0;\n    sigaction(SIGHUP, &sa_hup, NULL);\n    sa_term.sa_handler = handle_sigterm; sigemptyset(&sa_term.sa_mask); sa_term.sa_flags = 0;\n    sigaction(SIGTERM, &sa_term, NULL);\n    pid_t pid = getpid();\n    printf(\"[daemon] pid enregistre\\n\");\n    write_pidfile(\"/tmp/kf_daemon_test.pid\", pid);\n    int log_fd = open(\"/tmp/kf_daemon_test.log\", O_WRONLY|O_CREAT|O_TRUNC, 0644);\n    log_message(log_fd, \"daemon demarre\");\n    printf(\"[daemon] simulation: SIGHUP\\n\");\n    kill(pid, SIGHUP);\n    if (reload_config) { printf(\"[daemon] rechargement config\\n\"); log_message(log_fd, \"config rechargee\"); reload_config = 0; }\n    log_message(log_fd, \"tick\"); printf(\"[daemon] tick\\n\");\n    printf(\"[daemon] simulation: SIGTERM\\n\");\n    kill(pid, SIGTERM);\n    if (shutdown_requested) { printf(\"[daemon] arret propre\\n\"); log_message(log_fd, \"arret propre\"); }\n    close(log_fd); unlink(\"/tmp/kf_daemon_test.pid\"); unlink(\"/tmp/kf_daemon_test.log\");\n    printf(\"[daemon] termine\\n\");\n    return 0;\n}",

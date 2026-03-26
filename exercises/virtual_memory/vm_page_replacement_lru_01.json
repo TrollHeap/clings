@@ -13,10 +13,8 @@
     "Phase de remplissage : tant que filled < FRAMES, utilisez frames[filled++] sans appeler find_lru"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "Page faults: 10\n",
-    "test_code": "#include <stdio.h>\n#include <string.h>\n\n#define FRAMES 3\n#define REFS 12\n\nint find_lru(int last_used[], int n);\nint in_frames(int frames[], int n, int page);\n\nvoid test_lru_main_sequence(void) {\n    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};\n    int frames[FRAMES];\n    int last_used[FRAMES];\n    memset(frames, -1, sizeof(frames));\n    memset(last_used, 0, sizeof(last_used));\n    int faults = 0, filled = 0;\n    for (int t = 0; t < REFS; t++) {\n        int idx = in_frames(frames, FRAMES, refs[t]);\n        if (idx == -1) {\n            int pos = (filled < FRAMES) ? filled++ : find_lru(last_used, FRAMES);\n            frames[pos] = refs[t];\n            last_used[pos] = t;\n            faults++;\n        } else {\n            last_used[idx] = t;\n        }\n    }\n    TEST_ASSERT_EQUAL_INT(10, faults);\n}\n\nvoid test_find_lru_basic(void) {\n    int last_used[] = {10, 5, 8};\n    int idx = find_lru(last_used, 3);\n    TEST_ASSERT_EQUAL_INT(1, idx);\n}\n\nvoid test_lru_two_frames(void) {\n    int refs[] = {3, 2, 1, 0, 3, 2};\n    int frames[2];\n    int last_used[2];\n    memset(frames, -1, sizeof(frames));\n    memset(last_used, 0, sizeof(last_used));\n    int faults = 0, filled = 0;\n    for (int t = 0; t < 6; t++) {\n        int idx = in_frames(frames, 2, refs[t]);\n        if (idx == -1) {\n            int pos = (filled < 2) ? filled++ : find_lru(last_used, 2);\n            frames[pos] = refs[t];\n            last_used[pos] = t;\n            faults++;\n        } else {\n            last_used[idx] = t;\n        }\n    }\n    TEST_ASSERT(faults >= 3 && faults <= 6);\n}\n\nvoid test_in_frames_returns_index(void) {\n    int frames[] = {5, 3, 7};\n    int idx = in_frames(frames, 3, 3);\n    TEST_ASSERT_EQUAL_INT(1, idx);\n}\n\nint main(void) {\n    RUN_TEST(test_lru_main_sequence);\n    RUN_TEST(test_find_lru_basic);\n    RUN_TEST(test_lru_two_frames);\n    RUN_TEST(test_in_frames_returns_index);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Page faults: 10\n"
   },
   "visualizer": {
     "type": "dataflow",

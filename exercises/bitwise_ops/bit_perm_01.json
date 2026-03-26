@@ -5,17 +5,16 @@
   "difficulty": 4,
   "title": "Permissions Unix avec masques de bits",
   "description": "NSY103 — Les permissions Unix utilisent 9 bits: rwx pour user, group, other. chmod manipule ces bits avec des masques octaux. umask inverse la logique (bits à 1 = permissions retirées). Comprendre ces opérations est essentiel pour la sécurité système.\n\nImplémentez des fonctions pour afficher, ajouter, retirer et appliquer un umask sur des permissions.",
-  "starter_code": "#include <stdio.h>\n\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | 0;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & 0;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & 0;\n}",
-  "solution_code": "#include <stdio.h>\n\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | perm;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & ~perm;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & ~mask;\n}",
+  "starter_code": "#include <stdio.h>\n\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | 0;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & 0;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & 0;\n}\n\nint main(void) {\n    unsigned int file_mode = 0644;\n    printf(\"initial:  \"); print_perms(file_mode);\n    file_mode = add_perm(file_mode, S_IXUSR | S_IXGRP | S_IXOTH);\n    printf(\"add exec: \"); print_perms(file_mode);\n    file_mode = remove_perm(file_mode, S_IWGRP | S_IWOTH);\n    printf(\"rm write: \"); print_perms(file_mode);\n    unsigned int umask_val = 0022;\n    unsigned int requested = 0777;\n    unsigned int created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0777: \"); print_perms(created);\n    requested = 0666;\n    created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0666: \"); print_perms(created);\n    unsigned int special = 0755;\n    int owner_can_write = (special & S_IWUSR) ? 1 : 0;\n    int other_can_write = (special & S_IWOTH) ? 1 : 0;\n    printf(\"owner write: %d\\n\", owner_can_write);\n    printf(\"other write: %d\\n\", other_can_write);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | perm;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & ~perm;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & ~mask;\n}\n\nint main(void) {\n    {\n        printf(\"%d\\n\", (int)(add_perm(0644, S_IXUSR | S_IXGRP | S_IXOTH)));\n        printf(\"%d\\n\", (int)(add_perm(0644, 0)));\n        printf(\"%d\\n\", (int)(add_perm(0755, 0022)));\n    }\n    {\n        printf(\"%d\\n\", (int)(remove_perm(0755, S_IWGRP | S_IWOTH)));\n        printf(\"%d\\n\", (int)(remove_perm(0777, 0022)));\n        printf(\"%d\\n\", (int)(remove_perm(0755, S_IXUSR | S_IXGRP | S_IXOTH)));\n    }\n    {\n        printf(\"%d\\n\", (int)(apply_umask(0777, 0022)));\n        printf(\"%d\\n\", (int)(apply_umask(0666, 0022)));\n        printf(\"%d\\n\", (int)(apply_umask(0777, 0000)));\n    }\n    {\n        unsigned int mode = 0755;\n        int has_owner_write = (mode & S_IWUSR) ? 1 : 0;\n        int has_other_write = (mode & S_IWOTH) ? 1 : 0;\n        printf(\"%d\\n\", (has_owner_write) ? 1 : 0);\n        printf(\"%d\\n\", (has_other_write) ? 1 : 0);\n    }\n    return 0;\n}\n",
   "hints": [
     "Ajouter une permission: OR (|) active les bits sans toucher les autres",
     "Retirer une permission: AND avec NOT (~perm) éteint les bits ciblés",
     "umask fonctionne comme remove_perm: requested & ~mask"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_add_perm(void) {\n    TEST_ASSERT_EQUAL_INT(0755, add_perm(0644, S_IXUSR | S_IXGRP | S_IXOTH));\n    TEST_ASSERT_EQUAL_INT(0644, add_perm(0644, 0));\n    TEST_ASSERT_EQUAL_INT(0777, add_perm(0755, 0022));\n}\n\nvoid test_remove_perm(void) {\n    TEST_ASSERT_EQUAL_INT(0755, remove_perm(0755, S_IWGRP | S_IWOTH));\n    TEST_ASSERT_EQUAL_INT(0755, remove_perm(0777, 0022));\n    TEST_ASSERT_EQUAL_INT(0644, remove_perm(0755, S_IXUSR | S_IXGRP | S_IXOTH));\n}\n\nvoid test_apply_umask(void) {\n    TEST_ASSERT_EQUAL_INT(0755, apply_umask(0777, 0022));\n    TEST_ASSERT_EQUAL_INT(0644, apply_umask(0666, 0022));\n    TEST_ASSERT_EQUAL_INT(0777, apply_umask(0777, 0000));\n}\n\nvoid test_permission_checks(void) {\n    unsigned int mode = 0755;\n    int has_owner_write = (mode & S_IWUSR) ? 1 : 0;\n    int has_other_write = (mode & S_IWOTH) ? 1 : 0;\n    TEST_ASSERT_TRUE(has_owner_write);\n    TEST_ASSERT_FALSE(has_other_write);\n}\n\nint main(void) {\n    RUN_TEST(test_add_perm);\n    RUN_TEST(test_remove_perm);\n    RUN_TEST(test_apply_umask);\n    RUN_TEST(test_permission_checks);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "493\n420\n511\n493\n493\n420\n493\n420\n511\n1\n0"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -23,51 +22,106 @@
       {
         "label": "Permissions 0644 en bits",
         "stack": [
-          {"name": "0644 octal", "value": "110 100 100 binaire"},
-          {"name": "user", "value": "rw- (110 = read+write)"},
-          {"name": "group", "value": "r-- (100 = read)"},
-          {"name": "other", "value": "r-- (100 = read)"}
+          {
+            "name": "0644 octal",
+            "value": "110 100 100 binaire"
+          },
+          {
+            "name": "user",
+            "value": "rw- (110 = read+write)"
+          },
+          {
+            "name": "group",
+            "value": "r-- (100 = read)"
+          },
+          {
+            "name": "other",
+            "value": "r-- (100 = read)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Chaque triplet rwx occupe 3 bits — les constantes S_I* sont des masques pour chaque bit",
         "step_label": "1. Layout"
       },
       {
         "label": "add_perm: OR pour activer",
         "stack": [
-          {"name": "mode", "value": "110 100 100 (0644)"},
-          {"name": "perm", "value": "001 001 001 (0111=x pour tous)"},
-          {"name": "OR result", "value": "111 101 101 (0755)"}
+          {
+            "name": "mode",
+            "value": "110 100 100 (0644)"
+          },
+          {
+            "name": "perm",
+            "value": "001 001 001 (0111=x pour tous)"
+          },
+          {
+            "name": "OR result",
+            "value": "111 101 101 (0755)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "add_perm", "args": "0644, S_IX*", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "add_perm",
+            "args": "0644, S_IX*",
+            "is_active": true
+          }
+        ],
         "explanation": "OR active les bits d'exécution sans toucher read/write",
         "step_label": "2. Add"
       },
       {
         "label": "apply_umask: AND ~mask retire les permissions",
         "stack": [
-          {"name": "requested", "value": "111 111 111 (0777)"},
-          {"name": "umask", "value": "000 010 010 (0022)"},
-          {"name": "~umask", "value": "111 101 101"},
-          {"name": "AND result", "value": "111 101 101 (0755)"}
+          {
+            "name": "requested",
+            "value": "111 111 111 (0777)"
+          },
+          {
+            "name": "umask",
+            "value": "000 010 010 (0022)"
+          },
+          {
+            "name": "~umask",
+            "value": "111 101 101"
+          },
+          {
+            "name": "AND result",
+            "value": "111 101 101 (0755)"
+          }
         ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "apply_umask", "args": "0777, 0022", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "apply_umask",
+            "args": "0777, 0022",
+            "is_active": true
+          }
+        ],
         "explanation": "umask retire les bits group-write et other-write de la requête",
         "step_label": "3. Umask"
       }
     ]
   },
-  "prerequisites": ["bit-field-01"],
+  "prerequisites": [
+    "bit-field-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Les permissions Unix sont des masques de 9 bits — add=OR, remove=AND~, umask=AND~ appliqué à la création",
   "common_mistake": "Confondre umask et chmod: umask RETIRE des bits (AND ~mask), chmod SET des bits",
-  "kc_ids": ["KC-C04"],
+  "kc_ids": [
+    "KC-C04"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n\n/* == EXEMPLE ================================================\n * Permissions Unix: 9 bits rwx pour user/group/other\n * add = OR, remove = AND ~, umask = AND ~mask\n * =========================================================== */\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nvoid example_perms(void) {\n    unsigned int mode = 0644; /* rw-r--r-- */\n    printf(\"add exec: 0%03o\\n\", mode | 0111); /* 0755 */\n    printf(\"rm write: 0%03o\\n\", mode & ~(unsigned int)0222); /* 0444 */\n    printf(\"umask 022 on 0777: 0%03o\\n\", 0777 & ~022); /* 0755 */\n}\n\n/* == VOTRE EXERCICE ========================================= */\n\nvoid print_perms(unsigned int mode) {\n    char buf[10];\n    buf[0] = (mode & S_IRUSR) ? 'r' : '-';\n    buf[1] = (mode & S_IWUSR) ? 'w' : '-';\n    buf[2] = (mode & S_IXUSR) ? 'x' : '-';\n    buf[3] = (mode & S_IRGRP) ? 'r' : '-';\n    buf[4] = (mode & S_IWGRP) ? 'w' : '-';\n    buf[5] = (mode & S_IXGRP) ? 'x' : '-';\n    buf[6] = (mode & S_IROTH) ? 'r' : '-';\n    buf[7] = (mode & S_IWOTH) ? 'w' : '-';\n    buf[8] = (mode & S_IXOTH) ? 'x' : '-';\n    buf[9] = '\\0';\n    printf(\"%s (0%03o)\\n\", buf, mode & 0777);\n}\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | perm;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & ~perm;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & ~mask;\n}\n\nint main(void) {\n    unsigned int file_mode = 0644;\n    printf(\"initial:  \"); print_perms(file_mode);\n    file_mode = add_perm(file_mode, S_IXUSR | S_IXGRP | S_IXOTH);\n    printf(\"add exec: \"); print_perms(file_mode);\n    file_mode = remove_perm(file_mode, S_IWGRP | S_IWOTH);\n    printf(\"rm write: \"); print_perms(file_mode);\n    unsigned int umask_val = 0022;\n    unsigned int requested = 0777;\n    unsigned int created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0777: \"); print_perms(created);\n    requested = 0666;\n    created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0666: \"); print_perms(created);\n    unsigned int special = 0755;\n    int owner_can_write = (special & S_IWUSR) ? 1 : 0;\n    int other_can_write = (special & S_IWOTH) ? 1 : 0;\n    printf(\"owner write: %d\\n\", owner_can_write);\n    printf(\"other write: %d\\n\", other_can_write);\n    return 0;\n}",
     "#include <stdio.h>\n\n#define S_IRUSR 0400\n#define S_IWUSR 0200\n#define S_IXUSR 0100\n#define S_IRGRP 0040\n#define S_IWGRP 0020\n#define S_IXGRP 0010\n#define S_IROTH 0004\n#define S_IWOTH 0002\n#define S_IXOTH 0001\n\nvoid print_perms(unsigned int mode) {\n    char buf[10];\n    buf[0] = (mode & S_IRUSR) ? 'r' : '-';\n    buf[1] = (mode & S_IWUSR) ? 'w' : '-';\n    buf[2] = (mode & S_IXUSR) ? 'x' : '-';\n    buf[3] = (mode & S_IRGRP) ? 'r' : '-';\n    buf[4] = (mode & S_IWGRP) ? 'w' : '-';\n    buf[5] = (mode & S_IXGRP) ? 'x' : '-';\n    buf[6] = (mode & S_IROTH) ? 'r' : '-';\n    buf[7] = (mode & S_IWOTH) ? 'w' : '-';\n    buf[8] = (mode & S_IXOTH) ? 'x' : '-';\n    buf[9] = '\\0';\n    printf(\"%s (0%03o)\\n\", buf, mode & 0777);\n}\n\nunsigned int add_perm(unsigned int mode, unsigned int perm) {\n    return mode | perm;\n}\n\nunsigned int remove_perm(unsigned int mode, unsigned int perm) {\n    return mode & ____;\n}\n\nunsigned int apply_umask(unsigned int requested, unsigned int mask) {\n    return requested & ____;\n}\n\nint main(void) {\n    unsigned int file_mode = 0644;\n    printf(\"initial:  \"); print_perms(file_mode);\n    file_mode = add_perm(file_mode, S_IXUSR | S_IXGRP | S_IXOTH);\n    printf(\"add exec: \"); print_perms(file_mode);\n    file_mode = remove_perm(file_mode, S_IWGRP | S_IWOTH);\n    printf(\"rm write: \"); print_perms(file_mode);\n    unsigned int umask_val = 0022;\n    unsigned int requested = 0777;\n    unsigned int created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0777: \"); print_perms(created);\n    requested = 0666;\n    created = apply_umask(requested, umask_val);\n    printf(\"umask 022 on 0666: \"); print_perms(created);\n    unsigned int special = 0755;\n    int owner_can_write = (special & S_IWUSR) ? 1 : 0;\n    int other_can_write = (special & S_IWOTH) ? 1 : 0;\n    printf(\"owner write: %d\\n\", owner_can_write);\n    printf(\"other write: %d\\n\", other_can_write);\n    return 0;\n}",

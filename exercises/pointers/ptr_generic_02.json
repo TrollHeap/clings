@@ -5,17 +5,16 @@
   "difficulty": 4,
   "title": "Dispatch table de pointeurs de fonctions",
   "description": "NSY103 — Une dispatch table est un tableau de pointeurs de fonctions indexé par un identifiant. C'est le mécanisme qui sous-tend les vtables en C++ et les syscall tables du noyau Linux.\n\nImplémentez une calculatrice avec une dispatch table de 4 opérations (+, -, *, /) indexées par un enum.",
-  "starter_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n",
-  "solution_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n",
+  "starter_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\ntypedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\ntypedef int (*OpFunc)(int, int);\n\nOpFunc get_dispatch_table(void) {\n    static const OpFunc table[OP_COUNT] = {op_add, op_sub, op_mul, op_div};\n    return *table;\n}\n\nint main(void) {\n    /* Tester chaque op via pointeur de fonction direct */\n    printf(\"%d\\n\", op_add(10, 3));\n    printf(\"%d\\n\", op_sub(20, 4));\n    printf(\"%d\\n\", op_mul(3, 5));\n    printf(\"%d\\n\", op_div(10, 2));\n    printf(\"%d\\n\", op_div(7, 0));\n    return 0;\n}\n",
   "hints": [
     "typedef pour simplifier : `typedef int (*OpFunc)(int, int);`",
     "La dispatch table est un tableau : `OpFunc dispatch[OP_COUNT] = {op_add, op_sub, ...};`",
     "Appeler via la table : `dispatch[op](a, b)` — l'index sélectionne la fonction"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "typedef enum { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_COUNT } Op;\ntypedef int (*OpFunc)(int, int);\n\nint op_add(int a, int b) { return a + b; }\nint op_sub(int a, int b) { return a - b; }\nint op_mul(int a, int b) { return a * b; }\nint op_div(int a, int b) { return b != 0 ? a / b : 0; }\n\nOpFunc get_dispatch_table(void);\n\nvoid test_dispatch_add(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(13, table[OP_ADD](10, 3));\n}\n\nvoid test_dispatch_sub(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(16, table[OP_SUB](20, 4));\n}\n\nvoid test_dispatch_mul(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(14, table[OP_MUL](7, 2));\n}\n\nvoid test_dispatch_div(void) {\n    OpFunc table = get_dispatch_table();\n    TEST_ASSERT_EQUAL_INT(3, table[OP_DIV](15, 5));\n}\n\nint main(void) {\n    RUN_TEST(test_dispatch_add);\n    RUN_TEST(test_dispatch_sub);\n    RUN_TEST(test_dispatch_mul);\n    RUN_TEST(test_dispatch_div);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "13\n16\n15\n5\n0"
   },
   "visualizer": {
     "type": "stack_heap",

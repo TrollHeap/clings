@@ -13,10 +13,8 @@
     "shm_unlink supprime le segment nommé — appelez-le en dernier pour nettoyer"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "[serveur] recu: Alice: Salut!\n[serveur] recu: Bob: Hello!\n[serveur] recu: Alice: Ca va?\n[serveur] fin de reception\n=== Historique (3 messages) ===\n  [0] Alice: Salut!\n  [1] Bob: Hello!\n  [2] Alice: Ca va?\n[main] termine\n",
-    "test_code": "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <sys/mman.h>\n#include <fcntl.h>\n\n#define MAX_MESSAGES 8\n#define MSG_LEN 64\n#define SHM_NAME \"/kf_chat_history_test\"\n\ntypedef struct {\n    pthread_mutex_t mutex;\n    int count;\n    char messages[MAX_MESSAGES][MSG_LEN];\n} ChatHistory;\n\nChatHistory *create_shared_history(void);\nvoid add_message(ChatHistory *h, const char *msg);\nvoid print_history(ChatHistory *h);\n\nvoid test_create_shared_history(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    TEST_ASSERT_NOT_NULL(h);\n    TEST_ASSERT_EQUAL_INT(0, h->count);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nvoid test_add_message(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    add_message(h, \"test msg\");\n    TEST_ASSERT_EQUAL_INT(1, h->count);\n    TEST_ASSERT_EQUAL_STRING(\"test msg\", h->messages[0]);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nvoid test_multiple_messages(void) {\n    mq_unlink(SHM_NAME);\n    ChatHistory *h = create_shared_history();\n    add_message(h, \"msg1\");\n    add_message(h, \"msg2\");\n    add_message(h, \"msg3\");\n    TEST_ASSERT_EQUAL_INT(3, h->count);\n    TEST_ASSERT_EQUAL_STRING(\"msg2\", h->messages[1]);\n    munmap(h, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n}\n\nint main(void) {\n    RUN_TEST(test_create_shared_history);\n    RUN_TEST(test_add_message);\n    RUN_TEST(test_multiple_messages);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 3
+    "mode": "output",
+    "expected_output": "[serveur] recu: Alice: Salut!\n[serveur] recu: Bob: Hello!\n[serveur] recu: Alice: Ca va?\n[serveur] fin de reception\n=== Historique (3 messages) ===\n  [0] Alice: Salut!\n  [1] Bob: Hello!\n  [2] Alice: Ca va?\n[main] termine\n"
   },
   "visualizer": {
     "type": "stack_heap",
@@ -24,36 +22,71 @@
       {
         "label": "Segment shm créé et mappé",
         "stack": [
-          {"name": "history", "value": "ChatHistory*"}
+          {
+            "name": "history",
+            "value": "ChatHistory*"
+          }
         ],
         "heap": [
-          {"name": "shm /kf_chat_history", "value": "{mutex, count=0, messages[8]}"}
+          {
+            "name": "shm /kf_chat_history",
+            "value": "{mutex, count=0, messages[8]}"
+          }
         ],
-        "arrows": [{"from": "history", "to": "shm /kf_chat_history", "label": "mmap"}],
-        "call_frames": [{"function_name": "create_shared_history", "args": "void", "is_active": true}],
+        "arrows": [
+          {
+            "from": "history",
+            "to": "shm /kf_chat_history",
+            "label": "mmap"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "create_shared_history",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "shm_open + ftruncate + mmap créent un segment de mémoire partagée accessible par tous les threads.",
         "step_label": "shm_open"
       },
       {
         "label": "Message ajouté avec verrouillage mutex",
         "stack": [
-          {"name": "msg", "value": "\"Alice: Salut!\""}
+          {
+            "name": "msg",
+            "value": "\"Alice: Salut!\""
+          }
         ],
         "heap": [
-          {"name": "shm", "value": "{count=1, messages[0]=\"Alice: Salut!\"}"}
+          {
+            "name": "shm",
+            "value": "{count=1, messages[0]=\"Alice: Salut!\"}"
+          }
         ],
         "arrows": [],
-        "call_frames": [{"function_name": "add_message", "args": "h, msg", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "add_message",
+            "args": "h, msg",
+            "is_active": true
+          }
+        ],
         "explanation": "Le mutex protège l'accès concurrent à la structure d'historique.",
         "step_label": "add_message"
       }
     ]
   },
-  "prerequisites": ["capstone-chat-01", "shm-01"],
+  "prerequisites": [
+    "capstone-chat-01",
+    "shm-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "La mémoire partagée (shm) permet de persister l'historique entre threads/processus avec un mutex pour la synchronisation",
   "common_mistake": "Oublier PTHREAD_PROCESS_SHARED sur le mutexattr — le mutex ne fonctionnera pas entre processus mappant le même shm",
-  "kc_ids": ["KC-CAP"],
+  "kc_ids": [
+    "KC-CAP"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <sys/mman.h>\n#include <fcntl.h>\n\n/* == EXEMPLE =======================================\n * Compteur partage en shm avec mutex\n * Pattern: shm_open + mmap + mutex PROCESS_SHARED\n * ================================================= */\ntypedef struct { pthread_mutex_t m; int val; } SharedCounter;\n\nvoid example_shared_counter(void) {\n    int fd = shm_open(\"/kf_example\", O_CREAT|O_RDWR, 0600);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *c = mmap(NULL, sizeof(SharedCounter), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    pthread_mutexattr_t attr;\n    pthread_mutexattr_init(&attr);\n    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);\n    pthread_mutex_init(&c->m, &attr);\n    c->val = 0;\n    pthread_mutex_lock(&c->m);\n    c->val = 42;\n    pthread_mutex_unlock(&c->m);\n    printf(\"Counter: %d\\n\", c->val);\n    munmap(c, sizeof(SharedCounter));\n    shm_unlink(\"/kf_example\");\n}\n/* Resultat: Counter: 42 */\n\n/* == VOTRE EXERCICE ================================\n * Chat avec historique en shm\n * Stocker les messages dans un segment shm\n * Un thread serveur recoit et stocke\n * Afficher l'historique a la fin\n * ================================================= */\n\n#define MAX_MESSAGES 8\n#define MSG_LEN 64\n#define SHM_NAME \"/kf_chat_history\"\ntypedef struct { pthread_mutex_t mutex; int count; char messages[MAX_MESSAGES][MSG_LEN]; } ChatHistory;\n\nint main(void) {\n    /* TODO: creer shm, pipe, thread serveur, envoyer messages, afficher historique */\n    return 0;\n}",
     "#define _DEFAULT_SOURCE\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <sys/mman.h>\n#include <fcntl.h>\n\n#define MAX_MESSAGES 8\n#define MSG_LEN 64\n#define SHM_NAME \"/kf_chat_history\"\n\ntypedef struct { pthread_mutex_t mutex; int count; char messages[MAX_MESSAGES][MSG_LEN]; } ChatHistory;\n\nChatHistory *create_shared_history(void) {\n    int fd = shm_open(SHM_NAME, O_CREAT|O_RDWR, 0600);\n    ftruncate(fd, sizeof(ChatHistory));\n    ChatHistory *h = mmap(NULL, sizeof(ChatHistory), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    pthread_mutexattr_t attr;\n    pthread_mutexattr_init(&attr);\n    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);\n    pthread_mutex_init(&h->mutex, &attr);\n    h->count = 0;\n    return h;\n}\n\nvoid add_message(ChatHistory *h, const char *msg) {\n    pthread_mutex_lock(&h->mutex);\n    if (h->count < MAX_MESSAGES) {\n        strncpy(h->messages[h->count], msg, MSG_LEN-1);\n        h->messages[h->____][MSG_LEN-1] = '\\0'; /* quel index ? */\n        h->count++;\n    }\n    pthread_mutex_unlock(&h->mutex);\n}\n\nvoid print_history(ChatHistory *h) {\n    pthread_mutex_lock(&h->____); /* verrouiller quoi ? */\n    printf(\"=== Historique (%d messages) ===\\n\", h->count);\n    for (int i = 0; i < h->count; i++) printf(\"  [%d] %s\\n\", i, h->messages[i]);\n    pthread_mutex_unlock(&h->mutex);\n}\n\ntypedef struct { int read_fd; ChatHistory *history; } ServerCtx;\n\nvoid *server_thread(void *arg) {\n    ServerCtx *ctx = (ServerCtx *)arg;\n    char buf[MSG_LEN]; ssize_t n;\n    while ((n = read(ctx->read_fd, buf, sizeof(buf)-1)) > 0) {\n        buf[n] = '\\0';\n        printf(\"[serveur] recu: %s\\n\", buf);\n        add_message(ctx->history, buf);\n    }\n    printf(\"[serveur] fin de reception\\n\");\n    return NULL;\n}\n\nint main(void) {\n    ChatHistory *history = create_shared_history();\n    int pipefd[2]; pipe(pipefd);\n    ServerCtx ctx = {.read_fd = pipefd[0], .history = history};\n    pthread_t srv;\n    pthread_create(&srv, NULL, server_thread, &ctx);\n    const char *msgs[] = {\"Alice: Salut!\", \"Bob: Hello!\", \"Alice: Ca va?\"};\n    for (int i = 0; i < 3; i++) { write(pipefd[1], msgs[i], strlen(msgs[i])); usleep(10000); }\n    close(pipefd[1]);\n    pthread_join(srv, NULL);\n    close(pipefd[0]);\n    print_history(history);\n    munmap(history, sizeof(ChatHistory));\n    shm_unlink(SHM_NAME);\n    printf(\"[main] termine\\n\");\n    return 0;\n}",

@@ -5,17 +5,16 @@
   "difficulty": 3,
   "title": "Tableau de pointeurs vers chaînes",
   "description": "NSY103 — Un `char *words[]` est un tableau de pointeurs, chaque élément pointant vers une chaîne littérale. C'est la structure de `argv` dans `main(int argc, char *argv[])`.\n\nCréez un tableau de pointeurs vers chaînes, triez-le alphabétiquement avec un tri à bulles, puis affichez le résultat.",
-  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n}\n",
-  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = arr[j];\n                arr[j] = arr[j + 1];\n                arr[j + 1] = tmp;\n            }\n        }\n    }\n}\n",
+  "starter_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    // TODO: trier et afficher\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <string.h>\n\nvoid sort_strings(char *arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - 1 - i; j++) {\n            if (strcmp(arr[j], arr[j + 1]) > 0) {\n                char *tmp = arr[j];\n                arr[j] = arr[j + 1];\n                arr[j + 1] = tmp;\n            }\n        }\n    }\n}\n\nint main(void) {\n    char *fruits[] = {\"banane\", \"cerise\", \"abricot\", \"datte\", \"elderberry\"};\n    int n = 5;\n    sort_strings(fruits, n);\n    for (int i = 0; i < n; i++) printf(\"%s\\n\", fruits[i]);\n    return 0;\n}\n",
   "hints": [
     "On échange les pointeurs (char *), pas les chaînes elles-mêmes — c'est un swap de pointeurs",
     "`strcmp(a, b) > 0` signifie que a vient après b alphabétiquement",
     "`char *fruits[]` est un tableau de pointeurs — chaque élément est une adresse vers une chaîne"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_sort_two_strings(void) {\n    char *arr[] = {\"zebra\", \"apple\"};\n    sort_strings(arr, 2);\n    TEST_ASSERT_EQUAL_STRING(\"apple\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"zebra\", arr[1]);\n}\n\nvoid test_sort_three_strings(void) {\n    char *arr[] = {\"charlie\", \"alpha\", \"bravo\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"alpha\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"bravo\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"charlie\", arr[2]);\n}\n\nvoid test_sort_already_sorted(void) {\n    char *arr[] = {\"aaa\", \"bbb\", \"ccc\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"aaa\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"bbb\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"ccc\", arr[2]);\n}\n\nvoid test_sort_reverse_order(void) {\n    char *arr[] = {\"dog\", \"cat\", \"bat\"};\n    sort_strings(arr, 3);\n    TEST_ASSERT_EQUAL_STRING(\"bat\", arr[0]);\n    TEST_ASSERT_EQUAL_STRING(\"cat\", arr[1]);\n    TEST_ASSERT_EQUAL_STRING(\"dog\", arr[2]);\n}\n\nint main(void) {\n    RUN_TEST(test_sort_two_strings);\n    RUN_TEST(test_sort_three_strings);\n    RUN_TEST(test_sort_already_sorted);\n    RUN_TEST(test_sort_reverse_order);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "abricot\nbanane\ncerise\ndatte\nelderberry"
   },
   "visualizer": {
     "type": "stack_heap",

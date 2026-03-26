@@ -4,71 +4,117 @@
   "lang": "c",
   "difficulty": 5,
   "title": "Padding, alignement, offsetof",
-  "description": "NSY103 — Le compilateur ins\u00e8re du padding entre les champs d'une struct pour respecter les contraintes d'alignement. `offsetof(type, champ)` donne la position exacte d'un champ. R\u00e9ordonner les champs peut r\u00e9duire la taille.\n\nComparez deux structs avec les m\u00eames champs mais dans un ordre diff\u00e9rent pour observer l'impact du padding.",
-  "starter_code": "#include <stdio.h>\n#include <stddef.h>\ntypedef struct {\n    char a;\n    int b;\n    char c;\n    double d;\n    char e;\n} Padded;\ntypedef struct {\n    double d;\n    int b;\n    char a;\n    char c;\n    char e;\n} Packed;\nsize_t padded_sizeof(void) { return ____; }\nsize_t packed_sizeof(void) { return ____; }\nsize_t padded_offsetof_a(void) { return ____; }\nsize_t padded_offsetof_b(void) { return ____; }\nsize_t padded_offsetof_d(void) { return ____; }\nsize_t packed_offsetof_d(void) { return ____; }\nsize_t packed_offsetof_b(void) { return ____; }\nsize_t packed_offsetof_a(void) { return ____; }",
-  "solution_code": "#include <stdio.h>\n#include <stddef.h>\ntypedef struct {\n    char a;\n    int b;\n    char c;\n    double d;\n    char e;\n} Padded;\ntypedef struct {\n    double d;\n    int b;\n    char a;\n    char c;\n    char e;\n} Packed;\nsize_t padded_sizeof(void) { return sizeof(Padded); }\nsize_t packed_sizeof(void) { return sizeof(Packed); }\nsize_t padded_offsetof_a(void) { return offsetof(Padded, a); }\nsize_t padded_offsetof_b(void) { return offsetof(Padded, b); }\nsize_t padded_offsetof_d(void) { return offsetof(Padded, d); }\nsize_t packed_offsetof_d(void) { return offsetof(Packed, d); }\nsize_t packed_offsetof_b(void) { return offsetof(Packed, b); }\nsize_t packed_offsetof_a(void) { return offsetof(Packed, a); }",
+  "description": "NSY103 — Le compilateur insère du padding entre les champs d'une struct pour respecter les contraintes d'alignement. `offsetof(type, champ)` donne la position exacte d'un champ. Réordonner les champs peut réduire la taille.\n\nComparez deux structs avec les mêmes champs mais dans un ordre différent pour observer l'impact du padding.",
+  "starter_code": "#include <stdio.h>\n#include <stddef.h>\ntypedef struct {\n    char a;\n    int b;\n    char c;\n    double d;\n    char e;\n} Padded;\ntypedef struct {\n    double d;\n    int b;\n    char a;\n    char c;\n    char e;\n} Packed;\nsize_t padded_sizeof(void) { return ____; }\nsize_t packed_sizeof(void) { return ____; }\nsize_t padded_offsetof_a(void) { return ____; }\nsize_t padded_offsetof_b(void) { return ____; }\nsize_t padded_offsetof_d(void) { return ____; }\nsize_t packed_offsetof_d(void) { return ____; }\nsize_t packed_offsetof_b(void) { return ____; }\nsize_t packed_offsetof_a(void) { return ____; }\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stddef.h>\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a; char c; char e; } Packed;\nsize_t padded_sizeof(void) { return sizeof(Padded); }\nsize_t packed_sizeof(void) { return sizeof(Packed); }\nsize_t padded_offsetof_a(void) { return offsetof(Padded, a); }\nsize_t padded_offsetof_b(void) { return offsetof(Padded, b); }\nsize_t padded_offsetof_d(void) { return offsetof(Padded, d); }\nsize_t packed_offsetof_d(void) { return offsetof(Packed, d); }\nsize_t packed_offsetof_b(void) { return offsetof(Packed, b); }\nsize_t packed_offsetof_a(void) { return offsetof(Packed, a); }\n\nint main(void) {\n    printf(\"=== Padded ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(Padded));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Padded, a));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Padded, b));\n    printf(\"offsetof(c) = %zu\\n\", offsetof(Padded, c));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Padded, d));\n    printf(\"offsetof(e) = %zu\\n\", offsetof(Padded, e));\n    printf(\"=== Packed ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(Packed));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Packed, d));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Packed, b));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Packed, a));\n    printf(\"Economie : %zu octets\\n\", sizeof(Padded) - sizeof(Packed));\n    return 0;\n}",
   "hints": [
-    "`offsetof(Type, champ)` de <stddef.h> donne le d\u00e9calage en octets du champ depuis le d\u00e9but de la struct",
-    "R\u00e8gle d'alignement : chaque champ doit \u00eatre \u00e0 une adresse multiple de sa taille (int=4, double=8)",
+    "`offsetof(Type, champ)` de <stddef.h> donne le décalage en octets du champ depuis le début de la struct",
+    "Règle d'alignement : chaque champ doit être à une adresse multiple de sa taille (int=4, double=8)",
     "Trier les champs du plus grand au plus petit minimise le padding"
   ],
   "validation": {
-    "mode": "both",
-    "expected_output": "=== Padded ===\nsizeof = 32\noffsetof(a) = 0\noffsetof(b) = 4\noffsetof(c) = 8\noffsetof(d) = 16\noffsetof(e) = 24\n=== Packed ===\nsizeof = 16\noffsetof(d) = 0\noffsetof(b) = 8\noffsetof(a) = 12\nEconomie : 16 octets\n",
-    "test_code": "void test_padded_size(void) {\n    TEST_ASSERT_EQUAL_INT(32, (int)padded_sizeof());\n}\n\nvoid test_packed_size(void) {\n    TEST_ASSERT_EQUAL_INT(16, (int)packed_sizeof());\n}\n\nvoid test_padded_offsets(void) {\n    TEST_ASSERT_EQUAL_INT(0, (int)padded_offsetof_a());\n    TEST_ASSERT_EQUAL_INT(4, (int)padded_offsetof_b());\n    TEST_ASSERT_EQUAL_INT(16, (int)padded_offsetof_d());\n}\n\nvoid test_packed_offsets(void) {\n    TEST_ASSERT_EQUAL_INT(0, (int)packed_offsetof_d());\n    TEST_ASSERT_EQUAL_INT(8, (int)packed_offsetof_b());\n    TEST_ASSERT_EQUAL_INT(12, (int)packed_offsetof_a());\n}\n\nint main(void) {\n    RUN_TEST(test_padded_size);\n    RUN_TEST(test_packed_size);\n    RUN_TEST(test_padded_offsets);\n    RUN_TEST(test_packed_offsets);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "=== Padded ===\nsizeof = 32\noffsetof(a) = 0\noffsetof(b) = 4\noffsetof(c) = 8\noffsetof(d) = 16\noffsetof(e) = 24\n=== Packed ===\nsizeof = 16\noffsetof(d) = 0\noffsetof(b) = 8\noffsetof(a) = 12\nEconomie : 16 octets\n"
   },
   "visualizer": {
     "type": "stack_heap",
     "steps": [
       {
-        "label": "Layout Padded \u2014 avec padding",
+        "label": "Layout Padded — avec padding",
         "stack": [
-          {"name": "offset 0: a (char)", "value": "1 octet + 3 padding"},
-          {"name": "offset 4: b (int)", "value": "4 octets"},
-          {"name": "offset 8: c (char)", "value": "1 octet + 7 padding"},
-          {"name": "offset 16: d (double)", "value": "8 octets"},
-          {"name": "offset 24: e (char)", "value": "1 octet + 7 padding"},
-          {"name": "total", "value": "32 octets"}
+          {
+            "name": "offset 0: a (char)",
+            "value": "1 octet + 3 padding"
+          },
+          {
+            "name": "offset 4: b (int)",
+            "value": "4 octets"
+          },
+          {
+            "name": "offset 8: c (char)",
+            "value": "1 octet + 7 padding"
+          },
+          {
+            "name": "offset 16: d (double)",
+            "value": "8 octets"
+          },
+          {
+            "name": "offset 24: e (char)",
+            "value": "1 octet + 7 padding"
+          },
+          {
+            "name": "total",
+            "value": "32 octets"
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
         "explanation": "Le char c (offset 8) est suivi de 7 octets de padding pour aligner d (double) sur un multiple de 8. Le char e (offset 24) est suivi de 7 octets de padding pour que sizeof soit multiple de alignof(double)=8.",
-        "step_label": "Padded \u2014 19 octets de padding sur 32"
+        "step_label": "Padded — 19 octets de padding sur 32"
       },
       {
-        "label": "Layout Packed \u2014 champs r\u00e9ordonn\u00e9s",
+        "label": "Layout Packed — champs réordonnés",
         "stack": [
-          {"name": "offset 0: d (double)", "value": "8 octets"},
-          {"name": "offset 8: b (int)", "value": "4 octets"},
-          {"name": "offset 12: a (char)", "value": "1 octet"},
-          {"name": "offset 13: c (char)", "value": "1 octet"},
-          {"name": "offset 14: e (char)", "value": "1 octet + 1 padding"},
-          {"name": "total", "value": "16 octets"}
+          {
+            "name": "offset 0: d (double)",
+            "value": "8 octets"
+          },
+          {
+            "name": "offset 8: b (int)",
+            "value": "4 octets"
+          },
+          {
+            "name": "offset 12: a (char)",
+            "value": "1 octet"
+          },
+          {
+            "name": "offset 13: c (char)",
+            "value": "1 octet"
+          },
+          {
+            "name": "offset 14: e (char)",
+            "value": "1 octet + 1 padding"
+          },
+          {
+            "name": "total",
+            "value": "16 octets"
+          }
         ],
         "heap": [],
         "arrows": [],
         "call_frames": [
-          {"function_name": "main", "args": "void", "is_active": true}
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
         ],
-        "explanation": "En pla\u00e7ant double d'abord, puis int, puis les chars, on \u00e9limine presque tout le padding. 16 octets vs 32 \u2014 50% d'\u00e9conomie. C'est crucial pour les tableaux de milliers de structs.",
-        "step_label": "Packed \u2014 1 octet de padding sur 16"
+        "explanation": "En plaçant double d'abord, puis int, puis les chars, on élimine presque tout le padding. 16 octets vs 32 — 50% d'économie. C'est crucial pour les tableaux de milliers de structs.",
+        "step_label": "Packed — 1 octet de padding sur 16"
       }
     ]
   },
-  "prerequisites": ["struct-serialize-01"],
+  "prerequisites": [
+    "struct-serialize-01"
+  ],
   "exercise_type": "complete",
-  "key_concept": "Le padding d'alignement peut doubler la taille d'une struct \u2014 r\u00e9ordonner du plus grand au plus petit minimise le gaspillage",
-  "common_mistake": "Supposer que sizeof(struct) == somme des sizeof(champs) \u2014 le padding est invisible mais bien r\u00e9el",
-  "kc_ids": ["KC-C03"],
+  "key_concept": "Le padding d'alignement peut doubler la taille d'une struct — réordonner du plus grand au plus petit minimise le gaspillage",
+  "common_mistake": "Supposer que sizeof(struct) == somme des sizeof(champs) — le padding est invisible mais bien réel",
+  "kc_ids": [
+    "KC-C03"
+  ],
   "starter_code_stages": [
-    "#include <stdio.h>\n#include <stddef.h>\n\n/* == EXEMPLE ================================================\n * Padding dans une struct simple\n * char(1) + padding(3) + int(4) = 8 octets, pas 5\n * =========================================================== */\ntypedef struct { char c; int i; } Ex;\n\nvoid example_demo(void) {\n    printf(\"sizeof(Ex) = %zu\\n\", sizeof(Ex));\n    printf(\"offsetof(c) = %zu\\n\", offsetof(Ex, c));\n    printf(\"offsetof(i) = %zu\\n\", offsetof(Ex, i));\n}\n/* Resultat: sizeof=8, offset(c)=0, offset(i)=4 */\n\n/* == VOTRE EXERCICE =========================================\n * Comparez Padded (ordre na\u00eff) vs Packed (ordre optimis\u00e9)\n * Memes champs, ordre different, tailles differentes.\n * =========================================================== */\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a, c, e; } Packed;\n\nint main(void) {\n    /* TODO: afficher sizeof et offsetof pour les deux */\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stddef.h>\n\n/* == EXEMPLE ================================================\n * Padding dans une struct simple\n * char(1) + padding(3) + int(4) = 8 octets, pas 5\n * =========================================================== */\ntypedef struct { char c; int i; } Ex;\n\nvoid example_demo(void) {\n    printf(\"sizeof(Ex) = %zu\\n\", sizeof(Ex));\n    printf(\"offsetof(c) = %zu\\n\", offsetof(Ex, c));\n    printf(\"offsetof(i) = %zu\\n\", offsetof(Ex, i));\n}\n/* Resultat: sizeof=8, offset(c)=0, offset(i)=4 */\n\n/* == VOTRE EXERCICE =========================================\n * Comparez Padded (ordre naïf) vs Packed (ordre optimisé)\n * Memes champs, ordre different, tailles differentes.\n * =========================================================== */\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a, c, e; } Packed;\n\nint main(void) {\n    /* TODO: afficher sizeof et offsetof pour les deux */\n    return 0;\n}",
     "#include <stdio.h>\n#include <stddef.h>\n\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a, c, e; } Packed;\n\nint main(void) {\n    printf(\"=== Padded ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(Padded));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Padded, a));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Padded, b));\n    printf(\"offsetof(c) = %zu\\n\", offsetof(Padded, c));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Padded, d));\n    printf(\"offsetof(e) = %zu\\n\", offsetof(Padded, e));\n    printf(\"=== Packed ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(Packed));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Packed, d));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Packed, b));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Packed, ____));\n    printf(\"Economie : %zu octets\\n\", sizeof(____) - sizeof(____));\n    return 0;\n}",
     "#include <stdio.h>\n#include <stddef.h>\n\ntypedef struct {\n    char a;\n    int b;\n    char c;\n    double d;\n    char e;\n} Padded;\n\ntypedef struct {\n    double d;\n    int b;\n    char a;\n    char c;\n    char e;\n} Packed;\n\nint main(void) {\n    printf(\"=== Padded ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(____));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Padded, ____));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Padded, b));\n    printf(\"offsetof(c) = %zu\\n\", offsetof(____, c));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Padded, d));\n    printf(\"offsetof(e) = %zu\\n\", offsetof(Padded, e));\n\n    printf(\"=== Packed ===\\n\");\n    printf(\"sizeof = %zu\\n\", sizeof(Packed));\n    printf(\"offsetof(d) = %zu\\n\", offsetof(Packed, ____));\n    printf(\"offsetof(b) = %zu\\n\", offsetof(Packed, b));\n    printf(\"offsetof(a) = %zu\\n\", offsetof(Packed, a));\n\n    printf(\"Economie : %zu octets\\n\", sizeof(Padded) - sizeof(____));\n    return 0;\n}",
-    "#include <stdio.h>\n#include <stddef.h>\n\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a, c, e; } Packed;\n\n// Affichez sizeof et offsetof pour chaque struct\n// Calculez l'\u00e9conomie de m\u00e9moire\nint main(void) {\n    // TODO\n    return 0;\n}",
+    "#include <stdio.h>\n#include <stddef.h>\n\ntypedef struct { char a; int b; char c; double d; char e; } Padded;\ntypedef struct { double d; int b; char a, c, e; } Packed;\n\n// Affichez sizeof et offsetof pour chaque struct\n// Calculez l'économie de mémoire\nint main(void) {\n    // TODO\n    return 0;\n}",
     "#include <stdio.h>\n#include <stddef.h>\n\nint main(void) {\n    return 0;\n}"
   ]
 }

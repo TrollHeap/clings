@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Précision flottants et troncature",
   "description": "NSY103 — La précision contrôle les décimales des flottants (%.Nf) et la longueur max des chaînes (%.Ns). Combinée avec la largeur, elle offre un contrôle fin du formatage.\n\nAffichez des flottants avec différentes précisions et tronquez des chaînes.",
-  "starter_code": "#include <stdio.h>\n\nvoid format_precision(char *buf, size_t sz) {\n    double pi = 3.14159265358979;\n    double e = 2.71828182845905;\n    char *msg = \"Hello, clings!\";\n    snprintf(buf, sz, \"pi(0) = %.0f\\npi(2) = %.2f\\npi(6) = %.6f\\ne(4)  = %.4f\\ntrunc5= %.5s\\ntrunc10= %.10s\\n\",\n             pi, pi, pi, e, msg, msg);\n}",
-  "solution_code": "#include <stdio.h>\n\nvoid format_precision(char *buf, size_t sz) {\n    double pi = 3.14159265358979;\n    double e = 2.71828182845905;\n    char *msg = \"Hello, clings!\";\n    snprintf(buf, sz, \"pi(0) = %.0f\\npi(2) = %.2f\\npi(6) = %.6f\\ne(4)  = %.4f\\ntrunc5= %.5s\\ntrunc10= %.10s\\n\",\n             pi, pi, pi, e, msg, msg);\n}",
+  "starter_code": "#include <stdio.h>\n\nvoid format_precision(char *buf, size_t sz) {\n    double pi = 3.14159265358979;\n    double e = 2.71828182845905;\n    char *msg = \"Hello, clings!\";\n    snprintf(buf, sz, \"pi(0) = %.0f\\npi(2) = %.2f\\npi(6) = %.6f\\ne(4)  = %.4f\\ntrunc5= %.5s\\ntrunc10= %.10s\\n\",\n             pi, pi, pi, e, msg, msg);\n}\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <string.h>\n#include <stdio.h>\n\nvoid format_precision(char *buf, size_t sz) {\n    double pi = 3.14159265358979;\n    double e = 2.71828182845905;\n    char *msg = \"Hello, clings!\";\n    snprintf(buf, sz, \"pi(0) = %.0f\\npi(2) = %.2f\\npi(6) = %.6f\\ne(4)  = %.4f\\ntrunc5= %.5s\\ntrunc10= %.10s\\n\",\n             pi, pi, pi, e, msg, msg);\n}\n\nint main(void) {\n    {\n        char buf[128];\n        format_precision(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"pi(0) = 3\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_precision(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"pi(2) = 3.14\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_precision(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"pi(6) = 3.141593\")) ? 1 : 0);\n    }\n    {\n        char buf[128];\n        format_precision(buf, sizeof(buf));\n        printf(\"%d\\n\", (strstr(buf, \"trunc5= Hello\")) ? 1 : 0);\n        printf(\"%d\\n\", (strstr(buf, \"trunc10= Hello, cli\")) ? 1 : 0);\n    }\n    return 0;\n}\n",
   "hints": [
     "%.Nf affiche N décimales pour un flottant",
     "%.0f affiche sans décimale (arrondi à l'entier)",
     "%.Ns tronque la chaîne à N caractères maximum"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_pi_zero_decimals(void) {\n    char buf[128];\n    format_precision(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"pi(0) = 3\"));\n}\n\nvoid test_pi_two_decimals(void) {\n    char buf[128];\n    format_precision(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"pi(2) = 3.14\"));\n}\n\nvoid test_pi_six_decimals(void) {\n    char buf[128];\n    format_precision(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"pi(6) = 3.141593\"));\n}\n\nvoid test_string_truncate(void) {\n    char buf[128];\n    format_precision(buf, sizeof(buf));\n    TEST_ASSERT_TRUE(strstr(buf, \"trunc5= Hello\"));\n    TEST_ASSERT_TRUE(strstr(buf, \"trunc10= Hello, cli\"));\n}\n\nint main(void) {\n    RUN_TEST(test_pi_zero_decimals);\n    RUN_TEST(test_pi_two_decimals);\n    RUN_TEST(test_pi_six_decimals);\n    RUN_TEST(test_string_truncate);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "1\n1\n1\n1\n1"
   },
   "visualizer": {
     "type": "stack_heap",

@@ -5,16 +5,16 @@
   "difficulty": 2,
   "title": "Buffer dynamique avec realloc",
   "description": "NSY103 — `realloc(ptr, new_size)` redimensionne une allocation existante. Si le bloc ne peut pas être étendu en place, il est déplacé en mémoire.\n\nImplémentez un buffer qui commence à 2 entiers, puis est étendu à 6 avec realloc.",
-  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *buffer_resize(int *buf, size_t old_size, size_t new_size) {\n    /* TODO: realloc(buf, new_size * sizeof(int)) with safe pattern */\n    return NULL;\n}",
-  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *buffer_resize(int *buf, size_t old_size, size_t new_size) {\n    (void)old_size;\n    int *tmp = realloc(buf, new_size * sizeof(int));\n    if (!tmp) { free(buf); return NULL; }\n    return tmp;\n}",
+  "starter_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *buffer_resize(int *buf, size_t old_size, size_t new_size) {\n    /* TODO: realloc(buf, new_size * sizeof(int)) with safe pattern */\n    return NULL;\n}\n\nint main(void) {\n    // TODO\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n#include <stdlib.h>\n\nint *buffer_resize(int *buf, size_t old_size, size_t new_size) {\n    (void)old_size;\n    int *tmp = realloc(buf, new_size * sizeof(int));\n    if (!tmp) { free(buf); return NULL; }\n    return tmp;\n}\n\nint main(void) {\n    {\n        int *buf = malloc(2 * sizeof(int));\n        printf(\"%d\\n\", (buf) != NULL ? 1 : 0);\n        buf[0] = 10; buf[1] = 20;\n        int *tmp = buffer_resize(buf, 2, 4);\n        printf(\"%d\\n\", (tmp) != NULL ? 1 : 0);\n        printf(\"%d\\n\", (int)(tmp[0]));\n        printf(\"%d\\n\", (int)(tmp[1]));\n        free(tmp);\n    }\n    {\n        int *buf = malloc(3 * sizeof(int));\n        buf[0] = 5; buf[1] = 10; buf[2] = 15;\n        int *tmp = buffer_resize(buf, 3, 6);\n        printf(\"%d\\n\", (int)(tmp[0]));\n        printf(\"%d\\n\", (int)(tmp[1]));\n        printf(\"%d\\n\", (int)(tmp[2]));\n        free(tmp);\n    }\n    {\n        int *buf = malloc(1 * sizeof(int));\n        buf[0] = 1;\n        int *tmp = buffer_resize(buf, 1, 3);\n        printf(\"%d\\n\", (tmp) != NULL ? 1 : 0);\n        tmp[1] = 2; tmp[2] = 3;\n        printf(\"%d\\n\", (int)(tmp[0]));\n        printf(\"%d\\n\", (int)(tmp[1]));\n        printf(\"%d\\n\", (int)(tmp[2]));\n        free(tmp);\n    }\n    return 0;\n}\n",
   "hints": [
     "Pattern safe : `int *tmp = realloc(arr, new_size); if (tmp) arr = tmp;`",
     "realloc(NULL, size) est équivalent à malloc(size)",
     "Après realloc, les anciennes données sont préservées jusqu'à min(old_size, new_size)"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "int *buffer_resize(int *buf, size_t old_size, size_t new_size);\n\nvoid test_resize_grow(void) {\n    int *buf = malloc(2 * sizeof(int));\n    TEST_ASSERT_NOT_NULL(buf);\n    buf[0] = 10; buf[1] = 20;\n    int *tmp = buffer_resize(buf, 2, 4);\n    TEST_ASSERT_NOT_NULL(tmp);\n    TEST_ASSERT_EQUAL_INT(10, tmp[0]);\n    TEST_ASSERT_EQUAL_INT(20, tmp[1]);\n    free(tmp);\n}\n\nvoid test_resize_preserves_data(void) {\n    int *buf = malloc(3 * sizeof(int));\n    buf[0] = 5; buf[1] = 10; buf[2] = 15;\n    int *tmp = buffer_resize(buf, 3, 6);\n    TEST_ASSERT_EQUAL_INT(5, tmp[0]);\n    TEST_ASSERT_EQUAL_INT(10, tmp[1]);\n    TEST_ASSERT_EQUAL_INT(15, tmp[2]);\n    free(tmp);\n}\n\nvoid test_resize_allows_new_data(void) {\n    int *buf = malloc(1 * sizeof(int));\n    buf[0] = 1;\n    int *tmp = buffer_resize(buf, 1, 3);\n    TEST_ASSERT_NOT_NULL(tmp);\n    tmp[1] = 2; tmp[2] = 3;\n    TEST_ASSERT_EQUAL_INT(1, tmp[0]);\n    TEST_ASSERT_EQUAL_INT(2, tmp[1]);\n    TEST_ASSERT_EQUAL_INT(3, tmp[2]);\n    free(tmp);\n}\n\nint main(void) {\n    RUN_TEST(test_resize_grow);\n    RUN_TEST(test_resize_preserves_data);\n    RUN_TEST(test_resize_allows_new_data);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "1\n1\n10\n20\n5\n10\n15\n1\n1\n2\n3"
   },
   "visualizer": {
     "type": "stack_heap",

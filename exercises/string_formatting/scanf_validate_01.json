@@ -5,17 +5,16 @@
   "difficulty": 2,
   "title": "Validation d'entrée avec sscanf",
   "description": "NSY103 — sscanf parse une chaîne avec un format, comme scanf mais depuis un buffer. La valeur de retour indique combien de champs ont été lus — essentiel pour la validation.\n\nParsez différentes chaînes avec sscanf et vérifiez les résultats.",
-  "starter_code": "#include <stdio.h>\n\nint parse_line1(int *n, float *f, char *word) {\n    char *line1 = \"42 3.14 hello\";\n    return sscanf(line1, \"%d %f %s\", n, f, word);\n}\n\nint parse_line2(int *n) {\n    char *line2 = \"abc def\";\n    return sscanf(line2, \"%d\", n);\n}\n\nint parse_date(int *y, int *m, int *d) {\n    char *line3 = \"2024-01-15\";\n    return sscanf(line3, \"%d-%d-%d\", y, m, d);\n}",
-  "solution_code": "#include <stdio.h>\n\nint parse_line1(int *n, float *f, char *word) {\n    char *line1 = \"42 3.14 hello\";\n    return sscanf(line1, \"%d %f %s\", n, f, word);\n}\n\nint parse_line2(int *n) {\n    char *line2 = \"abc def\";\n    return sscanf(line2, \"%d\", n);\n}\n\nint parse_date(int *y, int *m, int *d) {\n    char *line3 = \"2024-01-15\";\n    return sscanf(line3, \"%d-%d-%d\", y, m, d);\n}",
+  "starter_code": "#include <stdio.h>\n\nint parse_line1(int *n, float *f, char *word) {\n    char *line1 = \"42 3.14 hello\";\n    return sscanf(line1, \"%d %f %s\", n, f, word);\n}\n\nint parse_line2(int *n) {\n    char *line2 = \"abc def\";\n    return sscanf(line2, \"%d\", n);\n}\n\nint parse_date(int *y, int *m, int *d) {\n    char *line3 = \"2024-01-15\";\n    return sscanf(line3, \"%d-%d-%d\", y, m, d);\n}\n\nint main(void) {\n    /* TODO */\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nint parse_line1(int *n, float *f, char *word) {\n    char *line1 = \"42 3.14 hello\";\n    return sscanf(line1, \"%d %f %s\", n, f, word);\n}\n\nint parse_line2(int *n) {\n    char *line2 = \"abc def\";\n    return sscanf(line2, \"%d\", n);\n}\n\nint parse_date(int *y, int *m, int *d) {\n    char *line3 = \"2024-01-15\";\n    return sscanf(line3, \"%d-%d-%d\", y, m, d);\n}\n\nint main(void) {\n    {\n        int n;\n        float f;\n        char word[32];\n        int ret = parse_line1(&n, &f, word);\n        printf(\"%d\\n\", (int)(ret));\n        printf(\"%d\\n\", (int)(n));\n    }\n    {\n        int n;\n        float f;\n        char word[32];\n        parse_line1(&n, &f, word);\n        printf(\"%s\\n\", word);\n    }\n    {\n        int n;\n        int ret = parse_line2(&n);\n        printf(\"%d\\n\", (int)(ret));\n    }\n    {\n        int y, m, d;\n        int ret = parse_date(&y, &m, &d);\n        printf(\"%d\\n\", (int)(ret));\n        printf(\"%d\\n\", (int)(y));\n        printf(\"%d\\n\", (int)(m));\n        printf(\"%d\\n\", (int)(d));\n    }\n    return 0;\n}\n",
   "hints": [
     "sscanf retourne le nombre de champs parsés avec succès",
     "Si le format ne matche pas, sscanf retourne 0 (aucun champ lu)",
     "Le format \"%d-%d-%d\" parse des entiers séparés par des tirets"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_line1_parse_success(void) {\n    int n;\n    float f;\n    char word[32];\n    int ret = parse_line1(&n, &f, word);\n    TEST_ASSERT_EQUAL_INT(3, ret);\n    TEST_ASSERT_EQUAL_INT(42, n);\n}\n\nvoid test_line1_float_value(void) {\n    int n;\n    float f;\n    char word[32];\n    parse_line1(&n, &f, word);\n    TEST_ASSERT_EQUAL_STRING(\"hello\", word);\n}\n\nvoid test_line2_parse_fail(void) {\n    int n;\n    int ret = parse_line2(&n);\n    TEST_ASSERT_EQUAL_INT(0, ret);\n}\n\nvoid test_date_parse_success(void) {\n    int y, m, d;\n    int ret = parse_date(&y, &m, &d);\n    TEST_ASSERT_EQUAL_INT(3, ret);\n    TEST_ASSERT_EQUAL_INT(2024, y);\n    TEST_ASSERT_EQUAL_INT(1, m);\n    TEST_ASSERT_EQUAL_INT(15, d);\n}\n\nint main(void) {\n    RUN_TEST(test_line1_parse_success);\n    RUN_TEST(test_line1_float_value);\n    RUN_TEST(test_line2_parse_fail);\n    RUN_TEST(test_date_parse_success);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "3\n42\nhello\n0\n3\n2024\n1\n15"
   },
   "visualizer": {
     "type": "stack_heap",

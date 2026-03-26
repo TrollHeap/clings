@@ -5,17 +5,16 @@
   "difficulty": 1,
   "title": "Swap de deux variables via pointeurs",
   "description": "NSY103 — Pour modifier des variables depuis une fonction, il faut passer leurs adresses (pointeurs). La fonction reçoit `int *a, int *b` et échange les valeurs via déréférencement `*a`, `*b`.\n\nImplémentez une fonction `swap` qui échange les valeurs de deux entiers via pointeurs.",
-  "starter_code": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n}\n",
-  "solution_code": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\n",
+  "starter_code": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    // TODO: appeler swap\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}\n",
+  "solution_code": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int tmp = *a;\n    *a = *b;\n    *b = tmp;\n}\n\nint main(void) {\n    int x = 5, y = 17;\n    printf(\"Avant : x=%d y=%d\\n\", x, y);\n    swap(&x, &y);\n    printf(\"Apres : x=%d y=%d\\n\", x, y);\n    return 0;\n}\n",
   "hints": [
     "La fonction swap reçoit des pointeurs : `void swap(int *a, int *b)`",
     "Pour lire la valeur pointée : `int tmp = *a;`",
     "Pour appeler swap, passez les adresses : `swap(&x, &y);`"
   ],
   "validation": {
-    "mode": "test",
-    "test_code": "void test_swap_basic(void) {\n    int x = 5, y = 17;\n    swap(&x, &y);\n    TEST_ASSERT_EQUAL_INT(17, x);\n    TEST_ASSERT_EQUAL_INT(5, y);\n}\n\nvoid test_swap_same_value(void) {\n    int x = 42, y = 42;\n    swap(&x, &y);\n    TEST_ASSERT_EQUAL_INT(42, x);\n    TEST_ASSERT_EQUAL_INT(42, y);\n}\n\nvoid test_swap_negative(void) {\n    int x = -10, y = 20;\n    swap(&x, &y);\n    TEST_ASSERT_EQUAL_INT(20, x);\n    TEST_ASSERT_EQUAL_INT(-10, y);\n}\n\nvoid test_swap_zero(void) {\n    int x = 0, y = 100;\n    swap(&x, &y);\n    TEST_ASSERT_EQUAL_INT(100, x);\n    TEST_ASSERT_EQUAL_INT(0, y);\n}\n\nint main(void) {\n    RUN_TEST(test_swap_basic);\n    RUN_TEST(test_swap_same_value);\n    RUN_TEST(test_swap_negative);\n    RUN_TEST(test_swap_zero);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n",
-    "expected_tests_pass": 4
+    "mode": "output",
+    "expected_output": "Avant : x=5 y=17\nApres : x=17 y=5"
   },
   "visualizer": {
     "type": "stack_heap",

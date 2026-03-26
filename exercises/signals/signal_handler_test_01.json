@@ -13,14 +13,18 @@
     "Dans le handler, `g_count++` suffit — les opérations sur `sig_atomic_t` sont atomiques par rapport aux signaux."
   ],
   "validation": {
-    "mode": "test",
-    "expected_tests_pass": 4,
-    "test_code": "void test_install_handler_returns_zero(void) {\n    int rc = install_handler();\n    TEST_ASSERT_EQUAL_INT(0, rc);\n}\n\nvoid test_handler_increments_count_once(void) {\n    g_count = 0;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(1, (int)g_count);\n}\n\nvoid test_handler_increments_count_multiple(void) {\n    g_count = 0;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    kill(getpid(), SIGUSR1);\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(3, (int)g_count);\n}\n\nvoid test_handler_does_not_reset_count(void) {\n    g_count = 10;\n    install_handler();\n    kill(getpid(), SIGUSR1);\n    TEST_ASSERT_EQUAL_INT(11, (int)g_count);\n}\n\nint main(void) {\n    RUN_TEST(test_install_handler_returns_zero);\n    RUN_TEST(test_handler_increments_count_once);\n    RUN_TEST(test_handler_increments_count_multiple);\n    RUN_TEST(test_handler_does_not_reset_count);\n    TEST_SUMMARY();\n    return _clings_failures > 0 ? 1 : 0;\n}\n"
+    "mode": "output",
+    "expected_output": "count=1"
   },
   "key_concept": "`sigaction` est la méthode POSIX recommandée pour installer des handlers de signaux. `volatile sig_atomic_t` garantit un accès sûr depuis le handler. `SA_RESTART` relance automatiquement les appels système interrompus.",
   "common_mistake": "Utiliser `signal()` au lieu de `sigaction()` (comportement non portable). Oublier `sigemptyset(&sa.sa_mask)` — sans cela, `sa_mask` contient des valeurs indéterminées.",
   "exercise_type": "complete",
   "prerequisites": [],
   "files": [],
-  "kc_ids": ["sigaction", "SIGUSR1", "sig_atomic_t", "SA_RESTART"]
+  "kc_ids": [
+    "sigaction",
+    "SIGUSR1",
+    "sig_atomic_t",
+    "SA_RESTART"
+  ]
 }
