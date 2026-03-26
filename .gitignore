@@ -1,5 +1,6 @@
 target/
 .claude/
+CLAUDE.md
 docs/
 log.txt
 output.txt
