@@ -53,6 +53,25 @@ const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
     "ptrace(",
 ];
 
+/// Find the position of the closing brace `}` matching an opening brace at `open_pos`.
+/// Returns the position just after the closing brace, or None if not found.
+fn find_closing_brace(code: &str, open_pos: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, ch) in code[open_pos..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(open_pos + i + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Supprime la fonction `main()` du code C utilisateur pour éviter la redéfinition
 /// lors de la compilation du harness de tests (test_current.c intègre le code utilisateur).
 ///
@@ -68,22 +87,7 @@ fn strip_main_function(code: &str) -> String {
         return code.to_string();
     };
     let brace_start = main_pos + brace_offset;
-    let mut depth = 0usize;
-    let mut end_pos = None;
-    for (i, ch) in code[brace_start..].char_indices() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    end_pos = Some(brace_start + i + 1);
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-    let end = end_pos.unwrap_or(code.len());
+    let end = find_closing_brace(code, brace_start).unwrap_or(code.len());
     format!("{}{}", &code[..main_pos], &code[end..])
 }
 
@@ -351,8 +355,8 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     run_output(source_path, work_dir, exercise)
 }
 
-/// Constructs gcc command-line arguments for output-validation mode.
-fn build_output_gcc_args<'a>(
+/// Constructs gcc command-line arguments for compilation.
+fn build_gcc_compilation_args<'a>(
     output_path: &'a str,
     source_path: &'a str,
     include_flag: &'a str,
@@ -377,7 +381,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
     let linker = linker_flags(&exercise.subject);
 
     let extra_args =
-        build_output_gcc_args(&output_path_str, &source_path_str, &include_flag, &linker);
+        build_gcc_compilation_args(&output_path_str, &source_path_str, &include_flag, &linker);
 
     let timeout = exercise
         .validation
