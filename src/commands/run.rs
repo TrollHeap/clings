@@ -50,10 +50,7 @@ pub fn cmd_review() -> Result<()> {
     }
 
     // For each due subject, prefer the weakest exercise (by exercise_scores); fallback to first
-    let weakest_by_subject = progress::get_all_weakest_exercises(&conn).unwrap_or_else(|e| {
-        eprintln!("  [clings] avertissement : weakest_exercises indisponible : {e}");
-        std::collections::HashMap::new()
-    });
+    let weakest_by_subject = progress::get_all_weakest_exercises(&conn)?;
     let mut due_exercises: Vec<&crate::models::Exercise> = due
         .iter()
         .filter_map(|subject_name| {
