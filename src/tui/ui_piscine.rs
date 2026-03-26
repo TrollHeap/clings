@@ -330,14 +330,12 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
 
             let mut spans = common::render_keybinds(&binds, key_style, dim);
 
-            if has_hints && state.hint_index > 0 {
-                common::update_hint_counter(
-                    &mut spans,
-                    " indice",
-                    state.hint_index,
-                    exercise.hints.len(),
-                );
-            }
+            common::append_hint_counter_if_visible(
+                &mut spans,
+                " indice",
+                state.hint_index,
+                exercise.hints.len(),
+            );
             Line::from(spans)
         };
 

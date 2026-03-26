@@ -220,6 +220,31 @@ pub struct VisStep {
     pub explanation: String,
     #[serde(default)]
     pub step_label: String,
+    /// Flèches entre variables (source → cible). Utilisées pour le layout multi-frames.
+    #[serde(default)]
+    pub arrows: Vec<VisArrow>,
+    /// Frames de la call stack au moment du step. Utilisées pour afficher plusieurs frames côte-à-côte.
+    #[serde(default)]
+    pub call_frames: Vec<VisCallFrame>,
+}
+
+/// Flèche entre deux variables dans le visualiseur (pointeur → cible).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisArrow {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+/// Frame de la call stack dans le visualiseur.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisCallFrame {
+    pub function_name: String,
+    #[serde(default)]
+    pub args: String,
+    #[serde(default)]
+    pub is_active: bool,
 }
 
 /// Variable affichée dans le stack ou le heap.

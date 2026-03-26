@@ -44,6 +44,10 @@ pub const PCT_GREEN_THRESHOLD: u32 = 75;
 pub const PCT_YELLOW_THRESHOLD: u32 = 25;
 pub const MINIMAP_MAX_ITEMS: usize = 60;
 pub const CONSECUTIVE_FAILURE_THRESHOLD: usize = 3;
+/// Pédagogie — gate hints : nombre minimum de tentatives avant que le 1er indice soit accessible.
+pub const HINT_MIN_ATTEMPTS: u8 = 2;
+/// Pédagogie — interleaving : succès consécutifs sur le même sujet avant suggestion de changer.
+pub const INTERLEAVING_NUDGE_THRESHOLD: u8 = 3;
 /// Seuil de piscine/exam : plus bas car la progression est linéaire sans navigation libre.
 pub const PISCINE_FAILURE_THRESHOLD: u32 = 2;
 pub const MASTERY_BAR_GREEN_THRESHOLD: f64 = 4.0;

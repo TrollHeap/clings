@@ -118,6 +118,58 @@ pub struct RunResult {
     pub compile_error: bool,
     /// `true` si le programme n'a pas terminé dans la limite de 10 secondes
     pub timeout: bool,
+    /// Conseil pédagogique dérivé du stderr gcc (None si pas d'erreur de compilation)
+    pub gcc_hint: Option<String>,
+}
+
+/// Analyse le stderr gcc et retourne un conseil pédagogique pour les erreurs courantes.
+pub fn parse_gcc_hint(stderr: &str) -> Option<String> {
+    let patterns: &[(&str, &str)] = &[
+        (
+            "implicit declaration of function",
+            "Fonction utilisée sans déclaration — ajoutez l'#include correspondant",
+        ),
+        (
+            "undefined reference to",
+            "Symbole non résolu — vérifiez l'include ou le flag de liaison (-lpthread, -lm…)",
+        ),
+        (
+            "undeclared",
+            "Identifiant non déclaré — vérifiez le nom et la portée de la variable/fonction",
+        ),
+        (
+            "expected ';'",
+            "Point-virgule manquant — repérez la ligne indiquée par gcc",
+        ),
+        (
+            "too few arguments",
+            "Trop peu d'arguments passés à la fonction",
+        ),
+        (
+            "too many arguments",
+            "Trop d'arguments passés à la fonction",
+        ),
+        (
+            "incompatible types",
+            "Types incompatibles — vérifiez les conversions ou un cast manquant",
+        ),
+        (
+            "dereferencing pointer to incomplete type",
+            "Pointeur vers un type incomplet — le struct est-il défini avant cet usage ?",
+        ),
+        ("unused variable", "Variable déclarée mais jamais utilisée"),
+        (
+            "control reaches end of non-void function",
+            "La fonction doit retourner une valeur sur tous les chemins d'exécution",
+        ),
+    ];
+
+    for (pattern, hint) in patterns {
+        if stderr.contains(pattern) {
+            return Some(hint.to_string());
+        }
+    }
+    None
 }
 
 /// Returns subject-specific linker flags for gcc.
@@ -352,6 +404,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
                     duration_ms,
                     compile_error: false,
                     timeout: false,
+                    gcc_hint: None,
                 };
             }
             let valid = validate_output(&stdout, exercise);
@@ -362,6 +415,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
                 duration_ms,
                 compile_error: false,
                 timeout: false,
+                gcc_hint: None,
             }
         },
     )
@@ -454,6 +508,7 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
                     duration_ms,
                     compile_error: false,
                     timeout: false,
+                    gcc_hint: None,
                 };
             }
             let (success, failures) = parse_test_summary(&stdout);
@@ -476,6 +531,7 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
                 duration_ms,
                 compile_error: false,
                 timeout: false,
+                gcc_hint: None,
             }
         },
     )
@@ -522,6 +578,7 @@ fn dispatch_gcc_result(
             duration_ms: timeout.as_millis().min(u64::MAX as u128) as u64,
             compile_error: false,
             timeout: true,
+            gcc_hint: None,
         },
         Err(KfError::Config(msg)) => make_compile_error(msg),
         Err(KfError::Io(e)) => RunResult {
@@ -531,6 +588,7 @@ fn dispatch_gcc_result(
             duration_ms: start.elapsed().as_millis().min(u64::MAX as u128) as u64,
             compile_error: false,
             timeout: false,
+            gcc_hint: None,
         },
         Err(e) => make_compile_error(format!("{e}")),
     }
@@ -715,6 +773,7 @@ fn spawn_drain_threads(
 
 /// Construct a RunResult representing a compile failure.
 fn make_compile_error(stderr: String) -> RunResult {
+    let gcc_hint = parse_gcc_hint(&stderr);
     RunResult {
         success: false,
         stdout: String::new(),
@@ -722,6 +781,7 @@ fn make_compile_error(stderr: String) -> RunResult {
         duration_ms: 0,
         compile_error: true,
         timeout: false,
+        gcc_hint,
     }
 }
 

@@ -168,6 +168,34 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
     common::render_body_with_sidebar(f, area, state, render_mastery_sidebar);
 }
 
+/// Ligne de progression de stage : S0 ── S1 ── [S2] ── S3 ── S4
+/// Stage courant en accent+bold, stages passés en vert, futurs en gris.
+fn stage_progress_line(current: Option<u8>) -> Line<'static> {
+    let sep = Span::styled(" ── ", Style::default().fg(common::C_OVERLAY));
+    let spans: Vec<Span<'static>> = (0u8..=4)
+        .flat_map(|s| {
+            let label = match current {
+                Some(c) if s == c => Span::styled(
+                    format!("[S{}]", s),
+                    Style::default()
+                        .fg(common::C_ACCENT)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Some(c) if s < c => {
+                    Span::styled(format!("S{}", s), Style::default().fg(common::C_SUCCESS))
+                }
+                _ => Span::styled(format!("S{}", s), Style::default().fg(common::C_BORDER)),
+            };
+            if s < 4 {
+                vec![label, sep.clone()]
+            } else {
+                vec![label]
+            }
+        })
+        .collect();
+    Line::from(spans)
+}
+
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.exercises[state.current_index];
     let mastery = state
@@ -177,46 +205,20 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
         .unwrap_or(0.0);
     let bar_color = common::mastery_color(mastery);
 
-    let mut lines: Vec<Line<'_>> = Vec::new();
-
-    // ── Section EXERCICE ─────────────────────────────────────────────────
-    lines.push(Line::from(Span::styled(
+    // ── Section EXERCICE + séparateur ────────────────────────────────────
+    let title_line = Line::from(Span::styled(
         exercise.title.as_str(),
         Style::default()
             .fg(common::C_TEXT)
             .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::raw(""));
-    lines.push(line![
-        span!(common::C_TEXT_DIM; "sujet   "),
-        Span::styled(
-            exercise.subject.as_str(),
-            Style::default().fg(common::C_SUBTEXT)
-        ),
-    ]);
-
-    let diff_line = common::difficulty_stars_line(exercise.difficulty);
-    let mut diff_spans: Vec<Span<'_>> = vec![span!(common::C_TEXT_DIM; "diff    ")];
-    diff_spans.extend(diff_line.spans);
-    lines.push(Line::from(diff_spans));
-
-    lines.push(line![
-        span!(common::C_TEXT_DIM; "type    "),
-        common::exercise_type_badge(exercise.exercise_type),
-    ]);
-
-    if let Some(stage) = state.current_stage {
-        lines.push(line![
-            span!(common::C_TEXT_DIM; "étape   "),
-            common::stage_badge(stage),
-        ]);
-    }
-
-    // ── Séparateur ────────────────────────────────────────────────────────
-    lines.push(Line::styled(
-        common::SEPARATOR,
-        Style::default().fg(common::C_OVERLAY),
     ));
+    let sep_line = Line::styled(common::SEPARATOR, Style::default().fg(common::C_OVERLAY));
+    let mut lines: Vec<Line<'_>> = vec![
+        title_line,
+        Line::raw(""),
+        stage_progress_line(state.current_stage),
+        sep_line,
+    ];
 
     // ── Section SUJET ─────────────────────────────────────────────────────
     let bar = common::mastery_bar_string(mastery, 10);
@@ -266,6 +268,31 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
         )));
     }
 
+    // Badge visualizer — met en évidence si l'exercice a des étapes visuelles
+    if !exercise.visualizer.steps.is_empty() {
+        lines.push(Line::raw(""));
+        lines.push(Line::from(vec![
+            Span::styled("[ ", Style::default().fg(common::C_TEXT_DIM)),
+            Span::styled(
+                "vis ",
+                Style::default()
+                    .fg(common::C_INFO)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{} étapes", exercise.visualizer.steps.len()),
+                Style::default().fg(common::C_SUBTEXT),
+            ),
+            Span::styled(" ]", Style::default().fg(common::C_TEXT_DIM)),
+        ]));
+        lines.push(Line::from(Span::styled(
+            "  → [v] pour visualiser",
+            Style::default()
+                .fg(common::C_TEXT_DIM)
+                .add_modifier(Modifier::ITALIC),
+        )));
+    }
+
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(common::C_BORDER))
@@ -310,14 +337,12 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
 
         let mut spans = common::render_keybinds(&binds, key_style, dim);
 
-        if has_hints && state.hint_index > 0 {
-            common::update_hint_counter(
-                &mut spans,
-                " hint",
-                state.hint_index,
-                exercise.hints.len(),
-            );
-        }
+        common::append_hint_counter_if_visible(
+            &mut spans,
+            " hint",
+            state.hint_index,
+            exercise.hints.len(),
+        );
         Line::from(spans)
     };
 

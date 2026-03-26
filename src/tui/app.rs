@@ -110,6 +110,9 @@ pub struct AppState {
     pub subject_order: Vec<String>,
     // Description panel scroll offset
     pub description_scroll: u16,
+    // Pédagogie — interleaving nudge
+    pub consecutive_successes_on_subject: u8,
+    pub last_success_subject: String,
     // Sub-structs
     pub overlay: OverlayState,
     pub header_cache: HeaderCache,
@@ -142,6 +145,8 @@ impl AppState {
             skip_file_changed: false,
             subject_order: Vec::new(),
             description_scroll: 0,
+            consecutive_successes_on_subject: 0,
+            last_success_subject: String::new(),
             overlay: OverlayState::default(),
             header_cache: HeaderCache::default(),
             timer_cache: PiscineTimerCache::default(),
@@ -669,10 +674,8 @@ impl App {
         if self.state.overlay.success_overlay {
             use ratatui::crossterm::event::KeyCode;
             self.state.overlay.success_overlay = false;
-            if matches!(key.code, KeyCode::Enter) {
-                if !self.navigate_next(conn, session_id) {
-                    self.state.should_quit = true;
-                }
+            if matches!(key.code, KeyCode::Enter) && !self.navigate_next(conn, session_id) {
+                self.state.should_quit = true;
             }
             return true;
         }
@@ -704,7 +707,22 @@ impl App {
 
     /// Shared hint reveal handler `[h]`.
     fn handle_hint_reveal(&mut self) {
+        use crate::constants::HINT_MIN_ATTEMPTS;
         let hints_len = self.state.exercises[self.state.current_index].hints.len();
+        if hints_len == 0 {
+            return;
+        }
+        // Gate : le 1er indice nécessite HINT_MIN_ATTEMPTS tentatives préalables.
+        if self.state.hint_index == 0 && self.state.consecutive_failures < HINT_MIN_ATTEMPTS {
+            let remaining = HINT_MIN_ATTEMPTS - self.state.consecutive_failures;
+            self.state.status_msg = Some(format!(
+                "Essayez encore ({} tentative{} avant le 1er indice)",
+                remaining,
+                if remaining > 1 { "s" } else { "" }
+            ));
+            self.state.status_msg_at = Some(std::time::Instant::now());
+            return;
+        }
         self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
     }
 
@@ -812,12 +830,35 @@ impl App {
             self.state.consecutive_failures = 0;
             if !self.state.already_recorded {
                 self.state.already_recorded = true;
-                if let Err(e) =
-                    crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, true)
+                // Clone avant tout borrow mutable
+                let subject = exercise.subject.clone();
+                let exercise_id = exercise.id.clone();
+                if let Err(e) = crate::progress::record_attempt(conn, &subject, &exercise_id, true)
                 {
                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                 }
                 Self::invalidate_header_cache(&mut self.state);
+                // Interleaving nudge : suggérer de changer de sujet après N succès consécutifs
+                if self.state.last_success_subject == subject {
+                    self.state.consecutive_successes_on_subject = self
+                        .state
+                        .consecutive_successes_on_subject
+                        .saturating_add(1);
+                } else {
+                    self.state.consecutive_successes_on_subject = 1;
+                    self.state.last_success_subject = subject.clone();
+                }
+                if self.state.consecutive_successes_on_subject
+                    >= crate::constants::INTERLEAVING_NUDGE_THRESHOLD
+                {
+                    self.state.status_msg = Some(format!(
+                        "{} succès sur «{}» — explorer un autre sujet booste la mémoire !",
+                        crate::constants::INTERLEAVING_NUDGE_THRESHOLD,
+                        subject
+                    ));
+                    self.state.status_msg_at = Some(std::time::Instant::now());
+                    self.state.consecutive_successes_on_subject = 0;
+                }
             }
             self.state.completed[self.state.current_index] = true;
             self.state.overlay.success_overlay = true;
@@ -1276,6 +1317,13 @@ mod tests {
         app.state.exercises = vec![ex];
         app.state.completed = vec![false];
         assert_eq!(app.state.hint_index, 0);
+
+        // Gate : hint 1 nécessite HINT_MIN_ATTEMPTS tentatives — sans tentatives, bloqué
+        app.handle_hint_reveal();
+        assert_eq!(app.state.hint_index, 0, "gate bloque sans tentatives");
+
+        // Simuler HINT_MIN_ATTEMPTS échecs pour débloquer
+        app.state.consecutive_failures = crate::constants::HINT_MIN_ATTEMPTS;
         app.handle_hint_reveal();
         assert_eq!(app.state.hint_index, 1);
         app.handle_hint_reveal();

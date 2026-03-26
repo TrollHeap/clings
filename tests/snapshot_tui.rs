@@ -80,6 +80,7 @@ fn snapshot_watch_view_with_compile_error() {
         duration_ms: 42,
         compile_error: true,
         timeout: false,
+        gcc_hint: Some("Point-virgule manquant — repérez la ligne indiquée par gcc".to_owned()),
     });
 
     terminal
@@ -104,6 +105,7 @@ fn snapshot_watch_view_success() {
         duration_ms: 5,
         compile_error: false,
         timeout: false,
+        gcc_hint: None,
     });
     state.completed[0] = true;
 
