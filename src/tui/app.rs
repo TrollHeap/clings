@@ -117,6 +117,10 @@ pub struct AppState {
     // Pédagogie — interleaving nudge
     pub consecutive_successes_on_subject: u8,
     pub last_success_subject: String,
+    // Subject → chapter mapping (computed once, cached)
+    pub subject_to_chapter: HashMap<String, usize>,
+    // Cached due count (invalidated when review_map changes)
+    pub cached_due_count: Option<usize>,
     // Sub-structs
     pub overlay: OverlayState,
     pub header_cache: HeaderCache,
@@ -151,6 +155,8 @@ impl AppState {
             description_scroll: 0,
             consecutive_successes_on_subject: 0,
             last_success_subject: String::new(),
+            subject_to_chapter: HashMap::new(),
+            cached_due_count: None,
             overlay: OverlayState::default(),
             header_cache: HeaderCache::default(),
             timer_cache: PiscineTimerCache::default(),
@@ -158,11 +164,41 @@ impl AppState {
     }
 
     /// Nombre de sujets dont la révision est due (days_until_due ≤ 0).
+    /// Uses cached value if available.
     pub fn due_count(&self) -> usize {
+        if let Some(cached) = self.cached_due_count {
+            return cached;
+        }
         self.review_map
             .values()
             .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
             .count()
+    }
+
+    /// Cache due_count calculation (call once per frame in dispatch loop).
+    pub fn update_due_count_cache(&mut self) {
+        let count = self
+            .review_map
+            .values()
+            .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
+            .count();
+        self.cached_due_count = Some(count);
+    }
+
+    /// Invalidate due_count cache (call after modifying review_map).
+    #[allow(dead_code)]
+    pub fn invalidate_due_count_cache(&mut self) {
+        self.cached_due_count = None;
+    }
+
+    /// Recompute subject_to_chapter cache from CHAPTERS.
+    #[allow(dead_code)]
+    pub fn rebuild_subject_to_chapter_cache(&mut self) {
+        self.subject_to_chapter = CHAPTERS
+            .iter()
+            .enumerate()
+            .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s.to_string(), i)))
+            .collect();
     }
 }
 
@@ -225,7 +261,7 @@ impl App {
         use std::time::Duration;
 
         // Prépare le premier exercice
-        self.load_current_exercise(conn)?;
+        self.reset_state_and_load_exercise(conn)?;
 
         let rx = match &self.state.source_path {
             Some(p) => crate::tui::events::spawn_event_reader(p.clone()),
@@ -234,6 +270,7 @@ impl App {
 
         // Boucle TEA
         loop {
+            self.state.update_due_count_cache();
             terminal.draw(|f| crate::tui::ui_watch::view(f, &self.state))?;
 
             match rx.recv_timeout(Duration::from_millis(50)) {
@@ -249,8 +286,10 @@ impl App {
         Ok(())
     }
 
-    /// Prépare l'exercice courant : source_path + stage.
-    pub fn load_current_exercise(&mut self, conn: &rusqlite::Connection) -> Result<()> {
+    /// Load current exercise and reset all related state.
+    /// Resets: hint_index, overlay states, status_msg, run_result, description_scroll,
+    /// consecutive_failures, already_recorded, vis state, etc.
+    pub fn reset_state_and_load_exercise(&mut self, conn: &rusqlite::Connection) -> Result<()> {
         let idx = self.state.current_index;
         if idx >= self.state.exercises.len() {
             self.state.should_quit = true;
@@ -319,17 +358,11 @@ impl App {
 
     /// Reconstruit `list_display_items` depuis `state.exercises` et `CHAPTERS`.
     fn build_list_display_items(state: &mut AppState) {
-        let subject_to_chapter: std::collections::HashMap<&str, usize> = CHAPTERS
-            .iter()
-            .enumerate()
-            .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s, i)))
-            .collect();
-
         // Pass 1: count exercises per chapter
         let mut chapter_counts: std::collections::HashMap<Option<usize>, (usize, usize)> =
             std::collections::HashMap::new();
         for (ex_idx, ex) in state.exercises.iter().enumerate() {
-            let ch_idx = subject_to_chapter.get(ex.subject.as_str()).copied();
+            let ch_idx = state.subject_to_chapter.get(ex.subject.as_str()).copied();
             let entry = chapter_counts.entry(ch_idx).or_insert((0, 0));
             entry.0 += 1;
             if state.completed.get(ex_idx).copied().unwrap_or(false) {
@@ -342,7 +375,7 @@ impl App {
         let mut current_chapter: Option<usize> = None;
 
         for (ex_idx, ex) in state.exercises.iter().enumerate() {
-            let ch_idx = subject_to_chapter.get(ex.subject.as_str()).copied();
+            let ch_idx = state.subject_to_chapter.get(ex.subject.as_str()).copied();
 
             if ch_idx != current_chapter {
                 current_chapter = ch_idx;
@@ -437,7 +470,10 @@ impl App {
 
     /// Gère les touches de l'overlay liste.
     /// Retourne `true` si Enter a été pressé (jump-to-exercise).
-    fn handle_list_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) -> bool {
+    fn dispatch_list_overlay_key(
+        state: &mut AppState,
+        key: ratatui::crossterm::event::KeyEvent,
+    ) -> bool {
         use ratatui::crossterm::event::KeyCode;
         let len = state.overlay.list_display_items.len();
         if len == 0 {
@@ -529,7 +565,10 @@ impl App {
     /// Gère les touches de l'overlay de recherche.
     /// Retourne `true` si Enter a été pressé avec un résultat sélectionné
     /// (l'appelant doit alors charger l'exercice et/ou sauvegarder le checkpoint).
-    fn handle_search_key(state: &mut AppState, key: ratatui::crossterm::event::KeyEvent) -> bool {
+    fn dispatch_search_overlay_key(
+        state: &mut AppState,
+        key: ratatui::crossterm::event::KeyEvent,
+    ) -> bool {
         use ratatui::crossterm::event::KeyCode;
         match key.code {
             KeyCode::Esc => {
@@ -658,7 +697,7 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) {
-        if let Err(e) = self.load_current_exercise(conn) {
+        if let Err(e) = self.reset_state_and_load_exercise(conn) {
             eprintln!("[clings] erreur chargement exercice: {e}");
         }
         if let Some(sid) = session_id {
@@ -667,9 +706,23 @@ impl App {
         }
     }
 
+    /// Handle success overlay key press (any key closes, Enter navigates to next).
+    fn handle_success_overlay_key(
+        &mut self,
+        key: ratatui::crossterm::event::KeyEvent,
+        conn: &rusqlite::Connection,
+        session_id: Option<&str>,
+    ) {
+        use ratatui::crossterm::event::KeyCode;
+        self.state.overlay.success_overlay = false;
+        if matches!(key.code, KeyCode::Enter) && !self.navigate_next(conn, session_id) {
+            self.state.should_quit = true;
+        }
+    }
+
     /// Dispatch overlay keys shared between watch and piscine.
     /// Returns `true` if the key was handled by an overlay (caller should `return`).
-    /// If an overlay navigation triggers a jump, calls `load_current_exercise`.
+    /// If an overlay navigation triggers a jump, calls `reset_state_and_load_exercise`.
     fn handle_overlay_dispatch(
         &mut self,
         key: ratatui::crossterm::event::KeyEvent,
@@ -694,21 +747,17 @@ impl App {
             return true;
         }
         if self.state.overlay.success_overlay {
-            use ratatui::crossterm::event::KeyCode;
-            self.state.overlay.success_overlay = false;
-            if matches!(key.code, KeyCode::Enter) && !self.navigate_next(conn, session_id) {
-                self.state.should_quit = true;
-            }
+            self.handle_success_overlay_key(key, conn, session_id);
             return true;
         }
         if self.state.overlay.list_active {
-            if Self::handle_list_key(&mut self.state, key) {
+            if Self::dispatch_list_overlay_key(&mut self.state, key) {
                 self.load_exercise_and_checkpoint(conn, session_id);
             }
             return true;
         }
         if self.state.overlay.search_active {
-            if Self::handle_search_key(&mut self.state, key) {
+            if Self::dispatch_search_overlay_key(&mut self.state, key) {
                 self.load_exercise_and_checkpoint(conn, session_id);
             }
             return true;
@@ -728,7 +777,7 @@ impl App {
     }
 
     /// Shared hint reveal handler `[h]`.
-    fn handle_hint_reveal(&mut self) {
+    fn reveal_next_hint(&mut self) {
         use crate::constants::HINT_MIN_ATTEMPTS;
         let hints_len = self.state.exercises[self.state.current_index].hints.len();
         if hints_len == 0 {
@@ -749,7 +798,7 @@ impl App {
     }
 
     /// Shared visualizer toggle `[v]`.
-    fn handle_vis_toggle(&mut self) {
+    fn toggle_visualizer_overlay(&mut self) {
         if !self.state.exercises[self.state.current_index]
             .visualizer
             .steps
@@ -790,7 +839,7 @@ impl App {
         let next = self.state.current_index + 1;
         if next < self.state.exercises.len() {
             self.state.current_index = next;
-            if let Err(e) = self.load_current_exercise(conn) {
+            if let Err(e) = self.reset_state_and_load_exercise(conn) {
                 eprintln!("[clings] erreur chargement exercice: {e}");
             }
             if let Some(sid) = session_id {
@@ -809,7 +858,7 @@ impl App {
     fn navigate_prev(&mut self, conn: &rusqlite::Connection, session_id: Option<&str>) {
         if self.state.current_index > 0 {
             self.state.current_index -= 1;
-            if let Err(e) = self.load_current_exercise(conn) {
+            if let Err(e) = self.reset_state_and_load_exercise(conn) {
                 eprintln!("[clings] erreur chargement exercice: {e}");
             }
             if let Some(sid) = session_id {
@@ -919,14 +968,14 @@ impl App {
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         self.state.should_quit = true;
                     }
-                    KeyCode::Char('h') | KeyCode::Char('H') => self.handle_hint_reveal(),
+                    KeyCode::Char('h') | KeyCode::Char('H') => self.reveal_next_hint(),
                     KeyCode::Char('s') | KeyCode::Char('S') => {
                         if self.can_reveal_solution(CONSECUTIVE_FAILURE_THRESHOLD) {
                             self.state.overlay.solution_active =
                                 !self.state.overlay.solution_active;
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => self.handle_vis_toggle(),
+                    KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
                     KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
                     KeyCode::Char('/') => self.open_search_overlay(),
                     KeyCode::Char('?') => {
@@ -999,7 +1048,7 @@ impl App {
         }
 
         // Prépare le premier exercice
-        self.load_current_exercise(conn)?;
+        self.reset_state_and_load_exercise(conn)?;
 
         let rx = match &self.state.source_path {
             Some(p) => crate::tui::events::spawn_event_reader(p.clone()),
@@ -1051,14 +1100,14 @@ impl App {
                         self.save_checkpoint(conn, session_id, idx);
                         self.state.should_quit = true;
                     }
-                    KeyCode::Char('h') | KeyCode::Char('H') => self.handle_hint_reveal(),
+                    KeyCode::Char('h') | KeyCode::Char('H') => self.reveal_next_hint(),
                     KeyCode::Char('s') | KeyCode::Char('S') => {
                         if self.can_reveal_solution_piscine() {
                             self.state.overlay.solution_active =
                                 !self.state.overlay.solution_active;
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => self.handle_vis_toggle(),
+                    KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
                     KeyCode::Char('n')
                     | KeyCode::Char('N')
                     | KeyCode::Char('j')
@@ -1337,7 +1386,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_hint_reveal_increments() {
+    fn reveal_next_hint_increments() {
         let mut app = App::new();
         let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
         app.state.exercises = vec![ex];
@@ -1345,39 +1394,39 @@ mod tests {
         assert_eq!(app.state.hint_index, 0);
 
         // Gate : hint 1 nécessite HINT_MIN_ATTEMPTS tentatives — sans tentatives, bloqué
-        app.handle_hint_reveal();
+        app.reveal_next_hint();
         assert_eq!(app.state.hint_index, 0, "gate bloque sans tentatives");
 
         // Simuler HINT_MIN_ATTEMPTS échecs pour débloquer
         app.state.consecutive_failures = crate::constants::HINT_MIN_ATTEMPTS;
-        app.handle_hint_reveal();
+        app.reveal_next_hint();
         assert_eq!(app.state.hint_index, 1);
-        app.handle_hint_reveal();
+        app.reveal_next_hint();
         assert_eq!(app.state.hint_index, 2);
         // Should not exceed hints length
-        app.handle_hint_reveal();
+        app.reveal_next_hint();
         assert_eq!(app.state.hint_index, 2);
     }
 
     #[test]
-    fn handle_vis_toggle_activates() {
+    fn toggle_visualizer_overlay_activates() {
         let mut app = App::new();
         let ex = make_exercise(vec![], true);
         app.state.exercises = vec![ex];
         app.state.completed = vec![false];
         assert!(!app.state.overlay.vis_active);
-        app.handle_vis_toggle();
+        app.toggle_visualizer_overlay();
         assert!(app.state.overlay.vis_active);
         assert_eq!(app.state.overlay.vis_step, 0);
     }
 
     #[test]
-    fn handle_vis_toggle_noop_without_steps() {
+    fn toggle_visualizer_overlay_noop_without_steps() {
         let mut app = App::new();
         let ex = make_exercise(vec![], false);
         app.state.exercises = vec![ex];
         app.state.completed = vec![false];
-        app.handle_vis_toggle();
+        app.toggle_visualizer_overlay();
         assert!(!app.state.overlay.vis_active);
     }
 
