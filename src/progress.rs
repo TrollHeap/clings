@@ -18,6 +18,8 @@ use crate::error::Result;
 use crate::mastery;
 use crate::models::{MasteryScore, SrsIntervalDays, Subject};
 
+const PRACTICE_LOG_MAX_ENTRIES: usize = 10_000;
+
 const SCHEMA_V1: &str = "
 CREATE TABLE IF NOT EXISTS exercise_scores (
     exercise_id     TEXT PRIMARY KEY,
@@ -159,41 +161,25 @@ pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
     Ok(subjects)
 }
 
-/// Record a practice attempt and update mastery.
-///
-/// All three writes (ensure subject, log entry, mastery update) are wrapped in a
-/// transaction so a crash mid-way never leaves the DB in an inconsistent state.
-pub fn record_attempt(
-    conn: &Connection,
+/// Insert a practice log entry into the database.
+fn insert_practice_log(
+    tx: &rusqlite::Transaction,
+    log_id: &str,
     subject: &str,
     exercise_id: &str,
     success: bool,
-) -> Result<Subject> {
-    let now = Utc::now().timestamp();
-    let seq = LOG_SEQ.fetch_add(1, Ordering::Relaxed);
-    let log_id = format!("{}-{}-{}", now, std::process::id(), seq);
-
-    let tx = conn.unchecked_transaction()?;
-
-    tx.execute(
-        "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
-        params![subject],
-    )?;
-
+    practiced_at: i64,
+) -> Result<()> {
     tx.execute(
         "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![log_id, subject, exercise_id, success as i32, now],
+        params![log_id, subject, exercise_id, success as i32, practiced_at],
     )?;
+    Ok(())
+}
 
-    let mut sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
-    mastery::update_mastery(&mut sub, success);
-
-    let (next_review, new_interval) =
-        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
-    sub.next_review_at = Some(next_review);
-    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
-
+/// Upsert subject mastery record with updated SRS state.
+fn upsert_subject_mastery(tx: &rusqlite::Transaction, sub: &Subject) -> Result<()> {
     tx.execute(
         "UPDATE subjects SET
             mastery_score = ?2,
@@ -215,6 +201,41 @@ pub fn record_attempt(
             sub.srs_interval_days.get(),
         ],
     )?;
+    Ok(())
+}
+
+/// Record a practice attempt and update mastery.
+///
+/// All writes (ensure subject, log entry, mastery update) are wrapped in a
+/// transaction so a crash mid-way never leaves the DB in an inconsistent state.
+pub fn record_attempt(
+    conn: &Connection,
+    subject: &str,
+    exercise_id: &str,
+    success: bool,
+) -> Result<Subject> {
+    let now = Utc::now().timestamp();
+    let seq = LOG_SEQ.fetch_add(1, Ordering::Relaxed);
+    let log_id = format!("{}-{}-{}", now, std::process::id(), seq);
+
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
+        "INSERT OR IGNORE INTO subjects (name) VALUES (?1)",
+        params![subject],
+    )?;
+
+    insert_practice_log(&tx, &log_id, subject, exercise_id, success, now)?;
+
+    let mut sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
+    mastery::update_mastery(&mut sub, success);
+
+    let (next_review, new_interval) =
+        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
+    sub.next_review_at = Some(next_review);
+    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
+
+    upsert_subject_mastery(&tx, &sub)?;
 
     // Upsert into exercise_scores (same transaction)
     tx.execute(
@@ -235,19 +256,23 @@ pub fn record_attempt(
     )?;
 
     tx.commit()?;
-    trim_practice_log(conn)?;
+    truncate_practice_log_to_max_entries(conn)?;
     Ok(sub)
 }
 
-/// Supprime les lignes de `practice_log` au-delà des 10 000 plus récentes.
+/// Supprime les lignes de `practice_log` au-delà des PRACTICE_LOG_MAX_ENTRIES plus récentes.
 /// Sans effet si le nombre de lignes est inférieur à ce seuil.
-fn trim_practice_log(conn: &Connection) -> Result<()> {
+fn truncate_practice_log_to_max_entries(conn: &Connection) -> Result<()> {
+    let offset = PRACTICE_LOG_MAX_ENTRIES - 1;
     conn.execute(
-        "DELETE FROM practice_log
-         WHERE practiced_at < (
-             SELECT practiced_at FROM practice_log
-             ORDER BY practiced_at DESC LIMIT 1 OFFSET 9999
-         )",
+        &format!(
+            "DELETE FROM practice_log
+             WHERE practiced_at < (
+                 SELECT practiced_at FROM practice_log
+                 ORDER BY practiced_at DESC LIMIT 1 OFFSET {}
+             )",
+            offset
+        ),
         [],
     )?;
     Ok(())
