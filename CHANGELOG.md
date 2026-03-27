@@ -4,7 +4,19 @@
 
 ### Added
 
-- Git-based progress sync module (`clings sync init/status/now`)
+- **NSY103 learning mode** (`--nsy103-only` flag in watch mode): dedicated subset of 103 exercises aligned with NSY103 core curriculum, separate from exam mode
+- **NSY103 exam mode** (`clings exam`): timed session based on past NSY103 exam papers with interactive TUI session selector
+- **NSY103 exam scenario exercises**: intermediate exercise sequences aligned with annales preparation
+- **Unity C test validation mode**: exercises now support unit test harness validation (C with Unity framework) alongside output validation
+- **Chapter-based reporting** (`clings report [chapter]`): per-chapter learning analytics (mastery distribution, completion rate, weak spots)
+- **libsys library support**: validated C library export for selected exercises
+- **Git-based progress sync module** (`clings sync init/status/now`): bidirectional sync with remote Git repository
+
+### Changed
+
+- **Exercise format migration**: TOML replaced JSON for exercise definitions (backwards-compatible loader)
+- **TUI performance optimization**: cached header strings, eliminated hot-path allocations (60Hz rendering)
+- **Refactored piscine/progress/error modules**: reduced duplication, aligned error handling conventions
 
 ## [1.0.1] — 2026-03-20
 
