@@ -4,9 +4,11 @@ use std::io;
 use std::io::Write;
 
 use colored::Colorize;
+use schemars::schema_for;
 
 use crate::constants::clings_data_dir;
 use crate::error::{KfError, Result};
+use crate::models::Exercise;
 use crate::{authoring, config, exercises, progress, sync};
 
 /// Prompt user for confirmation. Returns true if input equals "yes".
@@ -251,6 +253,20 @@ pub fn cmd_new(
         format!("clings new --validate-only {}", target.display()).bold()
     );
     println!();
+    Ok(())
+}
+
+/// Generate exercise.schema.json from the Exercise struct for IDE autocompletion.
+pub fn cmd_schema(output: &std::path::Path) -> Result<()> {
+    let schema = schema_for!(Exercise);
+    let json = serde_json::to_string_pretty(&schema)
+        .map_err(|e| KfError::Config(format!("sérialisation du schema : {e}")))?;
+    std::fs::write(output, &json)?;
+    println!(
+        "  {} Schema écrit dans {}",
+        "✓".bold().green(),
+        output.display()
+    );
     Ok(())
 }
 

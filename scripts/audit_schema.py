@@ -18,7 +18,7 @@ PLACEHOLDERS = [
     "__KEY_CONCEPT__", "__COMMON_MISTAKE__", "TODO_FILL",
 ]
 
-VALID_MODES = {"output", "test", "both"}
+VALID_MODES = {"output", "test"}
 VALID_EXERCISE_TYPES = {"complete", "fix_bug", "fill_blank", "refactor"}
 
 findings = []  # list of (severity, exercise_id, axis, message)
@@ -53,10 +53,10 @@ def check(ex_id, ex, all_ids):
         find("ERROR", ex_id, "schema", "hints absent ou vide")
 
     val = ex.get("validation", {})
-    if mode in ("output", "both"):
+    if mode == "output":
         eo = val.get("expected_output")
         if not eo:
-            find("ERROR", ex_id, "schema", "validation.expected_output absent pour mode output/both")
+            find("ERROR", ex_id, "schema", "validation.expected_output absent pour mode output")
 
     if mode not in VALID_MODES:
         find("ERROR", ex_id, "schema", f"validation.mode invalide : '{mode}'")
@@ -105,7 +105,7 @@ def check(ex_id, ex, all_ids):
         find("WARNING", ex_id, "pedagogique", "kc_ids vide (pas de mapping KC)")
 
     stages = ex.get("starter_code_stages", [])
-    if mode in ("output", "both"):
+    if mode == "output":
         if not stages:
             find("WARNING", ex_id, "schema", "starter_code_stages absent (mode output)")
         elif len(stages) != 5:

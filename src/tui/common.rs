@@ -458,10 +458,7 @@ pub fn render_run_result(
     } else if result.timeout {
         (MSG_TIMEOUT.to_string(), C_DANGER)
     } else {
-        let is_test = matches!(
-            exercise.validation.mode,
-            ValidationMode::Test | ValidationMode::Both
-        );
+        let is_test = matches!(exercise.validation.mode, ValidationMode::Test);
         if is_test {
             (MSG_TESTS_FAILED.to_string(), C_DANGER)
         } else {

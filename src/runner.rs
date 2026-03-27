@@ -2,7 +2,7 @@
 //!
 //! Compiles user code with `gcc -Wall -Wextra -std=c11`, writes it to `~/.clings/current.c`,
 //! runs it with a 10-second timeout, and validates stdout against expected output.
-//! Supports `Output`, `Test`, and `Both` validation modes via `compile_and_run()`.
+//! Supports `Output` and `Test` (Unity) validation modes via `compile_and_run()`.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -15,20 +15,20 @@ use crate::constants::{
     REGEX_PREFIX, TEST_SUMMARY_FAILURES, TEST_SUMMARY_IGNORED, TEST_SUMMARY_TESTS,
 };
 use crate::error::KfError;
-use crate::models::Exercise;
+use crate::models::{Exercise, ValidationMode};
 
 /// Préfixe des messages de timeout — utilisé pour la création du message et les pattern matches.
 const TIMEOUT_MSG_PREFIX: &str = "Délai d'exécution dépassé";
 
-// v1.1 : mode test désactivé — fonctions et constantes conservées pour v1.2
-#[allow(dead_code)]
-/// Nom du fichier de harnais de tests C copié dans le répertoire de travail.
-const TEST_H_FILENAME: &str = "test.h";
-#[allow(dead_code)]
+/// Nom du header Unity copié dans le répertoire de travail.
+const UNITY_H_FILENAME: &str = "unity.h";
+/// Nom du fichier unity_internals.h copié dans le répertoire de travail.
+const UNITY_INTERNALS_H_FILENAME: &str = "unity_internals.h";
+/// Nom du fichier source Unity compilé avec les tests.
+const UNITY_C_FILENAME: &str = "unity.c";
 /// Nom du fichier C généré qui inclut current.c + le code du harnais.
 const TEST_C_FILENAME: &str = "test_current.c";
 
-#[allow(dead_code)]
 /// Patterns C interdits dans `test_code` — prévient l'injection de code via exercices externes.
 const FORBIDDEN_TEST_CODE_PATTERNS: &[&str] = &[
     "system(",
@@ -91,7 +91,6 @@ fn strip_main_function(code: &str) -> String {
     format!("{}{}", &code[..main_pos], &code[end..])
 }
 
-#[allow(dead_code)]
 /// Valide `test_code` avant d'écrire le fichier C généré.
 /// Retourne `Some(pattern)` si un pattern interdit est trouvé, `None` sinon.
 fn validate_test_code(code: &str) -> Option<&'static str> {
@@ -369,8 +368,10 @@ pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
         fallback_work_dir.as_path()
     });
 
-    // v1.1 : mode output uniquement — tous les exercices utilisent la comparaison stdout
-    run_output(source_path, work_dir, exercise)
+    match exercise.validation.mode {
+        ValidationMode::Output => run_output(source_path, work_dir, exercise),
+        ValidationMode::Test => run_tests(source_path, work_dir, exercise),
+    }
 }
 
 /// Constructs gcc command-line arguments for compilation.
@@ -443,8 +444,7 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
     )
 }
 
-#[allow(dead_code)]
-/// Run test-harness mode: write test.h + test_current.c, compile, run, parse summary.
+/// Run test-harness mode: write Unity assets + test_current.c, compile, run, parse summary.
 fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let test_code = match &exercise.validation.test_code {
         Some(c) => c.as_str(),
@@ -461,14 +461,21 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
         ));
     }
 
-    // Write test.h from embedded asset
-    let test_h_content = include_str!("../assets/test.h");
-    let test_h_path = work_dir.join(TEST_H_FILENAME);
-    if let Err(e) = std::fs::write(&test_h_path, test_h_content) {
-        return make_compile_error(format!("Impossible d'écrire test.h : {e}"));
+    // Write Unity files from embedded assets
+    let unity_h = include_str!("../assets/unity/unity.h");
+    let unity_int_h = include_str!("../assets/unity/unity_internals.h");
+    let unity_c = include_str!("../assets/unity/unity.c");
+    for (name, content) in [
+        (UNITY_H_FILENAME, unity_h),
+        (UNITY_INTERNALS_H_FILENAME, unity_int_h),
+        (UNITY_C_FILENAME, unity_c),
+    ] {
+        if let Err(e) = std::fs::write(work_dir.join(name), content) {
+            return make_compile_error(format!("Impossible d'écrire {name} : {e}"));
+        }
     }
 
-    // Write test_current.c = user code (sans main) + test.h + test_code
+    // Write test_current.c = user code (sans main) + unity.h + test_code
     // On inline le contenu de current.c plutôt qu'un #include pour pouvoir supprimer
     // le main() utilisateur qui entrerait en conflit avec le main() du harness.
     let test_c_path = work_dir.join(TEST_C_FILENAME);
@@ -483,7 +490,7 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
     let user_code_no_main = strip_main_function(&user_code);
     // #line préserve les numéros de ligne dans les messages d'erreur gcc
     let test_c_content = format!(
-        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"test.h\"\n\n{test_code}\n"
+        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"unity.h\"\n\n{test_code}\n"
     );
     if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {
         return make_compile_error(format!("Impossible d'écrire test_current.c : {e}"));
@@ -496,10 +503,20 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
     let output_path = work_dir.join("kf_test");
     let output_path_str = output_path.to_string_lossy().into_owned();
     let test_c_path_str = test_c_path.to_string_lossy().into_owned();
+    let unity_c_path_str = work_dir
+        .join(UNITY_C_FILENAME)
+        .to_string_lossy()
+        .into_owned();
     let include_flag = format!("-I{}", work_dir.display());
     let linker = linker_flags(&exercise.subject);
 
-    let mut extra_args: Vec<&str> = vec!["-o", &output_path_str, &test_c_path_str, &include_flag];
+    let mut extra_args: Vec<&str> = vec![
+        "-o",
+        &output_path_str,
+        &test_c_path_str,
+        &unity_c_path_str,
+        &include_flag,
+    ];
     for flag in &linker {
         extra_args.push(flag);
     }

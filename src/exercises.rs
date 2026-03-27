@@ -354,21 +354,4 @@ mod tests {
         }
         Ok(())
     }
-
-    /// Vérifie que tous les exercices sont en mode Output (v1.1 : output-only).
-    #[test]
-    fn test_all_exercises_output_mode() -> crate::error::Result<()> {
-        use crate::models::ValidationMode;
-        let (exercises, _) = load_all_exercises()?;
-        let non_output: Vec<&str> = exercises
-            .iter()
-            .filter(|ex| !matches!(ex.validation.mode, ValidationMode::Output))
-            .map(|ex| ex.id.as_str())
-            .collect();
-        assert!(
-            non_output.is_empty(),
-            "Exercices non-output en v1.1 : {non_output:?}"
-        );
-        Ok(())
-    }
 }

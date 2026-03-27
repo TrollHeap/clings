@@ -37,24 +37,18 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
         ValidationMode::Test => (
             None,
             Some(
-                "#include \"test.h\"\n\
-                 TEST(test_placeholder) {\n\
-                 \tTEST_ASSERT(1 == 1, \"placeholder test\");\n\
+                "#include \"unity.h\"\n\
+                 \n\
+                 void test_placeholder(void) {\n\
+                 \tTEST_ASSERT_EQUAL_INT(1, 1);\n\
                  }\n\
-                 int main(void) { RUN_TESTS(); }"
-                    .to_string(),
-            ),
-            Some(1usize),
-        ),
-        ValidationMode::Both => (
-            Some("__EXPECTED_OUTPUT__".to_owned()),
-            Some(
-                "#include \"test.h\"\n\
-                 TEST(test_placeholder) {\n\
-                 \tTEST_ASSERT(1 == 1, \"placeholder test\");\n\
-                 }\n\
-                 int main(void) { RUN_TESTS(); }"
-                    .to_string(),
+                 \n\
+                 int main(void) {\n\
+                 \tUNITY_BEGIN();\n\
+                 \tRUN_TEST(test_placeholder);\n\
+                 \treturn UNITY_END();\n\
+                 }"
+                .to_string(),
             ),
             Some(1usize),
         ),
@@ -100,9 +94,8 @@ fn parse_mode(mode: &str) -> Result<ValidationMode> {
     match mode.to_lowercase().as_str() {
         "output" => Ok(ValidationMode::Output),
         "test" => Ok(ValidationMode::Test),
-        "both" => Ok(ValidationMode::Both),
         other => Err(KfError::Config(format!(
-            "mode invalide : '{other}' (attendu : output, test, both)"
+            "mode invalide : '{other}' (attendu : output, test)"
         ))),
     }
 }
@@ -167,23 +160,21 @@ pub fn validate_exercise(path: &Path) -> Vec<ValidationError> {
 
     // Validation mode checks
     match exercise.validation.mode {
-        ValidationMode::Output | ValidationMode::Both => {
-            match &exercise.validation.expected_output {
-                None => errors.push(ValidationError(
-                    "`validation.expected_output` manquant pour mode output/both".to_string(),
-                )),
-                Some(s) if s.contains("__EXPECTED_OUTPUT__") => errors.push(ValidationError(
-                    "`validation.expected_output` contient un placeholder".to_string(),
-                )),
-                _ => {}
-            }
-        }
+        ValidationMode::Output => match &exercise.validation.expected_output {
+            None => errors.push(ValidationError(
+                "`validation.expected_output` manquant pour mode output".to_string(),
+            )),
+            Some(s) if s.contains("__EXPECTED_OUTPUT__") => errors.push(ValidationError(
+                "`validation.expected_output` contient un placeholder".to_string(),
+            )),
+            _ => {}
+        },
         ValidationMode::Test => {}
     }
     match exercise.validation.mode {
-        ValidationMode::Test | ValidationMode::Both => match &exercise.validation.test_code {
+        ValidationMode::Test => match &exercise.validation.test_code {
             None => errors.push(ValidationError(
-                "`validation.test_code` manquant pour mode test/both".to_string(),
+                "`validation.test_code` manquant pour mode test".to_string(),
             )),
             Some(s) if s.trim().is_empty() => errors.push(ValidationError(
                 "`validation.test_code` est vide".to_string(),
@@ -226,14 +217,6 @@ mod tests {
         assert!(ex.validation.expected_output.is_none());
         assert!(ex.validation.expected_tests_pass.is_some());
         assert_eq!(ex.validation.mode, ValidationMode::Test);
-    }
-
-    #[test]
-    fn test_generate_skeleton_both_mode() {
-        let ex = generate_skeleton("pthreads", 3, "both").unwrap();
-        assert!(ex.validation.test_code.is_some());
-        assert!(ex.validation.expected_output.is_some());
-        assert_eq!(ex.validation.mode, ValidationMode::Both);
     }
 
     #[test]

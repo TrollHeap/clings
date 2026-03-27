@@ -1,11 +1,15 @@
 //! Core data types: `Exercise`, `Subject`, `ValidationMode`, and supporting enums.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Niveau de difficulté d'un exercice, de 1 (Facile) à 5 (Expert).
 /// Déverrouillé progressivement via le score de maîtrise SRS.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(try_from = "u8", into = "u8")]
+#[schemars(with = "u8")]
 pub enum Difficulty {
     /// Niveau 1 — introduction au concept
     Easy = 1,
@@ -57,7 +61,7 @@ impl std::fmt::Display for Difficulty {
 }
 
 /// Langage de programmation d'un exercice.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Lang {
     /// Exercice en Rust
@@ -79,7 +83,7 @@ impl std::fmt::Display for Lang {
 }
 
 /// Mode de validation d'un exercice.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationMode {
     /// Comparer stdout avec `expected_output` (défaut)
@@ -87,14 +91,12 @@ pub enum ValidationMode {
     Output,
     /// Exécuter le harnais de tests C et vérifier que tous les tests passent
     Test,
-    /// Les deux : output ET tests doivent passer
-    Both,
 }
 
 /// Configuration de validation d'un exercice.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ValidationConfig {
-    /// Mode de validation (output, test, both)
+    /// Mode de validation (output, test)
     #[serde(default)]
     pub mode: ValidationMode,
     /// Sortie attendue (comparaison stdout normalisée) ; supporte le préfixe `REGEX:`
@@ -102,7 +104,7 @@ pub struct ValidationConfig {
     /// Durée maximale d'exécution en millisecondes (remplace la limite globale de 10s)
     #[serde(default)]
     pub max_duration_ms: Option<u64>,
-    /// Code C du harnais de tests (inclus après `current.c` en mode Test/Both)
+    /// Code C du harnais de tests (inclus après `current.c` en mode Test)
     #[serde(default)]
     pub test_code: Option<String>,
     /// Nombre de tests attendus (si None : tous les tests déclarés doivent passer)
@@ -111,7 +113,7 @@ pub struct ValidationConfig {
 }
 
 /// Nature pédagogique d'un exercice.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExerciseType {
     /// Écrire le code complet depuis le squelette fourni (défaut)
@@ -137,7 +139,7 @@ impl std::fmt::Display for ExerciseType {
 }
 
 /// Fichier auxiliaire fourni avec un exercice (en-tête, données…).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExerciseFile {
     /// Nom du fichier tel qu'il sera écrit dans `~/.clings/`
@@ -150,7 +152,7 @@ pub struct ExerciseFile {
 }
 
 /// Définition complète d'un exercice chargé depuis un fichier JSON.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Exercise {
     /// Identifiant unique de l'exercice (ex. `ptr-deref-01`)
     pub id: String,
@@ -200,7 +202,7 @@ pub struct Exercise {
 }
 
 /// Visualiseur d'exercice — séquence d'étapes annotées.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 pub struct Visualizer {
     #[serde(rename = "type", default)]
     pub vis_type: String,
@@ -209,7 +211,7 @@ pub struct Visualizer {
 }
 
 /// Une étape du visualiseur avec snapshot mémoire.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisStep {
     pub label: String,
     #[serde(default)]
@@ -229,7 +231,7 @@ pub struct VisStep {
 }
 
 /// Flèche entre deux variables dans le visualiseur (pointeur → cible).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisArrow {
     pub from: String,
     pub to: String,
@@ -238,7 +240,7 @@ pub struct VisArrow {
 }
 
 /// Frame de la call stack dans le visualiseur.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisCallFrame {
     pub function_name: String,
     #[serde(default)]
@@ -250,7 +252,7 @@ pub struct VisCallFrame {
 /// Variable affichée dans le stack ou le heap.
 /// Accepte `name` ou `address` pour le libellé, `value` ou `content` pour la donnée.
 /// Les champs inconnus (arrows, call_frames, etc.) sont ignorés silencieusement.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct VisVar {
     pub name: String,
     pub value: String,

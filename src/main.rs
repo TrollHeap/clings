@@ -26,7 +26,7 @@ use colored::Colorize;
 
 use crate::commands::{
     cmd_annales, cmd_config, cmd_export, cmd_hint, cmd_import, cmd_list, cmd_new, cmd_progress,
-    cmd_reset, cmd_review, cmd_run, cmd_search, cmd_solution, cmd_stats, cmd_sync_init,
+    cmd_reset, cmd_review, cmd_run, cmd_schema, cmd_search, cmd_solution, cmd_stats, cmd_sync_init,
     cmd_sync_now, cmd_sync_status, cmd_watch,
 };
 
@@ -143,7 +143,7 @@ enum Commands {
         /// Niveau de difficulté 1–5
         #[arg(long, short = 'd', default_value = "1")]
         difficulty: u8,
-        /// Mode de validation : output, test, both
+        /// Mode de validation : output, test
         #[arg(long, short = 'm', default_value = "output")]
         mode: String,
         /// Fichier de sortie (défaut : ./exercises/<subject>/<id>.json)
@@ -169,6 +169,12 @@ enum Commands {
     /// Synchroniser la progression entre machines via Git
     #[command(subcommand)]
     Sync(SyncCommand),
+    /// Générer exercise.schema.json pour l'autocomplétion IDE
+    Schema {
+        /// Fichier de sortie
+        #[arg(short, long, default_value = "exercise.schema.json")]
+        output: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -227,6 +233,7 @@ fn main() {
         Some(Commands::Sync(SyncCommand::Init { remote })) => cmd_sync_init(&remote),
         Some(Commands::Sync(SyncCommand::Status)) => cmd_sync_status(),
         Some(Commands::Sync(SyncCommand::Now)) => cmd_sync_now(),
+        Some(Commands::Schema { output }) => cmd_schema(&output),
         None => (|| {
             let conn = progress::open_db()?;
             match tui::ui_launcher::select_launch(&conn) {

@@ -85,8 +85,7 @@ cargo install --path .
 Exercises support several validation modes:
 
 - **`output`** — validates the program's stdout (default mode)
-- **`test`** — validates via C unit tests (`test.h` harness with `RUN_TEST` macros)
-- **`both`** — validates both stdout AND C unit tests (output first, then tests)
+- **`test`** — validates via C unit tests (Unity framework: `UNITY_BEGIN`/`UNITY_END`/`RUN_TEST` macros)
 
 ### Content
 
