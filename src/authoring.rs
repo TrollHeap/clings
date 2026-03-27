@@ -169,9 +169,6 @@ pub fn validate_exercise(path: &Path) -> Vec<ValidationError> {
             )),
             _ => {}
         },
-        ValidationMode::Test => {}
-    }
-    match exercise.validation.mode {
         ValidationMode::Test => match &exercise.validation.test_code {
             None => errors.push(ValidationError(
                 "`validation.test_code` manquant pour mode test".to_string(),
@@ -181,7 +178,6 @@ pub fn validate_exercise(path: &Path) -> Vec<ValidationError> {
             )),
             _ => {}
         },
-        ValidationMode::Output => {}
     }
 
     errors

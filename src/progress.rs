@@ -204,6 +204,26 @@ fn upsert_subject_mastery(tx: &rusqlite::Transaction, sub: &Subject) -> Result<(
     Ok(())
 }
 
+/// Applique une mise à jour de mastery et SRS après un tentative de pratique.
+/// Retourne le score de mastery mis à jour.
+fn apply_mastery_update(
+    tx: &rusqlite::Transaction,
+    subject: &str,
+    success: bool,
+    now: i64,
+) -> Result<f64> {
+    let mut sub = get_subject(tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
+    mastery::update_mastery(&mut sub, success);
+
+    let (next_review, new_interval) =
+        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
+    sub.next_review_at = Some(next_review);
+    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
+
+    upsert_subject_mastery(tx, &sub)?;
+    Ok(sub.mastery_score.get())
+}
+
 /// Record a practice attempt and update mastery.
 ///
 /// All writes (ensure subject, log entry, mastery update) are wrapped in a
@@ -227,15 +247,8 @@ pub fn record_attempt(
 
     insert_practice_log(&tx, &log_id, subject, exercise_id, success, now)?;
 
-    let mut sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
-    mastery::update_mastery(&mut sub, success);
-
-    let (next_review, new_interval) =
-        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
-    sub.next_review_at = Some(next_review);
-    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
-
-    upsert_subject_mastery(&tx, &sub)?;
+    apply_mastery_update(&tx, subject, success, now)?;
+    let sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
 
     // Upsert into exercise_scores (same transaction)
     tx.execute(
@@ -401,11 +414,15 @@ pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
 
 /// Load piscine checkpoint, returns None if no checkpoint saved.
 pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
-    Ok(kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| {
-        s.parse()
-            .map_err(|_| eprintln!("[clings/progress] checkpoint piscine invalide : {s:?}"))
-            .ok()
-    }))
+    Ok(
+        kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| match s.parse::<usize>() {
+            Ok(idx) => Some(idx),
+            Err(_) => {
+                eprintln!("[clings/progress] checkpoint piscine invalide : {s:?}");
+                None
+            }
+        }),
+    )
 }
 
 /// Clear piscine checkpoint (called when piscine is fully completed).
@@ -425,10 +442,12 @@ pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Optio
     Ok(kv_get(conn, EXAM_CHECKPOINT_KEY)?.and_then(|s| {
         s.rsplit_once(':')
             .filter(|(sid, _)| *sid == session_id)
-            .and_then(|(_, rest)| {
-                rest.parse()
-                    .map_err(|_| eprintln!("[clings/progress] checkpoint exam invalide : {s:?}"))
-                    .ok()
+            .and_then(|(_, rest)| match rest.parse::<usize>() {
+                Ok(idx) => Some(idx),
+                Err(_) => {
+                    eprintln!("[clings/progress] checkpoint exam invalide : {s:?}");
+                    None
+                }
             })
     }))
 }
@@ -604,6 +623,56 @@ pub fn export_progress(conn: &Connection) -> Result<String> {
         .map_err(|e| crate::error::KfError::Config(format!("serialization error: {e}")))
 }
 
+/// Valide et clamp un sujet importé, retournant les valeurs clamped et les avertissements.
+fn clamp_and_warn_import_subject(sub: &Subject) -> (f64, i32, i64, i64, i64, Vec<String>) {
+    let clamped_score = sub.mastery_score.get();
+    let clamped_difficulty = sub.difficulty_unlocked.clamp(1, 5);
+    let clamped_interval = sub.srs_interval_days.get().clamp(
+        crate::constants::SRS_BASE_INTERVAL_DAYS,
+        crate::constants::SRS_MAX_INTERVAL_DAYS,
+    );
+    let clamped_total = sub.attempts_total.max(0);
+    let clamped_success = sub.attempts_success.max(0).min(clamped_total);
+
+    let mut warnings: Vec<String> = Vec::new();
+
+    if clamped_difficulty != sub.difficulty_unlocked {
+        warnings.push(format!(
+            "'{}': difficulty_unlocked {} → {} (clamped)",
+            sub.name, sub.difficulty_unlocked, clamped_difficulty
+        ));
+    }
+    if clamped_interval != sub.srs_interval_days.get() {
+        warnings.push(format!(
+            "'{}': srs_interval_days {} → {} (clamped)",
+            sub.name,
+            sub.srs_interval_days.get(),
+            clamped_interval
+        ));
+    }
+    if clamped_total != sub.attempts_total {
+        warnings.push(format!(
+            "'{}': attempts_total {} → {} (clamped)",
+            sub.name, sub.attempts_total, clamped_total
+        ));
+    }
+    if clamped_success != sub.attempts_success {
+        warnings.push(format!(
+            "'{}': attempts_success {} → {} (clamped)",
+            sub.name, sub.attempts_success, clamped_success
+        ));
+    }
+
+    (
+        clamped_score,
+        clamped_difficulty,
+        clamped_total,
+        clamped_success,
+        clamped_interval,
+        warnings,
+    )
+}
+
 /// Importe les sujets depuis un JSON exporté.
 /// Si `overwrite` est true, remplace les valeurs existantes.
 /// Si false, prend le max(mastery existant, mastery importé).
@@ -626,41 +695,15 @@ pub fn import_progress(
     let mut warnings: Vec<String> = Vec::new();
 
     for sub in &data.subjects {
-        let clamped_score = sub.mastery_score.get();
-        let clamped_difficulty = sub.difficulty_unlocked.clamp(1, 5);
-        let clamped_interval = sub.srs_interval_days.get().clamp(
-            crate::constants::SRS_BASE_INTERVAL_DAYS,
-            crate::constants::SRS_MAX_INTERVAL_DAYS,
-        );
-        let clamped_total = sub.attempts_total.max(0);
-        let clamped_success = sub.attempts_success.max(0).min(clamped_total);
-
-        if clamped_difficulty != sub.difficulty_unlocked {
-            warnings.push(format!(
-                "'{}': difficulty_unlocked {} → {} (clamped)",
-                sub.name, sub.difficulty_unlocked, clamped_difficulty
-            ));
-        }
-        if clamped_interval != sub.srs_interval_days.get() {
-            warnings.push(format!(
-                "'{}': srs_interval_days {} → {} (clamped)",
-                sub.name,
-                sub.srs_interval_days.get(),
-                clamped_interval
-            ));
-        }
-        if clamped_total != sub.attempts_total {
-            warnings.push(format!(
-                "'{}': attempts_total {} → {} (clamped)",
-                sub.name, sub.attempts_total, clamped_total
-            ));
-        }
-        if clamped_success != sub.attempts_success {
-            warnings.push(format!(
-                "'{}': attempts_success {} → {} (clamped)",
-                sub.name, sub.attempts_success, clamped_success
-            ));
-        }
+        let (
+            clamped_score,
+            clamped_difficulty,
+            clamped_total,
+            clamped_success,
+            clamped_interval,
+            sub_warnings,
+        ) = clamp_and_warn_import_subject(sub);
+        warnings.extend(sub_warnings);
 
         if overwrite {
             tx.execute(
@@ -1337,6 +1380,98 @@ mod tests {
         let conn = open_test_db()?;
         let loaded = load_last_session(&conn)?;
         assert_eq!(loaded, None);
+        Ok(())
+    }
+
+    // ── import_progress ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_import_progress_invalid_json() {
+        let mut conn = open_test_db().expect("open_test_db");
+        let result = import_progress(&mut conn, "not valid json { at all", false);
+        assert!(result.is_err(), "invalid JSON should return Err");
+    }
+
+    #[test]
+    fn test_import_progress_empty_subjects() -> Result<()> {
+        let mut conn = open_test_db()?;
+        let (count, warnings) = import_progress(&mut conn, r#"{"subjects": []}"#, false)?;
+        assert_eq!(count, 0);
+        assert!(warnings.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_progress_inserts_subject() -> Result<()> {
+        let mut conn = open_test_db()?;
+        let json = r#"{"subjects": [{"name": "pointers", "mastery_score": 2.5,
+            "attempts_total": 10, "attempts_success": 8,
+            "difficulty_unlocked": 2, "srs_interval_days": 7,
+            "last_practiced_at": null, "next_review_at": null}]}"#;
+        let (count, warnings) = import_progress(&mut conn, json, false)?;
+        assert_eq!(count, 1);
+        assert!(warnings.is_empty());
+        let sub = get_subject(&conn, "pointers")?.expect("subject should exist after import");
+        assert!((sub.mastery_score.get() - 2.5).abs() < f64::EPSILON);
+        assert_eq!(sub.attempts_total, 10);
+        assert_eq!(sub.difficulty_unlocked, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_progress_clamps_difficulty_out_of_bounds() -> Result<()> {
+        let mut conn = open_test_db()?;
+        let json = r#"{"subjects": [{"name": "pointers", "mastery_score": 1.0,
+            "attempts_total": 0, "attempts_success": 0,
+            "difficulty_unlocked": 99, "srs_interval_days": 1,
+            "last_practiced_at": null, "next_review_at": null}]}"#;
+        let (count, warnings) = import_progress(&mut conn, json, false)?;
+        assert_eq!(count, 1);
+        assert!(!warnings.is_empty(), "should warn about clamped difficulty");
+        assert!(
+            warnings.iter().any(|w| w.contains("difficulty_unlocked")),
+            "warning should mention difficulty_unlocked; got: {warnings:?}"
+        );
+        let sub = get_subject(&conn, "pointers")?.expect("subject should exist after import");
+        assert_eq!(
+            sub.difficulty_unlocked, 5,
+            "difficulty should be clamped to 5"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_progress_future_timestamp_accepted() -> Result<()> {
+        let mut conn = open_test_db()?;
+        // Unix timestamp in year 2100 (~4102444800)
+        let json = r#"{"subjects": [{"name": "signals", "mastery_score": 3.0,
+            "attempts_total": 5, "attempts_success": 4,
+            "difficulty_unlocked": 3, "srs_interval_days": 30,
+            "last_practiced_at": 4102444800, "next_review_at": 4102531200}]}"#;
+        let (count, _warnings) = import_progress(&mut conn, json, false)?;
+        assert_eq!(count, 1);
+        let sub = get_subject(&conn, "signals")?.expect("subject should exist after import");
+        assert_eq!(sub.last_practiced_at, Some(4102444800));
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_progress_overwrite_replaces_existing() -> Result<()> {
+        let mut conn = open_test_db()?;
+        ensure_subject(&conn, "pointers")?;
+        record_attempt(&conn, "pointers", "ptr-deref-01", true)?;
+
+        let json = r#"{"subjects": [{"name": "pointers", "mastery_score": 4.0,
+            "attempts_total": 20, "attempts_success": 18,
+            "difficulty_unlocked": 3, "srs_interval_days": 14,
+            "last_practiced_at": null, "next_review_at": null}]}"#;
+        let (count, _) = import_progress(&mut conn, json, true)?;
+        assert_eq!(count, 1);
+        let sub = get_subject(&conn, "pointers")?.expect("subject should exist");
+        assert!(
+            (sub.mastery_score.get() - 4.0).abs() < f64::EPSILON,
+            "overwrite should replace score"
+        );
         Ok(())
     }
 }

@@ -6,6 +6,24 @@ use crate::chapters;
 use crate::error::Result;
 use crate::{exercises, progress, tmux};
 
+/// Décompose une durée en (heures, minutes, secondes).
+fn decompose_elapsed(elapsed: std::time::Duration) -> (u64, u64, u64) {
+    let total_secs = elapsed.as_secs();
+    let hours = total_secs / 3600;
+    let mins = (total_secs % 3600) / 60;
+    let secs = total_secs % 60;
+    (hours, mins, secs)
+}
+
+/// Configure un timer pour une piscine/exam avec deadline optionnel.
+/// Retourne (deadline, timer_total_secs).
+fn setup_timer(timed_minutes: Option<u64>) -> (Option<std::time::Instant>, u64) {
+    let deadline =
+        timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
+    let timer_total = timed_minutes.map(|m| m * 60).unwrap_or(0);
+    (deadline, timer_total)
+}
+
 /// Run piscine mode: linear progression through ALL exercises, ignoring difficulty gating.
 /// Exercises are ordered: chapter 1 D1→D2→D3→D4→D5, then chapter 2, etc.
 pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Result<()> {
@@ -37,9 +55,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     }
 
     let total = exercise_order.len();
-    let deadline =
-        timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
-    let timer_total = timed_minutes.map(|m| m * 60).unwrap_or(0);
+    let (deadline, timer_total) = setup_timer(timed_minutes);
 
     // Restore checkpoint
     let start_index = progress::load_piscine_checkpoint(&conn)?
@@ -78,9 +94,7 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         .piscine_start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
-    let hours = elapsed.as_secs() / 3600;
-    let mins = (elapsed.as_secs() % 3600) / 60;
-    let secs = elapsed.as_secs() % 60;
+    let (hours, mins, secs) = decompose_elapsed(elapsed);
 
     if done == total {
         if let Err(e) = progress::clear_piscine_checkpoint(&conn) {
@@ -142,9 +156,7 @@ pub fn run_exam_piscine(
         return Ok(());
     }
 
-    let deadline =
-        timed_minutes.map(|m| std::time::Instant::now() + std::time::Duration::from_secs(m * 60));
-    let timer_total = timed_minutes.map(|m| m * 60).unwrap_or(0);
+    let (deadline, timer_total) = setup_timer(timed_minutes);
 
     // Restore checkpoint si session_id fourni
     let start_index = if let Some(sid) = session_id {
@@ -181,9 +193,7 @@ pub fn run_exam_piscine(
         .piscine_start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
-    let hours = elapsed.as_secs() / 3600;
-    let mins = (elapsed.as_secs() % 3600) / 60;
-    let secs = elapsed.as_secs() % 60;
+    let (hours, mins, secs) = decompose_elapsed(elapsed);
 
     if done == total {
         if let Err(e) = progress::clear_exam_checkpoint(&conn) {

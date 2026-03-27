@@ -419,7 +419,10 @@ mod tests {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
         let result = pull_and_merge(tmp.path(), &mut conn);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("sync error"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("erreur de synchronisation"));
     }
 
     #[test]

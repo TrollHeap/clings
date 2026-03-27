@@ -112,13 +112,19 @@ fn open_editor_standalone(file: &Path) -> bool {
     if !is_gui_editor(bin) {
         return false;
     }
-    let _ = Command::new(bin)
+    if let Err(e) = Command::new(bin)
         .args(args.iter().copied())
         .arg(file)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn();
+        .spawn()
+    {
+        eprintln!(
+            "[clings/tmux] avertissement : impossible de lancer l'éditeur '{}' : {e}",
+            bin
+        );
+    }
     true
 }
 

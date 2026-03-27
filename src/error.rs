@@ -6,15 +6,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum KfError {
     /// Erreur SQLite propagée depuis rusqlite
-    #[error("database error: {0}")]
+    #[error("erreur de base de données : {0}")]
     Database(#[from] rusqlite::Error),
 
     /// Erreur d'entrée/sortie standard
-    #[error("{0}")]
+    #[error("erreur I/O : {0}")]
     Io(#[from] std::io::Error),
 
     /// Erreur du système de surveillance de fichiers (`notify`)
-    #[error("watcher error: {0}")]
+    #[error("erreur de surveillance fichier : {0}")]
     Watch(String),
 
     /// L'identifiant d'exercice demandé est introuvable
@@ -22,7 +22,7 @@ pub enum KfError {
     ExerciseNotFound(String),
 
     /// Erreur de désérialisation JSON
-    #[error("json error: {0}")]
+    #[error("erreur JSON : {0}")]
     Json(#[from] serde_json::Error),
 
     /// Erreur de configuration ou de chemin (message libre)
@@ -30,7 +30,7 @@ pub enum KfError {
     Config(String),
 
     /// Erreur de synchronisation Git
-    #[error("sync error: {0}")]
+    #[error("erreur de synchronisation : {0}")]
     Sync(String),
 }
 
@@ -64,7 +64,7 @@ mod tests {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
         let kf_err = KfError::from(io_err);
         assert!(matches!(kf_err, KfError::Io(_)));
-        assert!(kf_err.to_string().contains("file missing"));
+        assert!(kf_err.to_string().contains("erreur I/O"));
     }
 
     #[test]
