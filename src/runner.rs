@@ -1384,4 +1384,275 @@ mod tests {
             "ce n'est pas une erreur de compilation"
         );
     }
+
+    #[test]
+    fn test_validate_test_code_blocks_forbidden_patterns() {
+        // Test that dangerous patterns are detected in test_code
+        let forbidden_cases = vec![
+            ("void test_a(void) { system(\"rm -rf /\"); }", "system("),
+            ("void test_b(void) { execv(\"/bin/sh\", NULL); }", "execv("),
+            ("void test_c(void) { fork(); }", "fork("),
+            (
+                "void test_d(void) { dlopen(\"evil.so\", RTLD_LAZY); }",
+                "dlopen(",
+            ),
+            (
+                "void test_e(void) { popen(\"cat /etc/passwd\", \"r\"); }",
+                "popen(",
+            ),
+            (
+                "void test_f(void) { ptrace(PTRACE_ATTACH, 1, 0, 0); }",
+                "ptrace(",
+            ),
+            ("void test_g(void) { setuid(0); }", "setuid("),
+            ("void test_h(void) { #pragma poison system }", "#pragma"),
+        ];
+
+        for (code, expected_pattern) in forbidden_cases {
+            let result = validate_test_code(code);
+            assert_eq!(
+                result,
+                Some(expected_pattern),
+                "should detect {expected_pattern:?} in code"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_test_code_allows_safe_patterns() {
+        // Test that safe test code passes validation
+        let safe_cases = vec![
+            "void test_add(void) { TEST_ASSERT_EQUAL_INT(5, add(2, 3)); }",
+            "void test_string(void) { TEST_ASSERT_EQUAL_STRING(\"hello\", my_func()); }",
+            "int main(void) { UNITY_BEGIN(); RUN_TEST(test_add); return UNITY_END(); }",
+            "void setUp(void) { /* init */ } void test_teardown(void) { }",
+        ];
+
+        for code in safe_cases {
+            let result = validate_test_code(code);
+            assert_eq!(result, None, "should allow safe code: {code:?}");
+        }
+    }
+
+    #[test]
+    fn test_linker_flags_pthreads_modules() {
+        // pthreads, semaphores, sync_concepts, sockets, capstones all need -lpthread
+        let pthread_subjects = vec![
+            "pthreads",
+            "semaphores",
+            "sync_concepts",
+            "sockets",
+            "capstones",
+        ];
+        for subject in pthread_subjects {
+            let flags = linker_flags(subject);
+            assert!(
+                flags.contains(&"-lpthread"),
+                "{subject} should include -lpthread, got: {flags:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_linker_flags_ipc_subjects() {
+        // message_queues and shared_memory need both -lrt and -lpthread
+        let ipc_subjects = vec!["message_queues", "shared_memory"];
+        for subject in ipc_subjects {
+            let flags = linker_flags(subject);
+            assert!(
+                flags.contains(&"-lrt"),
+                "{subject} should include -lrt, got: {flags:?}"
+            );
+            assert!(
+                flags.contains(&"-lpthread"),
+                "{subject} should include -lpthread, got: {flags:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_linker_flags_file_io() {
+        // file_io needs -lrt only
+        let flags = linker_flags("file_io");
+        assert_eq!(flags, vec!["-lrt"], "file_io should only have -lrt");
+    }
+
+    #[test]
+    fn test_linker_flags_no_special_flags() {
+        // pointers, structs, processes, etc. should have no special flags
+        let no_flag_subjects = vec![
+            "pointers",
+            "structs",
+            "processes",
+            "bitwise_ops",
+            "unknown_subject",
+        ];
+        for subject in no_flag_subjects {
+            let flags = linker_flags(subject);
+            assert!(
+                flags.is_empty(),
+                "{subject} should have no special flags, got: {flags:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_strip_main_function_simple() {
+        let code = "int main(void) { return 0; }";
+        let result = strip_main_function(code);
+        assert!(!result.contains("int main"), "main() should be stripped");
+        assert!(
+            result.is_empty() || result.trim().is_empty(),
+            "nothing should remain"
+        );
+    }
+
+    #[test]
+    fn test_strip_main_function_with_helpers() {
+        let code = r#"
+int helper(int x) { return x * 2; }
+int main(void) { return helper(5); }
+"#;
+        let result = strip_main_function(code);
+        assert!(!result.contains("int main"), "main() should be stripped");
+        assert!(result.contains("helper"), "helper() should remain");
+    }
+
+    #[test]
+    fn test_strip_main_function_no_main_returns_unchanged() {
+        let code = "void foo(void) { }\nint bar(void) { return 1; }";
+        let result = strip_main_function(code);
+        assert_eq!(result, code, "code without main should be unchanged");
+    }
+
+    #[test]
+    fn test_strip_main_function_deeply_nested_braces() {
+        let code = r#"
+int main(void) {
+    if (1) {
+        for (int i = 0; i < 10; i++) {
+            { int x = 0; }
+        }
+    }
+    return 0;
+}
+"#;
+        let result = strip_main_function(code);
+        assert!(
+            !result.contains("int main"),
+            "main() and all its nested braces should be removed"
+        );
+    }
+
+    #[test]
+    fn test_write_exercise_files_rejects_absolute_paths() {
+        use crate::models::ExerciseFile;
+        let dir = std::env::temp_dir().join("clings_test_abs_path");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut exercise = make_exercise("test", None);
+        exercise.files = vec![ExerciseFile {
+            name: "/etc/passwd".to_string(),
+            content: "should_be_rejected".to_string(),
+            readonly: false,
+        }];
+
+        let result = write_exercise_files(&exercise, &dir);
+        // Absolute paths should be skipped (eprintln warning) but function returns Ok
+        assert!(
+            result.is_ok(),
+            "write_exercise_files should handle absolute paths gracefully"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_write_exercise_files_normal_files() {
+        use crate::models::ExerciseFile;
+        let dir = std::env::temp_dir().join("clings_test_normal_files");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut exercise = make_exercise("test", None);
+        exercise.files = vec![
+            ExerciseFile {
+                name: "header.h".to_string(),
+                content: "#ifndef HEADER_H\n#define HEADER_H\nvoid func(void);\n#endif".to_string(),
+                readonly: false,
+            },
+            ExerciseFile {
+                name: "subdir/data.txt".to_string(),
+                content: "test data".to_string(),
+                readonly: false,
+            },
+        ];
+
+        let result = write_exercise_files(&exercise, &dir);
+        assert!(result.is_ok(), "writing normal files should succeed");
+
+        assert!(dir.join("header.h").exists(), "header.h should exist");
+        assert!(
+            dir.join("subdir/data.txt").exists(),
+            "subdir/data.txt should exist"
+        );
+
+        let header_content = std::fs::read_to_string(dir.join("header.h")).unwrap();
+        assert!(
+            header_content.contains("#ifndef HEADER_H"),
+            "header.h content should match"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_work_dir_creates_directory() {
+        // work_dir() should create the directory if it doesn't exist
+        // and return Ok with a valid path
+        let result = work_dir();
+        assert!(result.is_ok(), "work_dir() should return Ok");
+        let path = result.unwrap();
+        assert!(path.exists(), "work_dir() should create the directory");
+        assert!(path.is_dir(), "work_dir() should return a directory path");
+    }
+
+    #[test]
+    fn test_parse_gcc_hint_missing_semicolon() {
+        let stderr = "error: expected ';' before 'return' at line 5";
+        let hint = parse_gcc_hint(stderr);
+        assert!(hint.is_some(), "should detect missing semicolon pattern");
+        assert!(
+            hint.unwrap().contains("Point-virgule"),
+            "hint should mention semicolon in French"
+        );
+    }
+
+    #[test]
+    fn test_parse_gcc_hint_implicit_function() {
+        let stderr = "warning: implicit declaration of function 'strlen'";
+        let hint = parse_gcc_hint(stderr);
+        assert!(hint.is_some(), "should detect implicit declaration pattern");
+        assert!(
+            hint.unwrap().contains("déclaration"),
+            "hint should mention declaration"
+        );
+    }
+
+    #[test]
+    fn test_parse_gcc_hint_undefined_reference() {
+        let stderr = "undefined reference to `pthread_create'";
+        let hint = parse_gcc_hint(stderr);
+        assert!(hint.is_some(), "should detect undefined reference pattern");
+        assert!(
+            hint.unwrap().contains("liaison"),
+            "hint should mention linker flags"
+        );
+    }
+
+    #[test]
+    fn test_parse_gcc_hint_no_match() {
+        let stderr = "some random error message with no pattern match";
+        let hint = parse_gcc_hint(stderr);
+        assert!(hint.is_none(), "should return None for unknown errors");
+    }
 }

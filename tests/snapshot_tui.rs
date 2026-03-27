@@ -38,6 +38,10 @@ fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
         kc_ids: vec![],
         starter_code_stages: vec![],
         visualizer: Visualizer::default(),
+        libsys_module: None,
+        libsys_function: None,
+        libsys_unlock: None,
+        header_code: None,
     }
 }
 
@@ -151,4 +155,70 @@ fn snapshot_watch_view_solution_overlay() {
 
     let buffer = terminal.backend().buffer().clone();
     insta::assert_snapshot!("watch_view_solution_overlay", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_libsys_overlay_empty() {
+    use clings::tui::ui_libsys;
+
+    let backend = TestBackend::new(100, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut state = make_app_state();
+    state.overlay.libsys_active = true;
+    state.overlay.libsys_portfolio = vec![]; // Empty portfolio
+
+    terminal
+        .draw(|f| {
+            ui_libsys::render_libsys_overlay(f, f.area(), &state);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("libsys_overlay_empty", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_libsys_overlay_with_modules() {
+    use clings::libsys::{ExportedFn, ModuleStatus};
+    use clings::tui::ui_libsys;
+
+    let backend = TestBackend::new(100, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut state = make_app_state();
+    state.overlay.libsys_active = true;
+
+    // Populate with sample modules and functions
+    state.overlay.libsys_portfolio = vec![
+        ModuleStatus {
+            name: "my_string".to_string(),
+            functions: vec![
+                ExportedFn {
+                    name: "my_strdup".to_string(),
+                    commit_hash: "abc12345".to_string(),
+                },
+                ExportedFn {
+                    name: "my_strlen".to_string(),
+                    commit_hash: "def67890".to_string(),
+                },
+            ],
+            unlock_subject: None,
+        },
+        ModuleStatus {
+            name: "my_process".to_string(),
+            functions: vec![ExportedFn {
+                name: "my_fork".to_string(),
+                commit_hash: "ghi11111".to_string(),
+            }],
+            unlock_subject: Some("processes".to_string()),
+        },
+    ];
+
+    terminal
+        .draw(|f| {
+            ui_libsys::render_libsys_overlay(f, f.area(), &state);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("libsys_overlay_with_modules", format!("{buffer:#?}"));
 }
