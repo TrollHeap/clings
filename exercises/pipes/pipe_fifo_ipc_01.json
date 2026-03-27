@@ -146,7 +146,9 @@
       }
     ]
   },
-  "prerequisites": ["pipe_fifo_named_01.json"],
+  "prerequisites": [
+    "pipe-fifo-named-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "open() sur un FIFO bloque jusqu'au rendez-vous des deux extrémités ; fork() permet d'ouvrir les deux côtés",
   "common_mistake": "Ouvrir les deux extrémités dans le même processus avant fork() : le parent se bloquerait sur open(O_WRONLY) si l'enfant n'est pas encore prêt",
@@ -182,6 +184,8 @@
       "unlink"
     ],
     "deadlineMinutes": null,
-    "prereqMissionIds": ["pipe-fifo-named-01"]
+    "prereqMissionIds": [
+      "pipe-fifo-named-01"
+    ]
   }
 }

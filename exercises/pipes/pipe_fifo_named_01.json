@@ -128,7 +128,9 @@
       }
     ]
   },
-  "prerequisites": ["pipe_01.json"],
+  "prerequisites": [
+    "pipe-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "mkfifo crée un fichier spécial FIFO persistant ; O_RDWR évite le blocage en mono-processus",
   "common_mistake": "Ouvrir avec O_WRONLY ou O_RDONLY en mono-processus : open() bloque indéfiniment car l'autre extrémité n'est jamais ouverte",

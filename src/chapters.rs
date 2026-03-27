@@ -28,7 +28,7 @@ pub const CHAPTERS: &[Chapter] = &[
     Chapter {
         number: 1,
         title: "Fondamentaux C",
-        subjects: &["structs", "pointers"],
+        subjects: &["pointers", "structs"],
     },
     Chapter {
         number: 2,
