@@ -1,0 +1,141 @@
+common_mistake = "Oublier close(pipefd[1]) dans le parent — read() ne reçoit jamais EOF et bloque indéfiniment"
+description = """
+NSY103 — Scénario comparatif : même problème résolu de deux façons.
+
+Problème : incrémenter un compteur 10 fois depuis un worker, récupérer le résultat dans le parent.
+
+Version 1 — fork + pipe : le worker est un processus enfant, le résultat transite par un pipe.
+Version 2 — pthread + mutex : le worker est un thread, le compteur est une variable globale protégée par un mutex.
+
+⚠ Cet exercice combine : fork(), pipe(), read()/write(), pthread_create(), pthread_mutex_lock()."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Version fork : créer le pipe AVANT fork(), l'enfant écrit dans pipefd[1] et le parent lit depuis pipefd[0]",
+    "Fermer systématiquement le fd inutilisé de chaque côté (enfant : close(pipefd[0]), parent : close(pipefd[1])) — sinon read() bloque",
+    "Version thread : PTHREAD_MUTEX_INITIALIZER initialise le mutex statiquement ; pthread_mutex_lock/unlock encadrent l'incrément ; pthread_join attend la fin du thread",
+]
+id = "sc-fork-vs-pthread-01"
+kc_ids = ["KC-CAP"]
+key_concept = "fork+pipe = communication inter-processus via mémoire séparée ; pthread+mutex = synchronisation intra-processus via mémoire partagée"
+lang = "c"
+prerequisites = [
+    "fork-basic-01",
+    "pthread-mutex-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <pthread.h>
+
+/* === Version 1 : fork + pipe === */
+static void fork_version(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[0]);
+        int counter = 0;
+        for (int i = 0; i < 10; i++) counter++;
+        write(pipefd[1], &counter, sizeof(counter));
+        close(pipefd[1]);
+        _exit(0);
+    }
+    close(pipefd[1]);
+    int result;
+    read(pipefd[0], &result, sizeof(result));
+    close(pipefd[0]);
+    wait(NULL);
+    printf("[fork] counter=%d\n", result);
+}
+
+/* === Version 2 : pthread + mutex === */
+static int g_counter = 0;
+static pthread_mutex_t g_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+static void *thread_fn(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 10; i++) {
+        pthread_mutex_lock(&g_mtx);
+        g_counter++;
+        pthread_mutex_unlock(&g_mtx);
+    }
+    return NULL;
+}
+
+static void thread_version(void) {
+    g_counter = 0;
+    pthread_t t;
+    pthread_create(&t, NULL, thread_fn, NULL);
+    pthread_join(t, NULL);
+    printf("[thread] counter=%d\n", g_counter);
+}
+
+int main(void) {
+    fork_version();
+    thread_version();
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <pthread.h>
+
+/* === Version 1 : fork + pipe === */
+static void fork_version(void) {
+    int pipefd[2];
+    ____(pipefd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[____]);          /* fermer le fd de lecture dans l'enfant */
+        int counter = 0;
+        for (int i = 0; i < 10; i++) counter++;
+        write(pipefd[____], &counter, sizeof(counter));
+        close(pipefd[____]);
+        _exit(0);
+    }
+    close(pipefd[____]);              /* fermer le fd d'écriture dans le parent */
+    int result;
+    read(pipefd[____], &result, sizeof(result));
+    close(pipefd[0]);
+    ____(NULL);
+    printf("[fork] counter=%d\n", result);
+}
+
+/* === Version 2 : pthread + mutex === */
+static int g_counter = 0;
+static pthread_mutex_t g_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+static void *thread_fn(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 10; i++) {
+        pthread_mutex_lock(____);
+        g_counter++;
+        pthread_mutex_unlock(____);
+    }
+    return NULL;
+}
+
+static void thread_version(void) {
+    g_counter = 0;
+    pthread_t t;
+    pthread_create(&t, NULL, ____, NULL);
+    ____(t, NULL);
+    printf("[thread] counter=%d\n", g_counter);
+}
+
+int main(void) {
+    fork_version();
+    thread_version();
+    return 0;
+}'''
+subject = "scenarios"
+title = "fork + pipe vs pthread + mutex — même compteur, deux approches"
+
+[validation]
+expected_output = "[fork] counter=10\n[thread] counter=10\n"
+mode = "output"

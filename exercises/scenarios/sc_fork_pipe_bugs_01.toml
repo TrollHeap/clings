@@ -1,0 +1,88 @@
+common_mistake = "Ne pas fermer pipefd[1] dans le parent — read() attend EOF qui n'arrive jamais, blocage permanent"
+description = """
+NSY103 — Scénario exam : analyser et corriger des bugs dans du code fork + pipe.
+
+Le code ci-dessous est censé : forker un enfant, le faire écrire "hello pipe" dans un pipe, et le parent lit et affiche le message.
+
+Il contient 3 bugs classiques que l'exam NSY103 teste systématiquement :
+1. Descripteur du pipe non fermé dans l'enfant
+2. Descripteur du pipe non fermé dans le parent → read() bloque
+3. wait() absent → processus zombie
+
+⚠ Pattern direct de l'exam NSY103 session 2 2022-2023, question 2 (bugs fork/pipe/exec)."""
+difficulty = 3
+exercise_type = "fix_bug"
+hints = [
+    "Bug 1 : l'enfant doit fermer le fd de lecture (pipefd[0]) qu'il n'utilise pas — bonne pratique et évite les fuites",
+    "Bug 2 (critique) : le parent doit fermer pipefd[1] après fork() — sinon read() ne reçoit jamais EOF et bloque indéfiniment",
+    "Bug 3 : ajouter waitpid(pid, NULL, 0) après read() — sans ça, l'enfant reste zombie jusqu'à la fin du parent",
+]
+id = "sc-fork-pipe-bugs-01"
+kc_ids = ["KC-CAP"]
+key_concept = "Règle pipe : chaque processus ferme les descripteurs qu'il n'utilise pas — le EOF n'est envoyé que quand TOUS les fd d'écriture sont fermés"
+lang = "c"
+prerequisites = [
+    "fork-exec-01",
+    "pipe-basic-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[0]);                    /* FIX 1: fermer le fd de lecture */
+        write(pipefd[1], "hello pipe\n", 11);
+        close(pipefd[1]);
+        _exit(0);
+    }
+
+    close(pipefd[1]);                        /* FIX 2: fermer le fd d'écriture dans le parent */
+    char buf[64];
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[n > 0 ? n : 0] = '\0';
+    close(pipefd[0]);
+    waitpid(pid, NULL, 0);                   /* FIX 3: attendre l'enfant */
+    printf("recu: %s", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* BUG 1: manque close(pipefd[0]) ici */
+        write(pipefd[1], "hello pipe\n", 11);
+        close(pipefd[1]);
+        _exit(0);
+    }
+
+    /* BUG 2: manque close(pipefd[1]) ici — read() bloquera */
+    char buf[64];
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[n > 0 ? n : 0] = '\0';
+    close(pipefd[0]);
+    /* BUG 3: manque waitpid() — l'enfant devient zombie */
+    printf("recu: %s", buf);
+    return 0;
+}'''
+subject = "scenarios"
+title = "Bugs fork + pipe — 3 erreurs classiques à corriger"
+
+[validation]
+expected_output = "recu: hello pipe\n"
+max_duration_ms = 3000
+mode = "output"

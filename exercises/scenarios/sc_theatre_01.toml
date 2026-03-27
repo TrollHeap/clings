@@ -1,0 +1,147 @@
+common_mistake = "Créer le sémaphore avec valeur initiale 0 au lieu de 1 — tous les clients bloquent immédiatement sur sem_wait"
+description = """
+NSY103 — Scénario exam : réservation de théâtre.
+
+Un théâtre a 5 places. 8 clients (processus) tentent simultanément de réserver. Seuls les 5 premiers réussissent.
+
+Utiliser :
+- mémoire partagée (shm_open + mmap) pour stocker le compteur de places réservées
+- sémaphore nommé (sem_open, valeur initiale 1) comme mutex pour l'accès exclusif au compteur
+
+⚠ Pattern direct de l'exam NSY103 session 1 2022-2023, question 2."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Le sémaphore protège la section critique : sem_wait(sem) avant de lire/modifier places_reservees, sem_post(sem) après",
+    "Le compteur et les réservations vivent dans la struct Theatre en mémoire partagée (shm_open + mmap) — tous les processus mappent le même segment",
+    "N_CLIENTS > N_PLACES : vérifier places_reservees < N_PLACES dans la section critique avant de réserver, sinon le client repart sans place",
+]
+id = "sc-theatre-01"
+kc_ids = ["KC-CAP"]
+key_concept = "Sémaphore nommé (sem_open, init=1) = mutex inter-processus pour protéger une ressource en mémoire partagée"
+lang = "c"
+prerequisites = [
+    "sem-named-01",
+    "shm-create-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+
+#define N_PLACES  5
+#define N_CLIENTS 8
+#define SHM_NAME  "/kf_theatre"
+#define SEM_NAME  "/kf_theatre_sem"
+
+typedef struct {
+    int places_reservees;
+    int reservations[N_PLACES];
+} Theatre;
+
+int main(void) {
+    shm_unlink(SHM_NAME);
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0600);
+    ftruncate(fd, sizeof(Theatre));
+    Theatre *t = mmap(NULL, sizeof(Theatre),
+                      PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(t, 0, sizeof(Theatre));
+
+    sem_unlink(SEM_NAME);
+    sem_t *sem = sem_open(SEM_NAME, O_CREAT, 0600, 1);
+
+    for (int i = 0; i < N_CLIENTS; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sem_wait(sem);
+            if (t->places_reservees < N_PLACES) {
+                int place = t->places_reservees;
+                t->reservations[place] = i + 1;
+                t->places_reservees++;
+                printf("Client %d reserve place %d\n", i + 1, place + 1);
+            }
+            sem_post(sem);
+            exit(0);
+        }
+    }
+
+    for (int i = 0; i < N_CLIENTS; i++) wait(NULL);
+
+    printf("Complet: %d/%d places\n", t->places_reservees, N_PLACES);
+
+    sem_close(sem);
+    sem_unlink(SEM_NAME);
+    munmap(t, sizeof(Theatre));
+    shm_unlink(SHM_NAME);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+
+#define N_PLACES  5
+#define N_CLIENTS 8
+#define SHM_NAME  "/kf_theatre"
+#define SEM_NAME  "/kf_theatre_sem"
+
+typedef struct {
+    int places_reservees;
+    int reservations[N_PLACES];
+} Theatre;
+
+int main(void) {
+    shm_unlink(SHM_NAME);
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0600);
+    ftruncate(fd, sizeof(Theatre));
+    Theatre *t = mmap(NULL, sizeof(Theatre),
+                      PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(t, 0, sizeof(Theatre));
+
+    sem_unlink(SEM_NAME);
+    /* valeur initiale = ____ (mutex binaire) */
+    sem_t *sem = sem_open(SEM_NAME, O_CREAT, 0600, ____);
+
+    for (int i = 0; i < N_CLIENTS; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            ____(sem);              /* entrer en section critique */
+            if (t->places_reservees < ____) {
+                int place = t->places_reservees;
+                t->reservations[place] = i + 1;
+                t->places_reservees++;
+                printf("Client %d reserve place %d\n", i + 1, place + 1);
+            }
+            ____(sem);              /* sortir de section critique */
+            exit(0);
+        }
+    }
+
+    for (int i = 0; i < N_CLIENTS; i++) wait(NULL);
+
+    printf("Complet: %d/%d places\n", t->places_reservees, N_PLACES);
+
+    sem_close(sem);
+    sem_unlink(SEM_NAME);
+    munmap(t, sizeof(Theatre));
+    shm_unlink(SHM_NAME);
+    return 0;
+}'''
+subject = "scenarios"
+title = "Réservation de théâtre — sémaphore nommé + mémoire partagée"
+
+[validation]
+expected_output = "REGEX:(?s)(Client \\d+ reserve place \\d+\\n){5}Complet: 5/5 places\\n"
+mode = "output"

@@ -103,7 +103,7 @@ pub const CHAPTERS: &[Chapter] = &[
     Chapter {
         number: 16,
         title: "Projets intégrateurs",
-        subjects: &["capstones"],
+        subjects: &["scenarios", "capstones"],
     },
 ];
 

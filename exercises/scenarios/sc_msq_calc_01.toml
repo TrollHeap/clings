@@ -1,0 +1,145 @@
+common_mistake = "Taille de mq_msgsize dans mq_attr incorrecte — mq_send/mq_receive échouent si msgsize < sizeof(struct envoyé)"
+description = """
+NSY103 — Scénario exam : serveur de calcul par file de messages POSIX.
+
+Un processus client envoie une requête `{a=12, b=30}` dans la file `/kf_calc_req`.
+Un processus serveur lit la requête, calcule la somme, répond via `/kf_calc_resp`.
+
+Pattern direct de l'exam NSY103 2023-2024, question 2 (client/serveur MSQ).
+
+⚠ Cet exercice combine : mq_open(), mq_send(), mq_receive(), fork(), struct message personnalisée."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Créer deux files séparées : une pour les requêtes, une pour les réponses. mq_attr.mq_msgsize doit correspondre exactement à sizeof(Requete) ou sizeof(int)",
+    "Le serveur (enfant) : mq_receive sur la file requêtes, calcule sum = r.a + r.b, mq_send sur la file réponses",
+    "Le client (parent) : mq_send la requête, puis mq_receive la réponse — l'ordre compte : envoyer avant d'attendre",
+]
+id = "sc-msq-calc-01"
+kc_ids = ["KC-CAP"]
+key_concept = "POSIX MQ = canal typé entre processus ; deux files (req/resp) = communication bidirectionnelle sans mémoire partagée"
+lang = "c"
+prerequisites = [
+    "mq-01",
+    "mq-multiproc-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <mqueue.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+#define MQ_REQ  "/kf_calc_req"
+#define MQ_RESP "/kf_calc_resp"
+
+typedef struct {
+    int a;
+    int b;
+} Requete;
+
+int main(void) {
+    mq_unlink(MQ_REQ);
+    mq_unlink(MQ_RESP);
+
+    struct mq_attr attr_req  = { .mq_flags = 0, .mq_maxmsg = 4,
+                                 .mq_msgsize = sizeof(Requete), .mq_curmsgs = 0 };
+    struct mq_attr attr_resp = { .mq_flags = 0, .mq_maxmsg = 4,
+                                 .mq_msgsize = sizeof(int), .mq_curmsgs = 0 };
+
+    mqd_t mq_req  = mq_open(MQ_REQ,  O_CREAT | O_RDWR, 0600, &attr_req);
+    mqd_t mq_resp = mq_open(MQ_RESP, O_CREAT | O_RDWR, 0600, &attr_resp);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* serveur */
+        Requete r;
+        mq_receive(mq_req, (char *)&r, sizeof(r), NULL);
+        int sum = r.a + r.b;
+        mq_send(mq_resp, (char *)&sum, sizeof(sum), 0);
+        mq_close(mq_req);
+        mq_close(mq_resp);
+        exit(0);
+    }
+
+    /* client */
+    Requete r = { .a = 12, .b = 30 };
+    printf("Client envoie: %d + %d\n", r.a, r.b);
+    mq_send(mq_req, (char *)&r, sizeof(r), 0);
+
+    int sum;
+    mq_receive(mq_resp, (char *)&sum, sizeof(sum), NULL);
+    printf("Serveur repond: %d\n", sum);
+
+    wait(NULL);
+    mq_close(mq_req);
+    mq_close(mq_resp);
+    mq_unlink(MQ_REQ);
+    mq_unlink(MQ_RESP);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <mqueue.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+#define MQ_REQ  "/kf_calc_req"
+#define MQ_RESP "/kf_calc_resp"
+
+typedef struct {
+    int a;
+    int b;
+} Requete;
+
+int main(void) {
+    mq_unlink(MQ_REQ);
+    mq_unlink(MQ_RESP);
+
+    struct mq_attr attr_req  = { .mq_flags = 0, .mq_maxmsg = 4,
+                                 .mq_msgsize = ____(Requete), .mq_curmsgs = 0 };
+    struct mq_attr attr_resp = { .mq_flags = 0, .mq_maxmsg = 4,
+                                 .mq_msgsize = ____(int), .mq_curmsgs = 0 };
+
+    mqd_t mq_req  = mq_open(MQ_REQ,  O_CREAT | O_RDWR, 0600, &attr_req);
+    mqd_t mq_resp = mq_open(MQ_RESP, O_CREAT | O_RDWR, 0600, &attr_resp);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* serveur */
+        Requete r;
+        ____(mq_req, (char *)&r, sizeof(r), NULL);
+        int sum = r.a + r.b;
+        ____(mq_resp, (char *)&sum, sizeof(sum), 0);
+        mq_close(mq_req);
+        mq_close(mq_resp);
+        exit(0);
+    }
+
+    /* client */
+    Requete r = { .a = 12, .b = 30 };
+    printf("Client envoie: %d + %d\n", r.a, r.b);
+    ____(mq_req, (char *)&r, sizeof(r), 0);
+
+    int sum;
+    ____(mq_resp, (char *)&sum, sizeof(sum), NULL);
+    printf("Serveur repond: %d\n", sum);
+
+    wait(NULL);
+    mq_close(mq_req);
+    mq_close(mq_resp);
+    mq_unlink(MQ_REQ);
+    mq_unlink(MQ_RESP);
+    return 0;
+}'''
+subject = "scenarios"
+title = "Serveur de calcul MSQ — requête/réponse par file de messages POSIX"
+
+[validation]
+expected_output = "Client envoie: 12 + 30\nServeur repond: 42\n"
+mode = "output"
