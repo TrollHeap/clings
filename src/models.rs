@@ -125,6 +125,8 @@ pub enum ExerciseType {
     FillBlank,
     /// Réécrire le code en respectant des contraintes
     Refactor,
+    /// Implémentation d'une fonction API exportée vers la librairie personnelle libsys
+    LibraryExport,
 }
 
 impl std::fmt::Display for ExerciseType {
@@ -134,6 +136,7 @@ impl std::fmt::Display for ExerciseType {
             ExerciseType::FixBug => write!(f, "Fix Bug"),
             ExerciseType::FillBlank => write!(f, "Fill Blank"),
             ExerciseType::Refactor => write!(f, "Refactoring"),
+            ExerciseType::LibraryExport => write!(f, "libsys Export"),
         }
     }
 }
@@ -151,7 +154,10 @@ pub struct ExerciseFile {
     pub readonly: bool,
 }
 
-/// Définition complète d'un exercice chargé depuis un fichier JSON.
+/// Définition complète d'un exercice chargé depuis un fichier TOML.
+///
+/// Contient l'énoncé, le code de départ (éventuellement par stage de maîtrise),
+/// le code solution, les tests de validation, les indices, et les métadonnées pédagogiques.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Exercise {
     /// Identifiant unique de l'exercice (ex. `ptr-deref-01`)
@@ -199,9 +205,22 @@ pub struct Exercise {
     /// Visualiseur interactif d'étapes (stack/heap)
     #[serde(default)]
     pub visualizer: Visualizer,
+    /// Module libsys cible (ex. "my_string") — requis si exercise_type = LibraryExport
+    #[serde(default)]
+    pub libsys_module: Option<String>,
+    /// Nom de la fonction exportée (ex. "my_strdup") — requis si exercise_type = LibraryExport
+    #[serde(default)]
+    pub libsys_function: Option<String>,
+    /// Condition de déverrouillage : "standalone" ou nom d'un subject NSY103
+    #[serde(default)]
+    pub libsys_unlock: Option<String>,
+    /// Déclaration du header imposée (ex. "char *my_strdup(const char *s);")
+    #[serde(default)]
+    pub header_code: Option<String>,
 }
 
-/// Visualiseur d'exercice — séquence d'étapes annotées.
+/// Visualiseur interactif d'exercice — séquence d'étapes de mémoire (stack/heap).
+/// Utilisé par le mode [v] dans la TUI pour explorer l'état mémoire pas à pas.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 pub struct Visualizer {
     #[serde(rename = "type", default)]
@@ -210,7 +229,7 @@ pub struct Visualizer {
     pub steps: Vec<VisStep>,
 }
 
-/// Une étape du visualiseur avec snapshot mémoire.
+/// Une étape du visualiseur — snapshot de l'état mémoire (stack, heap, variables, arrows).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisStep {
     pub label: String,
@@ -230,31 +249,39 @@ pub struct VisStep {
     pub call_frames: Vec<VisCallFrame>,
 }
 
-/// Flèche entre deux variables dans le visualiseur (pointeur → cible).
+/// Flèche entre deux variables dans le visualiseur — représente un pointeur ou une relation.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisArrow {
+    /// Identifiant source (variable ou adresse)
     pub from: String,
+    /// Identifiant cible (variable ou adresse)
     pub to: String,
+    /// Label optionnel pour la relation (ex. "points to", "refers to")
     #[serde(default)]
     pub label: String,
 }
 
-/// Frame de la call stack dans le visualiseur.
+/// Frame de la call stack dans le visualiseur — représente une fonction en cours d'exécution.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VisCallFrame {
+    /// Nom de la fonction
     pub function_name: String,
+    /// Arguments affichés (texte libre)
     #[serde(default)]
     pub args: String,
+    /// `true` si c'est le frame actuel (au-dessus du stack)
     #[serde(default)]
     pub is_active: bool,
 }
 
-/// Variable affichée dans le stack ou le heap.
+/// Variable affichée dans le visualiseur (stack ou heap).
 /// Accepte `name` ou `address` pour le libellé, `value` ou `content` pour la donnée.
-/// Les champs inconnus (arrows, call_frames, etc.) sont ignorés silencieusement.
+/// Les champs inconnus sont ignorés silencieusement lors de la désérialisation.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct VisVar {
+    /// Nom ou adresse de la variable
     pub name: String,
+    /// Valeur affichée (représentation textuelle)
     pub value: String,
 }
 
@@ -431,36 +458,44 @@ impl Subject {
     }
 }
 
-/// Une question d'annale NSY103 avec le mapping vers les exercices clings.
+/// Une question d'examen annale — mapping vers les exercices clings pour révision/simulation.
 #[derive(Debug, Deserialize)]
 pub struct AnnaleQuestion {
+    /// Numéro de la question dans l'annale
     #[serde(default)]
     pub number: u32,
+    /// Barème (points attribués pour cette question)
     pub points: f32,
+    /// Titre/énoncé court de la question
     pub title: String,
-    /// Résumé de la question — désérialisé depuis JSON, affiché dans un futur mode détaillé.
+    /// Résumé détaillé de la question — désérialisé depuis JSON, affiché en mode détaillé
     #[serde(default)]
     #[allow(dead_code)]
     pub summary: String,
+    /// Sujets NSY103 couverts par cette question
     #[serde(default)]
     pub subjects: Vec<String>,
+    /// IDs des exercices clings couvrant cette question
     #[serde(default)]
     pub exercises: Vec<String>,
 }
 
-/// Une session d'annale (examen) NSY103/UTC502.
-/// Utilisée à la fois pour l'affichage (`clings annales`) et le mode exam simulé.
+/// Une session d'examen annale NSY103/UTC502 — questions et metadata pour simulation/révision.
 #[derive(Debug, Deserialize)]
 pub struct AnnaleSession {
+    /// Identifiant unique de la session (ex. "nsy103_2023")
     #[serde(default)]
     pub id: String,
+    /// Titre de la session
     pub title: String,
-    /// Date de la session d'examen — désérialisée depuis JSON, affichée dans un futur mode détaillé.
+    /// Date de l'examen — désérialisée depuis JSON, affichée en mode détaillé
     #[serde(default)]
     #[allow(dead_code)]
     pub date: String,
+    /// Barème total (somme des points de toutes les questions)
     #[serde(default)]
     pub total_points: f32,
+    /// Ensemble des questions de cette session
     pub questions: Vec<AnnaleQuestion>,
 }
 

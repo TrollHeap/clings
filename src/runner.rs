@@ -175,8 +175,11 @@ pub fn parse_gcc_hint(stderr: &str) -> Option<String> {
     None
 }
 
-/// Returns subject-specific linker flags for gcc.
-/// Threads subjects need `-lpthread`, IPC subjects need `-lrt`, others need none.
+/// Retourne les flags de liaison spécifiques au sujet pour gcc.
+/// - Sujets threads (pthreads, semaphores, sync_concepts, sockets, capstones) : `-lpthread`
+/// - Sujets IPC multi (message_queues, shared_memory) : `-lrt -lpthread`
+/// - Sujets file_io : `-lrt`
+/// - Autres : aucun flag
 fn linker_flags(subject: &str) -> Vec<&'static str> {
     match subject {
         "pthreads" | "semaphores" | "sync_concepts" | "sockets" | "capstones" => {
@@ -349,17 +352,17 @@ fn spawn_gcc_and_collect(
     Ok((stdout, stderr, status))
 }
 
-/// Compile and run a C source file, validating output against expected.
+/// Compile et exécute un fichier source C, valide la sortie.
 ///
-/// Compiles with `gcc -Wall -Wextra -std=c11`, runs with a 10-second timeout,
-/// then compares normalized stdout to `exercise.validation.expected_output`
-/// (exact or regex).
+/// Compile avec `gcc -Wall -Wextra -std=c11 -D_GNU_SOURCE`, exécute avec timeout 10s,
+/// puis compare stdout normalisé à `exercise.validation.expected_output`
+/// (comparaison exacte ou regex si préfixe `REGEX:`).
 ///
-/// Returns a [`RunResult`] with `success`, compiler/runtime `message`, and
-/// updated `mastery` score delta.
+/// Retourne [`RunResult`] avec `success`, messages compiler/runtime et durée.
+/// La mise à jour du score de maîtrise est effectuée par l'appelant.
 ///
 /// # Never panics
-/// Toutes les erreurs (compilation, timeout, output mismatch) sont capturées
+/// Toutes les erreurs (compilation, timeout, mismatch output) sont capturées
 /// dans `RunResult` — jamais de panic.
 pub fn compile_and_run(source_path: &Path, exercise: &Exercise) -> RunResult {
     let fallback_work_dir = std::path::PathBuf::from("/tmp");
@@ -758,10 +761,14 @@ pub fn select_starter_code(exercise: &Exercise, mastery: f64) -> &str {
         .unwrap_or(&exercise.starter_code)
 }
 
-/// Écrit le code source de l'exercice dans `~/.clings/current.c` via temp-file+rename atomique.
+/// Écrit le code source de l'exercice dans ~/.clings/current.c via temp-file+rename atomique.
+///
+/// Utilise `work_dir()` pour résoudre le répertoire, écrit les fichiers auxiliaires.
 ///
 /// # Errors
-/// `std::io::Error` if `$HOME` is not set or if the write/rename operation fails.
+/// Retourne `std::io::Error` si :
+/// - `work_dir()` échoue (HOME absent ou répertoire inaccessible)
+/// - write/rename du fichier temporaire échoue
 pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io::Result<PathBuf> {
     let dir = work_dir().map_err(|e| match e {
         KfError::Io(io) => io,
@@ -899,6 +906,10 @@ mod tests {
             kc_ids: vec![],
             starter_code_stages: vec![],
             visualizer: Default::default(),
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
         }
     }
 
@@ -1292,6 +1303,85 @@ mod tests {
         assert!(
             msg.contains(TIMEOUT_MSG_PREFIX),
             "expected TIMEOUT_MSG_PREFIX in error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_compile_and_run_syntax_error_returns_compile_error() {
+        let dir = std::env::temp_dir().join("clings_test_compile_err");
+        let _ = std::fs::create_dir_all(&dir);
+        let src = dir.join("syntax_error.c");
+        std::fs::write(&src, "int main(void) { invalid syntax HERE !!! }").unwrap();
+
+        let mut exercise = make_exercise("test_compile_err", Some("ok".to_string()));
+        // Use output mode so we don't need Unity
+        exercise.validation.mode = ValidationMode::Output;
+
+        let result = compile_and_run(&src, &exercise);
+
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert!(!result.success, "syntaxe invalide doit échouer");
+        assert!(result.compile_error, "doit signaler compile_error=true");
+        assert!(
+            !result.stderr.is_empty(),
+            "stderr doit contenir le message d'erreur gcc"
+        );
+    }
+
+    #[test]
+    fn test_compile_and_run_valid_c_succeeds() {
+        let dir = std::env::temp_dir().join("clings_test_compile_ok");
+        let _ = std::fs::create_dir_all(&dir);
+        let src = dir.join("hello.c");
+        std::fs::write(
+            &src,
+            "#include <stdio.h>\nint main(void){printf(\"ok\\n\");return 0;}\n",
+        )
+        .unwrap();
+
+        let mut exercise = make_exercise("test_compile_ok", Some("ok".to_string()));
+        exercise.validation.mode = ValidationMode::Output;
+        exercise.validation.expected_output = Some("ok".to_string());
+
+        let result = compile_and_run(&src, &exercise);
+
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert!(
+            result.success,
+            "C valide avec output correct doit réussir; stderr: {}",
+            result.stderr
+        );
+        assert!(
+            !result.compile_error,
+            "pas d'erreur de compilation attendue"
+        );
+    }
+
+    #[test]
+    fn test_compile_and_run_output_mismatch_fails() {
+        let dir = std::env::temp_dir().join("clings_test_mismatch");
+        let _ = std::fs::create_dir_all(&dir);
+        let src = dir.join("mismatch.c");
+        std::fs::write(
+            &src,
+            "#include <stdio.h>\nint main(void){printf(\"wrong\\n\");return 0;}\n",
+        )
+        .unwrap();
+
+        let mut exercise = make_exercise("test_mismatch", Some("expected_output".to_string()));
+        exercise.validation.mode = ValidationMode::Output;
+        exercise.validation.expected_output = Some("expected_output".to_string());
+
+        let result = compile_and_run(&src, &exercise);
+
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert!(!result.success, "output incorrect doit échouer");
+        assert!(
+            !result.compile_error,
+            "ce n'est pas une erreur de compilation"
         );
     }
 }

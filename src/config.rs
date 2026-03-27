@@ -14,33 +14,37 @@ static CONFIG: OnceLock<ClingConfig> = OnceLock::new();
 
 // ── Top-level struct ──────────────────────────────────────────────────────────
 
-/// Top-level user configuration loaded from ~/.clings/clings.toml.
+/// Configuration utilisateur top-level chargée depuis ~/.clings/clings.toml.
+/// Les sections manquantes utilisent les défauts de constants.rs.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ClingConfig {
-    /// SRS (Spaced Repetition System) configuration: decay, intervals, multiplier.
+    /// Configuration SRS : decay, intervals, multiplier.
     pub srs: SrsConfig,
-    /// UI configuration: editor path, tmux pane width.
+    /// Configuration UI : éditeur par défaut, largeur pane tmux.
     pub ui: UiConfig,
-    /// Tmux integration settings.
+    /// Configuration tmux : auto-open editor pane dans tmux.
     pub tmux: TmuxConfig,
-    /// Git sync configuration: remote, branch, enabled flag.
+    /// Configuration sync Git : remote URL, branch, enabled flag.
     pub sync: SyncConfig,
+    /// Chemin vers le repo libsys pour exports (défaut : $HOME/Developer/TOOLS/libsys).
+    #[serde(default)]
+    pub libsys_path: Option<std::path::PathBuf>,
 }
 
 // ── [srs] section ─────────────────────────────────────────────────────────────
 
-/// SRS (Spaced Repetition System) configuration.
+/// Configuration SRS (Spaced Repetition System).
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SrsConfig {
-    /// Days of inactivity before mastery score decays by 0.5.
+    /// Jours d'inactivité avant que le score décroisse de 0.5.
     pub decay_days: i64,
-    /// Minimum review interval (days) after a success.
+    /// Intervalle de révision minimal après succès (jours).
     pub base_interval_days: i64,
-    /// Maximum review interval (days) after repeated successes.
+    /// Intervalle de révision maximal après succès répétés (jours).
     pub max_interval_days: i64,
-    /// Multiplier applied to interval on success (e.g., 2.5).
+    /// Multiplicateur d'intervalle appliqué après succès (ex. 2.5x).
     pub interval_multiplier: f64,
 }
 
@@ -57,13 +61,13 @@ impl Default for SrsConfig {
 
 // ── [ui] section ──────────────────────────────────────────────────────────────
 
-/// UI and editor configuration.
+/// Configuration UI et éditeur.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct UiConfig {
-    /// Default editor command (e.g., 'nvim', 'vim'). Used in tmux pane integration.
+    /// Commande éditeur par défaut (ex. 'nvim', 'vim'). Utilisé dans tmux split.
     pub editor: String,
-    /// Width (in chars) of tmux editor pane when split. Default: 50.
+    /// Largeur du pane tmux éditeur (caractères). Défaut : 50.
     pub tmux_pane_width: u8,
 }
 
@@ -78,11 +82,11 @@ impl Default for UiConfig {
 
 // ── [tmux] section ────────────────────────────────────────────────────────────
 
-/// Tmux integration configuration.
+/// Configuration intégration tmux.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct TmuxConfig {
-    /// Enable/disable automatic tmux pane creation for editor integration.
+    /// Activer/désactiver la création automatique d'un pane tmux pour l'éditeur.
     pub enabled: bool,
 }
 
@@ -94,17 +98,17 @@ impl Default for TmuxConfig {
 
 // ── [sync] section ────────────────────────────────────────────────────────────
 
-/// Git sync configuration for progress synchronization across machines.
+/// Configuration synchronisation Git pour progès cross-machines.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SyncConfig {
-    /// Enable/disable git sync for progress snapshots.
+    /// Activer/désactiver la sync Git des snapshots de progression.
     pub enabled: bool,
-    /// Git remote URL (e.g., 'https://github.com/user/clings-progress.git').
+    /// URL remote Git (ex. 'https://github.com/user/clings-progress.git').
     pub remote: String,
-    /// Git branch name for progress snapshots. Default: 'main'.
+    /// Branche Git pour les snapshots. Défaut : 'main'.
     pub branch: String,
-    /// Machine hostname for sync commits. If empty, system hostname is used.
+    /// Hostname machine pour les commits sync. Si vide, utilise hostname système.
     pub hostname: String,
 }
 
@@ -121,8 +125,8 @@ impl Default for SyncConfig {
 
 // ── Load / access ─────────────────────────────────────────────────────────────
 
-/// Load config from `~/.clings/clings.toml`, falling back to defaults.
-/// Silently ignores missing or malformed files.
+/// Charge la configuration depuis ~/.clings/clings.toml avec fallback aux défauts.
+/// Ignore silencieusement les fichiers manquants ou mal formés.
 pub fn load() -> ClingConfig {
     let path = constants::clings_data_dir().join(constants::CONFIG_TOML_FILENAME);
 
@@ -142,19 +146,19 @@ pub fn load() -> ClingConfig {
     }
 }
 
-/// Initialize the global config. Must be called once at startup.
-/// Double-init is a no-op (OnceLock guarantees single initialization).
+/// Initialise la configuration globale. Doit être appelée une fois au démarrage.
+/// Double-init est un no-op (OnceLock garantit une seule initialisation).
 pub fn init(cfg: ClingConfig) {
     CONFIG.set(cfg).ok();
 }
 
-/// Access the global config. Returns default if `init()` was not called.
+/// Accède à la configuration globale. Retourne le défaut si `init()` n'a pas été appelée.
 pub fn get() -> &'static ClingConfig {
     CONFIG.get_or_init(ClingConfig::default)
 }
 
-/// Write a single `section.key = value` into `~/.clings/clings.toml`.
-/// Creates the file if it does not exist.
+/// Écrit une seule clé `section.key = value` dans ~/.clings/clings.toml.
+/// Crée le fichier s'il n'existe pas.
 pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<()> {
     const ALLOWED: &[(&str, &str)] = &[
         ("srs", "decay_days"),

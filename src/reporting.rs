@@ -7,26 +7,37 @@ use rusqlite::Connection;
 use crate::chapters::Chapter;
 use crate::error::Result;
 
-/// Report summary for a single subject within a chapter.
+/// Rapport d'apprentissage pour un sujet au sein d'un chapitre.
 #[derive(Debug, Clone)]
 pub struct SubjectReport {
+    /// Nom du sujet (ex. "pointers", "signals").
     pub subject: String,
+    /// Score moyen de maîtrise pour ce sujet.
     pub mastery: f64,
+    /// Nombre total de tentatives.
     pub attempts: u64,
+    /// Nombre de tentatives réussies.
     #[allow(dead_code)]
     pub successes: u64,
+    /// IDs des exercices avec mastery < 2.0 (points faibles).
     #[allow(dead_code)]
-    pub weakest_exercises: Vec<String>, // exercise IDs with mastery < 2.0
+    pub weakest_exercises: Vec<String>,
 }
 
-/// Report summary for an entire chapter.
+/// Rapport d'apprentissage pour un chapitre entier.
 #[derive(Debug, Clone)]
 pub struct ChapterReport {
+    /// Numéro du chapitre (1–16).
     pub chapter_num: u8,
+    /// Titre du chapitre.
     pub chapter_title: String,
+    /// Rapports par sujet.
     pub subjects: Vec<SubjectReport>,
+    /// Moyenne des mastery scores pour tous les sujets.
     pub avg_mastery: f64,
+    /// Nombre total de tentatives dans le chapitre.
     pub total_attempts: u64,
+    /// Taux de réussite en pourcentage.
     pub success_rate: f64,
 }
 

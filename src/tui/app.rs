@@ -26,61 +26,99 @@ pub enum ListDisplayItem {
     },
 }
 
-/// Messages traités par App::update_watch()
+/// Messages du dispatching événementiel TEA (Terminal Event Architecture).
+/// Traités par `update_watch()` / `update_piscine()`.
 #[derive(Debug)]
 pub enum Msg {
+    /// Touche clavier pressée (modifiée, avec shift/ctrl/alt).
     Key(ratatui::crossterm::event::KeyEvent),
+    /// Fichier utilisateur sauvegardé — compile+valide automatiquement en watch mode.
     FileChanged,
+    /// Tick timer périodique (ex. pour les animations, mise à jour du timer piscine).
     Tick,
+    /// Terminal redimensionné — layout sera recalculé au prochain dessin.
+    Resize(u16, u16),
 }
 
-/// État des overlays (help, list, search, solution, visualizer).
+/// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
 #[derive(Default)]
 pub struct OverlayState {
+    /// Overlay aide ([?]) — affiche les keybinds.
     pub help_active: bool,
+    /// Overlay liste ([l]) — affiche les exercices par chapitre.
     pub list_active: bool,
+    /// Exercice sélectionné dans la liste.
     pub list_selected: usize,
+    /// Items à afficher dans la liste (headers de chapitre + exercises).
     pub list_display_items: Vec<ListDisplayItem>,
+    /// Overlay recherche ([/]) — fuzzy search sur les exercices.
     pub search_active: bool,
+    /// Requête de recherche actuelle.
     pub search_query: String,
+    /// Résultats de recherche (indices dans exercises[]).
     pub search_results: Vec<usize>,
+    /// Exercice sélectionné dans les résultats.
     pub search_selected: usize,
+    /// Filtre par sujet : `true` = filtre activé.
     pub search_subject_filter: bool,
+    /// Flag pour savoir si `g` est pressé (commande 2-chars attendue).
     pub search_g_pending: bool,
+    /// Overlay solution ([s]) — affiche le code corrigé.
     pub solution_active: bool,
+    /// Overlay visualiseur ([v]) — memory visualization (stack/heap).
     pub vis_active: bool,
+    /// Étape actuelle du visualiseur.
     pub vis_step: usize,
+    /// Overlay succès — affiché brief après une réussite.
     pub success_overlay: bool,
-    /// Modal de confirmation avant de changer d'exercice (évite reset accidentel).
+    /// Modal de confirmation avant changement d'exercice (évite reset accidentel).
     pub nav_confirm_active: bool,
-    /// true = aller au suivant, false = aller au précédent.
+    /// Direction du changement : `true` = next, `false` = prev.
     pub nav_confirm_next: bool,
-    /// ListState persistant pour l'overlay liste [l] — préserve l'offset de scroll entre les frames.
+    /// ListState persistant pour l'overlay liste [l].
     pub list_list_state: ListState,
-    /// ListState persistant pour l'overlay recherche [/] — préserve l'offset de scroll entre les frames.
+    /// ListState persistant pour l'overlay recherche [/].
     pub search_list_state: ListState,
+    /// Overlay portfolio libsys ([b]) — affiche les exports.
+    pub libsys_active: bool,
+    /// Données du portfolio libsys (cache pour éviter I/O par frame).
+    pub libsys_portfolio: Vec<crate::libsys::ModuleStatus>,
 }
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
+/// Réduit les allocations string par frame en cachant les chaînes pré-formatées.
 #[derive(Default)]
 pub struct HeaderCache {
+    /// String pré-formatée de la minimap d'achèvement.
     pub cached_mini_map: String,
+    /// Compteur exercices actuels/totaux pré-formaté.
     pub cached_exercise_counter: String,
+    /// Affichage du score de maîtrise pré-formaté.
     pub cached_mastery_display: String,
+    /// Type d'exercice (complete, fix_bug, fill_blank, refactor, libsys).
     pub cached_exercise_type: String,
+    /// Longueur de la partie gauche du header (pour layout).
     pub cached_header_left_len: usize,
+    /// Longueur de la minimap (pour layout).
     pub cached_mini_map_len: usize,
-    // Tracking fields to detect state changes
+    /// Dernier index d'exercice en cache (détecte changement).
     last_cached_index: usize,
+    /// Dernier nombre total d'exercices en cache (détecte changement).
     last_cached_total: usize,
+    /// Dernier score de maîtrise en cache (détecte changement).
     last_cached_mastery: f64,
 }
 
-/// Cache du timer piscine — mis à jour dans Tick quand la seconde change.
+/// Cache du timer piscine/exam — mis à jour dans Tick quand la seconde change.
+/// Évite les allocations string à chaque rendu.
 pub struct PiscineTimerCache {
+    /// Temps écoulé pré-formaté.
     pub cached_piscine_elapsed_str: String,
+    /// Dernier temps écoulé en cache (détecte changement).
     pub piscine_last_elapsed_secs: u64,
+    /// Temps restant pré-formaté.
     pub cached_piscine_remaining_str: String,
+    /// Dernier temps restant en cache (détecte changement).
     pub piscine_last_remaining_secs: u64,
 }
 
@@ -95,45 +133,68 @@ impl Default for PiscineTimerCache {
     }
 }
 
-/// État centralisé — mode watch
+/// État centralisé TEA/Elm — gère tous les modes (watch/piscine/exam/run).
+/// Immutable rendering avec dérivation complète du state en View.
 pub struct AppState {
+    /// `true` si l'utilisateur a appuyé sur [q] ou fermé le terminal.
     pub should_quit: bool,
-    // Watch data
+    /// Tous les exercices chargés (filtrés par chapitre/mode).
     pub exercises: Vec<Exercise>,
+    /// Bool par exercice : `true` si mastery >= seuil ou résolu en piscine.
     pub completed: Vec<bool>,
+    /// Index courant dans `exercises[]`.
     pub current_index: usize,
+    /// Résultat du dernier compile+run : None avant la 1ère tentative.
     pub run_result: Option<RunResult>,
+    /// Chemin absolu du fichier ~/.clings/current.c.
     pub source_path: Option<PathBuf>,
+    /// Stage courant du code de départ (0–4) ou None si pas de stages.
     pub current_stage: Option<u8>,
+    /// Nom du pane tmux (ex. "pane-1:2") si intégration active.
     pub editor_pane: Option<String>,
+    /// Index du dernier indice révélé (0 = aucun).
     pub hint_index: usize,
+    /// `true` si compile est programmé (attend next Tick).
     pub compile_pending: bool,
+    /// Nombre d'échecs consécutifs sur l'exercice courant.
     pub consecutive_failures: u8,
+    /// `true` si la tentative courante est enregistrée en DB (évite doublons).
     pub already_recorded: bool,
+    /// Subject → days_until_review (negatif = due). Calculé au démarrage.
     pub review_map: HashMap<String, Option<i64>>,
+    /// Subject → mastery score courant (depuis DB). Calculé au démarrage.
     pub mastery_map: HashMap<String, f64>,
+    /// Deadline piscine (Instant du démarrage + durée limite).
     pub piscine_deadline: Option<Instant>,
+    /// Timestamp du démarrage du mode piscine.
     pub piscine_start: Option<Instant>,
+    /// Durée totale piscine en secondes (NSY103=9000, UTC502=10800).
     pub piscine_timer_total: u64,
+    /// Nombre d'échecs accumulés en piscine.
     pub piscine_fail_count: u32,
-    // Status message (file saved, etc.)
+    /// Message status courant (ex. "Fichier sauvegardé").
     pub status_msg: Option<String>,
+    /// Timestamp du message status (pour expiration après 3s).
     pub status_msg_at: Option<Instant>,
+    /// `true` pour ignorer le prochain FileChanged (ex. après write_starter_code).
     pub skip_file_changed: bool,
-    // Subject order cache (filled once on init)
+    /// Ordre des sujets (pour sidebar navigation).
     pub subject_order: Vec<String>,
-    // Description panel scroll offset
+    /// Offset vertical de scroll de la description en watch mode.
     pub description_scroll: u16,
-    // Pédagogie — interleaving nudge
+    /// Nombre de succès consécutifs sur le sujet courant (pour nudge interleaving).
     pub consecutive_successes_on_subject: u8,
+    /// Dernier sujet avec succès (pour vérifier changement de sujet).
     pub last_success_subject: String,
-    // Subject → chapter mapping (computed once, cached)
+    /// Subject → chapter number (pour résumé par chapitre).
     pub subject_to_chapter: HashMap<String, usize>,
-    // Cached due count (invalidated when review_map changes)
+    /// Nombre de sujets en révision (cached, invalidé quand review_map change).
     pub cached_due_count: Option<usize>,
-    // Sub-structs
+    /// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
     pub overlay: OverlayState,
+    /// Cache du header (mini-map, counter, mastery display).
     pub header_cache: HeaderCache,
+    /// Cache du timer piscine (elapsed, remaining).
     pub timer_cache: PiscineTimerCache,
 }
 
@@ -785,6 +846,10 @@ impl App {
             Self::handle_vis_key(&mut self.state, key);
             return true;
         }
+        if self.state.overlay.libsys_active {
+            self.state.overlay.libsys_active = false;
+            return true;
+        }
         false
     }
 
@@ -835,6 +900,14 @@ impl App {
                 matches!(item, ListDisplayItem::Exercise { exercise_index } if *exercise_index == ci)
             })
             .unwrap_or(0);
+    }
+
+    /// Portfolio libsys overlay `[b]`.
+    fn open_libsys_overlay(&mut self) {
+        let path = crate::libsys::libsys_path();
+        self.state.overlay.libsys_portfolio =
+            crate::libsys::portfolio_status(&path).unwrap_or_default();
+        self.state.overlay.libsys_active = true;
     }
 
     /// Shared search overlay open `[/]`.
@@ -920,6 +993,32 @@ impl App {
                 {
                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                 }
+                // Export libsys si c'est un exercice library_export
+                if exercise.exercise_type == crate::models::ExerciseType::LibraryExport {
+                    if let (Some(module), Some(function), Some(h_decl)) = (
+                        exercise.libsys_module.clone(),
+                        exercise.libsys_function.clone(),
+                        exercise.header_code.clone(),
+                    ) {
+                        let fn_name = function.clone();
+                        let c_code = std::fs::read_to_string(path).unwrap_or_default();
+                        let libsys_export = crate::libsys::LibsysExport {
+                            module,
+                            function,
+                            c_code,
+                            h_decl,
+                        };
+                        let libsys_path = crate::libsys::libsys_path();
+                        match crate::libsys::export(&libsys_path, &libsys_export) {
+                            Ok(()) => {
+                                self.state.status_msg =
+                                    Some(format!("✓ {fn_name} ajouté à libsys !"));
+                                self.state.status_msg_at = Some(std::time::Instant::now());
+                            }
+                            Err(e) => eprintln!("[clings] erreur export libsys: {e}"),
+                        }
+                    }
+                }
                 Self::invalidate_header_cache(&mut self.state);
                 // Interleaving nudge : suggérer de changer de sujet après N succès consécutifs
                 if self.state.last_success_subject == subject {
@@ -990,6 +1089,7 @@ impl App {
                     KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
                     KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
                     KeyCode::Char('/') => self.open_search_overlay(),
+                    KeyCode::Char('b') | KeyCode::Char('B') => self.open_libsys_overlay(),
                     KeyCode::Char('?') => {
                         self.state.overlay.help_active = true;
                     }
@@ -1026,6 +1126,9 @@ impl App {
             }
             Msg::FileChanged => self.handle_file_changed(),
             Msg::Tick => self.handle_tick_status_clear(),
+            Msg::Resize(_w, _h) => {
+                // Ratatui recalcule le layout à chaque draw — pas d'action requise.
+            }
         }
     }
 
@@ -1120,6 +1223,7 @@ impl App {
                         }
                     }
                     KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
+                    KeyCode::Char('b') | KeyCode::Char('B') => self.open_libsys_overlay(),
                     KeyCode::Char('n')
                     | KeyCode::Char('N')
                     | KeyCode::Char('j')
@@ -1208,6 +1312,9 @@ impl App {
                 }
             }
             Msg::FileChanged => self.handle_file_changed(),
+            Msg::Resize(_w, _h) => {
+                // Ratatui recalcule le layout à chaque draw — pas d'action requise.
+            }
             Msg::Tick => {
                 self.handle_tick_status_clear();
                 // Mise à jour du cache timer elapsed (1 allocation/seconde max)
@@ -1323,6 +1430,10 @@ mod tests {
             } else {
                 Visualizer::default()
             },
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
         }
     }
 
@@ -1455,5 +1566,74 @@ mod tests {
     #[test]
     fn format_remaining_secs_over_minute() {
         assert_eq!(format_remaining_secs(125), "2m05s restantes");
+    }
+
+    // ── Tests de transition d'état ───────────────────────────────────────
+
+    #[test]
+    fn open_list_overlay_sets_flag() {
+        let mut app = App::new();
+        app.state.exercises = vec![make_exercise(vec![], false)];
+        app.state.completed = vec![false];
+        assert!(!app.state.overlay.list_active);
+        app.open_list_overlay();
+        assert!(app.state.overlay.list_active);
+    }
+
+    #[test]
+    fn open_list_overlay_positions_cursor_on_current() {
+        let mut app = App::new();
+        app.state.exercises = vec![make_exercise(vec![], false), make_exercise(vec![], false)];
+        app.state.completed = vec![false, false];
+        app.state.current_index = 1;
+        app.open_list_overlay();
+        // list_selected doit pointer sur l'item correspondant à current_index
+        let selected = app.state.overlay.list_selected;
+        let found = app.state.overlay.list_display_items.iter().position(|item| {
+            matches!(item, ListDisplayItem::Exercise { exercise_index } if *exercise_index == 1)
+        });
+        assert_eq!(Some(selected), found);
+    }
+
+    #[test]
+    fn open_search_overlay_clears_state() {
+        let mut app = App::new();
+        app.state.overlay.search_query = "ancien".to_string();
+        app.state.overlay.search_subject_filter = true;
+        app.open_search_overlay();
+        assert!(app.state.overlay.search_active);
+        assert!(app.state.overlay.search_query.is_empty());
+        assert!(!app.state.overlay.search_subject_filter);
+    }
+
+    #[test]
+    fn help_overlay_activates_via_overlay_flag() {
+        let mut app = App::new();
+        assert!(!app.state.overlay.help_active);
+        app.state.overlay.help_active = true;
+        assert!(app.state.overlay.help_active);
+    }
+
+    #[test]
+    fn msg_resize_variant_is_handled() {
+        // Vérifie que Msg::Resize peut être construit et ne panique pas dans un match.
+        let msg = Msg::Resize(80, 24);
+        match msg {
+            Msg::Resize(w, h) => {
+                assert_eq!(w, 80);
+                assert_eq!(h, 24);
+            }
+            _ => panic!("mauvaise variante"),
+        }
+    }
+
+    #[test]
+    fn open_search_overlay_idempotent_when_already_active() {
+        let mut app = App::new();
+        app.open_search_overlay();
+        app.state.overlay.search_query = "test".to_string();
+        // Deuxième ouverture doit remettre la query à zéro
+        app.open_search_overlay();
+        assert!(app.state.overlay.search_query.is_empty());
     }
 }

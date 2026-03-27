@@ -2,34 +2,34 @@
 
 use thiserror::Error;
 
-/// Erreurs applicatives de clings.
+/// Erreurs applicatives de clings — enum des variantes possibles.
 #[derive(Debug, Error)]
 pub enum KfError {
-    /// Erreur SQLite propagée depuis rusqlite
+    /// Erreur SQLite (DB verrouillée, table manquante, etc.).
     #[error("erreur de base de données : {0}")]
     Database(#[from] rusqlite::Error),
 
-    /// Erreur d'entrée/sortie standard
+    /// Erreur d'entrée/sortie (fichier manquant, permission refusée, etc.).
     #[error("erreur I/O : {0}")]
     Io(#[from] std::io::Error),
 
-    /// Erreur du système de surveillance de fichiers (`notify`)
+    /// Erreur du file watcher (notify).
     #[error("erreur de surveillance fichier : {0}")]
     Watch(String),
 
-    /// L'identifiant d'exercice demandé est introuvable
+    /// Exercice demandé introuvable (ID invalide).
     #[error("exercice introuvable : {0}")]
     ExerciseNotFound(String),
 
-    /// Erreur de désérialisation JSON
+    /// Erreur de désérialisation JSON (exo invalide, annales mal formées).
     #[error("erreur JSON : {0}")]
     Json(#[from] serde_json::Error),
 
-    /// Erreur de configuration ou de chemin (message libre)
+    /// Erreur de configuration ou chemin (message libre — HOME absent, path invalide, etc.).
     #[error("{0}")]
     Config(String),
 
-    /// Erreur de synchronisation Git
+    /// Erreur de synchronisation Git (clone, pull, push échoué).
     #[error("erreur de synchronisation : {0}")]
     Sync(String),
 }
