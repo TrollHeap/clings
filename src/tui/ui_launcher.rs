@@ -32,7 +32,10 @@ pub enum LaunchChoice {
 pub enum LaunchMode {
     Watch,
     Piscine,
+    /// NSY103 learning mode — SRS adaptatif filtré sur les sujets NSY103-core.
     Nsy103,
+    /// NSY103 exam simulation — annales avec timer.
+    ExamNsy103,
 }
 
 /// Which screen the launcher is showing.
@@ -57,7 +60,7 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
         match &screen {
             Screen::Mode => {
                 let has_continue = last_session.is_some();
-                let item_count = if has_continue { 4 } else { 3 };
+                let item_count = if has_continue { 5 } else { 4 };
 
                 terminal
                     .draw(|f| {
@@ -92,10 +95,15 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                                 cursor = 0;
                                 list_state.select(Some(0));
                             }
-                            _ => {
-                                // NSY103 mode
+                            2 => {
                                 break LaunchChoice::Start {
                                     mode: LaunchMode::Nsy103,
+                                    chapter: None,
+                                };
+                            }
+                            _ => {
+                                break LaunchChoice::Start {
+                                    mode: LaunchMode::ExamNsy103,
                                     chapter: None,
                                 };
                             }
@@ -272,9 +280,16 @@ fn draw_mode_screen(
     idx += 1;
 
     items.push(make_item(
-        "NSY103 (annales/examen)",
+        "NSY103 (apprentissage C système)",
         idx == cursor,
         common::C_MAUVE,
+    ));
+    idx += 1;
+
+    items.push(make_item(
+        "Examen NSY103 (annales avec timer)",
+        idx == cursor,
+        common::C_DANGER,
     ));
 
     let list = List::new(items)
@@ -314,6 +329,7 @@ fn draw_chapter_screen(f: &mut Frame, cursor: usize, mode: LaunchMode) {
         LaunchMode::Watch => "Watch",
         LaunchMode::Piscine => "Piscine",
         LaunchMode::Nsy103 => "NSY103",
+        LaunchMode::ExamNsy103 => "Examen NSY103",
     };
 
     // Header
@@ -404,6 +420,24 @@ fn draw_help_screen(f: &mut Frame) {
         ]),
         Line::from(Span::styled(
             "                 Idéal pour réviser en une seule session.",
+            dim,
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  NSY103         ", Style::default().fg(common::C_MAUVE)),
+            Span::styled("SRS adaptatif, sujets NSY103-core uniquement.", text),
+        ]),
+        Line::from(Span::styled(
+            "                 Exclut scheduling et virtual_memory (UTC502).",
+            dim,
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Examen NSY103  ", Style::default().fg(common::C_DANGER)),
+            Span::styled("Simule une annale avec timer.", text),
+        ]),
+        Line::from(Span::styled(
+            "                 Choisir une session parmi les annales disponibles.",
             dim,
         )),
         Line::from(""),

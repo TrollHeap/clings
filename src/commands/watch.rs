@@ -9,10 +9,14 @@ use crate::error::Result;
 use crate::tui::app::App;
 use crate::{chapters, config, exercises, progress, sync, tmux};
 
+/// Subjects exclusive to UTC502 — excluded from NSY103-only mode.
+const NSY103_EXCLUDED: &[&str] = &["scheduling", "virtual_memory"];
+
 /// Start watch mode — interactive SRS-based exercise progression by chapter.
 /// Launches Ratatui TUI. Optionally filters by chapter; enables file-watching auto-compile and SRS decay.
 /// Calls sync pull/push if configured. Saves session state for "Continue" in launcher.
-pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
+/// If `nsy103_only` is true, filters out UTC502-specific subjects (scheduling, virtual_memory).
+pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
     // ── 0. Sync pull (si activé) ───────────────────────────────────────
     let clings_dir = clings_data_dir();
     let sync_cfg = config::get().sync.clone();
@@ -64,6 +68,15 @@ pub fn cmd_watch(filter_chapter: Option<u8>) -> Result<()> {
         })
         .cloned()
         .collect();
+
+    let gated_exercises: Vec<crate::models::Exercise> = if nsy103_only {
+        gated_exercises
+            .into_iter()
+            .filter(|ex| !NSY103_EXCLUDED.contains(&ex.subject.as_str()))
+            .collect()
+    } else {
+        gated_exercises
+    };
 
     let mut chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
     if !chapters::filter_by_chapter(&mut chapter_blocks, filter_chapter) {

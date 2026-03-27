@@ -203,7 +203,7 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Some(Commands::Watch { chapter }) => cmd_watch(chapter),
+        Some(Commands::Watch { chapter }) => cmd_watch(chapter, false),
         Some(Commands::List { subject, due }) => cmd_list(subject.as_deref(), due),
         Some(Commands::Run { exercise_id }) => cmd_run(&exercise_id),
         Some(Commands::Progress { subject }) => cmd_progress(subject.as_deref()),
@@ -250,19 +250,23 @@ fn main() {
                         .unwrap_or_else(|| ("watch".to_string(), None, 0));
                     match mode.as_str() {
                         "piscine" => piscine::cmd_piscine(chapter, None),
-                        _ => cmd_watch(chapter),
+                        _ => cmd_watch(chapter, false),
                     }
                 }
                 tui::ui_launcher::LaunchChoice::Start {
                     mode: tui::ui_launcher::LaunchMode::Watch,
                     chapter,
-                } => cmd_watch(chapter),
+                } => cmd_watch(chapter, false),
                 tui::ui_launcher::LaunchChoice::Start {
                     mode: tui::ui_launcher::LaunchMode::Piscine,
                     chapter,
                 } => piscine::cmd_piscine(chapter, None),
                 tui::ui_launcher::LaunchChoice::Start {
                     mode: tui::ui_launcher::LaunchMode::Nsy103,
+                    chapter: _,
+                } => cmd_watch(None, true),
+                tui::ui_launcher::LaunchChoice::Start {
+                    mode: tui::ui_launcher::LaunchMode::ExamNsy103,
                     chapter: _,
                 } => exam::cmd_exam(None, false),
                 tui::ui_launcher::LaunchChoice::Quit => Ok(()),
