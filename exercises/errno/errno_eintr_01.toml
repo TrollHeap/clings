@@ -1,0 +1,271 @@
+common_mistake = "Ne pas vérifier EINTR — l'appel semble échouer alors qu'il faut juste le relancer"
+description = """
+NSY103 — Quand un signal interrompt un appel système bloquant, celui-ci retourne -1 avec errno=EINTR. Il faut relancer l'appel dans une boucle.
+
+Implémentez une fonction safe_write() qui relance write() si errno==EINTR, et testez-la avec une écriture dans un pipe."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Un appel interrompu retourne -1",
+    "EINTR signifie qu'un signal a interrompu l'appel",
+    "La boucle do/while relance tant que n==-1 && errno==EINTR",
+]
+id = "errno-eintr-01"
+kc_ids = ["KC-C15"]
+key_concept = "Boucle EINTR: do { n=syscall(); } while(n==-1 && errno==EINTR);"
+lang = "c"
+prerequisites = ["errno-check-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t n;
+    do {
+        n = write(fd, buf, count);
+    } while (n == -1 && errno == EINTR);
+    return n;
+}
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t n;
+    do {
+        n = write(fd, buf, count);
+    } while (n == ____ && errno == ____);
+    return n;
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+/* == EXEMPLE: safe_read avec boucle EINTR ================ */
+ssize_t example_safe_read(int fd, void *buf, size_t count) {
+    ssize_t n;
+    do {
+        n = read(fd, buf, count);
+    } while (n == -1 && errno == EINTR);
+    return n;
+}
+
+/* == VOTRE EXERCICE: safe_write ========================== */
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t n;
+    /* TODO: boucle do/while comme example_safe_read */
+    n = write(fd, buf, count);
+    return n;
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t n;
+    do {
+        n = write(fd, buf, count);
+    } while (n == -1 && errno == ____); /* quelle constante? */
+    return n;
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t n;
+    do {
+        n = write(fd, buf, count);
+    } while (n == ____ && errno == ____);
+    return n;
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+// Implémentez safe_write: relance write() si EINTR
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    return write(fd, buf, count);
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+    const char *msg = "safe write ok";
+    ssize_t written = safe_write(pipefd[1], msg, strlen(msg));
+    close(pipefd[1]);
+    char buf[64];
+    ssize_t nr = read(pipefd[0], buf, sizeof(buf) - 1);
+    buf[nr] = '\0';
+    close(pipefd[0]);
+    printf("Written: %zd bytes\n", written);
+    printf("Read: %s\n", buf);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "EINTR et relance d'appel système"
+
+[validation]
+expected_output = """
+Written: 13 bytes
+Read: safe write ok
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Premier appel à write()"
+heap = []
+label = "write() appelé"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "fd, buf, count"
+function_name = "safe_write"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "?"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Signal reçu, on reboucle"
+heap = []
+label = "Si EINTR → relance"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "fd, buf, count"
+function_name = "safe_write"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "4 (EINTR)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "write réussit, on sort de la boucle"
+heap = []
+label = "Succès"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "13"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "0"

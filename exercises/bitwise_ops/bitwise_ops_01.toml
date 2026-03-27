@@ -1,0 +1,524 @@
+common_mistake = "Confondre & (bitwise AND) et && (logical AND)"
+description = """
+NSY103 — Les opérations bit-à-bit opèrent sur chaque bit indépendamment. Elles sont fondamentales pour les masques, flags, et manipulation de registres.
+
+Calculez et affichez les résultats de AND, OR, XOR, NOT et décalages sur 0xA5 et 0x0F."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "0xA5 = 10100101b, 0x0F = 00001111b — AND garde les bits communs",
+    "NOT (~a) & 0xFF masque à 8 bits pour éviter les bits hauts de unsigned int",
+    "a << 2 décale vers la gauche (multiplie par 4), & 0xFF tronque à 8 bits",
+]
+id = "bitwise-ops-01"
+kc_ids = ["KC-C04"]
+key_concept = "& AND, | OR, ^ XOR, ~ NOT, << décalage gauche, >> décalage droit"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return a & b;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return a | b;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return a ^ b;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return (~a) & 0xFF;
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return (a << n) & 0xFF;
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return a >> n;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return 0;
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return 0;
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return 0;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Operations bit-a-bit sur 0xCC et 0x33
+ * Memes operateurs : AND(&), OR(|), XOR(^), NOT(~), shifts
+ * =========================================================== */
+void example_bitwise(void) {
+    unsigned int x = 0xCC; /* 11001100b */
+    unsigned int y = 0x33; /* 00110011b */
+    printf("x        = 0x%02X\n", x);
+    printf("y        = 0x%02X\n", y);
+    printf("x AND y  = 0x%02X\n", x & y);        /* 0x00 */
+    printf("x OR  y  = 0x%02X\n", x | y);        /* 0xFF */
+    printf("x XOR y  = 0x%02X\n", x ^ y);        /* 0xFF */
+    printf("NOT x    = 0x%02X\n", (~x) & 0xFF);  /* 0x33 */
+    printf("x << 1   = 0x%02X\n", (x << 1) & 0xFF); /* 0x98 */
+    printf("x >> 1   = 0x%02X\n", x >> 1);       /* 0x66 */
+}
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return a & b;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return a | b;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return a ^ b;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return (~a) & 0xFF;
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return (a << n) & 0xFF;
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return a >> n;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return a & b;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return a | b;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return a ^ b;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return (____);
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return (____);
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return a >> n;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return ____;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return ____;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return ____;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return ____;
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return ____;
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return ____;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+// bit_and, bit_or, bit_xor, bit_not, bit_shift_left, bit_shift_right
+// Tester avec a=0xA5, b=0x0F
+
+unsigned int bit_and(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_or(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_xor(unsigned int a, unsigned int b) {
+    return 0;
+}
+
+unsigned int bit_not(unsigned int a) {
+    return 0;
+}
+
+unsigned int bit_shift_left(unsigned int a, int n) {
+    return 0;
+}
+
+unsigned int bit_shift_right(unsigned int a, int n) {
+    return 0;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int bit_and(unsigned int a, unsigned int b) { return 0; }
+unsigned int bit_or(unsigned int a, unsigned int b) { return 0; }
+unsigned int bit_xor(unsigned int a, unsigned int b) { return 0; }
+unsigned int bit_not(unsigned int a) { return 0; }
+unsigned int bit_shift_left(unsigned int a, int n) { return 0; }
+unsigned int bit_shift_right(unsigned int a, int n) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(bit_and(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_and(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_and(0xFF, 0xFF)));
+        printf("%d\n", (int)(bit_and(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_or(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_or(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_or(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_or(0x00, 0x0F)));
+    }
+    {
+        printf("%d\n", (int)(bit_xor(0xA5, 0x0F)));
+        printf("%d\n", (int)(bit_xor(0xA5, 0x50)));
+        printf("%d\n", (int)(bit_xor(0xFF, 0x00)));
+        printf("%d\n", (int)(bit_xor(0x00, 0xFF)));
+    }
+    {
+        printf("%d\n", (int)(bit_not(0xA5)));
+        printf("%d\n", (int)(bit_not(0xFF)));
+        printf("%d\n", (int)(bit_not(0x00)));
+        printf("%d\n", (int)(bit_not(0x50)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_left(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_left(0x50, 1)));
+        printf("%d\n", (int)(bit_shift_left(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_left(0x01, 2)));
+    }
+    {
+        printf("%d\n", (int)(bit_shift_right(0xA5, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xA0, 2)));
+        printf("%d\n", (int)(bit_shift_right(0xFF, 1)));
+        printf("%d\n", (int)(bit_shift_right(0x01, 2)));
+    }
+    return 0;
+}
+''',
+]
+subject = "bitwise_ops"
+title = "Opérations bits : AND, OR, XOR, décalages"
+
+[validation]
+expected_output = """
+5
+0
+255
+0
+175
+245
+255
+15
+170
+245
+255
+255
+90
+0
+255
+175
+148
+160
+254
+4
+41
+40
+127
+0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Valeurs initiales en binaire"
+
+[[visualizer.steps.stack]]
+name = "a (0xA5)"
+value = "10100101b"
+
+[[visualizer.steps.stack]]
+name = "b (0x0F)"
+value = "00001111b"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Résultats des opérations"
+
+[[visualizer.steps.stack]]
+name = "a & b"
+value = "0x05 (00000101b)"
+
+[[visualizer.steps.stack]]
+name = "a | b"
+value = "0xAF (10101111b)"
+
+[[visualizer.steps.stack]]
+name = "a ^ b"
+value = "0xAA (10101010b)"
+
+[[visualizer.steps.stack]]
+name = "~a & 0xFF"
+value = "0x5A (01011010b)"

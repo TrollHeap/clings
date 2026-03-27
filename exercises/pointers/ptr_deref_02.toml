@@ -1,0 +1,273 @@
+common_mistake = "Passer x au lieu de &x : la fonction reçoit une copie et ne modifie pas l'original"
+description = """
+NSY103 — Pour modifier des variables depuis une fonction, il faut passer leurs adresses (pointeurs). La fonction reçoit `int *a, int *b` et échange les valeurs via déréférencement `*a`, `*b`.
+
+Implémentez une fonction `swap` qui échange les valeurs de deux entiers via pointeurs."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "La fonction swap reçoit des pointeurs : `void swap(int *a, int *b)`",
+    "Pour lire la valeur pointée : `int tmp = *a;`",
+    "Pour appeler swap, passez les adresses : `swap(&x, &y);`",
+]
+id = "ptr-deref-02"
+kc_ids = ["KC-C01"]
+key_concept = "Passer &x à une fonction permet de modifier x depuis cette fonction via *ptr"
+lang = "c"
+prerequisites = ["ptr-deref-01"]
+solution_code = '''
+#include <stdio.h>
+
+void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(&x, &y);
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+void swap(int *a, int *b) {
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    // TODO: appeler swap
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Doubler une valeur via pointeur
+ * La fonction recoit l'adresse et modifie la variable originale.
+ * =========================================================== */
+void example_double(int *p) {
+    *p = *p * 2;
+}
+void example_demo(void) {
+    int val = 7;
+    printf("Avant : %d\n", val);
+    example_double(&val);
+    printf("Apres : %d\n", val);
+}
+/* Resultat: Avant : 7 / Apres : 14 */
+
+/* == VOTRE EXERCICE =========================================
+ * Swap de deux variables via pointeurs
+ * Inspirez-vous de example_double ci-dessus.
+ * Implementez swap(int *a, int *b) qui echange *a et *b.
+ * =========================================================== */
+void swap(int *a, int *b) {
+    (void)a; (void)b; /* TODO */
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(&x, &y);
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = ____; // copier la valeur de b
+    *b = ____; // restaurer depuis tmp
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(&x, &y);
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+void swap(____ *a, ____ *b) {
+    int tmp = ____;
+    ____ = *b;
+    ____ = tmp;
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(____, ____);
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+// Implémentez swap(int *a, int *b) qui échange *a et *b
+// Utilisez une variable temporaire tmp
+void swap(int *a, int *b) {
+    // TODO
+}
+
+int main(void) {
+    int x = 5, y = 17;
+    printf("Avant : x=%d y=%d\n", x, y);
+    // TODO: appeler swap
+    printf("Apres : x=%d y=%d\n", x, y);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+void swap(int *a, int *b) {
+}
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "Swap de deux variables via pointeurs"
+
+[validation]
+mode = "test"
+test_code = """
+void test_swap_basic(void) {
+    int a = 10, b = 20;
+    swap(&a, &b);
+    TEST_ASSERT_EQUAL_INT(20, a);
+    TEST_ASSERT_EQUAL_INT(10, b);
+}
+
+void test_swap_negative(void) {
+    int a = -5, b = 15;
+    swap(&a, &b);
+    TEST_ASSERT_EQUAL_INT(15, a);
+    TEST_ASSERT_EQUAL_INT(-5, b);
+}
+
+void test_swap_zeros(void) {
+    int a = 0, b = 0;
+    swap(&a, &b);
+    TEST_ASSERT_EQUAL_INT(0, a);
+    TEST_ASSERT_EQUAL_INT(0, b);
+}
+
+void test_swap_same_value(void) {
+    int a = 42, b = 42;
+    swap(&a, &b);
+    TEST_ASSERT_EQUAL_INT(42, a);
+    TEST_ASSERT_EQUAL_INT(42, b);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_swap_basic);
+    RUN_TEST(test_swap_negative);
+    RUN_TEST(test_swap_zeros);
+    RUN_TEST(test_swap_same_value);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "x et y sont des variables locales sur la pile de main. Pour les modifier depuis swap, il faut passer leurs adresses."
+heap = []
+label = "Avant swap"
+step_label = "Avant swap — x=5, y=17"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "17"
+
+[[visualizer.steps]]
+explanation = "swap reçoit a=&x et b=&y. tmp sauvegarde *a (=5). Puis *a = *b copie 17 dans x, et *b = tmp copie 5 dans y."
+heap = []
+label = "Pendant swap(&x, &y)"
+step_label = "Pendant swap — a→x, b→y, tmp=5"
+
+[[visualizer.steps.arrows]]
+from = "a"
+label = "*a"
+to = "x"
+
+[[visualizer.steps.arrows]]
+from = "b"
+label = "*b"
+to = "y"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "&x, &y"
+function_name = "swap"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "17"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→x"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→y"
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "5"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Retour dans main : x vaut maintenant 17, y vaut 5. L'échange a fonctionné car swap a modifié les valeurs originales via les pointeurs."
+heap = []
+label = "Après swap"
+step_label = "Après swap — x=17, y=5"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "17"
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "5"

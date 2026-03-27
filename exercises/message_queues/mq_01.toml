@@ -1,0 +1,355 @@
+common_mistake = "Confondre mtype et index : mtype est un filtre de message, pas la position dans la file"
+description = """
+NSY103 — Les files de messages POSIX (msgget/msgsnd/msgrcv) envoient des messages typés. Chaque message a un mtype (long) et un mtext[]. Sans syscall WASM, on simule avec un tableau de struct msgbuf.
+
+Créez une file de 4 slots, enfilez un message type=1 'hello queue', défilez et affichez.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "msgsnd_sim reçoit `type` en paramètre — affectez-le à queue[qtail].mtype",
+    "msgrcv_sim lit depuis queue[qhead] et incrémente qhead après la lecture (post-incrément)",
+    "En vrai IPC POSIX : msgget() crée la file dans le noyau, msgsnd/msgrcv passent par le kernel",
+    "Exercice suivant (API POSIX réelle) : mq-create-01 — mq_open/mq_send/mq_receive avec vraies files nommées",
+]
+id = "mq-01"
+kc_ids = ["KC-C12"]
+key_concept = "struct msgbuf {long mtype; char mtext[]}; mtype identifie le canal ; en vrai IPC msgget crée la file dans le kernel"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_sim(MsgBuf *out) {
+    if (qhead >= qtail) return -1;
+    *out = queue[qhead++];
+    return 0;
+}
+
+int main(void) {
+    msgsnd_sim(1, "hello queue");
+    MsgBuf msg;
+    msgrcv_sim(&msg);
+    printf("mtype=%ld mtext=%s\n", msg.mtype, msg.mtext);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = ____;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_sim(MsgBuf *out) {
+    if (qhead >= qtail) return -1;
+    *out = queue[____++];
+    return 0;
+}
+
+int main(void) {
+    msgsnd_sim(1, "hello queue");
+    MsgBuf msg;
+    msgrcv_sim(&msg);
+    printf("mtype=%ld mtext=%s\n", msg.mtype, msg.mtext);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+/* == EXEMPLE ===============================================
+ * File de priorite avec struct msgbuf
+ * Enfile 2 messages avec priorites, defile dans l'ordre FIFO.
+ * ========================================================= */
+MsgBuf example_q[QUEUE_LEN];
+int example_head = 0, example_tail = 0;
+
+void example_enqueue(long prio, const char *text) {
+    example_q[example_tail].mtype = prio;
+    strncpy(example_q[example_tail].mtext, text, MSG_SIZE - 1);
+    example_tail++;
+}
+
+int example_dequeue(MsgBuf *out) {
+    if (example_head >= example_tail) return -1;
+    *out = example_q[example_head++];
+    return 0;
+}
+
+void example_priority_queue(void) {
+    example_enqueue(3, "low priority");
+    example_enqueue(1, "high priority");
+    MsgBuf m;
+    while (example_dequeue(&m) == 0)
+        printf("prio=%ld: %s\n", m.mtype, m.mtext);
+}
+/* Resultat: prio=3: low priority, prio=1: high priority */
+
+/* == VOTRE EXERCICE ========================================
+ * File de messages : struct msgbuf + tableau
+ * Inspirez-vous de example_enqueue/example_dequeue ci-dessus.
+ * Implementez msgsnd_sim et msgrcv_sim.
+ * ========================================================= */
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    /* TODO: store type in queue[qtail].mtype, copy text, advance qtail */
+    qtail++;
+}
+
+int msgrcv_sim(MsgBuf *out) {
+    if (qhead >= qtail) return -1;
+    /* TODO: copy queue[qhead] to *out and advance qhead */
+    return 0;
+}
+
+int main(void) {
+    msgsnd_sim(1, "hello queue");
+    MsgBuf msg;
+    msgrcv_sim(&msg);
+    printf("mtype=%ld mtext=%s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_sim(MsgBuf *out) {
+    if (qhead >= qtail) return -1;
+    *out = queue[____++];  // lire la tête et avancer
+    return 0;
+}
+
+int main(void) {
+    msgsnd_sim(1, "hello queue");
+    MsgBuf msg;
+    msgrcv_sim(&msg);
+    printf("mtype=%ld mtext=%s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = ____;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_sim(MsgBuf *out) {
+    if (qhead >= qtail) return -1;
+    *out = queue[____++];
+    return 0;
+}
+
+int main(void) {
+    msgsnd_sim(1, "hello queue");
+    MsgBuf msg;
+    msgrcv_sim(&msg);
+    printf("mtype=%ld mtext=%s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 4
+
+typedef struct {
+    long mtype;
+    char mtext[MSG_SIZE];
+} MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+
+// Implémentez msgsnd_sim(long type, const char *text) :
+//   stocker type et text dans queue[qtail], incrémenter qtail
+
+// Implémentez msgrcv_sim(MsgBuf *out) :
+//   retourner -1 si file vide, sinon copier queue[qhead] dans *out et incrémenter qhead
+
+int main(void) {
+    // Enfilez type=1 "hello queue", défilez, affichez mtype et mtext
+    // Sortie attendue : "mtype=1 mtext=hello queue"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "File de messages simulée : struct msgbuf + tableau"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+La sortie ne correspond pas. Vérifie que queue[qtail].mtype = type et que msgrcv_sim lit depuis queue[qhead++].
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+Nos équipements IoT échangent des messages typés sur un bus interne. Nous avons besoin d'une implémentation de file de messages avec struct msgbuf : champ mtype (canal) + mtext (données).
+
+Démontrez enqueue avec msgsnd_sim puis dequeue avec msgrcv_sim, et affichez mtype + mtext.
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = []
+receivedTime = "09:00"
+subject = "Bus de messages IoT — struct msgbuf enqueue/dequeue"
+successEmail = """
+File de messages validée. mtype=1 mtext=hello queue — c'est exactement ce qu'il faut pour notre bus IoT.
+
+SensorGrid Ops"""
+syscallsInvolved = [
+    "msgsnd",
+    "msgrcv",
+    "msgget",
+]
+tier = 2
+
+[validation]
+expected_output = """
+mtype=1 mtext=hello queue
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "msgsnd_sim copie le message dans queue[qtail] et incrémente qtail. En vrai IPC POSIX, mq_send() effectue une copie kernel : le message est stocké dans la file du noyau, identifiée par son nom, et accessible par tout processus ayant ouvert cette même file nommée."
+label = "msgsnd_sim(1, 'hello queue') — enfile"
+step_label = "Étape 1 — Envoi du message dans la file"
+
+[[visualizer.steps.edges]]
+label = "qtail=0→1"
+source = "msg"
+target = "q"
+
+[[visualizer.steps.nodes]]
+id = "msg"
+label = """
+mtype=1
+mtext='hello queue'"""
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = "queue[0]"
+
+[[visualizer.steps]]
+explanation = "msgrcv_sim copie queue[qhead] dans le buffer de sortie et incrémente qhead. En POSIX réel, mq_receive() retire le message du noyau avec une copie vers l'espace utilisateur, libérant un emplacement dans la file pour de futurs envois."
+label = "msgrcv_sim() — défile"
+step_label = "Étape 2 — Défilement du message (réception)"
+
+[[visualizer.steps.edges]]
+label = "qhead=0→1"
+source = "q"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = "queue[0]"
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "MsgBuf msg"
+
+[[visualizer.steps]]
+explanation = "printf affiche le champ mtype (identifiant du canal) et mtext (données du message). Le mtype est la clé de filtrage en IPC POSIX : msgrcv peut cibler uniquement les messages d'un type donné, permettant de multiplexer plusieurs canaux sur une même file."
+label = "printf mtype + mtext"
+step_label = "Étape 3 — Affichage du message reçu"
+
+[[visualizer.steps.edges]]
+label = "mtype=1 mtext=..."
+source = "out"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "MsgBuf msg"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "stdout"

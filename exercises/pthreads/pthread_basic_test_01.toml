@@ -1,0 +1,82 @@
+common_mistake = "Oublier `pthread_join` : le thread devient un thread orphelin (zombie pthread). Ne pas caster `void *arg` correctement dans la fonction thread."
+description = """
+Implémentez deux fonctions :
+- `void *double_value(void *arg)` — reçoit un `int *`, multiplie la valeur pointée par 2, retourne NULL.
+- `int run_thread(int *val)` — crée un thread qui exécute `double_value(val)`, attend sa terminaison avec `pthread_join`, retourne 0 en cas de succès ou -1 en cas d'erreur.
+
+Le thread modifie directement la valeur via le pointeur partagé."""
+difficulty = 2
+exercise_type = "complete"
+files = []
+hints = [
+    "Signature de `pthread_create` : `int pthread_create(pthread_t *tid, const pthread_attr_t *attr, void *(*fn)(void *), void *arg)`. Passez NULL pour les attributs.",
+    "`pthread_join(tid, NULL)` bloque jusqu'à la fin du thread et libère ses ressources.",
+    "Dans `double_value`, castez `arg` en `int *` pour accéder à la valeur : `int *p = (int *)arg; *p *= 2;`",
+]
+id = "pthread-basic-test-01"
+kc_ids = [
+    "pthread_create",
+    "pthread_join",
+    "thread_function",
+]
+key_concept = "`pthread_create` démarre un thread ; `pthread_join` attend sa terminaison et récupère les ressources. Le thread et le thread appelant partagent le même espace mémoire."
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+void *double_value(void *arg) {
+    int *p = (int *)arg;
+    *p *= 2;
+    return NULL;
+}
+
+int run_thread(int *val) {
+    pthread_t tid;
+    if (pthread_create(&tid, NULL, double_value, val) != 0)
+        return -1;
+    if (pthread_join(tid, NULL) != 0)
+        return -1;
+    return 0;
+}
+
+int main(void) {
+    int x = 5;
+    if (run_thread(&x) == 0)
+        printf("%d\n", x);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+/* Multiplie la valeur pointée par 2, retourne NULL. */
+void *double_value(void *arg) {
+    /* TODO */
+    return NULL;
+}
+
+/* Crée un thread exécutant double_value(val), attend sa fin.
+ * Retourne 0 si succès, -1 sinon. */
+int run_thread(int *val) {
+    /* TODO */
+    return -1;
+}
+
+int main(void) {
+    int x = 5;
+    if (run_thread(&x) == 0)
+        printf("%d\n", x);
+    return 0;
+}
+'''
+subject = "pthreads"
+title = "pthread_create / pthread_join — thread de base"
+
+[validation]
+expected_output = "10"
+mode = "output"

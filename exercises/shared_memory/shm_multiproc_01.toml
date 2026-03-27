@@ -1,0 +1,335 @@
+common_mistake = "Lancer les écrivains en parallèle sans mutex → write_count++ est une race condition"
+description = """
+NSY103 — Avec un mutex inter-processus et un compteur de lecteurs, on implémente le pattern lecteurs-écrivains. Plusieurs lecteurs peuvent lire simultanément, mais un écrivain a un accès exclusif. Ici, on simplifie : les écrivains modifient séquentiellement, puis les lecteurs lisent.
+
+Créez un segment partagé avec un tableau de 3 valeurs. 3 enfants écrivains écrivent séquentiellement (via waitpid), puis le parent lit et affiche toutes les valeurs."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Chaque enfant écrit dans values[i] — indices distincts, pas de conflit",
+    "waitpid(pid, NULL, 0) entre chaque fork assure l'ordre séquentiel des write_count++",
+    "write_count est incrémenté séquentiellement grâce à waitpid",
+]
+id = "shm-multiproc-01"
+kc_ids = ["KC-C13"]
+key_concept = "N écrivains séquentiels (waitpid) puis lecture ; sans mutex si accès séquentiels garantis"
+lang = "c"
+prerequisites = ["shm-mmap-file-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+#define N 3
+
+typedef struct {
+    int values[N];
+    int write_count;
+} SharedData;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_multi", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedData));
+    SharedData *sd = (SharedData *)mmap(NULL, sizeof(SharedData),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(sd, 0, sizeof(SharedData));
+
+    for (int i = 0; i < N; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sd->values[i] = (i + 1) * 100;
+            sd->write_count++;
+            _exit(0);
+        }
+        waitpid(pid, NULL, 0);
+    }
+
+    printf("Writes: %d\n", sd->write_count);
+    for (int i = 0; i < N; i++)
+        printf("values[%d]=%d\n", i, sd->values[i]);
+
+    munmap(sd, sizeof(SharedData));
+    shm_unlink("/kf_shm_multi");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+#define N 3
+
+typedef struct {
+    int values[N];
+    int write_count;
+} SharedData;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_multi", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedData));
+    SharedData *sd = (SharedData *)mmap(NULL, sizeof(SharedData),
+        PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+    memset(sd, 0, sizeof(SharedData));
+
+    for (int i = 0; i < N; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sd->values[____] = (i + 1) * 100;
+            sd->write_count++;
+            _exit(0);
+        }
+        ____(pid, NULL, 0);
+    }
+
+    printf("Writes: %d\n", sd->write_count);
+    for (int i = 0; i < N; i++)
+        printf("values[%d]=%d\n", i, sd->values[i]);
+
+    munmap(sd, sizeof(SharedData));
+    shm_unlink("/kf_shm_multi");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+#define N 3
+typedef struct { int values[N]; int write_count; } SharedData;
+
+/* == EXEMPLE =======================================
+ * 2 ecrivains sequentiels en shm
+ * ================================================= */
+void example_multi(void) {
+    int fd = shm_open("/kf_ex_multi", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, 2*sizeof(int)+sizeof(int));
+    int *vals = (int *)mmap(NULL, 3*sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd); memset(vals, 0, 3*sizeof(int));
+    for (int i = 0; i < 2; i++) {
+        pid_t p = fork();
+        if (p == 0) { vals[i] = (i+1)*50; vals[2]++; _exit(0); }
+        waitpid(p, NULL, 0);
+    }
+    printf("[%d,%d] w=%d\n", vals[0], vals[1], vals[2]);
+    munmap(vals, 3*sizeof(int)); shm_unlink("/kf_ex_multi");
+}
+/* Resultat: [50,100] w=2 */
+
+/* == VOTRE EXERCICE ================================
+ * 3 ecrivains sequentiels: values[i]=(i+1)*100.
+ * ================================================= */
+int main(void) {
+    int fd = shm_open("/kf_shm_multi", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedData));
+    SharedData *sd = (SharedData *)mmap(NULL, sizeof(SharedData), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd); memset(sd, 0, sizeof(SharedData));
+    /* TODO: fork 3 sequential writers, parent reads */
+    munmap(sd, sizeof(SharedData)); shm_unlink("/kf_shm_multi");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+#define N 3
+
+typedef struct {
+    int values[N];
+    int write_count;
+} SharedData;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_multi", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedData));
+    SharedData *sd = (SharedData *)mmap(NULL, sizeof(SharedData),
+        PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+    memset(sd, 0, sizeof(SharedData));
+
+    for (int i = 0; i < N; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sd->values[____] = (i + 1) * 100;
+            sd->write_count++;
+            _exit(0);
+        }
+        ____(pid, NULL, 0);
+    }
+
+    printf("Writes: %d\n", sd->write_count);
+    for (int i = 0; i < N; i++)
+        printf("values[%d]=%d\n", i, sd->values[i]);
+
+    munmap(sd, sizeof(SharedData));
+    shm_unlink("/kf_shm_multi");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+#define N 3
+
+typedef struct {
+    int values[N];
+    int write_count;
+} SharedData;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_multi", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedData));
+    SharedData *sd = (SharedData *)mmap(NULL, sizeof(SharedData),
+        PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+    memset(sd, 0, sizeof(SharedData));
+
+    for (int i = 0; i < N; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sd->values[____] = (i + 1) * 100;
+            sd->write_count++;
+            _exit(0);
+        }
+        ____(pid, NULL, 0);
+    }
+
+    printf("Writes: %d\n", sd->write_count);
+    for (int i = 0; i < N; i++)
+        printf("values[%d]=%d\n", i, sd->values[i]);
+
+    munmap(sd, sizeof(SharedData));
+    shm_unlink("/kf_shm_multi");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define N 3
+
+int main(void) {
+    // SharedData{values[3], write_count} en shm
+    // 3 enfants séquentiels (waitpid): values[i]=(i+1)*100, write_count++
+    // Parent affiche Writes + values
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "N processus lecteurs/écrivains"
+
+[validation]
+expected_output = """
+Writes: 3
+values[0]=100
+values[1]=200
+values[2]=300
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le segment est initialisé à zéro avec memset avant les forks."
+label = "Segment initialisé à zéro"
+step_label = "init"
+
+[[visualizer.steps.arrows]]
+from = "sd (SharedData*)"
+to = "SharedData"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedData"
+value = "values=[0,0,0] writes=0"
+
+[[visualizer.steps.stack]]
+name = "sd (SharedData*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = "waitpid entre chaque fork garantit que write_count++ est atomique (un seul écrivain à la fois)."
+label = "3 enfants séquentiels écrivent"
+step_label = "sequential writes"
+
+[[visualizer.steps.arrows]]
+from = "sd (SharedData*)"
+to = "SharedData"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedData"
+value = "values=[100,200,300] writes=3"
+
+[[visualizer.steps.stack]]
+name = "sd (SharedData*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = "Le parent voit toutes les modifications faites par les 3 enfants."
+label = "Parent lit toutes les valeurs"
+step_label = "parent reads"
+
+[[visualizer.steps.arrows]]
+from = "sd (SharedData*)"
+to = "SharedData"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedData"
+value = "values=[100,200,300] writes=3"
+
+[[visualizer.steps.stack]]
+name = "sd (SharedData*)"
+value = "0xSHM"

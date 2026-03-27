@@ -1,0 +1,446 @@
+common_mistake = "Ne pas vérifier le retour de sscanf → utiliser des variables non initialisées si le parsing échoue"
+description = """
+NSY103 — sscanf parse une chaîne avec un format, comme scanf mais depuis un buffer. La valeur de retour indique combien de champs ont été lus — essentiel pour la validation.
+
+Parsez différentes chaînes avec sscanf et vérifiez les résultats."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "sscanf retourne le nombre de champs parsés avec succès",
+    "Si le format ne matche pas, sscanf retourne 0 (aucun champ lu)",
+    'Le format "%d-%d-%d" parse des entiers séparés par des tirets',
+]
+id = "scanf-validate-01"
+kc_ids = ["KC-C05"]
+key_concept = "sscanf retourne le nombre de champs parsés — toujours vérifier la valeur de retour pour valider l'entrée"
+lang = "c"
+prerequisites = ["sprintf-build-01"]
+solution_code = '''
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+    char *line1 = "42 3.14 hello";
+    return sscanf(line1, "%d %f %s", n, f, word);
+}
+
+int parse_line2(int *n) {
+    char *line2 = "abc def";
+    return sscanf(line2, "%d", n);
+}
+
+int parse_date(int *y, int *m, int *d) {
+    char *line3 = "2024-01-15";
+    return sscanf(line3, "%d-%d-%d", y, m, d);
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+    char *line1 = "42 3.14 hello";
+    return sscanf(line1, "%d %f %s", n, f, word);
+}
+
+int parse_line2(int *n) {
+    char *line2 = "abc def";
+    return sscanf(line2, "%d", n);
+}
+
+int parse_date(int *y, int *m, int *d) {
+    char *line3 = "2024-01-15";
+    return sscanf(line3, "%d-%d-%d", y, m, d);
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * sscanf parse une chaîne avec un format
+ * Retourne le nombre de champs lus avec succès
+ * =========================================================== */
+int example_sscanf(int *a, int *b) {
+    return sscanf("10 20", "%d %d", a, b);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Parsez line1, line2, line3 avec sscanf
+ * Vérifiez les retours pour détecter les échecs
+ * =========================================================== */
+
+int parse_line1(int *n, float *f, char *word) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int parse_line2(int *n) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int parse_date(int *y, int *m, int *d) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+    char *line1 = "42 3.14 hello";
+    return sscanf(line1, "%d %f %s", n, f, word);
+}
+
+int parse_line2(int *n) {
+    char *line2 = "abc def";
+    return sscanf(line2, "____", ____);
+}
+
+int parse_date(int *y, int *m, int *d) {
+    char *line3 = "2024-01-15";
+    return sscanf(line3, "____", ____, ____, ____);
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+    char *line1 = "42 3.14 hello";
+    return sscanf(line1, "____", ____, ____, ____);
+}
+
+int parse_line2(int *n) {
+    char *line2 = "abc def";
+    return sscanf(line2, "%d", n);
+}
+
+int parse_date(int *y, int *m, int *d) {
+    char *line3 = "2024-01-15";
+    return sscanf(line3, "%d-%d-%d", y, m, d);
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+    (void)n; (void)f; (void)word;
+    return 0;
+}
+
+int parse_line2(int *n) {
+    (void)n;
+    return 0;
+}
+
+int parse_date(int *y, int *m, int *d) {
+    (void)y; (void)m; (void)d;
+    return 0;
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int parse_line1(int *n, float *f, char *word) {
+}
+
+int parse_line2(int *n) {
+}
+
+int parse_date(int *y, int *m, int *d) {
+}
+
+int main(void) {
+    {
+        int n;
+        float f;
+        char word[32];
+        int ret = parse_line1(&n, &f, word);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(n));
+    }
+    {
+        int n;
+        float f;
+        char word[32];
+        parse_line1(&n, &f, word);
+        printf("%s\n", word);
+    }
+    {
+        int n;
+        int ret = parse_line2(&n);
+        printf("%d\n", (int)(ret));
+    }
+    {
+        int y, m, d;
+        int ret = parse_date(&y, &m, &d);
+        printf("%d\n", (int)(ret));
+        printf("%d\n", (int)(y));
+        printf("%d\n", (int)(m));
+        printf("%d\n", (int)(d));
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Validation d'entrée avec sscanf"
+
+[validation]
+expected_output = """
+3
+42
+hello
+0
+3
+2024
+1
+15"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sscanf retourne 3 : les 3 champs ont été parsés avec succès"
+heap = []
+label = "sscanf parse 3 champs depuis line1"
+step_label = "1. Succès"
+
+[[visualizer.steps.call_frames]]
+args = "n, f, word"
+function_name = "parse_line1"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "line1"
+value = '"42 3.14 hello"'
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "3.14"
+
+[[visualizer.steps.stack]]
+name = "word"
+value = '"hello"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = '"abc" ne matche pas %d → retourne 0, n inchangé'
+heap = []
+label = "sscanf échoue sur line2 (pas d'entier)"
+step_label = "2. Échec"
+
+[[visualizer.steps.call_frames]]
+args = "n"
+function_name = "parse_line2"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "line2"
+value = '"abc def"'
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = 'Le format "%d-%d-%d" sépare par tirets'
+heap = []
+label = "sscanf parse une date yyyy-mm-dd"
+step_label = "3. Date"
+
+[[visualizer.steps.call_frames]]
+args = "y, m, d"
+function_name = "parse_date"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "line3"
+value = '"2024-01-15"'
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "2024"
+
+[[visualizer.steps.stack]]
+name = "m"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "d"
+value = "15"

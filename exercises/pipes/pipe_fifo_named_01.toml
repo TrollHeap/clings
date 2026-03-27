@@ -1,0 +1,311 @@
+common_mistake = "Ouvrir avec O_WRONLY ou O_RDONLY en mono-processus : open() bloque indéfiniment car l'autre extrémité n'est jamais ouverte"
+description = """
+NSY103 — Un FIFO nommé (tube nommé) est créé avec mkfifo() et apparaît dans le système de fichiers comme un fichier spécial. Contrairement aux pipes anonymes, il persiste et peut être partagé entre processus non liés.
+
+Avec O_RDWR (Linux), un seul processus peut ouvrir les deux extrémités sans blocage. Créez le FIFO, ouvrez-le en O_RDWR, écrivez 'hello fifo', lisez, affichez, puis supprimez-le avec unlink()."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "mkfifo(path, mode) crée le fichier spécial FIFO dans le filesystem",
+    "O_RDWR permet à un seul processus d'ouvrir les deux extrémités sans blocage (Linux)",
+    "unlink(path) supprime le fichier FIFO du filesystem après utilisation",
+]
+id = "pipe-fifo-named-01"
+kc_ids = ["KC-C11"]
+key_concept = "mkfifo crée un fichier spécial FIFO persistant ; O_RDWR évite le blocage en mono-processus"
+lang = "c"
+prerequisites = ["pipe-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    mkfifo(FIFO_PATH, 0600);
+    int fd = open(FIFO_PATH, O_RDWR);
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    unlink(FIFO_PATH);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    ____(FIFO_PATH, 0600);
+    int fd = open(FIFO_PATH, ____);
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    ____(FIFO_PATH);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+// ★ Stage 0 — Exemple complet avec mkfifo (FIFO nommé)
+// Différence avec pipe anonyme :
+//   pipe(fd)   → temporaire, existe seulement tant que le processus vit
+//   mkfifo()   → fichier spécial dans le filesystem, partageable entre processus
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    mkfifo(FIFO_PATH, 0600);            // ★ crée le fichier FIFO (mode 600)
+    int fd = open(FIFO_PATH, O_RDWR);  // ★ O_RDWR : pas de blocage en mono-processus
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));        // ★ écriture dans le FIFO
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1); // ★ lecture
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    unlink(FIFO_PATH);                  // ★ supprime le fichier FIFO
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    mkfifo(FIFO_PATH, 0600);
+    int fd = open(FIFO_PATH, ____);  /* O_RDWR : ouverture non-bloquante sur même processus */
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    unlink(FIFO_PATH);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    mkfifo(FIFO_PATH, 0600);
+    int fd = open(FIFO_PATH, ____);  // quel flag évite le blocage ?
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    unlink(____);  // supprimer le FIFO
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    ____(FIFO_PATH, 0600);
+    int fd = open(FIFO_PATH, ____);
+    const char *msg = "hello fifo";
+    write(fd, msg, strlen(msg));
+    char buf[32];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd);
+    ____(FIFO_PATH);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#define FIFO_PATH "/tmp/kf_fifo_01"
+
+int main(void) {
+    // Créez un FIFO avec mkfifo(), ouvrez-le en O_RDWR
+    // Écrivez "hello fifo", lisez-le, affichez "Received: hello fifo"
+    // Supprimez le FIFO avec unlink()
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "FIFO nommé : mkfifo mono-processus"
+
+[mission]
+clientId = "syslab"
+clientName = "SysLab"
+contactEmail = "ops@syslab.sys"
+failureEmail = """
+La sortie n'est pas correcte. Vérifie que tu utilises mkfifo(), O_RDWR, et que tu appelles unlink() à la fin.
+
+Ops @ SysLab"""
+incidentEmail = """
+Bonjour,
+
+J'ai besoin de laisser un message dans le système de fichiers via un tube nommé. Un processus doit créer le FIFO, y écrire un message, le relire, puis nettoyer le tout. Pas de fork pour l'instant, juste une validation rapide que mkfifo fonctionne.
+
+Cordialement,
+Ops @ SysLab"""
+payout = 200
+prereqMissionIds = []
+receivedTime = "09:15"
+subject = "IPC — FIFO nommé mono-processus"
+successEmail = """
+Parfait ! Le FIFO est créé, le message passe, et unlink() nettoie proprement. Exactement ce qu'il nous fallait.
+
+Ops @ SysLab"""
+syscallsInvolved = [
+    "mkfifo",
+    "open",
+    "write",
+    "read",
+    "close",
+    "unlink",
+]
+tier = 2
+
+[validation]
+expected_output = """
+Received: hello fifo
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "mkfifo() crée un fichier spécial de type FIFO dans le système de fichiers, visible avec 'ls -l' (marqué 'p'). Contrairement aux pipes anonymes qui disparaissent avec le processus, ce fichier persiste et peut être partagé entre des processus sans lien de parenté."
+label = "mkfifo() — fichier spécial créé dans le filesystem"
+step_label = "Étape 1 — mkfifo() crée le fichier FIFO persistant dans le filesystem"
+
+[[visualizer.steps.edges]]
+label = "mkfifo()"
+source = "proc"
+target = "fs"
+
+[[visualizer.steps.nodes]]
+id = "fs"
+label = """
+/tmp/kf_fifo_01
+(fichier FIFO)"""
+
+[[visualizer.steps.nodes]]
+id = "proc"
+label = "processus"
+
+[[visualizer.steps]]
+explanation = "open(FIFO_PATH, O_RDWR) est non-bloquant en mono-processus sur Linux : le kernel considère que les deux extrémités sont ouvertes par le même fd. Avec O_RDONLY ou O_WRONLY seul, open() bloquerait indéfiniment jusqu'à ce qu'un autre processus ouvre l'extrémité opposée."
+label = "open(O_RDWR) — accès lecture+écriture sans blocage"
+step_label = "Étape 2 — open(O_RDWR) évite le blocage en mono-processus"
+
+[[visualizer.steps.edges]]
+label = "syscall open()"
+source = "proc"
+target = "fifo"
+
+[[visualizer.steps.edges]]
+label = "retourne fd"
+source = "fifo"
+target = "fd"
+
+[[visualizer.steps.nodes]]
+id = "proc"
+label = "processus"
+
+[[visualizer.steps.nodes]]
+id = "fifo"
+label = "/tmp/kf_fifo_01"
+
+[[visualizer.steps.nodes]]
+id = "fd"
+label = """
+fd
+(O_RDWR)"""
+
+[[visualizer.steps]]
+explanation = "write() puis read() sur le même fd O_RDWR fonctionnent car le FIFO est un buffer FIFO (First-In-First-Out) : write() dépose des octets dans la file kernel, read() les consomme dans l'ordre. Un seul processus peut ainsi tester le canal sans avoir besoin d'un second processus."
+label = "write() puis read() — aller-retour dans le buffer FIFO"
+step_label = "Étape 3 — write() puis read() : aller-retour dans le buffer FIFO kernel"
+
+[[visualizer.steps.edges]]
+label = "write()"
+source = "msg"
+target = "buf"
+
+[[visualizer.steps.edges]]
+label = "read()"
+source = "buf"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "msg"
+label = '"hello fifo"'
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = """
+kernel buffer
+(FIFO)"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "buf[]"
+
+[[visualizer.steps]]
+explanation = "unlink() supprime l'entrée du FIFO dans le répertoire du filesystem. Si des processus avaient encore le fichier ouvert, le nœud inode serait conservé jusqu'au dernier close() — c'est le mécanisme de reference counting des inodes POSIX. Ici le fd est déjà fermé, donc unlink() libère immédiatement l'inode."
+label = "unlink() — suppression du fichier FIFO"
+step_label = "Étape 4 — unlink() supprime le fichier FIFO du filesystem"
+
+[[visualizer.steps.edges]]
+label = "unlink()"
+source = "proc"
+target = "fs"
+
+[[visualizer.steps.nodes]]
+id = "fs"
+label = "/tmp/kf_fifo_01"
+
+[[visualizer.steps.nodes]]
+id = "proc"
+label = "processus"

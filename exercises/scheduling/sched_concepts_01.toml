@@ -1,0 +1,291 @@
+common_mistake = "Oublier le cas idle : si time < arrival[i], le CPU attend — sans ce test, les processus qui arrivent pendant un idle semblent démarrer avant leur arrivée"
+description = """
+NSY103 — L'ordonnancement du processeur vise à maximiser l'utilisation CPU et minimiser les temps d'attente. Avec 3 processus arrivant à des instants différents (P1 arrive à t=0 burst=4, P2 à t=1 burst=3, P3 à t=2 burst=1), calculez les temps de complétion en FCFS.
+
+Implémentez la fonction `simulate_fcfs` qui simule l'algorithme FCFS avec arrivées échelonnées. Si le CPU est libre avant l'arrivée du prochain processus, avancez `time` à son instant d'arrivée, puis exécutez son burst.
+
+Affichez pour chaque processus son temps de complétion (completion time)."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "En FCFS, si le CPU finit avant l'arrivée du processus i, il est idle : avancez `time = arrival[i]` avant d'exécuter le burst",
+    "Après `time += burst[i]`, la valeur de `time` est exactement le temps de complétion du processus i",
+    "P1 finit à t=4 ; P2 arrive à t=1 mais attend jusqu'à t=4, finit à t=7 ; P3 attend jusqu'à t=7, finit à t=8",
+]
+id = "sched-concepts-01"
+kc_ids = ["KC-C10"]
+key_concept = "FCFS non-préemptif : avancer time à arrival[i] si le CPU est idle, puis time += burst[i] — completion[i] = time après le burst"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#define N 3
+
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    int time = 0;
+    for (int i = 0; i < n; i++) {
+        if (time < arrival[i])
+            time = arrival[i];
+        time += burst[i];
+        completion[i] = time;
+    }
+}
+
+int main(void) {
+    int burst[]   = {4, 3, 1};
+    int arrival[] = {0, 1, 2};
+    int completion[N];
+    simulate_fcfs(burst, arrival, N, completion);
+    for (int i = 0; i < N; i++)
+        printf("P%d completion: %d\n", i + 1, completion[i]);
+    return 0;
+}
+'''
+starter_code = """
+#define N 3
+
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    int time = 0;
+    for (int i = 0; i < n; i++) {
+        /* Si le CPU est libre avant l'arrivee du processus, avancer au temps d'arrivee */
+        if (time < arrival[i])
+            time = /* TODO */;
+        time += /* TODO */;
+        completion[i] = /* TODO */;
+    }
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* == EXEMPLE ===========================================
+ * FCFS (First Come First Served) non-preemptif avec arrivees echelonnees.
+ * Algorithme :
+ *   Pour chaque processus i (dans l'ordre d'arrivee) :
+ *     1. Si le CPU est idle (time < arrival[i]), avancer : time = arrival[i]
+ *     2. Executer le burst : time += burst[i]
+ *     3. Enregistrer : completion[i] = time
+ * ======================================================= */
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    int time = 0;
+    for (int i = 0; i < n; i++) {
+        /* Etape 1 : si le CPU finit avant l'arrivee, on attend */
+        if (time < arrival[i])
+            time = arrival[i];  /* <-- avancer au temps d'arrivee */
+        /* Etape 2 : executer le burst */
+        time += burst[i];
+        /* Etape 3 : enregistrer le temps de completion */
+        completion[i] = time;
+    }
+}
+
+int main(void) {
+    int burst[]   = {4, 3, 1};
+    int arrival[] = {0, 1, 2};
+    int completion[N];
+    simulate_fcfs(burst, arrival, N, completion);
+    for (int i = 0; i < N; i++)
+        printf("P%d completion: %d\n", i + 1, completion[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    int time = 0;
+    for (int i = 0; i < n; i++) {
+        /* Si le CPU est libre (time < arrival[i]), avancer au temps d'arrivee */
+        if (time < arrival[i])
+            time = ____; /* remplacer ____ par la valeur correcte */
+        /* Executer le burst du processus i */
+        time += ____;   /* remplacer ____ */
+        /* Le temps de completion est la valeur courante de time */
+        completion[i] = ____;
+    }
+}
+
+int main(void) {
+    int burst[]   = {4, 3, 1};
+    int arrival[] = {0, 1, 2};
+    int completion[N];
+    simulate_fcfs(burst, arrival, N, completion);
+    for (int i = 0; i < N; i++)
+        printf("P%d completion: %d\n", i + 1, completion[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    int time = 0;
+    for (int i = 0; i < n; i++) {
+        /* Si le CPU est libre avant l'arrivee du processus, avancer au temps d'arrivee */
+        if (time < arrival[i])
+            time = /* TODO */;
+        time += burst[i];
+        completion[i] = /* TODO */;
+    }
+}
+
+int main(void) {
+    int burst[]   = {4, 3, 1};
+    int arrival[] = {0, 1, 2};
+    int completion[N];
+    simulate_fcfs(burst, arrival, N, completion);
+    for (int i = 0; i < N; i++)
+        printf("P%d completion: %d\n", i + 1, completion[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* Simule FCFS non-preemptif avec arrivees echelonnees.
+ * Remplit completion[i] = instant de fin du processus i. */
+void simulate_fcfs(int burst[], int arrival[], int n, int completion[]) {
+    /* ... */
+}
+
+int main(void) {
+    int burst[]   = {4, 3, 1};
+    int arrival[] = {0, 1, 2};
+    int completion[N];
+    simulate_fcfs(burst, arrival, N, completion);
+    for (int i = 0; i < N; i++)
+        printf("P%d completion: %d\n", i + 1, completion[i]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+int main(void) {
+    /* code ici */
+    return 0;
+}""",
+]
+subject = "scheduling"
+title = "Métriques d'ordonnancement : temps d'attente et de complétion"
+
+[validation]
+expected_output = """
+P1 completion: 4
+P2 completion: 7
+P3 completion: 8"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Les trois processus arrivent à des instants différents mais FCFS non-préemptif ne tient compte que de l'ordre d'arrivée : P1 est arrivé le premier et prend le CPU immédiatement. P2 et P3 doivent attendre dans la file prêt même si leur burst est plus court."
+label = "Timeline des arrivées : P1 à t=0, P2 à t=1, P3 à t=2"
+step_label = "Étape 1 — Arrivées échelonnées, file FCFS"
+
+[[visualizer.steps.edges]]
+label = "arrive t=1"
+source = "p1"
+target = "p2"
+
+[[visualizer.steps.edges]]
+label = "arrive t=2"
+source = "p2"
+target = "p3"
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = """
+P1
+arrival=0
+burst=4"""
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = """
+P2
+arrival=1
+burst=3"""
+
+[[visualizer.steps.nodes]]
+id = "p3"
+label = """
+P3
+arrival=2
+burst=1"""
+
+[[visualizer.steps]]
+explanation = "Le diagramme de Gantt montre l'occupation du CPU dans le temps. P2 arrive à t=1 mais ne peut démarrer qu'à t=4, quand P1 libère le CPU. P3 arrive à t=2 mais attend jusqu'à t=7. En FCFS non-préemptif, l'ordre d'arrivée détermine tout, indépendamment de la durée du burst."
+label = "Gantt chart FCFS : P1(0→4), P2(4→7), P3(7→8)"
+step_label = "Étape 2 — Gantt FCFS : P1 monopolise, P2 et P3 attendent"
+
+[[visualizer.steps.edges]]
+label = "t=4"
+source = "g1"
+target = "g2"
+
+[[visualizer.steps.edges]]
+label = "t=7"
+source = "g2"
+target = "g3"
+
+[[visualizer.steps.nodes]]
+id = "g1"
+label = """
+P1
+t=0→4"""
+
+[[visualizer.steps.nodes]]
+id = "g2"
+label = """
+P2
+t=4→7"""
+
+[[visualizer.steps.nodes]]
+id = "g3"
+label = """
+P3
+t=7→8"""
+
+[[visualizer.steps]]
+explanation = "Le temps de complétion (completion time) est l'instant où le processus termine son exécution. Le temps d'attente = completion − arrival − burst : P2 attend 4−1−3=0 ? Non : P2 attend de t=1 à t=4, soit 3 unités. Le turnaround = completion − arrival. Ces métriques sont fondamentales pour évaluer un ordonnanceur (NSY103 Ch.10)."
+label = "Temps de complétion calculés"
+step_label = "Étape 3 — Completion times : base des métriques d'ordonnancement"
+
+[[visualizer.steps.edges]]
+label = ""
+source = "c1"
+target = "c2"
+
+[[visualizer.steps.edges]]
+label = ""
+source = "c2"
+target = "c3"
+
+[[visualizer.steps.nodes]]
+id = "c1"
+label = """
+P1
+completion=4"""
+
+[[visualizer.steps.nodes]]
+id = "c2"
+label = """
+P2
+completion=7"""
+
+[[visualizer.steps.nodes]]
+id = "c3"
+label = """
+P3
+completion=8"""

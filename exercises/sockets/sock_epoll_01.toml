@@ -1,0 +1,276 @@
+common_mistake = "Oublier de fermer epfd → fuite de fd kernel (epoll instance)"
+description = """
+NSY103 — epoll est l'interface Linux de multiplexage scalable. epoll_create1 crée l'instance, epoll_ctl ajoute/modifie des fd, epoll_wait bloque jusqu'à un événement.
+
+Utilisez epoll pour surveiller deux socketpairs et lire les messages disponibles."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "epoll_create1(0) crée une instance epoll (le flag 0 = pas de CLOEXEC)",
+    "epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) ajoute un fd à surveiller",
+    "EPOLLIN signifie 'données disponibles en lecture'",
+]
+id = "sock-epoll-01"
+kc_ids = ["KC-C14"]
+key_concept = "epoll est O(1) vs select O(n) — epoll_create1, epoll_ctl ADD, epoll_wait est le trio fondamental"
+lang = "c"
+prerequisites = ["sock-select-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "EP1", 3, 0);
+    send(sv2[1], "EP2", 3, 0);
+    int epfd = epoll_create1(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = sv1[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, sv1[0], &ev);
+    ev.data.fd = sv2[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, sv2[0], &ev);
+    struct epoll_event events[2];
+    int n = epoll_wait(epfd, events, 2, 1000);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[64];
+        int r = recv(events[i].data.fd, buf, sizeof(buf) - 1, 0);
+        buf[r] = '\0';
+        printf("fd ready: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]);
+    close(sv2[0]); close(sv2[1]);
+    close(epfd);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "EP1", 3, 0);
+    send(sv2[1], "EP2", 3, 0);
+    int epfd = ____(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = sv1[0];
+    ____(epfd, EPOLL_CTL_ADD, sv1[0], &ev);
+    ev.data.fd = sv2[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, sv2[0], &ev);
+    struct epoll_event events[2];
+    int n = epoll_wait(epfd, events, 2, 1000);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[64];
+        int r = recv(events[i].data.fd, buf, sizeof(buf) - 1, 0);
+        buf[r] = '\0';
+        printf("fd ready: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]);
+    close(sv2[0]); close(sv2[1]);
+    close(epfd);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+/* == EXEMPLE ===============================================
+ * epoll simple : créer une instance et la fermer
+ * ========================================================= */
+
+int main(void) {
+    int epfd = epoll_create1(0);
+    printf("epoll instance created: %d\n", epfd);
+    if (epfd < 0) {
+        perror("epoll_create1");
+        return 1;
+    }
+    close(epfd);
+    printf("epoll instance closed\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "EP1", 3, 0);
+    send(sv2[1], "EP2", 3, 0);
+    int epfd = epoll_create1(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = sv1[0];
+    epoll_ctl(epfd, ____, sv1[0], &ev);
+    ev.data.fd = sv2[0];
+    epoll_ctl(epfd, ____, sv2[0], &ev);
+    struct epoll_event events[2];
+    int n = epoll_wait(epfd, events, 2, 1000);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[64];
+        int r = recv(events[i].data.fd, buf, sizeof(buf) - 1, 0);
+        buf[r] = '\0';
+        printf("fd ready: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]); close(epfd);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "EP1", 3, 0);
+    send(sv2[1], "EP2", 3, 0);
+    int epfd = ____(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = sv1[0];
+    ____(epfd, EPOLL_CTL_ADD, sv1[0], &ev);
+    ev.data.fd = sv2[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, sv2[0], &ev);
+    struct epoll_event events[2];
+    int n = epoll_wait(epfd, events, 2, 1000);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[64];
+        int r = recv(events[i].data.fd, buf, sizeof(buf) - 1, 0);
+        buf[r] = '\0';
+        printf("fd ready: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]); close(epfd);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+// epoll_create1, epoll_ctl ADD pour 2 socketpairs
+// epoll_wait → lire les événements
+// Sortie: Events: 2, fd ready: EP1, fd ready: EP2
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sockets"
+title = "Event loop avec epoll"
+
+[validation]
+expected_output = """
+Events: 2
+fd ready: EP1
+fd ready: EP2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On crée l'instance epoll et on ajoute les deux fd"
+heap = []
+label = "epoll_create1 + epoll_ctl ADD"
+step_label = "1. Setup"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "epfd"
+value = "epoll instance"
+
+[[visualizer.steps.stack]]
+name = "monitored"
+value = "{sv1[0], sv2[0]}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux sockets ont des données, epoll_wait retourne immédiatement"
+heap = []
+label = "epoll_wait retourne 2 événements"
+step_label = "2. Wait"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "events[0]"
+value = "EPOLLIN sur sv1[0]"
+
+[[visualizer.steps.stack]]
+name = "events[1]"
+value = "EPOLLIN sur sv2[0]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On itère sur events[] et on recv chaque fd prêt"
+heap = []
+label = "Lecture des données prêtes"
+step_label = "3. Lecture"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "EP1"
+value = "lu depuis sv1[0]"
+
+[[visualizer.steps.stack]]
+name = "EP2"
+value = "lu depuis sv2[0]"

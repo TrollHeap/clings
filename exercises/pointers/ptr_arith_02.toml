@@ -1,0 +1,357 @@
+common_mistake = "Confondre sizeof(arr) (taille tableau) avec sizeof(ptr) (taille pointeur = 8 octets sur x86_64)"
+description = """
+NSY103 — La différence entre deux pointeurs du même type donne le nombre d'éléments entre eux (pas le nombre d'octets). `sizeof` donne la taille en octets d'un type ou d'une variable.
+
+Utilisez la soustraction de pointeurs et sizeof pour calculer le nombre d'éléments et la taille en octets d'un tableau."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "`end - begin` donne le nombre d'éléments, pas d'octets",
+    "`sizeof(arr)` donne la taille totale du tableau en octets",
+    "`sizeof(arr) / sizeof(arr[0])` donne le nombre d'éléments",
+]
+id = "ptr-arith-02"
+kc_ids = ["KC-C01"]
+key_concept = "La soustraction de pointeurs donne un nombre d'éléments ; sizeof(arr)/sizeof(arr[0]) aussi"
+lang = "c"
+prerequisites = ["ptr-arith-01"]
+solution_code = '''
+#include <stdio.h>
+
+long array_distance(int *begin, int *end) {
+    return end - begin;
+}
+
+int *array_middle(int *begin, int *end) {
+    return begin + (end - begin) / 2;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(array_distance(arr, arr)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50, 60};
+        printf("%d\n", (int)(array_distance(arr, arr + 6)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4};
+        int *mid = array_middle(arr, arr + 4);
+        printf("%d\n", (int)(*mid));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        int *mid = array_middle(arr, arr + 5);
+        printf("%d\n", (int)(*mid));
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+long array_distance(int *begin, int *end) {
+    return ____ - ____;
+}
+
+int *array_middle(int *begin, int *end) {
+    return begin + (____ - ____) / 2;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(array_distance(arr, arr)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50, 60};
+        printf("%d\n", (int)(array_distance(arr, arr + 6)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4};
+        int *mid = array_middle(arr, arr + 4);
+        printf("%d\n", (int)(*____));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        int *mid = array_middle(arr, arr + 5);
+        printf("%d\n", (int)(*mid));
+    }
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Difference de pointeurs sur un tableau de char
+ * sizeof(char) == 1, donc difference == nombre d'octets.
+ * =========================================================== */
+void example_char_diff(void) {
+    char msg[] = "Hello";
+    char *begin = msg;
+    char *end = msg + 5;
+    long diff = end - begin;
+    printf("Difference : %ld caracteres\n", diff);
+    printf("sizeof(msg) : %lu (inclut '\\0')\n", (unsigned long)sizeof(msg));
+    printf("Elements : %lu\n", (unsigned long)(sizeof(msg) / sizeof(msg[0])));
+}
+/* Resultat: Difference : 5 / sizeof(msg) : 6 / Elements : 6 */
+
+/* == VOTRE EXERCICE =========================================
+ * Difference de pointeurs sur tableau de int
+ * sizeof(int) == 4, donc la difference est en elements.
+ * Utilisez sizeof(arr)/sizeof(arr[0]) pour compter.
+ * =========================================================== */
+
+int main(void) {
+    int arr[] = {10, 20, 30, 40, 50, 60};
+    /* TODO: begin, end, count, sizeof */
+    (void)arr;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    int arr[] = {10, 20, 30, 40, 50, 60};
+    int *begin = arr;
+    int *end = arr + 6;
+    long count = end - begin;
+    printf("Nombre d'elements : %ld\n", count);
+    printf("sizeof(int) : %lu\n", (unsigned long)sizeof(int));
+    printf("Taille totale : %lu octets\n", (unsigned long)sizeof(____));
+    printf("Elements via sizeof : %lu\n", (unsigned long)(sizeof(arr) / sizeof(____)));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+long array_distance(int *begin, int *end) {
+    return ____ - ____;
+}
+
+int *array_middle(int *begin, int *end) {
+    return begin + (____ - ____) / 2;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(array_distance(arr, arr)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50, 60};
+        printf("%d\n", (int)(array_distance(arr, arr + 6)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4};
+        int *mid = array_middle(arr, arr + 4);
+        printf("%d\n", (int)(*____));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        int *mid = array_middle(arr, arr + 5);
+        printf("%d\n", (int)(*mid));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+long array_distance(int *begin, int *end) {
+    /* TODO */
+    return 0;
+}
+
+int *array_middle(int *begin, int *end) {
+    /* TODO */
+    return NULL;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(array_distance(arr, arr)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50, 60};
+        printf("%d\n", (int)(array_distance(arr, arr + 6)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4};
+        int *mid = array_middle(arr, arr + 4);
+        printf("%d\n", (int)(*mid));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        int *mid = array_middle(arr, arr + 5);
+        printf("%d\n", (int)(*mid));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+long array_distance(int *begin, int *end) { return 0; }
+
+int *array_middle(int *begin, int *end) { return NULL; }
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(array_distance(arr, arr)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50, 60};
+        printf("%d\n", (int)(array_distance(arr, arr + 6)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4};
+        int *mid = array_middle(arr, arr + 4);
+        printf("%d\n", (int)(*mid));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        int *mid = array_middle(arr, arr + 5);
+        printf("%d\n", (int)(*mid));
+    }
+    return 0;
+}
+''',
+]
+subject = "pointers"
+title = "Différence de pointeurs et sizeof"
+
+[validation]
+mode = "test"
+test_code = """
+void test_distance_zero(void) {
+    int arr[] = {1, 2, 3};
+    TEST_ASSERT_EQUAL_INT(0, array_distance(arr, arr));
+}
+
+void test_distance_simple(void) {
+    int arr[] = {10, 20, 30};
+    TEST_ASSERT_EQUAL_INT(3, array_distance(arr, arr + 3));
+}
+
+void test_distance_six(void) {
+    int arr[] = {10, 20, 30, 40, 50, 60};
+    TEST_ASSERT_EQUAL_INT(6, array_distance(arr, arr + 6));
+}
+
+void test_middle_even(void) {
+    int arr[] = {1, 2, 3, 4};
+    int *mid = array_middle(arr, arr + 4);
+    TEST_ASSERT_EQUAL_INT(3, *mid);
+}
+
+void test_middle_odd(void) {
+    int arr[] = {10, 20, 30, 40, 50};
+    int *mid = array_middle(arr, arr + 5);
+    TEST_ASSERT_EQUAL_INT(30, *mid);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_distance_zero);
+    RUN_TEST(test_distance_simple);
+    RUN_TEST(test_distance_six);
+    RUN_TEST(test_middle_even);
+    RUN_TEST(test_middle_odd);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "arr occupe 6 * sizeof(int) = 24 octets contigus. begin pointe vers arr[0], end pointe après arr[5]. end - begin = 6 éléments."
+heap = []
+label = "Tableau arr en mémoire"
+step_label = "Tableau arr — begin et end"
+
+[[visualizer.steps.arrows]]
+from = "begin"
+label = "begin"
+to = "arr[0]"
+
+[[visualizer.steps.arrows]]
+from = "end"
+label = "end (past-the-end)"
+to = "arr[5]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "arr[0]"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "arr[1]"
+value = "20"
+
+[[visualizer.steps.stack]]
+name = "arr[2]"
+value = "30"
+
+[[visualizer.steps.stack]]
+name = "arr[3]"
+value = "40"
+
+[[visualizer.steps.stack]]
+name = "arr[4]"
+value = "50"
+
+[[visualizer.steps.stack]]
+name = "arr[5]"
+value = "60"
+
+[[visualizer.steps.stack]]
+name = "begin"
+value = "→arr[0]"
+
+[[visualizer.steps.stack]]
+name = "end"
+value = "→arr[6]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "end - begin = 6 (éléments, pas octets). sizeof(arr) = 24 octets. sizeof(arr)/sizeof(arr[0]) = 24/4 = 6. Attention : si arr est passé en paramètre, sizeof donne la taille du pointeur, pas du tableau."
+heap = []
+label = "Soustraction de pointeurs"
+step_label = "count = end - begin = 6 éléments"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "begin"
+value = "→arr[0]"
+
+[[visualizer.steps.stack]]
+name = "end"
+value = "→arr[6]"
+
+[[visualizer.steps.stack]]
+name = "count"
+value = "6"
+
+[[visualizer.steps.stack]]
+name = "sizeof(int)"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "sizeof(arr)"
+value = "24"

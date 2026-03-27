@@ -1,0 +1,269 @@
+common_mistake = "Croire que alarm() empile les timers — un seul alarm actif par processus"
+description = """
+NSY103 — alarm(seconds) programme la délivrance de SIGALRM après le délai spécifié. alarm(0) annule une alarme en cours. alarm() retourne le nombre de secondes restantes de l'alarme précédente.
+
+Installez un handler SIGALRM et utilisez alarm() pour mesurer le mécanisme. Pour un exercice déterministe, on simule le comportement avec raise()."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "alarm(n) programme SIGALRM dans n secondes — alarm(0) annule",
+    "alarm() retourne le nombre de secondes restantes de l'alarme précédente",
+    "Un seul timer alarm actif par processus — chaque appel remplace le précédent",
+]
+id = "sig-alarm-01"
+kc_ids = ["KC-C08"]
+key_concept = "alarm() programme un SIGALRM unique — chaque appel remplace le précédent, alarm(0) annule"
+lang = "c"
+prerequisites = ["sig-action-01"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t alarm_count = 0;
+
+void alarm_handler(int sig) {
+    (void)sig;
+    alarm_count++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = alarm_handler;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGALRM, &sa, NULL);
+    printf("SIGALRM handler installed\n");
+
+    /* Programmer une alarme (retourne 0 = pas d'alarme précédente) */
+    unsigned int prev = alarm(5);
+    printf("Previous alarm: %u\n", prev);
+
+    /* Reprogrammer (retourne le temps restant) */
+    prev = alarm(3);
+    printf("Remaining from previous: %u (approx)\n", prev > 0 ? 1 : 0);
+
+    /* Annuler */
+    prev = alarm(0);
+    printf("Cancelled, remaining: %u (approx)\n", prev > 0 ? 1 : 0);
+
+    /* Simuler la réception pour le test */
+    raise(SIGALRM);
+    raise(SIGALRM);
+    printf("Alarms received: %d\n", alarm_count);
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t alarm_count = 0;
+
+void alarm_handler(int sig) {
+    (void)sig;
+    alarm_count++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sigemptyset(&sa.sa_mask);
+    sigaction(____, &sa, NULL);
+    printf("SIGALRM handler installed\n");
+
+    /* Programmer une alarme (retourne 0 = pas d'alarme précédente) */
+    unsigned int prev = ____(5);
+    printf("Previous alarm: %u\n", prev);
+
+    /* Reprogrammer (retourne le temps restant) */
+    prev = alarm(3);
+    printf("Remaining from previous: %u (approx)\n", prev > 0 ? 1 : 0);
+
+    /* Annuler */
+    prev = alarm(____);
+    printf("Cancelled, remaining: %u (approx)\n", prev > 0 ? 1 : 0);
+
+    /* Simuler la réception pour le test */
+    raise(SIGALRM);
+    raise(SIGALRM);
+    printf("Alarms received: %d\n", alarm_count);
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * alarm basique : programmer et annuler
+ * ================================================= */
+void example_alarm_handler(int sig) { (void)sig; printf("example: ALARM!\n"); }
+void example_alarm(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = example_alarm_handler;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGALRM, &sa, NULL);
+    alarm(10);        /* dans 10s */
+    unsigned r = alarm(0); /* annuler */
+    printf("example: cancelled with %u remaining\n", r);
+    raise(SIGALRM);   /* simuler */
+}
+
+/* == VOTRE EXERCICE ================================
+ * alarm(5), alarm(3), alarm(0), puis raise x2
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t alarm_count = 0;
+void alarm_handler(int sig) { (void)sig; alarm_count++; }
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sigemptyset(&sa.sa_mask);
+    ____(SIGALRM, &sa, NULL);
+    printf("SIGALRM handler installed\n");
+    unsigned int prev = ____(5);
+    printf("Previous alarm: %u\n", prev);
+    prev = alarm(3);
+    printf("Remaining from previous: %u (approx)\n", prev > 0 ? 1 : 0);
+    prev = ____(0);
+    printf("Cancelled, remaining: %u (approx)\n", prev > 0 ? 1 : 0);
+    ____(SIGALRM); ____(SIGALRM);
+    printf("Alarms received: %d\n", alarm_count);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t alarm_count = 0;
+void alarm_handler(int sig) { (void)sig; alarm_count++; }
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sigemptyset(&sa.sa_mask);
+    sigaction(____, &sa, NULL);
+    printf("SIGALRM handler installed\n");
+    unsigned int prev = ____(5);
+    printf("Previous alarm: %u\n", prev);
+    prev = alarm(3);
+    printf("Remaining from previous: %u (approx)\n", prev > 0 ? 1 : 0);
+    prev = alarm(____);
+    printf("Cancelled, remaining: %u (approx)\n", prev > 0 ? 1 : 0);
+    raise(SIGALRM); raise(SIGALRM);
+    printf("Alarms received: %d\n", alarm_count);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+// handler SIGALRM incrémente alarm_count
+// main: sigaction, alarm(5), alarm(3), alarm(0)
+// raise(SIGALRM) x2 pour simuler
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "alarm() et SIGALRM"
+
+[validation]
+expected_output = """
+SIGALRM handler installed
+Previous alarm: 0
+Remaining from previous: 1 (approx)
+Cancelled, remaining: 1 (approx)
+Alarms received: 2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "alarm() demande au noyau de délivrer SIGALRM après 5s"
+heap = []
+label = "alarm(5) programme le timer"
+step_label = "alarm(5)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "timer"
+value = "5 secondes"
+
+[[visualizer.steps.stack]]
+name = "retour"
+value = "0 (pas de timer precedent)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque alarm() remplace le timer précédent — un seul actif"
+heap = []
+label = "alarm(3) reprogramme — retourne le restant"
+step_label = "alarm(3)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "timer"
+value = "3 secondes (nouveau)"
+
+[[visualizer.steps.stack]]
+name = "retour"
+value = "~5 (restant du précédent)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "alarm(0) annule sans programmer de nouveau timer"
+heap = []
+label = "alarm(0) annule le timer"
+step_label = "alarm(0)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "timer"
+value = "(annulé)"
+
+[[visualizer.steps.stack]]
+name = "retour"
+value = "~3 (restant)"

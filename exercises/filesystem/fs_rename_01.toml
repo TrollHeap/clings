@@ -1,0 +1,290 @@
+common_mistake = "rename() échoue entre filesystems différents (EXDEV) — il faut alors copier + unlink"
+description = """
+NSY103 — `rename()` déplace/renomme un fichier de manière atomique sur le même filesystem. Si la destination existe, elle est remplacée atomiquement — les lecteurs voient l'ancien ou le nouveau contenu, jamais un état intermédiaire. C'est la technique standard pour la mise à jour atomique de fichiers.
+
+Implémentez une mise à jour atomique : écrire dans un fichier temporaire, puis `rename()` vers la destination finale."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "`rename(ancien, nouveau)` — renomme atomiquement, la destination est écrasée si elle existe",
+    "Après rename(), l'ancien chemin n'existe plus — le fichier a été déplacé",
+    "`access(chemin, F_OK)` vérifie l'existence d'un fichier (retourne 0 si existe)",
+]
+id = "fs-rename-01"
+kc_ids = ["KC-C19"]
+key_concept = "rename() est atomique sur le même filesystem — utilisé pour les mises à jour sûres"
+lang = "c"
+prerequisites = [
+    "fs-stat-01",
+    "fs-link-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *target = "/tmp/kf_rename_target";
+    const char *tmp = "/tmp/kf_rename_tmp";
+    unlink(target); unlink(tmp);
+
+    FILE *f = fopen(target, "w");
+    fprintf(f, "ancienne version");
+    fclose(f);
+
+    f = fopen(tmp, "w");
+    fprintf(f, "nouvelle version");
+    fclose(f);
+
+    struct stat sb;
+    stat(target, &sb);
+    unsigned long ino_before = sb.st_ino;
+
+    if (rename(tmp, target) == -1) {
+        perror("rename");
+        return 1;
+    }
+
+    stat(target, &sb);
+    printf("Inode change : %d\n", (sb.st_ino != ino_before) ? 1 : 0);
+
+    char buf[64] = {0};
+    f = fopen(target, "r");
+    fgets(buf, sizeof(buf), f);
+    fclose(f);
+    printf("Contenu : %s\n", buf);
+
+    int tmp_existe = (access(tmp, F_OK) == 0) ? 1 : 0;
+    printf("Tmp existe encore : %d\n", tmp_existe);
+
+    unlink(target);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *target = "/tmp/kf_rename_target";
+    const char *tmp = "/tmp/kf_rename_tmp";
+    unlink(target); unlink(tmp);
+
+    FILE *f = fopen(target, "w");
+    fprintf(f, "ancienne version");
+    fclose(f);
+
+    f = fopen(tmp, "w");
+    fprintf(f, "nouvelle version");
+    fclose(f);
+
+    struct stat sb;
+    stat(target, &sb);
+    unsigned long ino_before = sb.st_ino;
+
+    if (____(tmp, target) == -1) {
+        perror("rename");
+        return 1;
+    }
+
+    stat(target, &sb);
+    printf("Inode change : %d\n", (sb.st_ino != ino_before) ? 1 : 0);
+
+    char buf[64] = {0};
+    f = fopen(target, "r");
+    fgets(buf, sizeof(buf), f);
+    fclose(f);
+    printf("Contenu : %s\n", buf);
+
+    int tmp_existe = (____(tmp, F_OK) == 0) ? 1 : 0;
+    printf("Tmp existe encore : %d\n", tmp_existe);
+
+    unlink(target);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+/* == EXEMPLE ================================================
+ * Renommer un fichier simple avec rename()
+ * rename() change l'entree de repertoire atomiquement.
+ * =========================================================== */
+void example_simple_rename(void) {
+    const char *a = "/tmp/kf_ex_old";
+    const char *b = "/tmp/kf_ex_new";
+    unlink(a); unlink(b);
+    FILE *f = fopen(a, "w"); fprintf(f, "data"); fclose(f);
+    rename(a, b);
+    printf("Ancien existe : %d\n", access(a, F_OK) == 0 ? 1 : 0);
+    printf("Nouveau existe : %d\n", access(b, F_OK) == 0 ? 1 : 0);
+    unlink(b);
+}
+/* Resultat: Ancien: 0, Nouveau: 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Mise a jour atomique: ecrire dans tmp, rename vers target
+ * Verifier que l'inode change et le contenu est mis a jour.
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *target = "/tmp/kf_rename_target";
+    const char *tmp = "/tmp/kf_rename_tmp";
+    unlink(target); unlink(tmp);
+    FILE *f = fopen(target, "w"); fprintf(f, "ancienne version"); fclose(f);
+    f = fopen(tmp, "w"); fprintf(f, "nouvelle version"); fclose(f);
+    struct stat sb;
+    stat(target, &sb);
+    unsigned long ino_before = sb.st_ino;
+    ____(tmp, target); // renommage atomique
+    stat(target, &sb);
+    printf("Inode change : %d\n", (sb.st_ino != ino_before) ? 1 : 0);
+    char buf[64] = {0};
+    f = fopen(target, "r"); fgets(buf, sizeof(buf), f); fclose(f);
+    printf("Contenu : %s\n", buf);
+    printf("Tmp existe encore : %d\n", access(tmp, F_OK) == 0 ? 1 : 0);
+    unlink(target);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *target = "/tmp/kf_rename_target";
+    const char *tmp = "/tmp/kf_rename_tmp";
+    unlink(target); unlink(tmp);
+    FILE *f = fopen(target, "w"); fprintf(f, "ancienne version"); fclose(f);
+    f = fopen(tmp, "w"); fprintf(f, "nouvelle version"); fclose(f);
+    struct stat sb;
+    stat(target, &sb);
+    unsigned long ino_before = sb.st_ino;
+    if (____(tmp, target) == -1) { perror("rename"); return 1; }
+    stat(target, &sb);
+    printf("Inode change : %d\n", (sb.st_ino != ino_before) ? 1 : 0);
+    char buf[64] = {0};
+    f = fopen(target, "r"); fgets(buf, sizeof(buf), f); fclose(f);
+    printf("Contenu : %s\n", buf);
+    int tmp_existe = (____(tmp, F_OK) == 0) ? 1 : 0;
+    printf("Tmp existe encore : %d\n", tmp_existe);
+    unlink(target);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+
+int main(void) {
+    // Creer target avec "ancienne version" et tmp avec "nouvelle version"
+    // Sauvegarder l'inode de target
+    // rename(tmp, target) pour mise a jour atomique
+    // Verifier: inode change, contenu mis a jour, tmp n'existe plus
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "rename() et atomicité"
+
+[validation]
+expected_output = """
+Inode change : 1
+Contenu : nouvelle version
+Tmp existe encore : 0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Deux fichiers existent : target pointe vers inode A (ancien contenu), tmp pointe vers inode B (nouveau contenu). Les deux sont sur le même filesystem."
+label = "Avant rename()"
+step_label = "Deux fichiers, deux inodes"
+
+[[visualizer.steps.arrows]]
+from = "target"
+label = "→"
+to = "inode A"
+
+[[visualizer.steps.arrows]]
+from = "tmp"
+label = "→"
+to = "inode B"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "inode A"
+value = '"ancienne version"'
+
+[[visualizer.steps.heap]]
+name = "inode B"
+value = '"nouvelle version"'
+
+[[visualizer.steps.stack]]
+name = "target"
+value = "→inode A (ancienne version)"
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "→inode B (nouvelle version)"
+
+[[visualizer.steps]]
+explanation = "rename() atomiquement : supprime l'entrée tmp, fait pointer target vers inode B, et libère inode A (nlink tombe à 0). Toute lecture de target pendant l'opération voit soit l'ancien soit le nouveau contenu — jamais un état corrompu."
+label = "Après rename(tmp, target)"
+step_label = "rename() atomique — target pointe vers inode B"
+
+[[visualizer.steps.arrows]]
+from = "target"
+label = "→"
+to = "inode B"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "inode A"
+value = "libéré (nlink=0)"
+
+[[visualizer.steps.heap]]
+name = "inode B"
+value = '"nouvelle version"'
+
+[[visualizer.steps.stack]]
+name = "target"
+value = "→inode B (nouvelle version)"
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "(n'existe plus)"

@@ -1,0 +1,481 @@
+common_mistake = "Ne pas propager le message sentinelle END — l'étape suivante reste bloquée dans mq_receive indéfiniment"
+description = """
+NSY103 — Capstone combinant pthreads, sémaphores et files de messages POSIX. Implémentez un pipeline de traitement à 3 étapes : Stage1 produit des données, Stage2 les transforme (x2), Stage3 les affiche. Les étapes communiquent via des files de messages (mq_send/mq_receive).
+
+Chaque étape est un thread, les files de messages assurent le découplage.
+
+⚠ Cet exercice combine : mq_open(), mq_send(), mq_receive(), pthread_create(), pthread_join()."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "mq_send envoie un message dans la file, mq_receive le récupère — les deux bloquent si la file est pleine/vide",
+    'Le message "END" sert de sentinelle : chaque étape le propage à la suivante puis se termine',
+    "mq_msgsize dans mq_attr doit être >= à la taille des messages envoyés sinon mq_receive échoue",
+]
+id = "capstone-prodcons-02"
+kc_ids = ["KC-CAP"]
+key_concept = "Les files de messages POSIX (mq_send/mq_receive) permettent un découplage naturel entre étapes d'un pipeline, avec blocage automatique"
+lang = "c"
+prerequisites = [
+    "capstone-prodcons-01",
+    "mq-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#define QUEUE1 "/kf_pipe_q1"
+#define QUEUE2 "/kf_pipe_q2"
+#define NUM_ITEMS 4
+#define MSG_SIZE 32
+
+void *stage1_producer(void *arg) {
+    mqd_t q1 = *((mqd_t *)arg);
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        char msg[MSG_SIZE];
+        snprintf(msg, MSG_SIZE, "%d", i * 10);
+        mq_send(q1, msg, strlen(msg) + 1, 0);
+        printf("[stage1] produit: %s\n", msg);
+    }
+    char end[] = "END";
+    mq_send(q1, end, strlen(end) + 1, 0);
+    return NULL;
+}
+
+void *stage2_transform(void *arg) {
+    mqd_t *queues = (mqd_t *)arg;
+    mqd_t q1 = queues[0];
+    mqd_t q2 = queues[1];
+    char buf[MSG_SIZE];
+    while (1) {
+        ssize_t n = mq_receive(q1, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) {
+            mq_send(q2, buf, strlen(buf) + 1, 0);
+            break;
+        }
+        int val = atoi(buf) * 2;
+        snprintf(buf, MSG_SIZE, "%d", val);
+        printf("[stage2] transforme: %d -> %s\n", val / 2, buf);
+        mq_send(q2, buf, strlen(buf) + 1, 0);
+    }
+    return NULL;
+}
+
+void *stage3_consumer(void *arg) {
+    mqd_t q2 = *((mqd_t *)arg);
+    char buf[MSG_SIZE];
+    int total = 0;
+    while (1) {
+        ssize_t n = mq_receive(q2, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) break;
+        int val = atoi(buf);
+        total += val;
+        printf("[stage3] consomme: %d (total=%d)\n", val, total);
+    }
+    printf("[stage3] total final: %d\n", total);
+    return NULL;
+}
+
+int main(void) {
+    mq_unlink(QUEUE1);
+    mq_unlink(QUEUE2);
+
+    struct mq_attr attr = {.mq_flags = 0, .mq_maxmsg = 10,
+                           .mq_msgsize = MSG_SIZE, .mq_curmsgs = 0};
+
+    mqd_t q1 = mq_open(QUEUE1, O_CREAT | O_RDWR, 0600, &attr);
+    mqd_t q2 = mq_open(QUEUE2, O_CREAT | O_RDWR, 0600, &attr);
+
+    mqd_t s2_queues[2] = {q1, q2};
+
+    pthread_t t1, t2, t3;
+    pthread_create(&t1, NULL, stage1_producer, &q1);
+    pthread_create(&t2, NULL, stage2_transform, s2_queues);
+    pthread_create(&t3, NULL, stage3_consumer, &q2);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    pthread_join(t3, NULL);
+
+    mq_close(q1);
+    mq_close(q2);
+    mq_unlink(QUEUE1);
+    mq_unlink(QUEUE2);
+    printf("[main] pipeline termine\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#define QUEUE1 "/kf_pipe_q1"
+#define QUEUE2 "/kf_pipe_q2"
+#define NUM_ITEMS 4
+#define MSG_SIZE 32
+
+void *stage1_producer(void *arg) {
+    mqd_t q1 = *((mqd_t *)arg);
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        char msg[MSG_SIZE];
+        snprintf(msg, MSG_SIZE, "%d", i * 10);
+        mq_send(q1, msg, strlen(msg) + 1, 0);
+        printf("[stage1] produit: %s\n", msg);
+    }
+    char end[] = "END";
+    ____(q1, end, strlen(end) + 1, 0);
+    return NULL;
+}
+
+void *stage2_transform(void *arg) {
+    mqd_t *queues = (mqd_t *)arg;
+    mqd_t q1 = queues[0];
+    mqd_t q2 = queues[1];
+    char buf[MSG_SIZE];
+    while (1) {
+        ssize_t n = ____(q1, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) {
+            mq_send(q2, buf, strlen(buf) + 1, 0);
+            break;
+        }
+        int val = atoi(buf) * 2;
+        snprintf(buf, MSG_SIZE, "%d", val);
+        printf("[stage2] transforme: %d -> %s\n", val / 2, buf);
+        ____(q2, buf, strlen(buf) + 1, 0);
+    }
+    return NULL;
+}
+
+void *stage3_consumer(void *arg) {
+    mqd_t q2 = *((mqd_t *)arg);
+    char buf[MSG_SIZE];
+    int total = 0;
+    while (1) {
+        ssize_t n = ____(q2, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) break;
+        int val = atoi(buf);
+        total += val;
+        printf("[stage3] consomme: %d (total=%d)\n", val, total);
+    }
+    printf("[stage3] total final: %d\n", total);
+    return NULL;
+}
+
+int main(void) {
+    mq_unlink(QUEUE1);
+    mq_unlink(QUEUE2);
+
+    struct mq_attr attr = {.mq_flags = 0, .mq_maxmsg = 10,
+                           .mq_msgsize = MSG_SIZE, .mq_curmsgs = 0};
+
+    mqd_t q1 = mq_open(QUEUE1, O_CREAT | O_RDWR, 0600, &attr);
+    mqd_t q2 = mq_open(QUEUE2, O_CREAT | O_RDWR, 0600, &attr);
+
+    mqd_t s2_queues[2] = {q1, q2};
+
+    pthread_t t1, t2, t3;
+    pthread_create(&t1, NULL, stage1_producer, &q1);
+    pthread_create(&t2, NULL, ____, s2_queues);
+    pthread_create(&t3, NULL, ____, &q2);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    pthread_join(t3, NULL);
+
+    mq_close(q1);
+    mq_close(q2);
+    mq_unlink(QUEUE1);
+    mq_unlink(QUEUE2);
+    printf("[main] pipeline termine\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+
+/* == EXEMPLE =======================================
+ * File de messages simple: envoyer/recevoir
+ * Pattern: mq_open + mq_send + mq_receive
+ * ================================================= */
+void example_mq_ping(void) {
+    mq_unlink("/kf_ex_mq");
+    struct mq_attr attr = {0, 10, 32, 0};
+    mqd_t q = mq_open("/kf_ex_mq", O_CREAT|O_RDWR, 0600, &attr);
+    char msg[] = "ping";
+    mq_send(q, msg, strlen(msg)+1, 0);
+    char buf[32];
+    mq_receive(q, buf, 32, NULL);
+    printf("Received: %s\n", buf);
+    mq_close(q); mq_unlink("/kf_ex_mq");
+}
+/* Resultat: Received: ping */
+
+/* == VOTRE EXERCICE ================================
+ * Pipeline 3 etapes via files de messages
+ * Stage1: produit 10,20,30,40 + END
+ * Stage2: transforme x2 + propage END
+ * Stage3: consomme et totalise
+ * ================================================= */
+
+#define QUEUE1 "/kf_pipe_q1"
+#define QUEUE2 "/kf_pipe_q2"
+#define NUM_ITEMS 4
+#define MSG_SIZE 32
+
+int main(void) {
+    example_mq_ping();
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+
+#define QUEUE1 "/kf_pipe_q1"
+#define QUEUE2 "/kf_pipe_q2"
+#define NUM_ITEMS 4
+#define MSG_SIZE 32
+
+void *stage1_producer(void *arg) {
+    mqd_t q1 = *((mqd_t *)arg);
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        char msg[MSG_SIZE]; snprintf(msg, MSG_SIZE, "%d", i*10);
+        ____(q1, msg, strlen(msg)+1, 0);
+        printf("[stage1] produit: %s\n", msg);
+    }
+    char end[] = "END";
+    ____(q1, end, strlen(end)+1, 0);
+    return NULL;
+}
+
+void *stage2_transform(void *arg) {
+    mqd_t *queues = (mqd_t *)arg;
+    char buf[MSG_SIZE];
+    while (1) {
+        ssize_t n = ____(queues[0], buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) { ____(queues[1], buf, strlen(buf)+1, 0); break; }
+        int val = atoi(buf) * 2;
+        printf("[stage2] transforme: %d -> %d\n", val/2, val);
+        snprintf(buf, MSG_SIZE, "%d", val);
+        ____(queues[____], buf, strlen(buf)+1, 0);
+    }
+    return NULL;
+}
+
+void *stage3_consumer(void *arg) {
+    mqd_t q2 = *((mqd_t *)arg);
+    char buf[MSG_SIZE]; int total = 0;
+    while (1) {
+        ssize_t n = ____(q2, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) break;
+        int val = atoi(buf); total += val;
+        printf("[stage3] consomme: %d (total=%d)\n", val, total);
+    }
+    printf("[stage3] total final: %d\n", total);
+    return NULL;
+}
+
+int main(void) {
+    mq_unlink(QUEUE1); mq_unlink(QUEUE2);
+    struct mq_attr attr = {.mq_flags=0, .mq_maxmsg=10, .mq_msgsize=MSG_SIZE, .mq_curmsgs=0};
+    mqd_t q1 = mq_open(QUEUE1, O_CREAT|O_RDWR, 0600, &attr);
+    mqd_t q2 = mq_open(QUEUE2, O_CREAT|O_RDWR, 0600, &attr);
+    mqd_t s2_queues[2] = {q1, q2};
+    pthread_t t1, t2, t3;
+    pthread_create(&t1, NULL, ____, &q1);
+    pthread_create(&t2, NULL, ____, s2_queues);
+    pthread_create(&t3, NULL, ____, &q2);
+    pthread_join(t1, NULL); pthread_join(t2, NULL); pthread_join(t3, NULL);
+    mq_close(q1); mq_close(q2);
+    mq_unlink(QUEUE1); mq_unlink(QUEUE2);
+    printf("[main] pipeline termine\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#define QUEUE1 "/kf_pipe_q1"
+#define QUEUE2 "/kf_pipe_q2"
+#define NUM_ITEMS 4
+#define MSG_SIZE 32
+
+void *stage1_producer(void *arg) {
+    mqd_t q1 = *((mqd_t *)arg);
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        char msg[MSG_SIZE]; snprintf(msg, MSG_SIZE, "%d", i*10);
+        ____(q1, msg, strlen(msg)+1, 0);
+        printf("[stage1] produit: %s\n", msg);
+    }
+    char end[] = "END";
+    ____(q1, end, strlen(end)+1, 0);
+    return NULL;
+}
+
+void *stage2_transform(void *arg) {
+    mqd_t *queues = (mqd_t *)arg;
+    mqd_t q1 = queues[0], q2 = queues[1];
+    char buf[MSG_SIZE];
+    while (1) {
+        ssize_t n = ____(q1, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) { ____(q2, buf, strlen(buf)+1, 0); break; }
+        int val = atoi(buf) * 2;
+        snprintf(buf, MSG_SIZE, "%d", val);
+        printf("[stage2] transforme: %d -> %s\n", val/2, buf);
+        ____(q2, buf, strlen(buf)+1, 0);
+    }
+    return NULL;
+}
+
+void *stage3_consumer(void *arg) {
+    mqd_t q2 = *((mqd_t *)arg);
+    char buf[MSG_SIZE]; int total = 0;
+    while (1) {
+        ssize_t n = ____(q2, buf, MSG_SIZE, NULL);
+        if (n < 0) break;
+        buf[n] = '\0';
+        if (strcmp(buf, "END") == 0) break;
+        int val = atoi(buf); total += val;
+        printf("[stage3] consomme: %d (total=%d)\n", val, total);
+    }
+    printf("[stage3] total final: %d\n", total);
+    return NULL;
+}
+
+int main(void) {
+    mq_unlink(QUEUE1); mq_unlink(QUEUE2);
+    struct mq_attr attr = {.mq_flags=0, .mq_maxmsg=10, .mq_msgsize=MSG_SIZE, .mq_curmsgs=0};
+    mqd_t q1 = mq_open(QUEUE1, O_CREAT|O_RDWR, 0600, &attr);
+    mqd_t q2 = mq_open(QUEUE2, O_CREAT|O_RDWR, 0600, &attr);
+    mqd_t s2_queues[2] = {q1, q2};
+    pthread_t t1, t2, t3;
+    pthread_create(&t1, NULL, ____, &q1);
+    pthread_create(&t2, NULL, ____, s2_queues);
+    pthread_create(&t3, NULL, ____, &q2);
+    pthread_join(t1, NULL); pthread_join(t2, NULL); pthread_join(t3, NULL);
+    mq_close(q1); mq_close(q2);
+    mq_unlink(QUEUE1); mq_unlink(QUEUE2);
+    printf("[main] pipeline termine\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <fcntl.h>
+
+// Pipeline multi-etapes avec files de messages POSIX
+// Stage1: produit 10,20,30,40 dans Q1, envoie END
+// Stage2: lit Q1, multiplie x2, envoie dans Q2, propage END
+// Stage3: lit Q2, somme les valeurs, affiche total
+// Chaque stage = un thread, communication par mq_send/mq_receive
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "capstones"
+title = "Pipeline multi-étapes avec pthreads, sémaphores et files de messages"
+
+[validation]
+expected_output = 'REGEX:(?s)(?=.*\[stage1\] produit: 10)(?=.*\[stage1\] produit: 20)(?=.*\[stage1\] produit: 30)(?=.*\[stage1\] produit: 40)(?=.*\[stage2\] transforme: 10 -> 20)(?=.*\[stage2\] transforme: 20 -> 40)(?=.*\[stage2\] transforme: 30 -> 60)(?=.*\[stage2\] transforme: 40 -> 80)(?=.*\[stage3\] consomme: 20)(?=.*\[stage3\] consomme: 40)(?=.*\[stage3\] consomme: 60)(?=.*\[stage3\] consomme: 80)(?=.*\[stage3\] total final: 200)(?=.*\[main\] pipeline termine).*'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Stage1 -> Q1 -> Stage2 -> Q2 -> Stage3. Chaque file découple les étapes."
+label = "Pipeline à 3 étapes avec files de messages"
+step_label = "pipeline"
+
+[[visualizer.steps.arrows]]
+from = "t1"
+label = "mq_send"
+to = "q1"
+
+[[visualizer.steps.arrows]]
+from = "q1"
+label = "mq_receive"
+to = "t2"
+
+[[visualizer.steps.arrows]]
+from = "t2"
+label = "mq_send"
+to = "q2"
+
+[[visualizer.steps.arrows]]
+from = "q2"
+label = "mq_receive"
+to = "t3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "q1"
+value = "/kf_pipe_q1"
+
+[[visualizer.steps.heap]]
+name = "q2"
+value = "/kf_pipe_q2"
+
+[[visualizer.steps.stack]]
+name = "t1"
+value = "stage1 (producteur)"
+
+[[visualizer.steps.stack]]
+name = "t2"
+value = "stage2 (transforme x2)"
+
+[[visualizer.steps.stack]]
+name = "t3"
+value = "stage3 (consommateur)"

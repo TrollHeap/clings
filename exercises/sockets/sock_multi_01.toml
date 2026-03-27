@@ -1,0 +1,435 @@
+common_mistake = "Ne pas fermer le fd client dans le parent après fork → fd leak, le client ne reçoit jamais EOF"
+description = """
+NSY103 — Un serveur peut gérer plusieurs clients en forkant un processus enfant pour chaque connexion acceptée. Le parent continue d'écouter, l'enfant traite le client.
+
+Implémentez un serveur qui accepte 2 clients séquentiels, chacun traité par un fork."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "accept() retourne un nouveau fd pour chaque client — le parent ferme ce fd après fork",
+    "fork() dans la boucle crée un enfant par client",
+    "L'enfant ferme srv (il n'en a pas besoin), le parent ferme cli (l'enfant s'en occupe)",
+]
+id = "sock-multi-01"
+kc_ids = ["KC-C14"]
+key_concept = "Le pattern fork-per-client : accept dans une boucle, fork un enfant pour chaque connexion"
+lang = "c"
+prerequisites = ["sock-udp-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+void send_client(int port, const char *msg) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa = {0};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+    send(fd, msg, strlen(msg), 0);
+    char buf[64];
+    int n = recv(fd, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Client got: %s\n", buf);
+    close(fd);
+}
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t clients = fork();
+    if (clients == 0) {
+        close(srv);
+        send_client(port, "AAA");
+        send_client(port, "BBB");
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        int cli = accept(srv, NULL, NULL);
+        pid_t child = fork();
+        if (child == 0) {
+            close(srv);
+            char buf[64];
+            int n = recv(cli, buf, sizeof(buf) - 1, 0);
+            buf[n] = '\0';
+            printf("Server child: %s\n", buf);
+            send(cli, buf, n, 0);
+            close(cli);
+            return 0;
+        }
+        close(cli);
+        waitpid(child, NULL, 0);
+    }
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+void send_client(int port, const char *msg) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa = {0};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+    send(fd, msg, strlen(msg), 0);
+    char buf[64];
+    int n = recv(fd, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Client got: %s\n", buf);
+    close(fd);
+}
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t clients = fork();
+    if (clients == 0) {
+        close(srv);
+        send_client(port, "AAA");
+        send_client(port, "BBB");
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        int cli = ____(srv, NULL, NULL);
+        pid_t child = ____();
+        if (child == 0) {
+            close(srv);
+            char buf[64];
+            int n = recv(cli, buf, sizeof(buf) - 1, 0);
+            buf[n] = '\0';
+            printf("Server child: %s\n", buf);
+            send(cli, buf, n, 0);
+            close(cli);
+            return 0;
+        }
+        close(cli);
+        waitpid(child, NULL, 0);
+    }
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+void send_client(int port, const char *msg) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa = {0};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+    send(fd, msg, strlen(msg), 0);
+    char buf[64];
+    int n = recv(fd, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Client got: %s\n", buf);
+    close(fd);
+}
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t clients = fork();
+    if (clients == 0) {
+        close(srv);
+        send_client(port, "AAA");
+        send_client(port, "BBB");
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        int cli = accept(srv, NULL, NULL);
+        /* TODO: fork() et traiter dans l'enfant */
+        pid_t child = fork();
+        if (child == 0) {
+            close(srv);
+            char buf[64];
+            int n = recv(cli, buf, sizeof(buf) - 1, 0);
+            buf[n] = '\0';
+            printf("Server child: %s\n", buf);
+            send(cli, buf, n, 0);
+            close(cli);
+            return 0;
+        }
+        close(cli);
+        waitpid(child, NULL, 0);
+    }
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+void send_client(int port, const char *msg) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa = {0};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+    send(fd, msg, strlen(msg), 0);
+    char buf[64];
+    int n = recv(fd, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Client got: %s\n", buf);
+    close(fd);
+}
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t clients = fork();
+    if (clients == 0) {
+        close(srv);
+        send_client(port, "AAA");
+        send_client(port, "BBB");
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        int cli = accept(srv, NULL, NULL);
+        pid_t child = ____();
+        if (child == 0) {
+            close(srv);
+            char buf[64];
+            int n = recv(cli, buf, sizeof(buf) - 1, 0);
+            buf[n] = '\0';
+            printf("Server child: %s\n", buf);
+            send(cli, buf, n, 0);
+            close(cli);
+            return 0;
+        }
+        close(cli);
+        waitpid(child, NULL, 0);
+    }
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+void send_client(int port, const char *msg) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa = {0};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+    send(fd, msg, strlen(msg), 0);
+    char buf[64];
+    int n = recv(fd, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Client got: %s\n", buf);
+    close(fd);
+}
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t clients = fork();
+    if (clients == 0) {
+        close(srv);
+        send_client(port, "AAA");
+        send_client(port, "BBB");
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        int cli = ____(srv, NULL, NULL);
+        pid_t child = ____();
+        if (child == 0) {
+            close(srv);
+            char buf[64];
+            int n = recv(cli, buf, sizeof(buf) - 1, 0);
+            buf[n] = '\0';
+            printf("Server child: %s\n", buf);
+            send(cli, buf, n, 0);
+            close(cli);
+            return 0;
+        }
+        close(cli);
+        waitpid(child, NULL, 0);
+    }
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+// Serveur multi-clients avec fork
+// Accepte 2 clients, fork un enfant echo pour chaque
+// Sortie: Server child: AAA, Client got: AAA, Server child: BBB, Client got: BBB
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sockets"
+title = "Serveur multi-clients (fork)"
+
+[validation]
+expected_output = 'REGEX:(?s)((Server child|Client got): (AAA|BBB)\n?){4}'
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "Serveur accept + fork par client"
+
+[[visualizer.steps.edges]]
+label = "fork()"
+source = "parent"
+target = "child1"
+
+[[visualizer.steps.edges]]
+label = "fork()"
+source = "parent"
+target = "child2"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+Parent
+accept() loop"""
+
+[[visualizer.steps.nodes]]
+id = "child1"
+label = """
+Child 1
+echo AAA"""
+
+[[visualizer.steps.nodes]]
+id = "child2"
+label = """
+Child 2
+echo BBB"""
+
+[[visualizer.steps]]
+label = "Client séquentiels"
+
+[[visualizer.steps.edges]]
+label = "AAA"
+source = "c1"
+target = "s"
+
+[[visualizer.steps.edges]]
+label = "BBB"
+source = "c2"
+target = "s"
+
+[[visualizer.steps.nodes]]
+id = "c1"
+label = """
+Client 1
+send(AAA)"""
+
+[[visualizer.steps.nodes]]
+id = "c2"
+label = """
+Client 2
+send(BBB)"""
+
+[[visualizer.steps.nodes]]
+id = "s"
+label = """
+Server children
+echo back"""

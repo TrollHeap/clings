@@ -1,0 +1,367 @@
+common_mistake = "Ne pas proteger le compteur readers avec mutex -> race condition entre lecteurs"
+description = """
+NSY103 — Le probleme lecteurs-redacteurs permet a plusieurs lecteurs de lire simultanement, mais un redacteur a un acces exclusif. On utilise : un semaphore 'rw_mutex' pour l'acces exclusif, un semaphore 'mutex' pour proteger le compteur de lecteurs, et un compteur 'readers'.
+
+Implementez 2 lecteurs sequentiels puis 1 redacteur. Les lecteurs incrementent un compteur de lectures, le redacteur ecrit une valeur. Affichez les resultats dans l'ordre."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Le premier lecteur (readers==1) verrouille rw_mutex pour bloquer les ecrivains",
+    "Le dernier lecteur (readers==0) relache rw_mutex pour laisser passer les ecrivains",
+    "L'ecrivain fait simplement wait/post sur rw_mutex — exclusif avec les lecteurs",
+]
+id = "sem-readers-01"
+kc_ids = ["KC-C11"]
+key_concept = "Lecteurs-redacteurs : premier lecteur lock rw_mutex, dernier unlock ; ecrivain lock exclusif"
+lang = "c"
+prerequisites = ["sem-barrier-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int data;
+    int readers;
+    int read_count;
+} RWData;
+
+int main(void) {
+    RWData *rw = (RWData *)mmap(NULL, sizeof(RWData),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    rw->data = 42;
+    rw->readers = 0;
+    rw->read_count = 0;
+
+    sem_t *mutex    = sem_open("/kf_sem_rmtx", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *rw_mutex = sem_open("/kf_sem_rwm",  O_CREAT | O_EXCL, 0644, 1);
+
+    for (int i = 0; i < 2; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sem_wait(mutex);
+            rw->readers++;
+            if (rw->readers == 1)
+                sem_wait(rw_mutex);
+            sem_post(mutex);
+
+            rw->read_count++;
+
+            sem_wait(mutex);
+            rw->readers--;
+            if (rw->readers == 0)
+                sem_post(rw_mutex);
+            sem_post(mutex);
+            _exit(0);
+        }
+        waitpid(pid, NULL, 0);
+    }
+
+    pid_t wpid = fork();
+    if (wpid == 0) {
+        sem_wait(rw_mutex);
+        rw->data = 99;
+        sem_post(rw_mutex);
+        _exit(0);
+    }
+    waitpid(wpid, NULL, 0);
+
+    printf("Reads: %d\n", rw->read_count);
+    printf("Data: %d\n", rw->data);
+
+    sem_close(mutex); sem_close(rw_mutex);
+    sem_unlink("/kf_sem_rmtx");
+    sem_unlink("/kf_sem_rwm");
+    munmap(rw, sizeof(RWData));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int data;
+    int readers;
+    int read_count;
+} RWData;
+
+int main(void) {
+    RWData *rw = (RWData *)mmap(NULL, sizeof(RWData),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    rw->data = 42;
+    rw->readers = 0;
+    rw->read_count = 0;
+
+    sem_t *mutex    = sem_open("/kf_sem_rmtx", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *rw_mutex = sem_open("/kf_sem_rwm",  O_CREAT | O_EXCL, 0644, 1);
+
+    for (int i = 0; i < 2; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sem_wait(mutex);
+            rw->readers++;
+            if (rw->readers == 1)
+                ____(rw_mutex);
+            sem_post(mutex);
+
+            rw->read_count++;
+
+            sem_wait(mutex);
+            rw->readers--;
+            if (rw->readers == 0)
+                ____(rw_mutex);
+            sem_post(mutex);
+            _exit(0);
+        }
+        waitpid(pid, NULL, 0);
+    }
+
+    pid_t wpid = fork();
+    if (wpid == 0) {
+        sem_wait(rw_mutex);
+        rw->data = 99;
+        sem_post(rw_mutex);
+        _exit(0);
+    }
+    waitpid(wpid, NULL, 0);
+
+    printf("Reads: %d\n", rw->read_count);
+    printf("Data: %d\n", rw->data);
+
+    sem_close(mutex); sem_close(rw_mutex);
+    sem_unlink("/kf_sem_rmtx");
+    sem_unlink("/kf_sem_rwm");
+    munmap(rw, sizeof(RWData));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct { int data; int readers; int read_count; } RWData;
+
+/* == EXEMPLE =======================================
+ * 1 lecteur + 1 ecrivain sequentiel
+ * ================================================= */
+void example_rw(void) {
+    int *d = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    *d = 10;
+    sem_t *rw = sem_open("/kf_ex_rw", O_CREAT|O_EXCL, 0644, 1);
+    /* reader */ sem_wait(rw); printf("Read: %d\n", *d); sem_post(rw);
+    /* writer */ sem_wait(rw); *d = 20; sem_post(rw);
+    printf("After write: %d\n", *d);
+    sem_close(rw); sem_unlink("/kf_ex_rw"); munmap(d, sizeof(int));
+}
+/* Resultat: Read: 10  After write: 20 */
+
+/* == VOTRE EXERCICE ================================
+ * Pattern lecteurs-redacteurs complet avec compteur de lecteurs.
+ * ================================================= */
+int main(void) {
+    RWData *rw = (RWData *)mmap(NULL, sizeof(RWData), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    rw->data = 42; rw->readers = 0; rw->read_count = 0;
+    /* TODO: 2 readers then 1 writer, using rw_mutex + mutex */
+    munmap(rw, sizeof(RWData));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct { int data; int readers; int read_count; } RWData;
+
+int main(void) {
+    RWData *rw = (RWData *)mmap(NULL, sizeof(RWData), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    rw->data = 42; rw->readers = 0; rw->read_count = 0;
+    sem_t *mutex = sem_open("/kf_sem_rmtx", O_CREAT|O_EXCL, 0644, 1);
+    sem_t *rw_mutex = sem_open("/kf_sem_rwm", O_CREAT|O_EXCL, 0644, 1);
+    for (int i = 0; i < 2; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sem_wait(mutex); rw->readers++;
+            if (rw->readers == 1) sem_wait(rw_mutex);
+            sem_post(mutex);
+            rw->read_count++;
+            sem_wait(mutex); rw->readers--;
+            if (rw->readers == 0) sem_post(rw_mutex);
+            sem_post(mutex);
+            _exit(0);
+        }
+        waitpid(pid, NULL, 0);
+    }
+    pid_t wpid = fork();
+    if (wpid == 0) { sem_wait(rw_mutex); rw->data = 99; sem_post(rw_mutex); _exit(0); }
+    waitpid(wpid, NULL, 0);
+    printf("Reads: %d\nData: %d\n", rw->read_count, rw->data);
+    sem_close(mutex); sem_close(rw_mutex);
+    sem_unlink("/kf_sem_rmtx"); sem_unlink("/kf_sem_rwm");
+    munmap(rw, sizeof(RWData));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int data;
+    int readers;
+    int read_count;
+} RWData;
+
+int main(void) {
+    RWData *rw = (RWData *)mmap(NULL, sizeof(RWData),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    rw->data = 42;
+    rw->readers = 0;
+    rw->read_count = 0;
+
+    sem_t *mutex    = sem_open("/kf_sem_rmtx", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *rw_mutex = sem_open("/kf_sem_rwm",  O_CREAT | O_EXCL, 0644, 1);
+
+    for (int i = 0; i < 2; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            sem_wait(mutex);
+            rw->readers++;
+            if (rw->readers == 1)
+                ____(rw_mutex);
+            sem_post(mutex);
+
+            rw->read_count++;
+
+            sem_wait(mutex);
+            rw->readers--;
+            if (rw->readers == 0)
+                ____(rw_mutex);
+            sem_post(mutex);
+            _exit(0);
+        }
+        waitpid(pid, NULL, 0);
+    }
+
+    pid_t wpid = fork();
+    if (wpid == 0) {
+        sem_wait(rw_mutex);
+        rw->data = 99;
+        sem_post(rw_mutex);
+        _exit(0);
+    }
+    waitpid(wpid, NULL, 0);
+
+    printf("Reads: %d\n", rw->read_count);
+    printf("Data: %d\n", rw->data);
+
+    sem_close(mutex); sem_close(rw_mutex);
+    sem_unlink("/kf_sem_rmtx");
+    sem_unlink("/kf_sem_rwm");
+    munmap(rw, sizeof(RWData));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // RWData{data, readers, read_count} en mmap
+    // mutex + rw_mutex
+    // 2 lecteurs seq: first locks rw, last unlocks rw
+    // 1 ecrivain: wait(rw)/write/post(rw)
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Probleme lecteurs-redacteurs"
+
+[validation]
+expected_output = """
+Reads: 2
+Data: 99
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "2 lecteurs sequentiels"
+
+[[visualizer.steps.edges]]
+label = "read (lock rw if first)"
+source = "r1"
+target = "data"
+
+[[visualizer.steps.edges]]
+label = "read (unlock rw if last)"
+source = "r2"
+target = "data"
+
+[[visualizer.steps.nodes]]
+id = "r1"
+label = "Reader 1"
+
+[[visualizer.steps.nodes]]
+id = "r2"
+label = "Reader 2"
+
+[[visualizer.steps.nodes]]
+id = "data"
+label = """
+data=42
+read_count=2"""
+
+[[visualizer.steps]]
+label = "1 ecrivain exclusif"
+
+[[visualizer.steps.edges]]
+label = "wait(rw_mutex)/write/post"
+source = "w"
+target = "data"
+
+[[visualizer.steps.nodes]]
+id = "w"
+label = "Writer"
+
+[[visualizer.steps.nodes]]
+id = "data"
+label = "data: 42 -> 99"
+
+[[visualizer.steps]]
+edges = []
+label = "Resultat: 2 lectures, data=99"
+
+[[visualizer.steps.nodes]]
+id = "result"
+label = """
+Reads: 2
+Data: 99"""

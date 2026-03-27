@@ -1,0 +1,221 @@
+common_mistake = "Oublier de passer l'adresse de sb avec & — stat() attend un pointeur"
+description = """
+NSY103 — L'appel système `stat()` remplit une structure `struct stat` avec les métadonnées d'un fichier : taille, permissions, timestamps, type. Les macros `S_ISREG()`, `S_ISDIR()` permettent de tester le type de fichier.
+
+Utilisez `stat()` pour afficher la taille et le type du fichier `/etc/hostname`."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "La fonction s'appelle `stat(chemin, &sb)` — premier argument : chemin, second : pointeur vers struct stat",
+    "La taille du fichier est dans le champ `sb.st_size`",
+    "Le type est testé via `S_ISREG(sb.st_mode)` pour un fichier régulier",
+]
+id = "fs-stat-01"
+kc_ids = ["KC-C19"]
+key_concept = "stat() remplit struct stat avec les métadonnées d'un fichier"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct stat sb;
+    const char *path = "/tmp/kf_test_stat";
+    FILE *f = fopen(path, "w");
+    if (!f) { perror("fopen"); return 1; }
+    fprintf(f, "hello world");
+    fclose(f);
+    if (stat(path, &sb) == -1) {
+        perror("stat");
+        return 1;
+    }
+    printf("Taille : %ld octets\n", (long)sb.st_size);
+    printf("Est un fichier : %d\n", S_ISREG(sb.st_mode) ? 1 : 0);
+    printf("Est un repertoire : %d\n", S_ISDIR(sb.st_mode) ? 1 : 0);
+    remove(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct stat sb;
+    if (____("____", &sb) == -1) {
+        perror("stat");
+        return 1;
+    }
+    printf("Taille : %ld octets\n", (long)sb.____);
+    printf("Est un fichier : %d\n", S_ISREG(sb.____) ? 1 : 0);
+    printf("Est un repertoire : %d\n", S_ISDIR(sb.st_mode) ? 1 : 0);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+
+/* == EXEMPLE ================================================
+ * Utiliser stat() pour verifier si un chemin est un repertoire
+ * stat() remplit une struct stat avec les metadonnees.
+ * S_ISDIR() teste le type via st_mode.
+ * =========================================================== */
+void example_check_dir(void) {
+    struct stat sb;
+    if (stat("/tmp", &sb) == -1) {
+        perror("stat");
+        return;
+    }
+    printf("/tmp est un repertoire : %d\n", S_ISDIR(sb.st_mode) ? 1 : 0);
+    printf("Permissions : %o\n", sb.st_mode & 0777);
+}
+/* Resultat: /tmp est un repertoire : 1, Permissions : 1777 */
+
+/* == VOTRE EXERCICE =========================================
+ * Utiliser stat() pour afficher la taille et le type d'un fichier
+ * Creez un fichier temporaire, puis utilisez stat() dessus.
+ * Affichez st_size, S_ISREG(), S_ISDIR().
+ * =========================================================== */
+int main(void) {
+    /* TODO: creer fichier, appeler stat(), afficher infos */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct stat sb;
+    const char *path = "/tmp/kf_test_stat";
+    FILE *f = fopen(path, "w");
+    if (!f) { perror("fopen"); return 1; }
+    fprintf(f, "hello world");
+    fclose(f);
+    if (stat(____, &sb) == -1) { // chemin du fichier
+        perror("stat");
+        return 1;
+    }
+    printf("Taille : %ld octets\n", (long)sb.____); // champ taille
+    printf("Est un fichier : %d\n", S_ISREG(sb.st_mode) ? 1 : 0);
+    printf("Est un repertoire : %d\n", S_ISDIR(sb.st_mode) ? 1 : 0);
+    remove(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct stat sb;
+    const char *path = "/tmp/kf_test_stat";
+    FILE *f = fopen(path, "w");
+    if (!f) { perror("fopen"); return 1; }
+    fprintf(f, "hello world");
+    fclose(f);
+    if (____(path, &____) == -1) {
+        perror("stat");
+        return 1;
+    }
+    printf("Taille : %ld octets\n", (long)sb.____);
+    printf("Est un fichier : %d\n", ____(sb.st_mode) ? 1 : 0);
+    printf("Est un repertoire : %d\n", S_ISDIR(sb.____) ? 1 : 0);
+    remove(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    // Creez un fichier /tmp/kf_test_stat contenant "hello world"
+    // Appelez stat() dessus
+    // Affichez: taille en octets, S_ISREG, S_ISDIR
+    // Supprimez le fichier avec remove()
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "stat() et informations de fichier"
+
+[validation]
+expected_output = """
+Taille : 11 octets
+Est un fichier : 1
+Est un repertoire : 0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "La structure `struct stat` est allouée sur la pile. Elle contient de nombreux champs : st_size, st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, etc."
+heap = []
+label = "Déclaration struct stat"
+step_label = "struct stat sb — structure de métadonnées"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sb"
+value = "{...}"
+
+[[visualizer.steps.stack]]
+name = "path"
+value = '"/tmp/kf_test_stat"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "stat() remplit la structure sb via le noyau. Le champ st_size contient la taille en octets. st_mode encode le type (fichier régulier = 0100000) et les permissions (644)."
+heap = []
+label = "Appel stat()"
+step_label = "stat() remplit sb depuis le noyau"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sb.st_size"
+value = "11"
+
+[[visualizer.steps.stack]]
+name = "sb.st_mode"
+value = "0100644"
+
+[[visualizer.steps.stack]]
+name = "sb.st_ino"
+value = "..."
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les macros S_ISREG et S_ISDIR extraient les bits de type de st_mode. S_ISREG teste si les bits correspondent à un fichier régulier (0100000). S_ISDIR teste pour un répertoire (0040000)."
+heap = []
+label = "Test S_ISREG / S_ISDIR"
+step_label = "Macros de test de type de fichier"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "S_ISREG(sb.st_mode)"
+value = "1 (vrai)"
+
+[[visualizer.steps.stack]]
+name = "S_ISDIR(sb.st_mode)"
+value = "0 (faux)"

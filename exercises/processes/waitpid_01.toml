@@ -1,0 +1,265 @@
+common_mistake = "Utiliser status directement comme code de sortie — il faut WEXITSTATUS pour extraire les 8 bits"
+description = """
+NSY103 — waitpid(pid, &status, options) permet d'attendre un processus avec des options : WNOHANG retourne immédiatement si aucun enfant n'est terminé, WUNTRACED détecte les enfants stoppés (SIGSTOP).
+
+Démontrez les macros WIFEXITED, WIFSIGNALED, WEXITSTATUS sur différents scénarios de terminaison."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "WEXITSTATUS(status) extrait le code de sortie (8 bits, 0-255)",
+    "WTERMSIG(status) retourne le numéro du signal qui a tué le processus",
+    "raise(sig) envoie un signal au processus courant (équivalent de kill(getpid(), sig))",
+]
+id = "waitpid-01"
+kc_ids = ["KC-C07"]
+key_concept = "Le status de wait encode la terminaison : WIFEXITED pour exit normal, WIFSIGNALED pour signal"
+lang = "c"
+prerequisites = ["fork-multi-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void check_status(const char *label, int status) {
+    if (WIFEXITED(status))
+        printf("%s: exited normally, code=%d\n", label, WEXITSTATUS(status));
+    else if (WIFSIGNALED(status))
+        printf("%s: killed by signal %d\n", label, WTERMSIG(status));
+    else
+        printf("%s: other\n", label);
+}
+
+int main(void) {
+    /* Enfant 1: sortie normale */
+    pid_t c1 = fork();
+    if (c1 == 0) _exit(0);
+
+    /* Enfant 2: sortie avec code erreur */
+    pid_t c2 = fork();
+    if (c2 == 0) _exit(42);
+
+    /* Enfant 3: tué par signal */
+    pid_t c3 = fork();
+    if (c3 == 0) {
+        raise(SIGTERM); /* se tue avec SIGTERM */
+        _exit(1);    /* jamais atteint */
+    }
+
+    int status;
+    waitpid(c1, &status, 0);
+    check_status("Child 1", status);
+
+    waitpid(c2, &status, 0);
+    check_status("Child 2", status);
+
+    waitpid(c3, &status, 0);
+    check_status("Child 3", status);
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void check_status(const char *label, int status) {
+    if (WIFEXITED(status))
+        printf("%s: exited normally, code=%d\n", label, ____(status));
+    else if (WIFSIGNALED(status))
+        printf("%s: killed by signal %d\n", label, ____(status));
+    else
+        printf("%s: other\n", label);
+}
+
+int main(void) {
+    /* Enfant 1: sortie normale */
+    pid_t c1 = fork();
+    if (c1 == 0) _exit(0);
+
+    /* Enfant 2: sortie avec code erreur */
+    pid_t c2 = fork();
+    if (c2 == 0) _exit(42);
+
+    /* Enfant 3: tué par signal */
+    pid_t c3 = fork();
+    if (c3 == 0) {
+        raise(____); /* se tue avec SIGTERM */
+        _exit(1);    /* jamais atteint */
+    }
+
+    int status;
+    waitpid(c1, &status, 0);
+    check_status("Child 1", status);
+
+    waitpid(c2, &status, 0);
+    check_status("Child 2", ____);
+
+    waitpid(c3, &status, 0);
+    check_status("Child 3", status);
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Décodage simple du status de wait
+ * ================================================= */
+void example_wait_status(void) {
+    pid_t p = fork();
+    if (p == 0) _exit(7);
+    int st;
+    wait(&st);
+    if (WIFEXITED(st))
+        printf("example: code=%d\n", WEXITSTATUS(st));
+}
+/* Resultat: example: code=7 */
+
+/* == VOTRE EXERCICE ================================
+ * 3 enfants: exit(0), exit(42), raise(SIGTERM)
+ * Décodez chaque status avec les macros W*
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void check_status(const char *label, int status) {
+    if (WIFEXITED(status))
+        printf("%s: exited normally, code=%d\n", label, ____(status));
+    else if (____SIGNALED(status))
+        printf("%s: killed by signal %d\n", label, ____(status));
+    else
+        printf("%s: other\n", label);
+}
+
+int main(void) {
+    pid_t c1 = ____(); if (c1 == 0) _exit(0);
+    pid_t c2 = fork(); if (c2 == 0) _exit(42);
+    pid_t c3 = fork();
+    if (c3 == 0) { ____(SIGTERM); _exit(1); }
+    int status;
+    ____(c1, &status, 0); check_status("Child 1", status);
+    waitpid(c2, &status, 0); check_status("Child 2", status);
+    waitpid(c3, &status, 0); check_status("Child 3", status);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void check_status(const char *label, int status) {
+    if (WIFEXITED(status))
+        printf("%s: exited normally, code=%d\n", label, ____(status));
+    else if (WIFSIGNALED(status))
+        printf("%s: killed by signal %d\n", label, ____(status));
+    else
+        printf("%s: other\n", label);
+}
+
+int main(void) {
+    pid_t c1 = fork(); if (c1 == 0) _exit(0);
+    pid_t c2 = fork(); if (c2 == 0) _exit(42);
+    pid_t c3 = fork();
+    if (c3 == 0) { raise(____); _exit(1); }
+    int status;
+    waitpid(c1, &status, 0); check_status("Child 1", status);
+    waitpid(c2, &status, 0); check_status("Child 2", ____);
+    waitpid(c3, &status, 0); check_status("Child 3", status);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+// check_status(label, status): WIFEXITED→WEXITSTATUS, WIFSIGNALED→WTERMSIG
+// main: 3 enfants avec exit(0), exit(42), raise(SIGTERM)
+// waitpid chacun et check_status
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "waitpid avec WNOHANG, WUNTRACED"
+
+[validation]
+expected_output = """
+Child 1: exited normally, code=0
+Child 2: exited normally, code=42
+Child 3: killed by signal 15
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Trois scénarios : sortie normale, code erreur, signal"
+heap = []
+label = "3 enfants avec terminaisons différentes"
+step_label = "3 enfants"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "c1"
+value = "_exit(0)"
+
+[[visualizer.steps.stack]]
+name = "c2"
+value = "_exit(42)"
+
+[[visualizer.steps.stack]]
+name = "c3"
+value = "raise(SIGTERM)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le status encode le mode de terminaison dans ses bits"
+heap = []
+label = "Décodage du status avec les macros"
+step_label = "Macros wait"
+
+[[visualizer.steps.call_frames]]
+args = "label, status"
+function_name = "check_status"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED(c1)"
+value = "true, code=0"
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED(c2)"
+value = "true, code=42"
+
+[[visualizer.steps.stack]]
+name = "WIFSIGNALED(c3)"
+value = "true, sig=15"

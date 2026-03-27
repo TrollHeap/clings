@@ -1,0 +1,215 @@
+common_mistake = "Supposer que sizeof(struct) == somme des sizeof(champs) — le padding ajoute des octets"
+description = """
+NSY103 — Les types C ont des tailles et des alignements spécifiques. sizeof donne la taille, offsetof donne le décalage d'un champ dans une structure. Le padding assure l'alignement naturel.
+
+Explorez les tailles des types fondamentaux et le padding dans les structures."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "sizeof(type) retourne la taille en octets, y compris le padding",
+    "offsetof(struct, field) retourne le décalage en octets depuis le début",
+    "Le compilateur ajoute du padding pour respecter l'alignement naturel de chaque type",
+]
+id = "pmem-maps-01"
+kc_ids = ["KC-C17"]
+key_concept = "sizeof/offsetof révèlent le padding d'alignement dans les structures"
+lang = "c"
+prerequisites = ["pmem-layout-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stddef.h>
+struct Padded {
+    char a;
+    int b;
+    char c;
+};
+struct Packed {
+    int x;
+    int y;
+};
+int main(void) {
+    printf("char: %zu\n", sizeof(char));
+    printf("int: %zu\n", sizeof(int));
+    printf("long: %zu\n", sizeof(long));
+    printf("ptr: %zu\n", sizeof(void *));
+    printf("Padded size: %zu\n", sizeof(struct Padded));
+    printf("Packed size: %zu\n", sizeof(struct Packed));
+    printf("offsetof(Padded, b): %zu\n", offsetof(struct Padded, b));
+    printf("offsetof(Padded, c): %zu\n", offsetof(struct Padded, c));
+    printf("Padding exists: %s\n",
+        sizeof(struct Padded) > sizeof(char) + sizeof(int) + sizeof(char) ? "yes" : "no");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stddef.h>
+
+struct Padded {
+    char a;
+    int b;
+    char c;
+};
+
+struct Packed {
+    int x;
+    int y;
+};
+
+int main(void) {
+    printf("char: %zu\n", sizeof(char));
+    printf("int: %zu\n", sizeof(int));
+    printf("long: %zu\n", sizeof(long));
+    printf("ptr: %zu\n", sizeof(void *));
+    printf("Padded size: %zu\n", ____(struct Padded));
+    printf("Packed size: %zu\n", sizeof(struct Packed));
+    printf("offsetof(Padded, b): %zu\n", ____(struct Padded, b));
+    printf("offsetof(Padded, c): %zu\n", offsetof(struct Padded, c));
+    printf("Padding exists: %s\n",
+        sizeof(struct Padded) > sizeof(char) + sizeof(int) + sizeof(char) ? "yes" : "no");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stddef.h>
+
+/* == EXEMPLE: alignement naturel ====================== */
+void example_align(void) {
+    struct Ex { char c; double d; };
+    printf("Ex size: %zu (char=1 + double=8 + padding)\n", sizeof(struct Ex));
+    printf("offsetof(Ex, d): %zu\n", offsetof(struct Ex, d));
+}
+
+struct Padded { char a; int b; char c; };
+struct Packed { int x; int y; };
+int main(void) {
+    printf("char: %zu\n", sizeof(char));
+    printf("int: %zu\n", sizeof(int));
+    printf("long: %zu\n", sizeof(long));
+    printf("ptr: %zu\n", sizeof(void *));
+    printf("Padded size: %zu\n", sizeof(struct Padded));
+    printf("Packed size: %zu\n", sizeof(struct Packed));
+    printf("offsetof(Padded, b): %zu\n", offsetof(struct Padded, b));
+    printf("offsetof(Padded, c): %zu\n", offsetof(struct Padded, c));
+    printf("Padding exists: %s\n",
+        sizeof(struct Padded) > sizeof(char)+sizeof(int)+sizeof(char) ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stddef.h>
+struct Padded { char a; int b; char c; };
+struct Packed { int x; int y; };
+int main(void) {
+    printf("char: %zu\n", sizeof(char));
+    printf("int: %zu\n", sizeof(int));
+    printf("long: %zu\n", sizeof(long));
+    printf("ptr: %zu\n", sizeof(void *));
+    printf("Padded size: %zu\n", sizeof(struct Padded));
+    printf("Packed size: %zu\n", sizeof(struct Packed));
+    printf("offsetof(Padded, b): %zu\n", offsetof(struct Padded, b));
+    printf("offsetof(Padded, c): %zu\n", ____(struct Padded, c));
+    printf("Padding exists: %s\n",
+        sizeof(struct Padded) > sizeof(char)+sizeof(int)+sizeof(char) ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stddef.h>
+struct Padded { char a; int b; char c; };
+struct Packed { int x; int y; };
+int main(void) {
+    printf("char: %zu\n", sizeof(char));
+    printf("int: %zu\n", sizeof(int));
+    printf("long: %zu\n", sizeof(long));
+    printf("ptr: %zu\n", sizeof(void *));
+    printf("Padded size: %zu\n", ____(struct Padded));
+    printf("Packed size: %zu\n", sizeof(struct Packed));
+    printf("offsetof(Padded, b): %zu\n", ____(struct Padded, b));
+    printf("offsetof(Padded, c): %zu\n", offsetof(struct Padded, c));
+    printf("Padding exists: %s\n",
+        sizeof(struct Padded) > sizeof(char)+sizeof(int)+sizeof(char) ? "yes" : "no");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stddef.h>
+
+// Explorez sizeof et offsetof sur les types et structures
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Tailles et alignement mémoire"
+
+[validation]
+expected_output = """
+char: 1
+int: 4
+long: 8
+ptr: 8
+Padded size: 12
+Packed size: 8
+offsetof(Padded, b): 4
+offsetof(Padded, c): 8
+Padding exists: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Tailles standard sur x86_64"
+heap = []
+label = "Types fondamentaux"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "char"
+value = "1 octet"
+
+[[visualizer.steps.stack]]
+name = "int"
+value = "4 octets"
+
+[[visualizer.steps.stack]]
+name = "long"
+value = "8 octets"
+
+[[visualizer.steps.stack]]
+name = "void*"
+value = "8 octets"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le compilateur ajoute du padding pour aligner int à 4"
+heap = []
+label = "Padding dans struct"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Padded"
+value = "[a:1][pad:3][b:4][c:1][pad:3] = 12"
+
+[[visualizer.steps.stack]]
+name = "Packed"
+value = "[x:4][y:4] = 8"

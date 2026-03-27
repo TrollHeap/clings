@@ -1,0 +1,307 @@
+common_mistake = "Oublier le cast (long) dans index * sizeof — overflow sur grands fichiers avec int"
+description = """
+NSY103 — Les fichiers à enregistrements fixes (fixed-size records) permettent un accès direct par index : offset = index * sizeof(record). On utilise fwrite/fread pour sérialiser des structs binaires.
+
+Créez une mini base de données d'étudiants avec accès direct par numéro."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "SEEK_SET pour un accès absolu : index * sizeof(Student) donne l'offset",
+    "fwrite(&s, sizeof(Student), 1, f) écrit une struct entière en binaire",
+    "fread(&s, sizeof(Student), 1, f) retourne 1 si lecture réussie",
+]
+id = "file-record-01"
+kc_ids = ["KC-C06"]
+key_concept = "L'accès direct par index dans un fichier à enregistrements fixes : offset = index * sizeof(record)"
+lang = "c"
+prerequisites = ["file-seek-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    int id;
+    char name[20];
+    float grade;
+} Student;
+
+void write_student(FILE *f, int index, const Student *s) {
+    fseek(f, index * (long)sizeof(Student), SEEK_SET);
+    fwrite(s, sizeof(Student), 1, f);
+}
+
+int read_student(FILE *f, int index, Student *s) {
+    fseek(f, index * (long)sizeof(Student), SEEK_SET);
+    return fread(s, sizeof(Student), 1, f) == 1;
+}
+
+int main(void) {
+    FILE *db = tmpfile();
+    if (!db) return 1;
+
+    Student students[] = {
+        {101, "Alice",   15.5f},
+        {102, "Bob",     12.0f},
+        {103, "Charlie", 17.5f},
+    };
+
+    for (int i = 0; i < 3; i++)
+        write_student(db, i, &students[i]);
+
+    /* Lecture dans l'ordre inverse */
+    Student s;
+    for (int i = 2; i >= 0; i--) {
+        if (read_student(db, i, &s))
+            printf("[%d] %s: %.1f\n", s.id, s.name, s.grade);
+    }
+
+    fclose(db);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    int id;
+    char name[20];
+    float grade;
+} Student;
+
+void write_student(FILE *f, int index, const Student *s) {
+    fseek(f, index * (long)sizeof(Student), ____);
+    fwrite(s, sizeof(Student), 1, f);
+}
+
+int read_student(FILE *f, int index, Student *s) {
+    fseek(f, index * (long)sizeof(Student), ____);
+    return fread(s, ____, 1, f) == 1;
+}
+
+int main(void) {
+    FILE *db = tmpfile();
+    if (!db) return 1;
+
+    Student students[] = {
+        {101, "Alice",   15.5f},
+        {102, "Bob",     12.0f},
+        {103, "Charlie", 17.5f},
+    };
+
+    for (int i = 0; i < 3; i++)
+        write_student(db, i, &students[i]);
+
+    /* Lecture dans l'ordre inverse */
+    Student s;
+    for (int i = 2; i >= 0; i--) {
+        if (read_student(db, i, &s))
+            printf("[%d] %s: %.1f\n", s.id, s.____, s.____);
+    }
+
+    fclose(db);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int id; char name[20]; float grade; } Student;
+
+/* == EXEMPLE =======================================
+ * Base de données de produits à enregistrements fixes
+ * Pattern: fseek(index * sizeof) + fwrite/fread
+ * ================================================= */
+typedef struct { int code; char label[16]; double price; } Product;
+
+void example_db(void) {
+    FILE *f = tmpfile();
+    if (!f) return;
+    Product prods[] = {{1, "Clavier", 29.99}, {2, "Souris", 15.50}};
+    for (int i = 0; i < 2; i++) {
+        fseek(f, i * (long)sizeof(Product), SEEK_SET);
+        fwrite(&prods[i], sizeof(Product), 1, f);
+    }
+    Product p;
+    fseek(f, 1 * (long)sizeof(Product), SEEK_SET);
+    fread(&p, sizeof(Product), 1, f);
+    printf("Product: %s @ %.2f\n", p.label, p.price);
+    fclose(f);
+}
+/* Resultat: Product: Souris @ 15.50 */
+
+/* == VOTRE EXERCICE ================================
+ * Base de données d'étudiants, lecture en ordre inverse.
+ * Inspirez-vous de example_db.
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int id; char name[20]; float grade; } Student;
+
+void write_student(FILE *f, int index, const Student *s) {
+    fseek(f, index * (long)sizeof(Student), SEEK_SET);
+    fwrite(s, sizeof(Student), 1, f);
+}
+
+int read_student(FILE *f, int index, Student *s) {
+    fseek(f, index * (long)sizeof(Student), SEEK_SET);
+    return fread(s, sizeof(Student), 1, f) == 1;
+}
+
+int main(void) {
+    FILE *db = tmpfile();
+    if (!db) return 1;
+    Student students[] = {
+        {101, "Alice", 15.5f}, {102, "Bob", 12.0f}, {103, "Charlie", 17.5f},
+    };
+    for (int i = 0; i < 3; i++)
+        write_student(db, i, &students[i]);
+    Student s;
+    for (int i = 2; i >= 0; i--) {
+        if (read_student(db, i, &s))
+            printf("[%d] %s: %.1f\n", s.____, s.____, s.____); // id, name, grade
+    }
+    fclose(db);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int id; char name[20]; float grade; } Student;
+
+void write_student(FILE *f, int index, const Student *s) {
+    fseek(f, index * (long)sizeof(Student), ____);
+    fwrite(s, sizeof(Student), 1, f);
+}
+
+int read_student(FILE *f, int index, Student *s) {
+    fseek(f, index * (long)sizeof(Student), ____);
+    return fread(s, ____, 1, f) == 1;
+}
+
+int main(void) {
+    FILE *db = tmpfile();
+    if (!db) return 1;
+    Student students[] = {
+        {101, "Alice", 15.5f}, {102, "Bob", 12.0f}, {103, "Charlie", 17.5f},
+    };
+    for (int i = 0; i < 3; i++)
+        write_student(db, i, &students[i]);
+    Student s;
+    for (int i = 2; i >= 0; i--) {
+        if (read_student(db, i, &s))
+            printf("[%d] %s: %.1f\n", s.id, s.____, s.____);
+    }
+    fclose(db);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int id; char name[20]; float grade; } Student;
+
+// Écrire write_student(FILE*, int index, const Student*)
+// Écrire read_student(FILE*, int index, Student*)
+// main: tmpfile, écrire 3 étudiants, lire en ordre inverse
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Base de données à enregistrements fixes"
+
+[validation]
+expected_output = """
+[103] Charlie: 17.5
+[102] Bob: 12.0
+[101] Alice: 15.5
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Chaque Student occupe sizeof(Student) octets dans le fichier"
+label = "Écriture séquentielle de 3 étudiants"
+step_label = "Écriture"
+
+[[visualizer.steps.arrows]]
+from = "students[0]"
+label = "fwrite"
+to = "db (tmpfile)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "db (tmpfile)"
+value = "[Alice|Bob|Charlie]"
+
+[[visualizer.steps.stack]]
+name = "students[0]"
+value = '{101, "Alice", 15.5}'
+
+[[visualizer.steps.stack]]
+name = "students[1]"
+value = '{102, "Bob", 12.0}'
+
+[[visualizer.steps.stack]]
+name = "students[2]"
+value = '{103, "Charlie", 17.5}'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fseek au bon offset, fread remplit la struct directement"
+heap = []
+label = "Accès direct index 2 → Charlie"
+step_label = "Lecture directe"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "db, 2, &s"
+function_name = "read_student"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s"
+value = '{103, "Charlie", 17.5}'
+
+[[visualizer.steps.stack]]
+name = "offset"
+value = "2 * sizeof(Student)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Accès aléatoire : pas besoin de lire séquentiellement"
+heap = []
+label = "Lecture inverse terminée"
+step_label = "Résultat"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sortie"
+value = "Charlie → Bob → Alice"

@@ -1,0 +1,277 @@
+common_mistake = "Utiliser rdlock dans le writer → pas d'exclusion, data race"
+description = """
+NSY103 — Un rwlock permet plusieurs lecteurs simultanés OU un seul écrivain. pthread_rwlock_rdlock pour la lecture, pthread_rwlock_wrlock pour l'écriture.
+
+Utilisez un rwlock pour protéger l'accès à une valeur partagée avec 2 lecteurs et 1 écrivain."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "pthread_rwlock_rdlock pour le lecteur — plusieurs lecteurs peuvent lire en parallèle",
+    "pthread_rwlock_wrlock pour l'écrivain — accès exclusif",
+    "Toujours appeler pthread_rwlock_unlock après la section critique",
+]
+id = "pthread-rwlock-01"
+kc_ids = ["KC-C09"]
+key_concept = "rwlock permet N lecteurs simultanés OU 1 écrivain exclusif — meilleure concurrence que mutex pour lectures fréquentes"
+lang = "c"
+prerequisites = ["pthread-pool-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int shared_val = 10;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Reader %d: value = %d\n", id, shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    (void)arg;
+    pthread_rwlock_wrlock(&rwlock);
+    shared_val = 99;
+    printf("Writer: set value = %d\n", shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t r1, r2, w;
+    int id1 = 1, id2 = 2;
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w, NULL, writer, NULL);
+    pthread_join(w, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int shared_val = 10;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    ____(&rwlock);
+    printf("Reader %d: value = %d\n", id, shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    (void)arg;
+    ____(&rwlock);
+    shared_val = 99;
+    printf("Writer: set value = %d\n", shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t r1, r2, w;
+    int id1 = 1, id2 = 2;
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w, NULL, writer, NULL);
+    pthread_join(w, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * rwlock simple: créer et destroyer
+ * Le rwlock permet aux lecteurs de coexister
+ * ========================================================= */
+int shared_val = 10;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    printf("rwlock initialized\n");
+    printf("shared_val = %d\n", shared_val);
+    pthread_rwlock_destroy(&rwlock);
+    printf("rwlock destroyed\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int shared_val = 10;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Reader %d: value = %d\n", id, shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    (void)arg;
+    pthread_rwlock_wrlock(&rwlock);
+    shared_val = 99;
+    printf("Writer: set value = %d\n", shared_val);
+    ____(&rwlock);  // déverrouiller
+    return NULL;
+}
+
+int main(void) {
+    pthread_t r1, r2, w;
+    int id1 = 1, id2 = 2;
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w, NULL, writer, NULL);
+    pthread_join(w, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int shared_val = 10;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    ____(&rwlock);
+    printf("Reader %d: value = %d\n", id, shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    (void)arg;
+    ____(&rwlock);
+    shared_val = 99;
+    printf("Writer: set value = %d\n", shared_val);
+    pthread_rwlock_unlock(&rwlock);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t r1, r2, w;
+    int id1 = 1, id2 = 2;
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w, NULL, writer, NULL);
+    pthread_join(w, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// rwlock pour shared_val=10
+// Reader 1 lit, Writer met 99, Reader 2 lit
+// Sortie: Reader 1: value = 10, Writer: set value = 99, Reader 2: value = 99
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "pthreads"
+title = "Read-write lock"
+
+[validation]
+expected_output = """
+Reader 1: value = 10
+Writer: set value = 99
+Reader 2: value = 99
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Reader 1 prend un read-lock et lit 10"
+heap = []
+label = "Reader 1 lit la valeur initiale"
+step_label = "1. Lecture"
+
+[[visualizer.steps.call_frames]]
+args = "id=1"
+function_name = "reader"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "shared_val"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "rwlock"
+value = "RD_LOCKED"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Writer prend un write-lock exclusif et met 99"
+heap = []
+label = "Writer modifie la valeur"
+step_label = "2. Écriture"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "writer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "shared_val"
+value = "99"
+
+[[visualizer.steps.stack]]
+name = "rwlock"
+value = "WR_LOCKED"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Reader 2 voit la valeur mise à jour (99)"
+heap = []
+label = "Reader 2 lit la nouvelle valeur"
+step_label = "3. Re-lecture"
+
+[[visualizer.steps.call_frames]]
+args = "id=2"
+function_name = "reader"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "shared_val"
+value = "99"
+
+[[visualizer.steps.stack]]
+name = "rwlock"
+value = "RD_LOCKED"

@@ -1,0 +1,333 @@
+common_mistake = "Oublier le cast (char*) dans container_of — sans lui, l'arithmétique de pointeurs utilise sizeof(*ptr) au lieu d'octets"
+description = """
+NSY103 — Dans le noyau Linux, les listes chaînées sont intrusives : le nœud de liste est imbriqué dans la struct de données. La macro `container_of` retrouve la struct englobante à partir de l'adresse du nœud, en utilisant `offsetof`.
+
+Implémentez une liste intrusive simplifiée avec `container_of`, `list_add` et un parcours."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "`container_of(ptr, type, member)` soustrait offsetof(type, member) à l'adresse ptr pour remonter au début de la struct",
+    "Le nœud de liste `ListNode link` est un champ de Task, pas un wrapper autour de Task",
+    "list_add insère en tête : `node->next = head->next; head->next = node;`",
+]
+id = "struct-intrusive-01"
+kc_ids = ["KC-C03"]
+key_concept = "container_of utilise offsetof pour retrouver la struct englobante — c'est le fondement des listes intrusives du noyau Linux"
+lang = "c"
+prerequisites = ["struct-padding-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+
+typedef struct ListNode {
+    struct ListNode *next;
+} ListNode;
+
+typedef struct {
+    int pid;
+    char name[16];
+    ListNode link;
+} Task;
+
+void list_add(ListNode *head, ListNode *node) {
+    node->next = head->next;
+    head->next = node;
+}
+
+int main(void) {
+    ListNode head = {NULL};
+
+    Task t1 = {100, "init", {NULL}};
+    Task t2 = {200, "bash", {NULL}};
+    Task t3 = {300, "vim", {NULL}};
+
+    list_add(&head, &t1.link);
+    list_add(&head, &t2.link);
+    list_add(&head, &t3.link);
+
+    printf("Task list:\n");
+    for (ListNode *n = head.next; n; n = n->next) {
+        Task *t = container_of(n, Task, link);
+        printf("  pid=%d name=%s\n", t->pid, t->name);
+    }
+
+    printf("offsetof(Task, link) = %zu\n", offsetof(Task, link));
+    printf("sizeof(Task) = %zu\n", sizeof(Task));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(____, ____)))
+
+typedef struct ListNode {
+    struct ListNode *next;
+} ListNode;
+
+typedef struct {
+    int pid;
+    char name[16];
+    ListNode ____;
+} Task;
+
+void list_add(ListNode *head, ListNode *node) {
+    node->next = head->____;
+    head->next = ____;
+}
+
+int main(void) {
+    ListNode head = {NULL};
+
+    Task t1 = {100, "init", {NULL}};
+    Task t2 = {200, "bash", {NULL}};
+    Task t3 = {300, "vim", {NULL}};
+
+    list_add(&head, &t1.link);
+    list_add(&head, &t2.link);
+    list_add(&head, &t3.link);
+
+    printf("Task list:\n");
+    for (ListNode *n = head.next; n; n = n->next) {
+        Task *t = container_of(n, Task, ____);
+        printf("  pid=%d name=%s\n", t->pid, t->name);
+    }
+
+    printf("offsetof(Task, link) = %zu\n", offsetof(Task, link));
+    printf("sizeof(Task) = %zu\n", sizeof(Task));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * container_of simplifie : retrouver un Employee depuis son badge
+ * Le badge (struct Badge) est imbrique dans Employee.
+ * =========================================================== */
+typedef struct Badge { int id; } Badge;
+typedef struct { char name[20]; Badge badge; } Employee;
+
+#define example_container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+
+void example_demo(void) {
+    Employee emp = {"Alice", {42}};
+    Badge *b = &emp.badge;
+    Employee *e = example_container_of(b, Employee, badge);
+    printf("%s (badge %d)\n", e->name, e->badge.id);
+    printf("offsetof(Employee, badge) = %zu\n", offsetof(Employee, badge));
+}
+/* Resultat: Alice (badge 42) / offsetof = 20 */
+
+/* == VOTRE EXERCICE =========================================
+ * Liste intrusive de Tasks avec container_of
+ * Chaque Task contient un ListNode link.
+ * =========================================================== */
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+
+typedef struct ListNode { struct ListNode *next; } ListNode;
+typedef struct { int pid; char name[16]; ListNode link; } Task;
+
+void list_add(ListNode *head, ListNode *node) {
+    node->next = head->next; head->next = node;
+}
+
+int main(void) {
+    /* TODO: creer 3 tasks, les ajouter, parcourir avec container_of */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+
+typedef struct ListNode { struct ListNode *next; } ListNode;
+typedef struct { int pid; char name[16]; ListNode link; } Task;
+
+void list_add(ListNode *head, ListNode *node) {
+    node->next = head->next; head->next = node;
+}
+
+int main(void) {
+    ListNode head = {NULL};
+    Task t1 = {100, "init", {NULL}};
+    Task t2 = {200, "bash", {NULL}};
+    Task t3 = {300, "vim", {NULL}};
+    list_add(&head, &t1.link);
+    list_add(&head, &t2.link);
+    list_add(&head, &t3.link);
+    printf("Task list:\n");
+    for (ListNode *n = head.next; n; n = n->next) {
+        Task *t = container_of(n, Task, ____);
+        printf("  pid=%d name=%s\n", t->____, t->____);
+    }
+    printf("offsetof(Task, link) = %zu\n", offsetof(Task, link));
+    printf("sizeof(Task) = %zu\n", sizeof(Task));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(____, ____)))
+
+typedef struct ListNode {
+    struct ListNode *next;
+} ListNode;
+
+typedef struct {
+    int pid;
+    char name[16];
+    ListNode ____;
+} Task;
+
+void list_add(ListNode *head, ListNode *node) {
+    node->next = head->____;
+    head->next = ____;
+}
+
+int main(void) {
+    ListNode head = {NULL};
+
+    Task t1 = {100, "init", {NULL}};
+    Task t2 = {200, "bash", {NULL}};
+    Task t3 = {300, "vim", {NULL}};
+
+    list_add(&head, &t1.link);
+    list_add(&head, &t2.link);
+    list_add(&head, &t3.link);
+
+    printf("Task list:\n");
+    for (ListNode *n = head.next; n; n = n->next) {
+        Task *t = container_of(n, Task, ____);
+        printf("  pid=%d name=%s\n", t->pid, t->name);
+    }
+
+    printf("offsetof(Task, link) = %zu\n", offsetof(Task, link));
+    printf("sizeof(Task) = %zu\n", sizeof(Task));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+
+// Definissez container_of, ListNode, Task
+// Implementez list_add et parcourez avec container_of
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stddef.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Liste intrusive style noyau (container_of)"
+
+[validation]
+expected_output = """
+Task list:
+  pid=300 name=vim
+  pid=200 name=bash
+  pid=100 name=init
+offsetof(Task, link) = 24
+sizeof(Task) = 32
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Les Tasks sont sur la pile, chacune contient un ListNode `link` à l'offset 24. La liste passe par les champs link, pas par les Tasks elles-mêmes. C'est l'inversion clé : la donnée contient le nœud, pas l'inverse."
+heap = []
+label = "3 Tasks avec nœuds intrusifs"
+step_label = "Liste intrusive — le nœud est DANS la donnée"
+
+[[visualizer.steps.arrows]]
+from = "head.next"
+label = "next"
+to = "t3 {300,vim}"
+
+[[visualizer.steps.arrows]]
+from = "t3 {300,vim}"
+label = "next"
+to = "t2 {200,bash}"
+
+[[visualizer.steps.arrows]]
+from = "t2 {200,bash}"
+label = "next"
+to = "t1 {100,init}"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "head.next"
+value = "→t3.link"
+
+[[visualizer.steps.stack]]
+name = "t3 {300,vim}"
+value = "link.next → t2.link"
+
+[[visualizer.steps.stack]]
+name = "t2 {200,bash}"
+value = "link.next → t1.link"
+
+[[visualizer.steps.stack]]
+name = "t1 {100,init}"
+value = "link.next = NULL"
+
+[[visualizer.steps]]
+explanation = "container_of soustrait offsetof(Task, link)=24 de l'adresse de n. On recule de 24 octets pour passer du champ link au début de la struct Task. C'est de l'arithmétique de pointeurs pure — aucune allocation supplémentaire."
+heap = []
+label = "container_of retrouve Task depuis ListNode"
+step_label = "container_of — remonter de 24 octets"
+
+[[visualizer.steps.arrows]]
+from = "n"
+label = "container_of"
+to = "t3 {300,vim}"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "→t3.link (offset 24)"
+
+[[visualizer.steps.stack]]
+name = "(char*)n - 24"
+value = "→t3 (début)"
+
+[[visualizer.steps.stack]]
+name = "t->pid"
+value = "300"
+
+[[visualizer.steps.stack]]
+name = "t->name"
+value = '"vim"'

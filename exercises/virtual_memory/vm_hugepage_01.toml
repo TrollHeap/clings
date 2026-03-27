@@ -1,0 +1,280 @@
+common_mistake = "Supposer que MAP_HUGETLB fonctionne toujours — il faut des huge pages pré-réservées dans /proc/sys/vm/nr_hugepages"
+description = """
+NSY103 — Les huge pages (2MB ou 1GB sur x86_64) réduisent la pression sur le TLB en utilisant moins d'entrées pour couvrir la même mémoire. MAP_HUGETLB demande des huge pages au noyau. On peut aussi utiliser madvise avec MADV_HUGEPAGE pour le transparent huge pages (THP).
+
+Comparez la taille de page standard avec les huge pages et explorez les constantes associées."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "madvise(addr, len, MADV_HUGEPAGE) demande au noyau d'utiliser des transparent huge pages",
+    "Une huge page de 2MB = 512 pages standard de 4KB",
+    "munmap libère le mapping, qu'il soit en pages standard ou huge pages",
+]
+id = "vm-hugepage-01"
+kc_ids = ["KC-C18"]
+key_concept = "Les huge pages (2MB) réduisent les TLB misses en couvrant 512x plus de mémoire par entrée"
+lang = "c"
+prerequisites = [
+    "vm-mmap-01",
+    "vm-page-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif
+
+int main(void) {
+    long ps = getpagesize();
+    long hp_size = 2L * 1024 * 1024; /* 2MB */
+    printf("Standard page: %ld bytes\n", ps);
+    printf("Huge page: %ld bytes\n", hp_size);
+    printf("Ratio: %ld standard pages per huge page\n", hp_size / ps);
+    long tlb_entries = 1024;
+    long coverage_std = tlb_entries * ps;
+    long coverage_hp = tlb_entries * hp_size;
+    printf("TLB coverage (standard): %ld MB\n", coverage_std / (1024 * 1024));
+    printf("TLB coverage (huge): %ld MB\n", coverage_hp / (1024 * 1024));
+    char *mem = (char *)mmap(NULL, hp_size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    int rc = madvise(mem, (size_t)hp_size, MADV_HUGEPAGE);
+    printf("madvise HUGEPAGE: %s\n", rc == 0 ? "ok" : "unsupported");
+    memset(mem, 'H', (size_t)hp_size);
+    printf("Filled 2MB: %c...%c\n", mem[0], mem[hp_size - 1]);
+    munmap(mem, (size_t)hp_size);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif
+
+int main(void) {
+    long ps = getpagesize();
+    long hp_size = 2L * 1024 * 1024; /* 2MB */
+    printf("Standard page: %ld bytes\n", ps);
+    printf("Huge page: %ld bytes\n", hp_size);
+    printf("Ratio: %ld standard pages per huge page\n", hp_size / ps);
+    long tlb_entries = 1024;
+    long coverage_std = tlb_entries * ps;
+    long coverage_hp = tlb_entries * hp_size;
+    printf("TLB coverage (standard): %ld MB\n", coverage_std / (1024 * 1024));
+    printf("TLB coverage (huge): %ld MB\n", coverage_hp / (1024 * 1024));
+    char *mem = (char *)mmap(NULL, hp_size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    int rc = ____(mem, (size_t)hp_size, ____);
+    printf("madvise HUGEPAGE: %s\n", rc == 0 ? "ok" : "unsupported");
+    memset(mem, 'H', (size_t)hp_size);
+    printf("Filled 2MB: %c...%c\n", mem[0], mem[hp_size - 1]);
+    ____(mem, (size_t)hp_size);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif
+
+/* == EXEMPLE: calcul de couverture TLB ================ */
+void example_tlb(void) {
+    long ps = getpagesize();
+    int entries = 64;
+    printf("64 entrées TLB x %ld = %ld KB couverts\n", ps, (long)entries * ps / 1024);
+    printf("64 entrées TLB x 2MB = %d MB couverts\n", entries * 2);
+}
+
+int main(void) {
+    long ps = getpagesize();
+    long hp_size = 2L * 1024 * 1024;
+    printf("Standard page: %ld bytes\n", ps);
+    printf("Huge page: %ld bytes\n", hp_size);
+    printf("Ratio: %ld standard pages per huge page\n", hp_size / ps);
+    long tlb_entries = 1024;
+    long coverage_std = tlb_entries * ps;
+    long coverage_hp = tlb_entries * hp_size;
+    printf("TLB coverage (standard): %ld MB\n", coverage_std / (1024*1024));
+    printf("TLB coverage (huge): %ld MB\n", coverage_hp / (1024*1024));
+    char *mem = mmap(NULL, hp_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    int rc = madvise(mem, (size_t)hp_size, MADV_HUGEPAGE);
+    printf("madvise HUGEPAGE: %s\n", rc == 0 ? "ok" : "unsupported");
+    memset(mem, 'H', (size_t)hp_size);
+    printf("Filled 2MB: %c...%c\n", mem[0], mem[hp_size-1]);
+    munmap(mem, (size_t)hp_size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif
+
+int main(void) {
+    long ps = getpagesize();
+    long hp_size = 2L * 1024 * 1024;
+    printf("Standard page: %ld bytes\n", ps);
+    printf("Huge page: %ld bytes\n", hp_size);
+    printf("Ratio: %ld standard pages per huge page\n", hp_size / ps);
+    long tlb_entries = 1024;
+    long coverage_std = tlb_entries * ps;
+    long coverage_hp = tlb_entries * hp_size;
+    printf("TLB coverage (standard): %ld MB\n", coverage_std / (1024*1024));
+    printf("TLB coverage (huge): %ld MB\n", coverage_hp / (1024*1024));
+    char *mem = mmap(NULL, hp_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    int rc = madvise(mem, (size_t)hp_size, ____);
+    printf("madvise HUGEPAGE: %s\n", rc == 0 ? "ok" : "unsupported");
+    memset(mem, 'H', (size_t)hp_size);
+    printf("Filled 2MB: %c...%c\n", mem[0], mem[hp_size-1]);
+    ____(mem, (size_t)hp_size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif
+
+int main(void) {
+    long ps = getpagesize();
+    long hp_size = 2L * 1024 * 1024;
+    printf("Standard page: %ld bytes\n", ps);
+    printf("Huge page: %ld bytes\n", hp_size);
+    printf("Ratio: %ld standard pages per huge page\n", hp_size / ps);
+    long tlb_entries = 1024;
+    long coverage_std = tlb_entries * ps;
+    long coverage_hp = tlb_entries * hp_size;
+    printf("TLB coverage (standard): %ld MB\n", coverage_std / (1024*1024));
+    printf("TLB coverage (huge): %ld MB\n", coverage_hp / (1024*1024));
+    char *mem = mmap(NULL, hp_size, PROT_READ|PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    int rc = ____(mem, (size_t)hp_size, ____);
+    printf("madvise HUGEPAGE: %s\n", rc == 0 ? "ok" : "unsupported");
+    memset(mem, 'H', (size_t)hp_size);
+    printf("Filled 2MB: %c...%c\n", mem[0], mem[hp_size-1]);
+    ____(mem, (size_t)hp_size);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+// Comparez pages standard et huge, utilisez madvise MADV_HUGEPAGE
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Huge pages et TLB"
+
+[validation]
+expected_output = "REGEX:(?s)Huge.*pages"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "1 huge page remplace 512 entrées TLB standard"
+heap = []
+label = "Pages standard vs huge"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ps"
+value = "4096 (4KB)"
+
+[[visualizer.steps.stack]]
+name = "hp_size"
+value = "2097152 (2MB)"
+
+[[visualizer.steps.stack]]
+name = "ratio"
+value = "512"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les huge pages multiplient par 512 la couverture TLB"
+heap = []
+label = "Couverture TLB"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "TLB std"
+value = "4 MB (1024 x 4KB)"
+
+[[visualizer.steps.stack]]
+name = "TLB huge"
+value = "2048 MB (1024 x 2MB)"
+
+[[visualizer.steps]]
+explanation = "Le noyau tente de consolider en huge page"
+label = "MADV_HUGEPAGE"
+step_label = "Étape 3"
+
+[[visualizer.steps.arrows]]
+from = "mem"
+to = "2MB zone"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "2MB zone"
+content = '"HHH...HHH"'
+
+[[visualizer.steps.stack]]
+name = "mem"
+value = "→ 2MB mapping"
+
+[[visualizer.steps.stack]]
+name = "madvise"
+value = "MADV_HUGEPAGE"

@@ -1,0 +1,166 @@
+common_mistake = "Supposer que la page fait toujours 4096 — sur ARM64 elle peut faire 16384"
+description = """
+NSY103 — La mémoire virtuelle est découpée en pages (typiquement 4096 octets sur x86_64). getpagesize() et sysconf(_SC_PAGESIZE) retournent cette taille. Toutes les opérations mmap/mprotect doivent être alignées sur cette granularité.
+
+Affichez la taille de page et vérifiez qu'elle est une puissance de 2."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "getpagesize() retourne la taille de page en octets",
+    "_SC_PAGESIZE est la constante sysconf pour la taille de page",
+    "Sur x86_64, la page standard fait 4096 octets (2^12)",
+]
+id = "vm-page-01"
+kc_ids = ["KC-C18"]
+key_concept = "La page est l'unité de base de la mémoire virtuelle — getpagesize() la révèle"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+int is_power_of_2(long n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+int main(void) {
+    long ps1 = getpagesize();
+    long ps2 = sysconf(_SC_PAGESIZE);
+    printf("getpagesize: %ld\n", ps1);
+    printf("sysconf: %ld\n", ps2);
+    printf("Match: %s\n", ps1 == ps2 ? "yes" : "no");
+    printf("Power of 2: %s\n", is_power_of_2(ps1) ? "yes" : "no");
+    printf("Page size >= 4096: %s\n", ps1 >= 4096 ? "yes" : "no");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+
+int is_power_of_2(long n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+int main(void) {
+    long ps1 = ____();
+    long ps2 = sysconf(____);
+    printf("getpagesize: %ld\n", ps1);
+    printf("sysconf: %ld\n", ps2);
+    printf("Match: %s\n", ps1 == ps2 ? "yes" : "no");
+    printf("Power of 2: %s\n", is_power_of_2(ps1) ? "yes" : "no");
+    printf("Page size >= 4096: %s\n", ps1 >= 4096 ? "yes" : "no");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+
+/* == EXEMPLE: constantes de page ====================== */
+void example_page(void) {
+    printf("PAGE_SIZE via getpagesize: %d\n", getpagesize());
+    printf("Bits: %d (2^12 = 4096)\n", 12);
+}
+
+int is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }
+int main(void) {
+    long ps1 = getpagesize();
+    long ps2 = sysconf(_SC_PAGESIZE);
+    printf("getpagesize: %ld\n", ps1);
+    printf("sysconf: %ld\n", ps2);
+    printf("Match: %s\n", ps1 == ps2 ? "yes" : "no");
+    printf("Power of 2: %s\n", is_power_of_2(ps1) ? "yes" : "no");
+    printf("Page size >= 4096: %s\n", ps1 >= 4096 ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+int is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }
+int main(void) {
+    long ps1 = getpagesize();
+    long ps2 = sysconf(_SC_PAGESIZE);
+    printf("getpagesize: %ld\n", ps1);
+    printf("sysconf: %ld\n", ps2);
+    printf("Match: %s\n", ps1 == ps2 ? "yes" : "no");
+    printf("Power of 2: %s\n", ____(ps1) ? "yes" : "no");
+    printf("Page size >= 4096: %s\n", ps1 >= 4096 ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+int is_power_of_2(long n) { return n > 0 && (n & (n-1)) == 0; }
+int main(void) {
+    long ps1 = ____();
+    long ps2 = sysconf(____);
+    printf("getpagesize: %ld\n", ps1);
+    printf("sysconf: %ld\n", ps2);
+    printf("Match: %s\n", ps1 == ps2 ? "yes" : "no");
+    printf("Power of 2: %s\n", is_power_of_2(ps1) ? "yes" : "no");
+    printf("Page size >= 4096: %s\n", ps1 >= 4096 ? "yes" : "no");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+// Affichez la taille de page avec 2 API et vérifiez les propriétés
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Taille de page et getpagesize()"
+
+[validation]
+expected_output = 'REGEX:(?s)getpagesize: \d+\nsysconf: \d+\nMatch: yes\nPower of 2: yes\nPage size >= 4096: yes'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Deux API, même résultat: 4096 octets"
+heap = []
+label = "Page size"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ps1"
+value = "4096 (getpagesize)"
+
+[[visualizer.steps.stack]]
+name = "ps2"
+value = "4096 (sysconf)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Pages toujours puissance de 2 pour l'alignement"
+heap = []
+label = "Propriétés"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Match"
+value = "yes"
+
+[[visualizer.steps.stack]]
+name = "Power of 2"
+value = "yes (4096 = 2^12)"

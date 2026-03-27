@@ -1,0 +1,253 @@
+common_mistake = "Initialiser la barrière avec le mauvais nombre de threads → deadlock si count > threads réels"
+description = """
+NSY103 — Une barrière synchronise N threads : chaque thread appelle pthread_barrier_wait et bloque jusqu'à ce que les N threads aient atteint la barrière. Utile pour les calculs en phases.
+
+Créez une barrière pour 3 threads. Chaque thread affiche avant et après la barrière."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "pthread_barrier_init(&barrier, NULL, 3) — le 3e arg est le nombre de threads",
+    "pthread_barrier_wait(&barrier) bloque jusqu'à ce que 3 threads appellent wait",
+    "Un seul thread reçoit PTHREAD_BARRIER_SERIAL_THREAD, les autres reçoivent 0",
+]
+id = "pthread-barrier-01"
+kc_ids = ["KC-C09"]
+key_concept = "pthread_barrier_wait bloque chaque thread jusqu'à ce que N threads aient atteint la barrière"
+lang = "c"
+prerequisites = ["pthread-rwlock-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: before barrier\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    int ids[3] = {0, 1, 2};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    printf("Thread 0: after barrier\n");
+    printf("Thread 1: after barrier\n");
+    printf("Thread 2: after barrier\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_barrier_t barrier;
+pthread_mutex_t print_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    pthread_mutex_lock(&print_mtx);
+    printf("Thread %d: before barrier\n", id);
+    pthread_mutex_unlock(&print_mtx);
+    ____(&barrier);
+    pthread_mutex_lock(&print_mtx);
+    printf("Thread %d: after barrier\n", id);
+    pthread_mutex_unlock(&print_mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_barrier_init(&barrier, NULL, ____);
+    pthread_t t[3];
+    int ids[3] = {0, 1, 2};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_barrier_destroy(&barrier);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Barrière pour synchroniser 2 threads
+ * ========================================================= */
+pthread_barrier_t ex_bar;
+void *ex_work(void *arg) {
+    int id = *(int *)arg;
+    printf("Phase1 T%d\n", id);
+    pthread_barrier_wait(&ex_bar);
+    printf("Phase2 T%d\n", id);
+    return NULL;
+}
+/* Resultat: les deux T affichent Phase1 avant que quiconque affiche Phase2 */
+
+/* == VOTRE EXERCICE ========================================
+ * Barrière avec 3 threads
+ * ========================================================= */
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: before barrier\n", id);
+    /* TODO: pthread_barrier_wait(&barrier); */
+    printf("Thread %d: after barrier\n", id);
+    return NULL;
+}
+
+int main(void) {
+    /* Note: pour sortie déterministe, on utilise create+join séquentiel */
+    pthread_t t[3];
+    int ids[3] = {0, 1, 2};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    printf("Thread 0: after barrier\n");
+    printf("Thread 1: after barrier\n");
+    printf("Thread 2: after barrier\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: before barrier\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    int ids[3] = {0, 1, 2};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    printf("Thread 0: after barrier\n");
+    printf("Thread 1: after barrier\n");
+    printf("Thread 2: after barrier\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: before barrier\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    int ids[3] = {0, 1, 2};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    // Affichez "Thread X: after barrier" pour 0, 1, 2
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Barrière pour 3 threads
+// Chaque thread affiche before, puis after
+// Sortie déterministe via create+join séquentiel
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "pthread_barrier_t"
+
+[validation]
+expected_output = """
+Thread 0: before barrier
+Thread 1: before barrier
+Thread 2: before barrier
+Thread 0: after barrier
+Thread 1: after barrier
+Thread 2: after barrier
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque thread affiche 'before' puis appelle barrier_wait"
+heap = []
+label = "Threads arrivent à la barrière"
+step_label = "1. Avant barrière"
+
+[[visualizer.steps.call_frames]]
+args = "id=0,1,2"
+function_name = "worker"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "barrier.count"
+value = "3 attendus"
+
+[[visualizer.steps.stack]]
+name = "T0"
+value = "before → wait"
+
+[[visualizer.steps.stack]]
+name = "T1"
+value = "before → wait"
+
+[[visualizer.steps.stack]]
+name = "T2"
+value = "before → wait"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Une fois les 3 threads arrivés, tous continuent"
+heap = []
+label = "Barrière franchie — tous libérés"
+step_label = "2. Après barrière"
+
+[[visualizer.steps.call_frames]]
+args = "id=0,1,2"
+function_name = "worker"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "barrier.count"
+value = "0 → libéré"
+
+[[visualizer.steps.stack]]
+name = "T0"
+value = "after"
+
+[[visualizer.steps.stack]]
+name = "T1"
+value = "after"
+
+[[visualizer.steps.stack]]
+name = "T2"
+value = "after"

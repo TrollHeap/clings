@@ -1,0 +1,312 @@
+common_mistake = "Oublier que read() sur le fd inotify peut retourner plusieurs événements — il faut itérer sur le buffer"
+description = """
+NSY103 — `inotify` est l'API Linux pour surveiller les modifications du système de fichiers. `inotify_init()` crée une instance, `inotify_add_watch()` ajoute un chemin à surveiller avec un masque d'événements (IN_CREATE, IN_MODIFY, IN_DELETE...). Les événements sont lus via `read()` en structs `inotify_event`.
+
+Surveillez un répertoire avec inotify, créez un fichier dedans, puis lisez l'événement IN_CREATE."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "`inotify_init()` crée l'instance inotify et retourne un descripteur de fichier",
+    "`inotify_add_watch(fd, chemin, masque)` ajoute un chemin à surveiller",
+    "Le nom du fichier est dans `event->name`, le type d'événement dans `event->mask`",
+]
+id = "fs-inotify-01"
+kc_ids = ["KC-C19"]
+key_concept = "inotify surveille les changements du filesystem via le noyau Linux"
+lang = "c"
+prerequisites = [
+    "fs-readdir-01",
+    "fs-stat-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+
+#define BUF_LEN (sizeof(struct inotify_event) + 256)
+
+int main(void) {
+    const char *dir = "/tmp/kf_inotify";
+    unlink("/tmp/kf_inotify/test.txt");
+    rmdir(dir);
+    mkdir(dir, 0755);
+
+    int fd = inotify_init();
+    if (fd == -1) { perror("inotify_init"); return 1; }
+
+    int wd = inotify_add_watch(fd, dir, IN_CREATE);
+    if (wd == -1) { perror("inotify_add_watch"); close(fd); return 1; }
+
+    FILE *f = fopen("/tmp/kf_inotify/test.txt", "w");
+    fprintf(f, "hello");
+    fclose(f);
+
+    struct pollfd pfd = {fd, POLLIN, 0};
+    int ret = poll(&pfd, 1, 1000);
+    if (ret > 0) {
+        char buf[BUF_LEN];
+        ssize_t len = read(fd, buf, sizeof(buf));
+        if (len > 0) {
+            struct inotify_event *event = (struct inotify_event *)buf;
+            printf("Evenement detecte\n");
+            printf("Fichier : %s\n", event->name);
+            printf("Creation : %d\n", (event->mask & IN_CREATE) ? 1 : 0);
+        }
+    }
+
+    inotify_rm_watch(fd, wd);
+    close(fd);
+    unlink("/tmp/kf_inotify/test.txt");
+    rmdir(dir);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+
+#define BUF_LEN (sizeof(struct inotify_event) + 256)
+
+int main(void) {
+    const char *dir = "/tmp/kf_inotify";
+    mkdir(dir, 0755);
+
+    int fd = ____();
+    if (fd == -1) { perror("inotify_init"); return 1; }
+
+    int wd = ____(fd, dir, IN_CREATE);
+    if (wd == -1) { perror("inotify_add_watch"); close(fd); return 1; }
+
+    FILE *f = fopen("/tmp/kf_inotify/test.txt", "w");
+    fprintf(f, "hello");
+    fclose(f);
+
+    struct pollfd pfd = {fd, POLLIN, 0};
+    int ret = poll(&pfd, 1, 1000);
+    if (ret > 0) {
+        char buf[BUF_LEN];
+        ssize_t len = read(fd, buf, sizeof(buf));
+        if (len > 0) {
+            struct inotify_event *event = (struct inotify_event *)buf;
+            printf("Evenement detecte\n");
+            printf("Fichier : %s\n", event->____);
+            printf("Creation : %d\n", (event->mask & ____) ? 1 : 0);
+        }
+    }
+
+    inotify_rm_watch(fd, wd);
+    close(fd);
+    unlink("/tmp/kf_inotify/test.txt");
+    rmdir(dir);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+
+#define BUF_LEN (sizeof(struct inotify_event) + 256)
+
+/* == EXEMPLE ================================================
+ * Surveiller les modifications d'un fichier avec inotify
+ * inotify_init() cree l'instance, inotify_add_watch() ajoute
+ * un chemin, read() lit les evenements.
+ * =========================================================== */
+void example_watch_modify(void) {
+    const char *path = "/tmp/kf_ex_watch";
+    FILE *f = fopen(path, "w"); fprintf(f, "init"); fclose(f);
+    int fd = inotify_init();
+    int wd = inotify_add_watch(fd, path, IN_MODIFY);
+    /* modifier le fichier */
+    f = fopen(path, "a"); fprintf(f, " added"); fclose(f);
+    struct pollfd pfd = {fd, POLLIN, 0};
+    if (poll(&pfd, 1, 1000) > 0) {
+        char buf[BUF_LEN];
+        read(fd, buf, sizeof(buf));
+        printf("Modification detectee !\n");
+    }
+    inotify_rm_watch(fd, wd);
+    close(fd); unlink(path);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Surveiller un REPERTOIRE pour IN_CREATE
+ * Creer un fichier dedans, lire l'evenement, afficher le nom.
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+
+#define BUF_LEN (sizeof(struct inotify_event) + 256)
+
+int main(void) {
+    const char *dir = "/tmp/kf_inotify";
+    unlink("/tmp/kf_inotify/test.txt"); rmdir(dir);
+    mkdir(dir, 0755);
+    int fd = inotify_init();
+    if (fd == -1) { perror("inotify_init"); return 1; }
+    int wd = inotify_add_watch(fd, dir, ____); // evenement creation
+    if (wd == -1) { perror("watch"); close(fd); return 1; }
+    FILE *f = fopen("/tmp/kf_inotify/test.txt", "w"); fprintf(f, "hello"); fclose(f);
+    struct pollfd pfd = {fd, POLLIN, 0};
+    if (poll(&pfd, 1, 1000) > 0) {
+        char buf[BUF_LEN];
+        ssize_t len = read(fd, buf, sizeof(buf));
+        if (len > 0) {
+            struct inotify_event *event = (struct inotify_event *)buf;
+            printf("Evenement detecte\n");
+            printf("Fichier : %s\n", event->name);
+            printf("Creation : %d\n", (event->mask & IN_CREATE) ? 1 : 0);
+        }
+    }
+    inotify_rm_watch(fd, wd); close(fd);
+    unlink("/tmp/kf_inotify/test.txt"); rmdir(dir);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+
+#define BUF_LEN (sizeof(struct inotify_event) + 256)
+
+int main(void) {
+    const char *dir = "/tmp/kf_inotify";
+    unlink("/tmp/kf_inotify/test.txt"); rmdir(dir);
+    mkdir(dir, 0755);
+    int fd = ____();
+    if (fd == -1) { perror("inotify_init"); return 1; }
+    int wd = ____(fd, dir, IN_CREATE);
+    if (wd == -1) { perror("watch"); close(fd); return 1; }
+    FILE *f = fopen("/tmp/kf_inotify/test.txt", "w"); fprintf(f, "hello"); fclose(f);
+    struct pollfd pfd = {fd, POLLIN, 0};
+    if (poll(&pfd, 1, 1000) > 0) {
+        char buf[BUF_LEN];
+        ssize_t len = read(fd, buf, sizeof(buf));
+        if (len > 0) {
+            struct inotify_event *event = (struct inotify_event *)buf;
+            printf("Evenement detecte\n");
+            printf("Fichier : %s\n", event->____);
+            printf("Creation : %d\n", (event->mask & ____) ? 1 : 0);
+        }
+    }
+    inotify_rm_watch(fd, wd); close(fd);
+    unlink("/tmp/kf_inotify/test.txt"); rmdir(dir);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+#include <poll.h>
+
+int main(void) {
+    // Creer /tmp/kf_inotify, initialiser inotify
+    // Ajouter un watch pour IN_CREATE
+    // Creer un fichier test.txt, lire l'evenement
+    // Afficher: nom du fichier, type d'evenement
+    // Nettoyer: rm_watch, close, unlink, rmdir
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Surveillance de fichiers avec inotify"
+
+[validation]
+expected_output = """
+Evenement detecte
+Fichier : test.txt
+Creation : 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "inotify_init() crée une instance dans le noyau. inotify_add_watch() ajoute un répertoire à surveiller pour les événements IN_CREATE. Le wd (watch descriptor) identifie cette surveillance."
+label = "Initialisation inotify"
+step_label = "inotify_init + inotify_add_watch"
+
+[[visualizer.steps.arrows]]
+from = "fd"
+label = "→"
+to = "inotify instance"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "inotify instance"
+value = "{watches: [{dir, IN_CREATE}]}"
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "inotify fd"
+
+[[visualizer.steps.stack]]
+name = "wd"
+value = "watch descriptor"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Quand un fichier est créé dans le répertoire surveillé, le noyau enqueue un inotify_event. read() sur le fd inotify retourne cet événement. event->name contient le nom relatif du fichier créé."
+heap = []
+label = "Lecture d'événement"
+step_label = "read() récupère l'événement IN_CREATE"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "event->wd"
+value = "watch descriptor"
+
+[[visualizer.steps.stack]]
+name = "event->mask"
+value = "IN_CREATE"
+
+[[visualizer.steps.stack]]
+name = "event->name"
+value = '"test.txt"'

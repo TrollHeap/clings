@@ -1,0 +1,208 @@
+common_mistake = "Croire que fork copie toute la mémoire — c'est COW, copie différée"
+description = """
+NSY103 — Après fork(), parent et enfant partagent les mêmes pages physiques (COW). L'écriture dans l'un provoque une copie privée. On peut observer ce comportement: les variables sont identiques après fork mais divergent après modification.
+
+Démontrez le mécanisme COW en comparant des valeurs avant et après modification dans parent/enfant."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "fork() duplique le processus — les pages sont COW (partagées jusqu'à écriture)",
+    "wait() attend la fin de l'enfant — assure l'ordre d'affichage",
+    "L'enfant modifie sa copie privée, le parent garde l'original (100)",
+]
+id = "pmem-cow-01"
+kc_ids = ["KC-C17"]
+key_concept = "COW: après fork, les pages sont partagées jusqu'à la première écriture"
+lang = "c"
+prerequisites = ["pmem-mprotect-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+int shared_val = 100;
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before fork: %d\n", shared_val);
+    pid_t pid = fork();
+    if (pid == 0) {
+        printf("Child before write: %d\n", shared_val);
+        shared_val = 999;
+        printf("Child after write: %d\n", shared_val);
+        _exit(0);
+    }
+    wait(&(int){0});
+    printf("Parent after child exit: %d\n", shared_val);
+    printf("COW works: %s\n", shared_val == 100 ? "yes" : "no");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+
+int shared_val = 100;
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before fork: %d\n", shared_val);
+    pid_t pid = ____();
+    if (pid == 0) {
+        printf("Child before write: %d\n", shared_val);
+        shared_val = 999;
+        printf("Child after write: %d\n", shared_val);
+        _exit(0);
+    }
+    ____(&(int){0});
+    printf("Parent after child exit: %d\n", shared_val);
+    printf("COW works: %s\n", shared_val == ____ ? "yes" : "no");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+
+/* == EXEMPLE: fork + variable locale ================== */
+void example_cow(void) {
+    int x = 42;
+    if (fork() == 0) { x = 0; printf("child x=%d\n", x); _exit(0); }
+    wait(NULL);
+    printf("parent x=%d\n", x);
+}
+
+int shared_val = 100;
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before fork: %d\n", shared_val);
+    pid_t pid = fork();
+    if (pid == 0) {
+        printf("Child before write: %d\n", shared_val);
+        shared_val = 999;
+        printf("Child after write: %d\n", shared_val);
+        _exit(0);
+    }
+    wait(&(int){0});
+    printf("Parent after child exit: %d\n", shared_val);
+    printf("COW works: %s\n", shared_val == 100 ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+int shared_val = 100;
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before fork: %d\n", shared_val);
+    pid_t pid = fork();
+    if (pid == 0) {
+        printf("Child before write: %d\n", shared_val);
+        shared_val = 999;
+        printf("Child after write: %d\n", shared_val);
+        _exit(0);
+    }
+    wait(&(int){0});
+    printf("Parent after child exit: %d\n", shared_val);
+    printf("COW works: %s\n", shared_val == ____ ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+int shared_val = 100;
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before fork: %d\n", shared_val);
+    pid_t pid = ____();
+    if (pid == 0) {
+        printf("Child before write: %d\n", shared_val);
+        shared_val = 999;
+        printf("Child after write: %d\n", shared_val);
+        _exit(0);
+    }
+    ____(&(int){0});
+    printf("Parent after child exit: %d\n", shared_val);
+    printf("COW works: %s\n", shared_val == ____ ? "yes" : "no");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int shared_val = 100;
+
+// Démontrez COW: fork, modifier dans l'enfant, vérifier le parent
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Copy-on-Write (COW) après fork()"
+
+[validation]
+expected_output = """
+Before fork: 100
+Child before write: 100
+Child after write: 999
+Parent after child exit: 100
+COW works: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "fork() — COW"
+
+[[visualizer.steps.edges]]
+label = "mêmes pages physiques"
+source = "parent"
+target = "child"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+parent
+shared_val=100"""
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = """
+enfant
+shared_val=100"""
+
+[[visualizer.steps]]
+label = "Enfant écrit → copie"
+
+[[visualizer.steps.edges]]
+label = "pages séparées (COW)"
+source = "parent"
+target = "child"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+parent
+shared_val=100"""
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = """
+enfant
+shared_val=999"""

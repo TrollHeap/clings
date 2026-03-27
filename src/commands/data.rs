@@ -219,12 +219,12 @@ pub fn cmd_new(
         let exercises_dir = exercises::resolve_exercises_dir()?;
         let dir = exercises_dir.join(subject);
         std::fs::create_dir_all(&dir)?;
-        dir.join(format!("{}.json", exercise.id))
+        dir.join(format!("{}.toml", exercise.id))
     };
 
-    let json = serde_json::to_string_pretty(&exercise)
-        .map_err(|e| KfError::Config(format!("sérialisation JSON : {e}")))?;
-    std::fs::write(&target, &json)?;
+    let toml_str = toml::to_string_pretty(&exercise)
+        .map_err(|e| KfError::Config(format!("sérialisation TOML : {e}")))?;
+    std::fs::write(&target, &toml_str)?;
 
     println!();
     println!(
@@ -240,11 +240,11 @@ pub fn cmd_new(
         "__STARTER_CODE__",
         "__SOLUTION_CODE__",
     ] {
-        if json.contains(placeholder) {
+        if toml_str.contains(placeholder) {
             println!("    {} {}", "•".dimmed(), placeholder.yellow());
         }
     }
-    if json.contains("__EXPECTED_OUTPUT__") {
+    if toml_str.contains("__EXPECTED_OUTPUT__") {
         println!("    {} {}", "•".dimmed(), "__EXPECTED_OUTPUT__".yellow());
     }
     println!();

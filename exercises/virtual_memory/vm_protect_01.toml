@@ -1,0 +1,274 @@
+common_mistake = "Passer une adresse non alignée à mprotect — elle doit être un multiple de la taille de page"
+description = """
+NSY103 — mprotect() change les permissions d'une zone mémoire (lecture, écriture, exécution). Les permissions sont vérifiées par la MMU à chaque accès. Tenter un accès interdit provoque un SIGSEGV.
+
+Allouez une zone avec mmap, changez ses permissions avec mprotect, et vérifiez le comportement."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "mprotect(addr, len, prot) change les permissions d'une zone mémoire",
+    "PROT_READ seul interdit l'écriture — tentative = SIGSEGV",
+    "L'adresse doit être alignée sur une frontière de page",
+]
+id = "vm-protect-01"
+kc_ids = ["KC-C18"]
+key_concept = "mprotect change les permissions de pages mémoire — la MMU les applique matériellement"
+lang = "c"
+prerequisites = ["vm-mmap-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <string.h>
+
+static jmp_buf jump_buf;
+static void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }
+
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *mem = (char *)mmap(NULL, ps, PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(mem, "writable");
+    printf("Before protect: %s\n", mem);
+    int rc = mprotect(mem, ps, PROT_READ);
+    printf("mprotect result: %d\n", rc);
+    printf("Read after protect: %s\n", mem);
+    signal(SIGSEGV, handler);
+    if (setjmp(jump_buf) == 0) {
+        mem[0] = 'X';
+        printf("Write succeeded\n");
+    } else {
+        printf("Write blocked: SIGSEGV caught\n");
+    }
+    mprotect(mem, ps, PROT_READ | PROT_WRITE);
+    mem[0] = 'W';
+    printf("After restore: %c%s\n", mem[0], mem + 1);
+    munmap(mem, ps);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <string.h>
+
+static jmp_buf jump_buf;
+static void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }
+
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *mem = (char *)mmap(NULL, ps, PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(mem, "writable");
+    printf("Before protect: %s\n", mem);
+    int rc = ____(mem, ps, ____);
+    printf("mprotect result: %d\n", rc);
+    printf("Read after protect: %s\n", mem);
+    signal(SIGSEGV, handler);
+    if (setjmp(jump_buf) == 0) {
+        mem[0] = 'X';
+        printf("Write succeeded\n");
+    } else {
+        printf("Write blocked: SIGSEGV caught\n");
+    }
+    ____(mem, ps, PROT_READ | PROT_WRITE);
+    mem[0] = 'W';
+    printf("After restore: %c%s\n", mem[0], mem + 1);
+    munmap(mem, ps);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <string.h>
+
+/* == EXEMPLE: PROT_NONE interdit tout accès =========== */
+static jmp_buf ex_jmp;
+static void ex_handler(int sig) { (void)sig; longjmp(ex_jmp, 1); }
+void example_none(void) {
+    size_t ps = (size_t)getpagesize();
+    char *p = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    p[0] = 'A';
+    mprotect(p, ps, PROT_NONE);
+    signal(SIGSEGV, ex_handler);
+    if (setjmp(ex_jmp) == 0) { char c = p[0]; (void)c; printf("Read ok\n"); }
+    else { printf("PROT_NONE: lecture interdite\n"); }
+    munmap(p, ps);
+}
+
+static jmp_buf jump_buf;
+static void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(mem, "writable");
+    printf("Before protect: %s\n", mem);
+    int rc = mprotect(mem, ps, PROT_READ);
+    printf("mprotect result: %d\n", rc);
+    printf("Read after protect: %s\n", mem);
+    signal(SIGSEGV, handler);
+    if (setjmp(jump_buf) == 0) { mem[0] = 'X'; printf("Write succeeded\n"); }
+    else { printf("Write blocked: SIGSEGV caught\n"); }
+    mprotect(mem, ps, PROT_READ|PROT_WRITE);
+    mem[0] = 'W';
+    printf("After restore: %c%s\n", mem[0], mem+1);
+    munmap(mem, ps);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <string.h>
+static jmp_buf jump_buf;
+static void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(mem, "writable");
+    printf("Before protect: %s\n", mem);
+    int rc = mprotect(mem, ps, PROT_READ);
+    printf("mprotect result: %d\n", rc);
+    printf("Read after protect: %s\n", mem);
+    signal(SIGSEGV, handler);
+    if (setjmp(jump_buf) == 0) { mem[0] = 'X'; printf("Write succeeded\n"); }
+    else { printf("Write blocked: SIGSEGV caught\n"); }
+    ____(mem, ps, PROT_READ | PROT_WRITE);
+    mem[0] = 'W';
+    printf("After restore: %c%s\n", mem[0], mem+1);
+    munmap(mem, ps);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <string.h>
+static jmp_buf jump_buf;
+static void handler(int sig) { (void)sig; longjmp(jump_buf, 1); }
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(mem, "writable");
+    printf("Before protect: %s\n", mem);
+    int rc = ____(mem, ps, ____);
+    printf("mprotect result: %d\n", rc);
+    printf("Read after protect: %s\n", mem);
+    signal(SIGSEGV, handler);
+    if (setjmp(jump_buf) == 0) { mem[0] = 'X'; printf("Write succeeded\n"); }
+    else { printf("Write blocked: SIGSEGV caught\n"); }
+    ____(mem, ps, PROT_READ | PROT_WRITE);
+    mem[0] = 'W';
+    printf("After restore: %c%s\n", mem[0], mem+1);
+    munmap(mem, ps);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+
+// Allouez avec mmap, protégez en lecture seule, détectez SIGSEGV, restaurez
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "mprotect et protection des pages"
+
+[validation]
+expected_output = "REGEX:(?s)mprotect.*PROT_READ OK"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "La page est accessible en lecture et écriture"
+label = "mmap PROT_READ|PROT_WRITE"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "mem"
+to = "page"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page"
+content = '"writable"'
+
+[[visualizer.steps.stack]]
+name = "mem"
+value = "→ page RW"
+
+[[visualizer.steps.stack]]
+name = "ps"
+value = "4096"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Écriture interdite — la MMU génère SIGSEGV"
+label = "mprotect PROT_READ"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page"
+content = '"writable" (lecture seule)'
+
+[[visualizer.steps.stack]]
+name = "mem"
+value = "→ page R-only"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Permissions restaurées, écriture possible"
+label = "Restauration RW"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page"
+content = '"Writable"'
+
+[[visualizer.steps.stack]]
+name = "mem[0]"
+value = "'w' → 'W'"

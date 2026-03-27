@@ -1,0 +1,332 @@
+common_mistake = "Utiliser sem_close/sem_unlink sur un semaphore anonyme — ces fonctions sont pour les semaphores nommes uniquement"
+description = """
+NSY103 — Un semaphore anonyme est cree avec sem_init() directement dans une variable sem_t (pas de nom). Le parametre pshared=0 le limite aux threads du meme processus, pshared=1 permet le partage inter-processus (si place en memoire partagee).
+
+Creez un semaphore anonyme local (pshared=0) avec une valeur initiale de 3. Faites 3 sem_wait successifs (decremente a 0), puis affichez la valeur finale."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "sem_init(&sem, 0, 3) : pshared=0 (local), valeur initiale=3",
+    "Chaque sem_wait decremente de 1 : 3 -> 2 -> 1 -> 0",
+    "sem_destroy libere les ressources du semaphore anonyme",
+]
+id = "sem-unnamed-01"
+kc_ids = ["KC-C11"]
+key_concept = "sem_init cree un semaphore anonyme sur la stack ; pshared=0 pour threads, pshared=1 pour processus"
+lang = "c"
+prerequisites = ["sem-named-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+/* Test mode: no solution needed, test harness covers it */
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <semaphore.h>
+
+/* Test mode: no starter_code needed */
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <semaphore.h>
+
+/* Test mode: understand sem_init, sem_wait, sem_getvalue, sem_destroy */
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+''',
+    '''
+#include <semaphore.h>
+
+/* pshared=0 for threads, initial value affects behavior */
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+''',
+    '''
+#include <semaphore.h>
+
+/* sem_wait decrements, sem_post increments */
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+''',
+    '''
+#include <semaphore.h>
+
+/* Implement semaphore operations */
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+''',
+    '''
+#include <semaphore.h>
+
+int main(void) {
+    {
+        sem_t s;
+        int rc = sem_init(&s, 0, 3);
+        printf("%d\n", (int)(rc));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 5);
+        int val;
+        int rc = sem_getvalue(&s, &val);
+        printf("%d\n", (int)(rc));
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    {
+        sem_t s;
+        sem_init(&s, 0, 3);
+        for (int i = 0; i < 3; i++)
+        sem_wait(&s);
+        int val;
+        sem_getvalue(&s, &val);
+        printf("%d\n", (int)(val));
+        sem_destroy(&s);
+    }
+    return 0;
+}
+''',
+]
+subject = "semaphores"
+title = "Semaphore anonyme: sem_init"
+
+[validation]
+expected_output = """
+0
+0
+5
+2
+0"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_init initialise un semaphore sur la stack. pshared=0 signifie partage intra-processus uniquement."
+heap = []
+label = "sem_init: semaphore local valeur 3"
+step_label = "init"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t)"
+value = "val=3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque sem_wait decremente atomiquement. Aucun blocage car la valeur reste >= 0 a chaque etape."
+heap = []
+label = "3x sem_wait: 3 -> 0"
+step_label = "decrements"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t)"
+value = "val=0"

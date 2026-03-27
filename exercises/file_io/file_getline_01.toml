@@ -1,0 +1,323 @@
+common_mistake = 'Oublier de retirer le \n de fgets — les comparaisons de chaînes échouent silencieusement'
+description = '''
+NSY103 — fgets(buf, n, stream) lit au plus n-1 caractères jusqu'à \n ou EOF. C'est la méthode standard pour lire un fichier texte ligne par ligne.
+
+Comptez les lignes et les mots d'un texte simulé avec fmemopen.'''
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    'fgets(line, sizeof(line), f) lit une ligne entière (avec \n)',
+    'line[strcspn(line, "\n")] = 0 retire le saut de ligne',
+    "Incrémentez total_lines à chaque tour de boucle",
+]
+id = "file-getline-01"
+kc_ids = ["KC-C06"]
+key_concept = 'fgets lit au plus n-1 chars et ajoute \0, mais conserve le \n dans le buffer'
+lang = "c"
+prerequisites = ["file-open-modes-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) {
+            in_word = 0;
+        } else if (!in_word) {
+            in_word = 1;
+            words++;
+        }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    FILE *f = fmemopen((void *)text, strlen(text), "r");
+    if (!f) return 1;
+    char line[256];
+    int total_lines = 0, total_words = 0;
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        total_lines++;
+        total_words += count_words(line);
+    }
+    fclose(f);
+    printf("Lines: %d\n", total_lines);
+    printf("Words: %d\n", total_words);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) {
+            in_word = 0;
+        } else if (!in_word) {
+            in_word = 1;
+            words++;
+        }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    FILE *f = fmemopen((void *)text, strlen(text), "r");
+    if (!f) return 1;
+    char line[256];
+    int total_lines = 0, total_words = 0;
+    while (fgets(____, ____, f)) {
+        line[strcspn(line, "\n")] = ____;
+        total_lines++;
+        total_words += count_words(____);
+    }
+    fclose(f);
+    printf("Lines: %d\n", ____);
+    printf("Words: %d\n", ____);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+/* == EXEMPLE =======================================
+ * Compter les caractères par ligne avec fgets
+ * ================================================= */
+void example_count_chars(void) {
+    const char *data = "abc\ndefgh\nij\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return;
+    char buf[64];
+    int linenum = 0;
+    while (fgets(buf, sizeof(buf), f)) {
+        buf[strcspn(buf, "\n")] = 0;
+        linenum++;
+        printf("Line %d: %zu chars\n", linenum, strlen(buf));
+    }
+    fclose(f);
+}
+/* Resultat: Line 1: 3 chars, Line 2: 5 chars, Line 3: 2 chars */
+
+/* == VOTRE EXERCICE ================================
+ * Compter les lignes et les mots d'un texte
+ * Inspirez-vous de example_count_chars.
+ * ================================================= */
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) { in_word = 0; }
+        else if (!in_word) { in_word = 1; words++; }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    /* TODO: fmemopen, boucle fgets, compter lignes et mots */
+    (void)text;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) { in_word = 0; }
+        else if (!in_word) { in_word = 1; words++; }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    FILE *f = fmemopen((void *)text, strlen(text), "r");
+    if (!f) return 1;
+    char line[256];
+    int total_lines = 0, total_words = 0;
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        total_lines++;
+        total_words += count_words(____); // quelle variable?
+    }
+    fclose(f);
+    printf("Lines: %d\n", ____);
+    printf("Words: %d\n", ____);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) { in_word = 0; }
+        else if (!in_word) { in_word = 1; words++; }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    FILE *f = fmemopen((void *)text, strlen(text), "r");
+    if (!f) return 1;
+    char line[256];
+    int total_lines = 0, total_words = 0;
+    while (fgets(____, ____, f)) {
+        line[strcspn(line, "\n")] = ____;
+        total_lines++;
+        total_words += count_words(____);
+    }
+    fclose(f);
+    printf("Lines: %d\n", ____);
+    printf("Words: %d\n", ____);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int count_words(const char *s) {
+    int words = 0, in_word = 0;
+    for (; *s; s++) {
+        if (isspace((unsigned char)*s)) { in_word = 0; }
+        else if (!in_word) { in_word = 1; words++; }
+    }
+    return words;
+}
+
+int main(void) {
+    const char *text =
+        "Le noyau Linux\n"
+        "gere les processus\n"
+        "et la memoire\n";
+    // Ouvrir text avec fmemopen en lecture
+    // Boucle fgets: compter lignes, accumuler mots
+    // Afficher Lines: N et Words: N
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Lecture ligne par ligne avec fgets"
+
+[validation]
+expected_output = """
+Lines: 3
+Words: 9
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "fmemopen crée un FILE* qui lit depuis la chaîne text"
+heap = []
+label = "Ouverture du texte avec fmemopen"
+step_label = "Init"
+
+[[visualizer.steps.arrows]]
+from = "f"
+label = "lit"
+to = "text"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "text"
+value = '"Le noyau Linux\ngere les..."'
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (r)"
+
+[[visualizer.steps.stack]]
+name = "total_lines"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "total_words"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "3 mots détectés par count_words"
+heap = []
+label = 'fgets lit ligne 1: "Le noyau Linux"'
+step_label = "Ligne 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "line"
+value = '"Le noyau Linux"'
+
+[[visualizer.steps.stack]]
+name = "total_lines"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "total_words"
+value = "3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "3 lignes (3+3+2=8 mots au total)"
+heap = []
+label = "Après toutes les lignes"
+step_label = "Résultat"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "total_lines"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "total_words"
+value = "8"

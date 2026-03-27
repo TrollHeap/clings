@@ -3,19 +3,15 @@
 //! Used by `clings new`.
 
 use std::path::Path;
+use std::process::Command;
 
 use crate::error::{KfError, Result};
 use crate::models::{Difficulty, Exercise, Lang, ValidationConfig, ValidationMode};
 
 /// An error found while validating an exercise JSON file.
-#[derive(Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq)]
+#[error("{0}")]
 pub struct ValidationError(pub String);
-
-impl std::fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 /// Generate a skeleton `Exercise` with visible placeholders.
 ///
@@ -54,12 +50,13 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
         ),
     };
 
+    let title = format!("__TITLE__ ({})", id);
     let exercise = Exercise {
-        id: id.clone(),
+        id,
         subject: subject.to_string(),
         lang: Lang::C,
         difficulty,
-        title: format!("__TITLE__ ({})", id),
+        title,
         description: "__DESCRIPTION__\n\nRemplacez ce texte par l'énoncé de l'exercice."
             .to_string(),
         starter_code:
@@ -100,6 +97,66 @@ fn parse_mode(mode: &str) -> Result<ValidationMode> {
     }
 }
 
+/// Returns subject-specific linker flags for gcc.
+fn linker_flags_for_subject(subject: &str) -> Vec<&'static str> {
+    match subject {
+        "pthreads" | "semaphores" | "sync_concepts" | "sockets" | "capstones" => {
+            vec!["-lpthread"]
+        }
+        "message_queues" | "shared_memory" => vec!["-lrt", "-lpthread"],
+        "file_io" => vec!["-lrt"],
+        _ => vec![],
+    }
+}
+
+/// Compile solution_code to verify it's valid C code.
+/// Returns `None` if successful, or `Some(error_message)` if compilation failed.
+fn compile_solution_code(solution_code: &str, subject: &str) -> Option<String> {
+    let temp_dir = std::env::temp_dir();
+    let source_path = temp_dir.join("clings-validate-solution.c");
+    let output_path = temp_dir.join("clings-validate-solution");
+
+    // Write solution code to temp file
+    if let Err(e) = std::fs::write(&source_path, solution_code) {
+        return Some(format!("Impossible d'écrire le fichier temporaire : {e}"));
+    }
+
+    // Compile with gcc
+    let mut cmd = Command::new("gcc");
+    cmd.arg("-Wall")
+        .arg("-Wextra")
+        .arg("-std=c11")
+        .arg("-D_GNU_SOURCE")
+        .arg("-o")
+        .arg(&output_path)
+        .arg(&source_path);
+
+    // Add subject-specific linker flags
+    for flag in linker_flags_for_subject(subject) {
+        cmd.arg(flag);
+    }
+
+    let output = match cmd.output() {
+        Ok(o) => o,
+        Err(e) => {
+            let _ = std::fs::remove_file(&source_path);
+            return Some(format!("Impossible d'invoquer gcc : {e}"));
+        }
+    };
+
+    // Cleanup temp files
+    let _ = std::fs::remove_file(&source_path);
+    let _ = std::fs::remove_file(&output_path);
+
+    // Check if compilation succeeded
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Some(format!("Compilation échouée :\n{stderr}"));
+    }
+
+    None
+}
+
 /// Validate an exercise JSON file and return a list of errors.
 ///
 /// An empty list means the file is structurally valid.
@@ -117,11 +174,21 @@ pub fn validate_exercise(path: &Path) -> Vec<ValidationError> {
         }
     };
 
-    let exercise: Exercise = match serde_json::from_str(&raw) {
-        Ok(e) => e,
-        Err(e) => {
-            errors.push(ValidationError(format!("JSON invalide : {e}")));
-            return errors;
+    let exercise: Exercise = if path.extension().is_some_and(|e| e == "toml") {
+        match toml::from_str(&raw) {
+            Ok(e) => e,
+            Err(e) => {
+                errors.push(ValidationError(format!("TOML invalide : {e}")));
+                return errors;
+            }
+        }
+    } else {
+        match serde_json::from_str(&raw) {
+            Ok(e) => e,
+            Err(e) => {
+                errors.push(ValidationError(format!("JSON invalide : {e}")));
+                return errors;
+            }
         }
     };
 
@@ -178,6 +245,13 @@ pub fn validate_exercise(path: &Path) -> Vec<ValidationError> {
             )),
             _ => {}
         },
+    }
+
+    // Compile solution_code to verify it's valid
+    if let Some(compile_error) = compile_solution_code(&exercise.solution_code, &exercise.subject) {
+        errors.push(ValidationError(format!(
+            "`solution_code` n'a pas pu être compilée : {compile_error}"
+        )));
     }
 
     errors
@@ -249,5 +323,16 @@ mod tests {
         let path = write_tmp("clings_test_valid.json", json);
         let errors = validate_exercise(&path);
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    }
+
+    #[test]
+    fn test_compile_solution_code_valid() {
+        let valid_code =
+            "#include <stdio.h>\nint main(void) {\n    printf(\"hello\");\n    return 0;\n}";
+        let result = compile_solution_code(valid_code, "pointers");
+        assert!(
+            result.is_none(),
+            "valid code should compile, got: {result:?}"
+        );
     }
 }

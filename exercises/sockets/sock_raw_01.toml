@@ -1,0 +1,195 @@
+common_mistake = "Oublier htons pour tot_len et id — les champs multi-octets doivent être en network byte order"
+description = """
+NSY103 — Les raw sockets (SOCK_RAW) permettent de construire des paquets au niveau IP. Cet exercice simule la construction d'un en-tête IP sans envoyer réellement (pas besoin de root).
+
+Construisez un en-tête IP manuellement et affichez ses champs."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "IPv4 → version = 4",
+    "TTL standard = 64 (nombre de sauts avant suppression du paquet)",
+    "IHL = 5 signifie 5 mots de 32 bits = 20 octets (en-tête minimal)",
+]
+id = "sock-raw-01"
+kc_ids = ["KC-C14"]
+key_concept = "struct iphdr permet de construire manuellement un paquet IP — version=4, ihl=5 (20B), ttl=64, protocol=6 (TCP)"
+lang = "c"
+prerequisites = ["sock-unix-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+int main(void) {
+    struct iphdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = 4;
+    hdr.ihl = 5;
+    hdr.tos = 0;
+    hdr.tot_len = htons(sizeof(struct iphdr));
+    hdr.id = htons(12345);
+    hdr.frag_off = 0;
+    hdr.ttl = 64;
+    hdr.protocol = IPPROTO_TCP;
+    hdr.saddr = inet_addr("192.168.1.1");
+    hdr.daddr = inet_addr("10.0.0.1");
+    hdr.check = 0;
+    printf("Version: %d\n", hdr.version);
+    printf("IHL: %d (%d bytes)\n", hdr.ihl, hdr.ihl * 4);
+    printf("TTL: %d\n", hdr.ttl);
+    printf("Protocol: %d (TCP)\n", hdr.protocol);
+    char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &hdr.saddr, src, sizeof(src));
+    inet_ntop(AF_INET, &hdr.daddr, dst, sizeof(dst));
+    printf("Src: %s\n", src);
+    printf("Dst: %s\n", dst);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+int main(void) {
+    struct iphdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = ____;
+    hdr.ihl = 5;
+    hdr.tos = 0;
+    hdr.tot_len = htons(sizeof(struct iphdr));
+    hdr.id = htons(12345);
+    hdr.frag_off = 0;
+    hdr.ttl = ____;
+    hdr.protocol = IPPROTO_TCP;
+    hdr.saddr = inet_addr("192.168.1.1");
+    hdr.daddr = inet_addr("10.0.0.1");
+    hdr.check = 0;
+    printf("Version: %d\n", hdr.version);
+    printf("IHL: %d (%d bytes)\n", hdr.ihl, hdr.ihl * 4);
+    printf("TTL: %d\n", hdr.ttl);
+    printf("Protocol: %d (TCP)\n", hdr.protocol);
+    char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &hdr.saddr, src, sizeof(src));
+    inet_ntop(AF_INET, &hdr.daddr, dst, sizeof(dst));
+    printf("Src: %s\n", src);
+    printf("Dst: %s\n", dst);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+/* == EXEMPLE ===============================================
+ * struct iphdr simple : affichage des champs
+ * ========================================================= */
+
+int main(void) {
+    struct iphdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    printf("IPv4 header size: %zu bytes\n", sizeof(struct iphdr));
+    printf("Version field offset: %zu\n", (char *)&hdr.version - (char *)&hdr);
+    printf("TTL field offset: %zu\n", (char *)&hdr.ttl - (char *)&hdr);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+int main(void) {
+    struct iphdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = 4;
+    hdr.ihl = 5;
+    hdr.tos = 0;
+    hdr.tot_len = htons(sizeof(struct iphdr));
+    hdr.id = htons(12345);
+    hdr.ttl = ____;
+    hdr.protocol = IPPROTO_TCP;
+    hdr.saddr = inet_addr("192.168.1.1");
+    hdr.daddr = inet_addr("10.0.0.1");
+    printf("Version: %d\n", hdr.version);
+    printf("IHL: %d (%d bytes)\n", hdr.ihl, hdr.ihl * 4);
+    printf("TTL: %d\n", hdr.ttl);
+    printf("Protocol: %d (TCP)\n", hdr.protocol);
+    char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &hdr.saddr, src, sizeof(src));
+    inet_ntop(AF_INET, &hdr.daddr, dst, sizeof(dst));
+    printf("Src: %s\n", src);
+    printf("Dst: %s\n", dst);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+int main(void) {
+    struct iphdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = ____;
+    hdr.ihl = 5;
+    hdr.tot_len = htons(sizeof(struct iphdr));
+    hdr.id = htons(12345);
+    hdr.ttl = ____;
+    hdr.protocol = IPPROTO_TCP;
+    hdr.saddr = inet_addr("192.168.1.1");
+    hdr.daddr = inet_addr("10.0.0.1");
+    printf("Version: %d\n", hdr.version);
+    printf("IHL: %d (%d bytes)\n", hdr.ihl, hdr.ihl * 4);
+    printf("TTL: %d\n", hdr.ttl);
+    printf("Protocol: %d (TCP)\n", hdr.protocol);
+    char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &hdr.saddr, src, sizeof(src));
+    inet_ntop(AF_INET, &hdr.daddr, dst, sizeof(dst));
+    printf("Src: %s\n", src);
+    printf("Dst: %s\n", dst);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+// Construire un struct iphdr: version=4, ihl=5, ttl=64, protocol=TCP
+// Adresses: 192.168.1.1 → 10.0.0.1
+// Afficher Version, IHL, TTL, Protocol, Src, Dst
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sockets"
+title = "Raw socket et construction de paquet"
+
+[validation]
+expected_output = """
+Version: 4
+IHL: 5 (20 bytes)
+TTL: 64
+Protocol: 6 (TCP)
+Src: 192.168.1.1
+Dst: 10.0.0.1
+"""
+mode = "output"

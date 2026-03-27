@@ -1,0 +1,271 @@
+common_mistake = "Utiliser MAP_PRIVATE au lieu de MAP_SHARED → les écritures ne sont jamais reflétées dans le fichier"
+description = """
+NSY103 — mmap() peut aussi mapper un fichier ordinaire en mémoire (pas seulement shm_open). Les modifications au mapping sont écrites dans le fichier avec msync() ou automatiquement à munmap(). Cela permet de persister les données sur disque.
+
+Créez un fichier temporaire, mappez-le avec mmap MAP_SHARED, écrivez une struct dedans, synchronisez avec msync, puis relisez depuis un nouveau mapping pour vérifier la persistance."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "MAP_SHARED avec un fichier fait que les écritures sont reflétées dans le fichier",
+    "msync(ptr, len, MS_SYNC) force l'écriture synchrone sur disque",
+    "Un second mmap sur le même fichier voit les données écrites",
+]
+id = "shm-mmap-file-01"
+kc_ids = ["KC-C13"]
+key_concept = "mmap sur fichier = mapping persisté sur disque ; msync force la synchronisation"
+lang = "c"
+prerequisites = ["shm-ringbuf-01"]
+solution_code = '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+typedef struct {
+    int version;
+    char data[32];
+} FileData;
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_mmap_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ftruncate(fd, sizeof(FileData));
+
+    FileData *w = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+    w->version = 1;
+    strncpy(w->data, "persisted", 31);
+    msync(w, sizeof(FileData), MS_SYNC);
+    munmap(w, sizeof(FileData));
+
+    FileData *r = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ, MAP_SHARED, fd, 0);
+    printf("version=%d data=%s\n", r->version, r->data);
+    munmap(r, sizeof(FileData));
+
+    close(fd);
+    unlink(tmpfile);
+    return 0;
+}'''
+starter_code = '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+typedef struct {
+    int version;
+    char data[32];
+} FileData;
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_mmap_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ftruncate(fd, sizeof(FileData));
+
+    FileData *w = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ | PROT_WRITE, ____, fd, 0);
+
+    w->version = 1;
+    strncpy(w->data, "persisted", 31);
+    ____(w, sizeof(FileData), MS_SYNC);
+    munmap(w, sizeof(FileData));
+
+    FileData *r = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ, MAP_SHARED, fd, 0);
+    printf("version=%d data=%s\n", r->version, r->data);
+    munmap(r, sizeof(FileData));
+
+    close(fd);
+    unlink(tmpfile);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+typedef struct { int version; char data[32]; } FileData;
+
+/* == EXEMPLE =======================================
+ * mmap fichier pour persister un entier
+ * ================================================= */
+void example_mmap_file(void) {
+    char tmp[] = "/tmp/kf_ex_mmap_XXXXXX";
+    int fd = mkstemp(tmp);
+    ftruncate(fd, sizeof(int));
+    int *p = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    *p = 123;
+    msync(p, sizeof(int), MS_SYNC);
+    munmap(p, sizeof(int));
+    p = (int *)mmap(NULL, sizeof(int), PROT_READ, MAP_SHARED, fd, 0);
+    printf("Persisted: %d\n", *p);
+    munmap(p, sizeof(int));
+    close(fd); unlink(tmp);
+}
+/* Resultat: Persisted: 123 */
+
+/* == VOTRE EXERCICE ================================
+ * mmap fichier avec struct FileData, msync, relire.
+ * ================================================= */
+int main(void) {
+    char tmpfile[] = "/tmp/kf_mmap_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ftruncate(fd, sizeof(FileData));
+    /* TODO: mmap write, set fields, msync, munmap, mmap read, printf */
+    close(fd); unlink(tmpfile);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = ____("test_file.txt", ____, 0644);
+    write(fd, "Hello MMap", 10);
+    close(fd);
+    
+    fd = ____("test_file.txt", ____, NULL);
+    void *addr = ____(NULL, 10, PROT_READ, ____, fd, 0);
+    char *str = (char *)addr;
+    printf("Content: %.10s\\n", str);
+    munmap(addr, 10);
+    close(fd);
+    return 0;
+}''',
+    '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+typedef struct {
+    int version;
+    char data[32];
+} FileData;
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_mmap_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ftruncate(fd, sizeof(FileData));
+
+    FileData *w = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ | PROT_WRITE, ____, fd, 0);
+
+    w->version = 1;
+    strncpy(w->data, "persisted", 31);
+    ____(w, sizeof(FileData), MS_SYNC);
+    munmap(w, sizeof(FileData));
+
+    FileData *r = (FileData *)mmap(NULL, sizeof(FileData),
+        PROT_READ, MAP_SHARED, fd, 0);
+    printf("version=%d data=%s\n", r->version, r->data);
+    munmap(r, sizeof(FileData));
+
+    close(fd);
+    unlink(tmpfile);
+    return 0;
+}''',
+    """
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+typedef struct { int version; char data[32]; } FileData;
+
+int main(void) {
+    // mkstemp, ftruncate, mmap MAP_SHARED
+    // Write version=1, data="persisted", msync
+    // munmap, re-mmap read-only, verify, cleanup
+    return 0;
+}""",
+    """
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "mmap sur fichier vs shm_open"
+
+[validation]
+expected_output = """
+version=1 data=persisted
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "mmap fichier en écriture"
+
+[[visualizer.steps.edges]]
+label = "mmap MAP_SHARED"
+source = "file"
+target = "w"
+
+[[visualizer.steps.nodes]]
+id = "file"
+label = "tmpfile"
+
+[[visualizer.steps.nodes]]
+id = "w"
+label = """
+FileData *w
+write mapping"""
+
+[[visualizer.steps]]
+label = "msync — écriture forcée sur disque"
+
+[[visualizer.steps.edges]]
+label = "msync MS_SYNC"
+source = "w"
+target = "file"
+
+[[visualizer.steps.nodes]]
+id = "w"
+label = """
+version=1
+data="persisted""""
+
+[[visualizer.steps.nodes]]
+id = "file"
+label = "fichier sur disque"
+
+[[visualizer.steps]]
+label = "Second mmap en lecture — données persistées"
+
+[[visualizer.steps.edges]]
+label = "mmap PROT_READ"
+source = "file"
+target = "r"
+
+[[visualizer.steps.nodes]]
+id = "file"
+label = "fichier"
+
+[[visualizer.steps.nodes]]
+id = "r"
+label = """
+FileData *r
+version=1 data=persisted"""

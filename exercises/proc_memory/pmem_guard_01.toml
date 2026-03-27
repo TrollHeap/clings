@@ -1,0 +1,255 @@
+common_mistake = "Oublier de mapper 2 pages — la guard doit être une page séparée"
+description = """
+NSY103 — Une guard page est une page mémoire avec PROT_NONE placée après un buffer. Toute écriture au-delà du buffer provoque un SIGSEGV immédiat, permettant de détecter les buffer overflows.
+
+Implémentez un buffer avec guard page et démontrez la détection de débordement."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "mprotect(guard, page_size, PROT_NONE) crée la guard page",
+    "PROT_NONE interdit toute lecture et écriture — accès = SIGSEGV",
+    "Deux pages: une pour le buffer (RW), une pour la guard (NONE)",
+]
+id = "pmem-guard-01"
+kc_ids = ["KC-C17"]
+key_concept = "Guard page PROT_NONE après un buffer détecte les overflows via SIGSEGV"
+lang = "c"
+prerequisites = ["pmem-mprotect-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+static jmp_buf jbuf;
+static void segv_handler(int sig) { (void)sig; longjmp(jbuf, 1); }
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t total = (size_t)ps * 2;
+    void *base = mmap(NULL, total,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+    char *buffer = (char *)base;
+    char *guard = buffer + ps;
+    mprotect(guard, (size_t)ps, PROT_NONE);
+    printf("Buffer page: OK\n");
+    memset(buffer, 'A', 10);
+    buffer[10] = '\0';
+    printf("Buffer data: %s\n", buffer);
+    signal(SIGSEGV, segv_handler);
+    if (setjmp(jbuf) == 0) {
+        guard[0] = 'X';
+        printf("Guard write succeeded (unexpected)\n");
+    } else {
+        printf("Guard page caught overflow\n");
+    }
+    munmap(base, total);
+    printf("Cleanup OK\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+
+static jmp_buf jbuf;
+static void segv_handler(int sig) { (void)sig; longjmp(jbuf, 1); }
+
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t total = (size_t)ps * 2;
+    void *base = mmap(NULL, total,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+    char *buffer = (char *)base;
+    char *guard = buffer + ps;
+    ____(guard, (size_t)ps, ____);
+    printf("Buffer page: OK\n");
+    memset(buffer, 'A', 10);
+    buffer[10] = '\0';
+    printf("Buffer data: %s\n", buffer);
+    signal(SIGSEGV, segv_handler);
+    if (setjmp(jbuf) == 0) {
+        guard[0] = 'X';
+        printf("Guard write succeeded (unexpected)\n");
+    } else {
+        printf("Guard page caught overflow\n");
+    }
+    munmap(base, total);
+    printf("Cleanup OK\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+
+/* == EXEMPLE: guard page simple ======================= */
+void example_guard(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    void *p = mmap(NULL, (size_t)ps*2, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    mprotect((char*)p + ps, (size_t)ps, PROT_NONE);
+    printf("Guard page set up at offset %ld\n", ps);
+    munmap(p, (size_t)ps*2);
+}
+
+static jmp_buf jbuf;
+static void segv_handler(int sig) { (void)sig; longjmp(jbuf, 1); }
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t total = (size_t)ps * 2;
+    void *base = mmap(NULL, total, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+    char *buffer = (char *)base;
+    char *guard = buffer + ps;
+    mprotect(guard, (size_t)ps, PROT_NONE);
+    printf("Buffer page: OK\n");
+    memset(buffer, 'A', 10); buffer[10]='\0';
+    printf("Buffer data: %s\n", buffer);
+    signal(SIGSEGV, segv_handler);
+    if (setjmp(jbuf)==0) { guard[0]='X'; printf("Guard write succeeded (unexpected)\n"); }
+    else printf("Guard page caught overflow\n");
+    munmap(base, total);
+    printf("Cleanup OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+static jmp_buf jbuf;
+static void segv_handler(int sig) { (void)sig; longjmp(jbuf, 1); }
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t total = (size_t)ps * 2;
+    void *base = mmap(NULL, total, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+    char *buffer = (char *)base;
+    char *guard = buffer + ps;
+    mprotect(guard, (size_t)ps, ____);
+    printf("Buffer page: OK\n");
+    memset(buffer, 'A', 10); buffer[10]='\0';
+    printf("Buffer data: %s\n", buffer);
+    signal(SIGSEGV, segv_handler);
+    if (setjmp(jbuf)==0) { guard[0]='X'; printf("Guard write succeeded (unexpected)\n"); }
+    else printf("Guard page caught overflow\n");
+    munmap(base, total);
+    printf("Cleanup OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+static jmp_buf jbuf;
+static void segv_handler(int sig) { (void)sig; longjmp(jbuf, 1); }
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t total = (size_t)ps * 2;
+    void *base = mmap(NULL, total, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+    char *buffer = (char *)base;
+    char *guard = buffer + ps;
+    ____(guard, (size_t)ps, ____);
+    printf("Buffer page: OK\n");
+    memset(buffer, 'A', 10); buffer[10]='\0';
+    printf("Buffer data: %s\n", buffer);
+    signal(SIGSEGV, segv_handler);
+    if (setjmp(jbuf)==0) { guard[0]='X'; printf("Guard write succeeded (unexpected)\n"); }
+    else printf("Guard page caught overflow\n");
+    munmap(base, total);
+    printf("Cleanup OK\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
+
+// Créez un buffer + guard page, détectez le débordement
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Guard pages: détection de débordement"
+
+[validation]
+expected_output = """
+Buffer page: OK
+Buffer data: AAAAAAAAAA
+Guard page caught overflow
+Cleanup OK
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Guard page après le buffer"
+label = "2 pages mmap"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page 1"
+content = "AAAAAAAAAA"
+
+[[visualizer.steps.heap]]
+address = "page 2"
+content = "[GUARD - PROT_NONE]"
+
+[[visualizer.steps.stack]]
+name = "buffer"
+value = "page 1: RW"
+
+[[visualizer.steps.stack]]
+name = "guard"
+value = "page 2: PROT_NONE"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Écriture sur guard page = détection immédiate"
+heap = []
+label = "Débordement → SIGSEGV"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "guard[0]"
+value = "→ SIGSEGV!"

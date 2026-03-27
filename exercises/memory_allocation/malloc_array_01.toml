@@ -1,0 +1,363 @@
+common_mistake = "Oublier free() → fuite mémoire. Ne pas vérifier NULL → segfault potentiel."
+description = """
+NSY103 — `malloc(n * sizeof(type))` alloue `n` éléments sur le tas. Toujours vérifier le retour (NULL si échec) et libérer avec `free()` en fin d'usage.
+
+Implémentez `alloc_array(n)` qui retourne un tableau dynamique de `n` entiers, et `free_array(arr)` qui le libère."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "`int *arr = malloc(5 * sizeof(int));` puis vérifier `if (!arr) { ... }`",
+    "Remplir avec `arr[i] = i + 1;` dans une boucle",
+    "Libérer avec `free(arr);` après usage",
+]
+id = "malloc-array-01"
+kc_ids = ["KC-C02"]
+key_concept = "malloc retourne void*, toujours vérifier NULL et appeler free()"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int *alloc_array(int n) {
+    if (n <= 0) return NULL;
+    return malloc((size_t)n * sizeof(int));
+}
+
+void free_array(int *arr) {
+    free(arr);
+}
+
+int main(void) {
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 1; arr[1] = 2; arr[2] = 3; arr[3] = 4; arr[4] = 5;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[4]));
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(-5);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(0);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(100);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 999; arr[99] = 777;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[99]));
+        free_array(arr);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+int *alloc_array(int n) {
+    /* TODO: allouer un tableau de n entiers */
+    /* Retourner NULL si n <= 0 */
+    return NULL;
+}
+
+void free_array(int *arr) {
+    /* TODO: libérer le tableau */
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Buffer dynamique de caracteres avec malloc
+ * malloc(n) alloue n octets sur le tas, free() les libere.
+ * =========================================================== */
+void example_char_buffer(void) {
+    int len = 6;
+    char *buf = malloc(len * sizeof(char));
+    if (!buf) { fprintf(stderr, "malloc echoue\n"); return; }
+    buf[0] = 'H'; buf[1] = 'e'; buf[2] = 'l';
+    buf[3] = 'l'; buf[4] = 'o'; buf[5] = '\0';
+    printf("buf = %s\n", buf);
+    free(buf);
+}
+/* Resultat: buf = Hello */
+
+/* == VOTRE EXERCICE =========================================
+ * Tableau dynamique d'entiers avec malloc
+ * Inspirez-vous de example_char_buffer ci-dessus.
+ * Allouez n=5 ints, remplissez avec 1..5, affichez, liberez.
+ * =========================================================== */
+
+int main(void) {
+    int n = 5;
+    /* TODO: allouez un tableau de n ints avec malloc */
+    /* TODO: remplissez avec 1..5, affichez, liberez */
+    (void)n;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int n = 5;
+    int *arr = malloc(n * sizeof(int));
+    if (!arr) {
+        fprintf(stderr, "malloc echoue\n");
+        return 1;
+    }
+    for (int i = 0; i < n; i++) {
+        arr[i] = ____; // valeur i+1
+    }
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+    ____; // libération
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int *alloc_array(int n) {
+    /* TODO: allouer un tableau de n entiers */
+    /* Retourner NULL si n <= 0 */
+    return NULL;
+}
+
+void free_array(int *arr) {
+    /* TODO: libérer le tableau */
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int *alloc_array(int n) {
+    /* TODO */
+    return NULL;
+}
+
+void free_array(int *arr) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 1; arr[1] = 2; arr[2] = 3; arr[3] = 4; arr[4] = 5;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[4]));
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(-5);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(0);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(100);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 999; arr[99] = 777;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[99]));
+        free_array(arr);
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int *alloc_array(int n) { return NULL; }
+
+void free_array(int *arr) { }
+
+int main(void) {
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 1; arr[1] = 2; arr[2] = 3; arr[3] = 4; arr[4] = 5;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[4]));
+        free_array(arr);
+    }
+    {
+        int *arr = alloc_array(-5);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(0);
+        printf("%d\n", (arr) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_array(100);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 999; arr[99] = 777;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[99]));
+        free_array(arr);
+    }
+    return 0;
+}
+''',
+]
+subject = "memory_allocation"
+title = "Tableau dynamique avec malloc"
+
+[validation]
+mode = "test"
+test_code = """
+void test_alloc_array_basic(void) {
+    int *arr = alloc_array(5);
+    TEST_ASSERT_NOT_NULL(arr);
+    free_array(arr);
+}
+
+void test_alloc_array_write_read(void) {
+    int *arr = alloc_array(5);
+    TEST_ASSERT_NOT_NULL(arr);
+    arr[0] = 1;
+    arr[1] = 2;
+    arr[2] = 3;
+    arr[3] = 4;
+    arr[4] = 5;
+    TEST_ASSERT_EQUAL_INT(1, arr[0]);
+    TEST_ASSERT_EQUAL_INT(5, arr[4]);
+    free_array(arr);
+}
+
+void test_alloc_array_negative(void) {
+    int *arr = alloc_array(-5);
+    TEST_ASSERT_NULL(arr);
+}
+
+void test_alloc_array_zero(void) {
+    int *arr = alloc_array(0);
+    TEST_ASSERT_NULL(arr);
+}
+
+void test_alloc_array_large(void) {
+    int *arr = alloc_array(100);
+    TEST_ASSERT_NOT_NULL(arr);
+    arr[0] = 999;
+    arr[99] = 777;
+    TEST_ASSERT_EQUAL_INT(999, arr[0]);
+    TEST_ASSERT_EQUAL_INT(777, arr[99]);
+    free_array(arr);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_alloc_array_basic);
+    RUN_TEST(test_alloc_array_write_read);
+    RUN_TEST(test_alloc_array_negative);
+    RUN_TEST(test_alloc_array_zero);
+    RUN_TEST(test_alloc_array_large);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "arr est déclaré sur la pile mais non initialisé. malloc n'a pas encore été appelé — aucun bloc heap n'existe."
+heap = []
+label = "Avant malloc"
+step_label = "Avant malloc — arr non initialisé"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "arr"
+value = "NULL"
+
+[[visualizer.steps]]
+explanation = "malloc(5 * sizeof(int)) = 20 octets sur le heap. arr reçoit l'adresse de [0]. Les indices 1..5 sont écrits via la boucle, puis libérés par free(arr)."
+label = "Après malloc(5*sizeof(int)) et remplissage"
+step_label = "malloc(5*sizeof(int)) — arr → heap"
+
+[[visualizer.steps.arrows]]
+from = "arr"
+to = "[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "[0]"
+value = "1"
+
+[[visualizer.steps.heap]]
+address = "[1]"
+value = "2"
+
+[[visualizer.steps.heap]]
+address = "[2]"
+value = "3"
+
+[[visualizer.steps.heap]]
+address = "[3]"
+value = "4"
+
+[[visualizer.steps.heap]]
+address = "[4]"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "arr"
+value = "→heap[0]"

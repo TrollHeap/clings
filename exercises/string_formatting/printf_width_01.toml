@@ -1,0 +1,325 @@
+common_mistake = "Confondre %-10d (gauche) et %10d (droite) — le signe '-' inverse l'alignement"
+description = """
+NSY103 — La largeur minimale dans printf contrôle l'espace occupé par une valeur. %10d aligne à droite sur 10 caractères, %-10d aligne à gauche. %0Nd remplit de zéros.
+
+Affichez des valeurs avec différentes largeurs et alignements."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "%10d → aligné à droite sur 10 caractères (espaces à gauche)",
+    "%-10d → aligné à gauche sur 10 caractères (espaces à droite)",
+    "%06d → rempli de zéros sur 6 chiffres",
+]
+id = "printf-width-01"
+kc_ids = ["KC-C05"]
+key_concept = "%Nd largeur minimale, %-Nd alignement gauche, %0Nd zero-fill — contrôle total de la mise en forme"
+lang = "c"
+prerequisites = ["printf-formats-01"]
+solution_code = '''
+#include <string.h>
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+    int a = 42, b = 1234, c = 7;
+    snprintf(buf, sz, "[%10d]\n[%-10d]\n[%10d]\n[%-10d]\n[%06d]\n[%06d]\n",
+             a, a, b, c, a, b);
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+    int a = 42, b = 1234, c = 7;
+    snprintf(buf, sz, "[%10d]\n[%-10d]\n[%10d]\n[%-10d]\n[%06d]\n[%06d]\n",
+             a, a, b, c, a, b);
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Largeurs et alignements avec snprintf
+ * %8d = droite, %-8d = gauche, %05d = zero-fill
+ * =========================================================== */
+void example_width(char *buf, size_t sz) {
+    int x = 99, y = 5678;
+    char out[128];
+    snprintf(out, sizeof(out), "[%8d]\n[%-8d]\n[%05d]\n", x, x, y);
+    snprintf(buf, sz, "%s", out);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * a=42, b=1234, c=7
+ * Largeur 10 droite/gauche, puis zero-fill 06
+ * =========================================================== */
+
+void format_width(char *buf, size_t sz) {
+    /* TODO: implementation */
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+    int a = 42, b = 1234, c = 7;
+    snprintf(buf, sz, "[%10d]\n[%-10d]\n[____]\n[____]\n[%06d]\n[____]\n",
+             a, a, ____, ____, a, ____);
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+    int a = 42, b = 1234, c = 7;
+    snprintf(buf, sz, "[____]\n[____]\n[____]\n[____]\n[____]\n[____]\n",
+             ____, ____, ____, ____, ____, ____);
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+    (void)buf; (void)sz;
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void format_width(char *buf, size_t sz) {
+}
+
+int main(void) {
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[        42]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[42        ]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[000042]")) ? 1 : 0);
+        printf("%d\n", (strstr(buf, "[001234]")) ? 1 : 0);
+    }
+    {
+        char buf[128];
+        format_width(buf, sizeof(buf));
+        printf("%d\n", (strstr(buf, "[      1234]")) ? 1 : 0);
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Largeur et alignement printf"
+
+[validation]
+expected_output = """
+1
+1
+1
+1
+1"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "%10d réserve 10 positions, remplit d'espaces à gauche"
+heap = []
+label = "Alignement à droite (%10d)"
+step_label = "1. Droite"
+
+[[visualizer.steps.call_frames]]
+args = "buf, sz"
+function_name = "format_width"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "format"
+value = '"%10d"'
+
+[[visualizer.steps.stack]]
+name = "a=42"
+value = "[        42]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le flag '-' force l'alignement à gauche"
+heap = []
+label = "Alignement à gauche (%-10d)"
+step_label = "2. Gauche"
+
+[[visualizer.steps.call_frames]]
+args = "buf, sz"
+function_name = "format_width"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "format"
+value = '"%-10d"'
+
+[[visualizer.steps.stack]]
+name = "a=42"
+value = "[42        ]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le flag '0' remplace les espaces par des zéros"
+heap = []
+label = "Remplissage zéros (%06d)"
+step_label = "3. Zéros"
+
+[[visualizer.steps.call_frames]]
+args = "buf, sz"
+function_name = "format_width"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "format"
+value = '"%06d"'
+
+[[visualizer.steps.stack]]
+name = "a=42"
+value = "[000042]"
+
+[[visualizer.steps.stack]]
+name = "b=1234"
+value = "[001234]"

@@ -1,0 +1,236 @@
+common_mistake = "Confondre exit code (0-255) et signal number — ils sont encodés différemment dans status"
+description = """
+NSY103 — waitpid() retourne un entier 'status' encodé. Les macros WIFEXITED, WEXITSTATUS, WIFSIGNALED, WTERMSIG décodent ce status.
+
+Étant donné des valeurs de status simulées, décodez-les avec les macros sys/wait.h.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "#include <sys/wait.h> pour les macros",
+    "WIFEXITED(status) : vrai si le process est sorti normalement (exit/return)",
+    "WEXITSTATUS(status) : exit code réel (0-255) si WIFEXITED est vrai",
+]
+id = "wait-macros-01"
+kc_ids = ["KC-C07"]
+key_concept = "WIFEXITED(s)=(s&0x7f)==0, WEXITSTATUS(s)=(s>>8)&0xff, WIFSIGNALED quand low 7 bits non nuls"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <sys/wait.h>
+void decode_status(int status) {
+    if (WIFEXITED(status)) {
+        printf("Sortie normale, code=%d\n", WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        printf("Tue par signal %d\n", WTERMSIG(status));
+    } else {
+        printf("Status inconnu: %d\n", status);
+    }
+}
+int main(void) {
+    decode_status(0);
+    decode_status(256);
+    decode_status(512);
+    decode_status(9);
+    decode_status(2);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/wait.h>
+
+void decode_status(int status) {
+    if (____(status)) {
+        printf("Sortie normale, code=%d\n", ____(status));
+    } else if (____(status)) {
+        printf("Tue par signal %d\n", ____(status));
+    } else {
+        printf("Status inconnu: %d\n", status);
+    }
+}
+
+int main(void) {
+    decode_status(0);
+    decode_status(256);
+    decode_status(512);
+    decode_status(9);
+    decode_status(2);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Decoder des status wait() differents
+ * WIFEXITED/WEXITSTATUS pour sortie normale,
+ * WIFSIGNALED/WTERMSIG pour mort par signal.
+ * ================================================= */
+void example_decode(int status) {
+    if (WIFEXITED(status)) {
+        printf("Exit code: %d\n", WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        printf("Killed by signal: %d\n", WTERMSIG(status));
+    }
+}
+/* Resultat: Exit code: 3 / Killed by signal: 11 */
+
+/* == VOTRE EXERCICE ================================
+ * Decoder le statut de sortie avec les macros wait
+ * Inspirez-vous de example_decode ci-dessus.
+ * Utilisez les memes macros mais avec le format
+ * "Sortie normale, code=X" / "Tue par signal X".
+ * ================================================= */
+void decode_status(int status) {
+    /* TODO: WIFEXITED, WEXITSTATUS, WIFSIGNALED, WTERMSIG */
+    (void)status;
+}
+
+int main(void) {
+    decode_status(0);
+    decode_status(256);
+    decode_status(512);
+    decode_status(9);
+    decode_status(2);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/wait.h>
+
+void decode_status(int status) {
+    if (____(status)) {
+        printf("Sortie normale, code=%d\n", ____(status));
+    } else if (____(status)) {
+        printf("Tue par signal %d\n", ____(status));
+    } else {
+        printf("Status inconnu: %d\n", status);
+    }
+}
+
+int main(void) {
+    decode_status(0);
+    decode_status(256);
+    decode_status(512);
+    decode_status(9);
+    decode_status(2);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/wait.h>
+
+void decode_status(int status) {
+    if (____(status)) {
+        printf("Sortie normale, code=%d\n", ____(status));
+    } else if (____(status)) {
+        printf("Tue par signal %d\n", ____(status));
+    } else {
+        printf("Status inconnu: %d\n", status);
+    }
+}
+
+int main(void) {
+    decode_status(0);
+    decode_status(256);
+    decode_status(512);
+    decode_status(9);
+    decode_status(2);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/wait.h>
+
+void decode_status(int status) {
+    // WIFEXITED → "Sortie normale, code=X"
+    // WIFSIGNALED → "Tue par signal X"
+    // sinon → "Status inconnu: X"
+}
+
+int main(void) {
+    decode_status(0); decode_status(256); decode_status(512);
+    decode_status(9); decode_status(2);
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/wait.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Décoder le statut de sortie avec les macros wait"
+
+[validation]
+expected_output = """
+Sortie normale, code=0
+Sortie normale, code=1
+Sortie normale, code=2
+Tue par signal 9
+Tue par signal 2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "status=0 : exit code 0"
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED"
+value = "(0 & 0x7f)==0 → true"
+
+[[visualizer.steps.stack]]
+name = "WEXITSTATUS"
+value = "(0>>8)&0xff = 0"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "status=256 : exit code 1"
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "256 (0x100)"
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED"
+value = "(256 & 0x7f)==0 → true"
+
+[[visualizer.steps.stack]]
+name = "WEXITSTATUS"
+value = "(256>>8)&0xff = 1"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "status=9 : tué par signal 9"
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED"
+value = "(9 & 0x7f)=9 ≠ 0 → false"
+
+[[visualizer.steps.stack]]
+name = "WIFSIGNALED"
+value = "true"
+
+[[visualizer.steps.stack]]
+name = "WTERMSIG"
+value = "9 & 0x7f = 9"

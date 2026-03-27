@@ -1,0 +1,346 @@
+common_mistake = "Oublier FD_ZERO avant chaque appel à select — la fd_set garde les résultats précédents"
+description = """
+NSY103 — select() permet de surveiller plusieurs descripteurs de fichier simultanément. On passe un fd_set à select() qui bloque jusqu'à ce qu'au moins un fd soit prêt en lecture. FD_SET() ajoute un fd, FD_ISSET() vérifie s'il est prêt.
+
+Créez 2 pipes. Deux enfants écrivent chacun dans un pipe. Le parent utilise select() pour lire les messages dès qu'ils arrivent."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "FD_SET(fd, &rfds) ajoute fd à l'ensemble surveillé",
+    "FD_ISSET(fd, &rfds) vérifie si fd est prêt après select()",
+    "Le premier argument de select est le plus grand fd + 1",
+]
+id = "pipe-select-01"
+kc_ids = ["KC-C10"]
+key_concept = "select() multiplexe N descripteurs ; FD_SET ajoute, FD_ISSET vérifie la disponibilité"
+lang = "c"
+prerequisites = ["pipe-bidir-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/select.h>
+
+int main(void) {
+    int fd1[2], fd2[2];
+    pipe(fd1);
+    pipe(fd2);
+
+    /* Écriture dans les deux pipes depuis le parent (ordre garanti) */
+    write(fd1[1], "msg-A\n", 6); close(fd1[1]);
+    write(fd2[1], "msg-B\n", 6); close(fd2[1]);
+
+    int done = 0;
+    while (done < 2) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        if (fd1[0] >= 0) FD_SET(fd1[0], &rfds);
+        if (fd2[0] >= 0) FD_SET(fd2[0], &rfds);
+        int maxfd = (fd1[0] > fd2[0] ? fd1[0] : fd2[0]) + 1;
+        select(maxfd, &rfds, NULL, NULL, NULL);
+
+        char buf[64];
+        ssize_t n;
+        if (fd1[0] >= 0 && FD_ISSET(fd1[0], &rfds)) {
+            n = read(fd1[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd1[0]); fd1[0] = -1; done++;
+        }
+        if (fd2[0] >= 0 && FD_ISSET(fd2[0], &rfds)) {
+            n = read(fd2[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd2[0]); fd2[0] = -1; done++;
+        }
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/select.h>
+
+int main(void) {
+    int fd1[2], fd2[2];
+    pipe(fd1);
+    pipe(fd2);
+
+    if (fork() == 0) {
+        close(fd1[0]); close(fd2[0]); close(fd2[1]);
+        write(fd1[1], "msg-A\n", 6);
+        close(fd1[1]);
+        _exit(0);
+    }
+    if (fork() == 0) {
+        close(fd1[0]); close(fd1[1]); close(fd2[0]);
+        write(fd2[1], "msg-B\n", 6);
+        close(fd2[1]);
+        _exit(0);
+    }
+    close(fd1[1]);
+    close(fd2[1]);
+
+    int done = 0;
+    while (done < 2) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        if (fd1[0] >= 0) ____(&rfds, fd1[0]);
+        if (fd2[0] >= 0) ____(&rfds, fd2[0]);
+        int maxfd = (fd1[0] > fd2[0] ? fd1[0] : fd2[0]) + 1;
+        select(maxfd, &rfds, NULL, NULL, NULL);
+
+        char buf[64];
+        ssize_t n;
+        if (fd1[0] >= 0 && ____(fd1[0], &rfds)) {
+            n = read(fd1[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd1[0]); fd1[0] = -1; done++;
+        }
+        if (fd2[0] >= 0 && ____(fd2[0], &rfds)) {
+            n = read(fd2[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd2[0]); fd2[0] = -1; done++;
+        }
+    }
+    wait(NULL); wait(NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/select.h>
+
+/* == EXEMPLE =======================================
+ * select() avec un seul pipe et timeout
+ * ================================================= */
+void example_select_one(void) {
+    int fd[2];
+    pipe(fd);
+    if (fork() == 0) {
+        close(fd[0]);
+        write(fd[1], "data", 4);
+        close(fd[1]);
+        _exit(0);
+    }
+    close(fd[1]);
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(fd[0], &rfds);
+    select(fd[0]+1, &rfds, NULL, NULL, NULL);
+    if (FD_ISSET(fd[0], &rfds)) {
+        char buf[16];
+        ssize_t n = read(fd[0], buf, sizeof(buf)-1);
+        buf[n] = '\0';
+        printf("Got: %s\n", buf);
+    }
+    close(fd[0]); wait(NULL);
+}
+/* Resultat: Got: data */
+
+/* == VOTRE EXERCICE ================================
+ * select() avec 2 pipes, 2 enfants.
+ * ================================================= */
+int main(void) {
+    int fd1[2], fd2[2];
+    pipe(fd1); pipe(fd2);
+    if (fork() == 0) {
+        close(fd1[0]); close(fd2[0]); close(fd2[1]);
+        write(fd1[1], "msg-A\n", 6); close(fd1[1]); _exit(0);
+    }
+    if (fork() == 0) {
+        close(fd1[0]); close(fd1[1]); close(fd2[0]);
+        write(fd2[1], "msg-B\n", 6); close(fd2[1]); _exit(0);
+    }
+    close(fd1[1]); close(fd2[1]);
+    /* TODO: use select() loop to read from both pipes */
+    wait(NULL); wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/select.h>
+
+int main(void) {
+    int fd1[2], fd2[2];
+    pipe(fd1); pipe(fd2);
+    if (fork() == 0) { close(fd1[0]); close(fd2[0]); close(fd2[1]); write(fd1[1], "msg-A\n", 6); close(fd1[1]); _exit(0); }
+    if (fork() == 0) { close(fd1[0]); close(fd1[1]); close(fd2[0]); write(fd2[1], "msg-B\n", 6); close(fd2[1]); _exit(0); }
+    close(fd1[1]); close(fd2[1]);
+    int done = 0;
+    while (done < 2) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        if (fd1[0] >= 0) FD_SET(fd1[0], &rfds);
+        if (fd2[0] >= 0) FD_SET(fd2[0], &rfds);
+        int maxfd = (fd1[0] > fd2[0] ? fd1[0] : fd2[0]) + 1;
+        select(maxfd, &rfds, NULL, NULL, NULL);
+        char buf[64]; ssize_t n;
+        if (fd1[0] >= 0 && ____(fd1[0], &rfds)) {
+            n = read(fd1[0], buf, sizeof(buf)-1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd1[0]); fd1[0] = -1; done++;
+        }
+        if (fd2[0] >= 0 && ____(fd2[0], &rfds)) {
+            n = read(fd2[0], buf, sizeof(buf)-1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd2[0]); fd2[0] = -1; done++;
+        }
+    }
+    wait(NULL); wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/select.h>
+
+int main(void) {
+    int fd1[2], fd2[2];
+    pipe(fd1);
+    pipe(fd2);
+
+    if (fork() == 0) {
+        close(fd1[0]); close(fd2[0]); close(fd2[1]);
+        write(fd1[1], "msg-A\n", 6);
+        close(fd1[1]);
+        _exit(0);
+    }
+    if (fork() == 0) {
+        close(fd1[0]); close(fd1[1]); close(fd2[0]);
+        write(fd2[1], "msg-B\n", 6);
+        close(fd2[1]);
+        _exit(0);
+    }
+    close(fd1[1]);
+    close(fd2[1]);
+
+    int done = 0;
+    while (done < 2) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        if (fd1[0] >= 0) ____(&rfds, fd1[0]);
+        if (fd2[0] >= 0) ____(&rfds, fd2[0]);
+        int maxfd = (fd1[0] > fd2[0] ? fd1[0] : fd2[0]) + 1;
+        select(maxfd, &rfds, NULL, NULL, NULL);
+
+        char buf[64];
+        ssize_t n;
+        if (fd1[0] >= 0 && ____(fd1[0], &rfds)) {
+            n = read(fd1[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd1[0]); fd1[0] = -1; done++;
+        }
+        if (fd2[0] >= 0 && ____(fd2[0], &rfds)) {
+            n = read(fd2[0], buf, sizeof(buf) - 1);
+            if (n > 0) { buf[n-1] = '\0'; printf("Select got: %s\n", buf); }
+            close(fd2[0]); fd2[0] = -1; done++;
+        }
+    }
+    wait(NULL); wait(NULL);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/select.h>
+
+int main(void) {
+    // 2 pipes, 2 enfants écrivent "msg-A" et "msg-B"
+    // Parent: boucle select() pour lire dès qu'un pipe est prêt
+    // Afficher "Select got: msg-A" et "Select got: msg-B"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Multiplexage avec select() sur pipes"
+
+[validation]
+expected_output = """
+Select got: msg-A
+Select got: msg-B
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "FD_SET() inscrit chaque fd dans le bitmap fd_set. select() bloque jusqu'à ce qu'au moins un fd soit prêt en lecture — c'est le mécanisme de multiplexage qui évite de faire deux read() bloquants en séquence (ce qui raterait le premier message disponible)."
+label = "2 pipes surveillés par select()"
+step_label = "Étape 1 — FD_SET enregistre les pipes dans fd_set, select() attend"
+
+[[visualizer.steps.edges]]
+label = "FD_SET"
+source = "fd1"
+target = "select"
+
+[[visualizer.steps.edges]]
+label = "FD_SET"
+source = "fd2"
+target = "select"
+
+[[visualizer.steps.nodes]]
+id = "fd1"
+label = "fd1[0] (pipe 1)"
+
+[[visualizer.steps.nodes]]
+id = "fd2"
+label = "fd2[0] (pipe 2)"
+
+[[visualizer.steps.nodes]]
+id = "select"
+label = "select()"
+
+[[visualizer.steps]]
+explanation = "select() retourne en indiquant combien de fd sont prêts. FD_ISSET() interroge le bitmap résultant pour savoir quel(s) fd peuvent être lus sans bloquer. C'est le cœur du multiplexage : un seul thread gère plusieurs sources d'événements sans créer de threads supplémentaires."
+label = "select() retourne — fd prêt détecté avec FD_ISSET"
+step_label = "Étape 2 — select() retourne, FD_ISSET() identifie les fd prêts"
+
+[[visualizer.steps.edges]]
+label = "which fd ready?"
+source = "select"
+target = "check"
+
+[[visualizer.steps.nodes]]
+id = "select"
+label = "select() returns"
+
+[[visualizer.steps.nodes]]
+id = "check"
+label = "FD_ISSET(fd, &rfds)"
+
+[[visualizer.steps]]
+explanation = "Une fois FD_ISSET() confirmé, read() est garanti de retourner immédiatement avec des données. fd1[0] est remis à -1 après fermeture pour éviter qu'il réapparaisse dans le fd_set à l'itération suivante — c'est le pattern standard pour gérer des sources qui se ferment une par une."
+label = "read() sur les fd prêts → affichage"
+step_label = "Étape 3 — read() sur les fd prêts, fermeture progressive"
+
+[[visualizer.steps.edges]]
+label = "msg-A, msg-B"
+source = "read"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "read"
+label = "read(fd)"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "stdout"

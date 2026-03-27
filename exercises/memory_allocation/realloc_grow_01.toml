@@ -1,0 +1,307 @@
+common_mistake = "Stocker le retour de realloc directement dans v->data — si realloc échoue (NULL), on perd le pointeur original (fuite mémoire)"
+description = """
+NSY103 — Agrandir un buffer de 1 élément à chaque fois coûte O(n²) à cause des copies répétées. La stratégie de croissance géométrique (doubler la capacité) amène le coût amorti à O(1) par insertion.
+
+Implémentez un vecteur dynamique avec croissance ×2 et suivez les réallocations."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Croissance ×2 : `new_cap = cap == 0 ? 4 : cap * 2`",
+    "Toujours stocker le retour de realloc dans un temporaire — si NULL, l'ancien pointeur reste valide",
+    "Insérer à `v->data[v->len]` puis incrémenter len",
+]
+id = "realloc-grow-01"
+kc_ids = ["KC-C02"]
+key_concept = "La croissance géométrique (×2) donne un coût amorti O(1) par insertion au lieu de O(n) avec croissance linéaire"
+lang = "c"
+prerequisites = ["realloc-buf-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int *data;
+    int len;
+    int cap;
+} Vec;
+
+Vec vec_new(void) {
+    return (Vec){NULL, 0, 0};
+}
+
+void vec_push(Vec *v, int val) {
+    if (v->len == v->cap) {
+        int new_cap = v->cap == 0 ? 4 : v->cap * 2;
+        int *tmp = realloc(v->data, new_cap * sizeof(int));
+        if (!tmp) return;
+        v->data = tmp;
+        v->cap = new_cap;
+    }
+    v->data[v->len] = val;
+    v->len++;
+}
+
+void vec_free(Vec *v) {
+    free(v->data);
+    v->data = NULL;
+    v->len = v->cap = 0;
+}
+
+int main(void) {
+    Vec v = vec_new();
+    for (int i = 0; i < 10; i++) vec_push(&v, i*i);
+    printf("len=%d cap=%d\n", v.len, v.cap);
+    printf("contenu:");
+    for (int i = 0; i < v.len; i++) printf(" %d", v.data[i]);
+    printf("\n");
+    vec_free(&v);
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int *data;
+    int len;
+    int cap;
+} Vec;
+
+Vec vec_new(void) {
+    return (Vec){NULL, 0, 0};
+}
+
+void vec_push(Vec *v, int val) {
+    /* TODO: grow capacity by 2x when len == cap */
+    /* Pattern: new_cap = cap == 0 ? 4 : cap * 2 */
+    /* Safe realloc via tmp, append val at v->data[v->len++] */
+}
+
+void vec_free(Vec *v) {
+    free(v->data);
+    v->data = NULL;
+    v->len = v->cap = 0;
+}
+
+int main(void) {
+    // TODO: push 10 carrés parfaits
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Buffer de chars avec croissance x2
+ * Montre le pattern realloc dans un temporaire.
+ * =========================================================== */
+typedef struct { char *buf; int len, cap; } CharBuf;
+
+void example_append(CharBuf *b, char c) {
+    if (b->len == b->cap) {
+        int nc = b->cap == 0 ? 4 : b->cap * 2;
+        char *tmp = realloc(b->buf, nc);
+        if (!tmp) return;
+        b->buf = tmp; b->cap = nc;
+    }
+    b->buf[b->len++] = c;
+}
+void example_demo(void) {
+    CharBuf b = {NULL, 0, 0};
+    const char *s = "Hello";
+    for (int i = 0; s[i]; i++) example_append(&b, s[i]);
+    example_append(&b, '\0');
+    printf("%s (len=%d cap=%d)\n", b.buf, b.len, b.cap);
+    free(b.buf);
+}
+/* Resultat: Hello (len=6 cap=8) */
+
+/* == VOTRE EXERCICE =========================================
+ * Vec d'entiers avec croissance x2 et tracking des reallocs
+ * =========================================================== */
+typedef struct { int *data; int len, cap; } Vec;
+
+Vec vec_new(void) { return (Vec){NULL, 0, 0}; }
+void vec_push(Vec *v, int val) { (void)v; (void)val; }
+void vec_free(Vec *v) { free(v->data); v->data=NULL; v->len=v->cap=0; }
+
+int main(void) {
+    Vec v = vec_new();
+    for (int i = 0; i < 10; i++) vec_push(&v, i*i);
+    printf("len=%d cap=%d\n", v.len, v.cap);
+    printf("contenu:");
+    for (int i = 0; i < v.len; i++) printf(" %d", v.data[i]);
+    printf("\n");
+    vec_free(&v);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int *data; int len, cap; } Vec;
+Vec vec_new(void) { return (Vec){NULL, 0, 0}; }
+
+void vec_push(Vec *v, int val) {
+    if (v->len == v->cap) {
+        int new_cap = v->cap == 0 ? 4 : v->cap * 2;
+        int *tmp = realloc(v->data, new_cap * sizeof(int));
+        if (!tmp) return;
+        v->data = tmp;
+        printf("  realloc: %d -> %d\n", v->cap, new_cap);
+        v->cap = new_cap;
+    }
+    v->data[v->len] = val;
+    v->____++;
+}
+
+void vec_free(Vec *v) { free(v->data); v->data=NULL; v->len=v->cap=0; }
+
+int main(void) {
+    Vec v = vec_new();
+    for (int i = 0; i < 10; i++) vec_push(&v, i*i);
+    printf("len=%d cap=%d\n", v.____, v.____);
+    printf("contenu:");
+    for (int i = 0; i < v.len; i++) printf(" %d", v.data[i]);
+    printf("\n");
+    vec_free(&v);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int *data;
+    int len;
+    int cap;
+} Vec;
+
+Vec vec_new(void) {
+    return (Vec){NULL, 0, 0};
+}
+
+void vec_push(Vec *v, int val) {
+    if (v->len == v->cap) {
+        int new_cap = v->cap == 0 ? 4 : v->cap * ____;
+        int *tmp = realloc(v->data, new_cap * sizeof(int));
+        if (!tmp) return;
+        v->data = ____;
+        printf("  realloc: %d -> %d\n", v->cap, new_cap);
+        v->cap = ____;
+    }
+    v->data[v->____] = val;
+    v->len++;
+}
+
+void vec_free(Vec *v) {
+    free(v->data);
+    v->data = NULL;
+    v->len = v->cap = 0;
+}
+
+int main(void) {
+    Vec v = vec_new();
+    for (int i = 0; i < 10; i++)
+        vec_push(&v, i * i);
+
+    printf("len=%d cap=%d\n", v.len, v.cap);
+    printf("contenu:");
+    for (int i = 0; i < v.len; i++)
+        printf(" %d", v.data[i]);
+    printf("\n");
+    vec_free(&v);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int *data; int len, cap; } Vec;
+
+// Implémentez vec_new, vec_push (croissance x2), vec_free
+// Affichez les reallocs au fur et à mesure
+int main(void) {
+    // TODO: push 10 carrés parfaits
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Croissance géométrique de buffer"
+
+[validation]
+expected_output = """
+len=10 cap=16
+contenu: 0 1 4 9 16 25 36 49 64 81"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Première allocation : cap passe de 0 à 4. Le buffer est plein (len==cap). Le prochain push déclenchera un realloc."
+label = "Après 4 push (cap=4)"
+step_label = "Buffer plein — prochain push = realloc"
+
+[[visualizer.steps.arrows]]
+from = "v.data"
+label = "malloc(16)"
+to = "heap"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap"
+value = "[0, 1, 4, 9]"
+
+[[visualizer.steps.stack]]
+name = "v.data"
+value = "→heap"
+
+[[visualizer.steps.stack]]
+name = "v.len"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "v.cap"
+value = "4"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Seulement 3 reallocs pour 10 éléments (0→4, 4→8, 8→16). Coût amorti O(1) par insertion. 6 slots inutilisés — compromis mémoire/performance."
+label = "Après realloc 4→16 (10 éléments)"
+step_label = "Croissance ×2 — 3 reallocs pour 10 insertions"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap"
+value = "[0,1,4,9,16,25,36,49,64,81,_,_,_,_,_,_]"
+
+[[visualizer.steps.stack]]
+name = "v.data"
+value = "→heap"
+
+[[visualizer.steps.stack]]
+name = "v.len"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "v.cap"
+value = "16"

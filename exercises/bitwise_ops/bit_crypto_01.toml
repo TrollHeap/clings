@@ -1,0 +1,495 @@
+common_mistake = "Rotation: oublier n &= 7 → undefined behavior si n >= 8 (shift >= width of type)"
+description = """
+NSY103 — Le chiffrement XOR est le plus simple des ciphers symétriques: chaque octet du message est XORé avec un octet de la clé (cyclique). Propriété fondamentale: A ^ K ^ K = A (encrypt = decrypt). Combiné avec rotation de bits et substitution, on obtient un mini-cipher plus résistant.
+
+Implémentez un XOR cipher, une rotation de bits, et combinez-les en un mini-cipher multi-passes."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "XOR cipher: buf[i] ^= key[i % klen] — l'opérateur est ^=",
+    "Rotation gauche N bits: (val << N) | (val >> (8-N)) — les bits qui sortent à gauche rentrent à droite",
+    "mini_decrypt est l'inverse de mini_encrypt: même XOR mais rotate_right au lieu de rotate_left",
+]
+id = "bit-crypto-01"
+kc_ids = ["KC-C04"]
+key_concept = "XOR cipher exploite A^K^K=A pour encrypt=decrypt. La rotation de bits ajoute de la diffusion. Combiner les deux = mini-cipher à passes multiples."
+lang = "c"
+prerequisites = ["bit-crc-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+void xor_cipher(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    for (int i = 0; i < len; i++) {
+        buf[i] ^= key[i % klen];
+    }
+}
+
+unsigned char rotate_left(unsigned char val, int n) {
+    n &= 7;
+    return (val << n) | (val >> (8 - n));
+}
+
+unsigned char rotate_right(unsigned char val, int n) {
+    n &= 7;
+    return (val >> n) | (val << (8 - n));
+}
+
+void mini_encrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_left(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+void mini_decrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_right(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+int main(void) {
+    unsigned char msg1[] = "Hello";
+    int len1 = 5;
+    unsigned char key1[] = {0xAA};
+    printf("original : ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("encrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("decrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    printf("rotl(0xA5,3) = 0x%02X\n", rotate_left(0xA5, 3));
+    printf("rotr(0x2D,3) = 0x%02X\n", rotate_right(0x2D, 3));
+    printf("rotl(rotr(0xA5,3),3) = 0x%02X\n", rotate_left(rotate_right(0xA5, 3), 3));
+    unsigned char msg2[] = "ABCDE";
+    int len2 = 5;
+    unsigned char key2[] = {0x13, 0x37};
+    printf("mini original : ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_encrypt(msg2, len2, key2, 2);
+    printf("mini encrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_decrypt(msg2, len2, key2, 2);
+    printf("mini decrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+void xor_cipher(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    for (int i = 0; i < len; i++) {
+        buf[i] = buf[i];
+    }
+}
+
+unsigned char rotate_left(unsigned char val, int n) {
+    n &= 7;
+    return (val << n) | (val >> (8 - 0));
+}
+
+unsigned char rotate_right(unsigned char val, int n) {
+    n &= 7;
+    return (val >> n) | (val << (8 - n));
+}
+
+void mini_encrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_left(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+void mini_decrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_right(buf[i], 0);
+    xor_cipher(buf, len, key, klen);
+}
+
+int main(void) {
+    unsigned char msg1[] = "Hello";
+    int len1 = 5;
+    unsigned char key1[] = {0xAA};
+    printf("original : ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("encrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("decrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    printf("rotl(0xA5,3) = 0x%02X\n", rotate_left(0xA5, 3));
+    printf("rotr(0x2D,3) = 0x%02X\n", rotate_right(0x2D, 3));
+    printf("rotl(rotr(0xA5,3),3) = 0x%02X\n", rotate_left(rotate_right(0xA5, 3), 3));
+    unsigned char msg2[] = "ABCDE";
+    int len2 = 5;
+    unsigned char key2[] = {0x13, 0x37};
+    printf("mini original : ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_encrypt(msg2, len2, key2, 2);
+    printf("mini encrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_decrypt(msg2, len2, key2, 2);
+    printf("mini decrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * XOR: A ^ K ^ K = A (symétrique)
+ * Rotation: bits circulaires, rotl inverse de rotr
+ * =========================================================== */
+void example_xor(void) {
+    unsigned char x = 0x42;
+    unsigned char k = 0xFF;
+    printf("0x%02X ^ 0x%02X = 0x%02X\n", x, k, x ^ k); /* 0xBD */
+    printf("0x%02X ^ 0x%02X = 0x%02X\n", x ^ k, k, (x ^ k) ^ k); /* 0x42 */
+}
+
+/* == VOTRE EXERCICE ========================================= */
+
+void xor_cipher(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    for (int i = 0; i < len; i++)
+        buf[i] ^= key[i % klen];
+}
+
+unsigned char rotate_left(unsigned char val, int n) {
+    n &= 7;
+    return (val << n) | (val >> (8 - n));
+}
+
+unsigned char rotate_right(unsigned char val, int n) {
+    n &= 7;
+    return (val >> n) | (val << (8 - n));
+}
+
+void mini_encrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_left(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+void mini_decrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_right(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+int main(void) {
+    unsigned char msg1[] = "Hello";
+    int len1 = 5;
+    unsigned char key1[] = {0xAA};
+    printf("original : ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("encrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("decrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    printf("rotl(0xA5,3) = 0x%02X\n", rotate_left(0xA5, 3));
+    printf("rotr(0x2D,3) = 0x%02X\n", rotate_right(0x2D, 3));
+    printf("rotl(rotr(0xA5,3),3) = 0x%02X\n", rotate_left(rotate_right(0xA5, 3), 3));
+    unsigned char msg2[] = "ABCDE";
+    int len2 = 5;
+    unsigned char key2[] = {0x13, 0x37};
+    printf("mini original : ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_encrypt(msg2, len2, key2, 2);
+    printf("mini encrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_decrypt(msg2, len2, key2, 2);
+    printf("mini decrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void xor_cipher(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    for (int i = 0; i < len; i++)
+        buf[i] ^= key[i % klen];
+}
+
+unsigned char rotate_left(unsigned char val, int n) {
+    n &= 7;
+    return (val << n) | (val >> (8 - n));
+}
+
+unsigned char rotate_right(unsigned char val, int n) {
+    n &= 7;
+    return (val >> n) | (val << (8 - n));
+}
+
+void mini_encrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_left(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+void mini_decrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_right(buf[i], ____);
+    xor_cipher(buf, len, key, klen);
+}
+
+int main(void) {
+    unsigned char msg1[] = "Hello";
+    int len1 = 5;
+    unsigned char key1[] = {0xAA};
+    printf("original : ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("encrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("decrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    printf("rotl(0xA5,3) = 0x%02X\n", rotate_left(0xA5, 3));
+    printf("rotr(0x2D,3) = 0x%02X\n", rotate_right(0x2D, 3));
+    printf("rotl(rotr(0xA5,3),3) = 0x%02X\n", rotate_left(rotate_right(0xA5, 3), 3));
+    unsigned char msg2[] = "ABCDE";
+    int len2 = 5;
+    unsigned char key2[] = {0x13, 0x37};
+    printf("mini original : ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_encrypt(msg2, len2, key2, 2);
+    printf("mini encrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_decrypt(msg2, len2, key2, 2);
+    printf("mini decrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void xor_cipher(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    for (int i = 0; i < len; i++) {
+        buf[i] ____ key[i % klen];
+    }
+}
+
+unsigned char rotate_left(unsigned char val, int n) {
+    n &= 7;
+    return (val << n) | (val >> (8 - ____));
+}
+
+unsigned char rotate_right(unsigned char val, int n) {
+    n &= 7;
+    return (val >> n) | (val << (8 - n));
+}
+
+void mini_encrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_left(buf[i], 3);
+    xor_cipher(buf, len, key, klen);
+}
+
+void mini_decrypt(unsigned char *buf, int len, const unsigned char *key, int klen) {
+    xor_cipher(buf, len, key, klen);
+    for (int i = 0; i < len; i++)
+        buf[i] = rotate_right(buf[i], ____);
+    xor_cipher(buf, len, key, klen);
+}
+
+int main(void) {
+    unsigned char msg1[] = "Hello";
+    int len1 = 5;
+    unsigned char key1[] = {0xAA};
+    printf("original : ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("encrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    xor_cipher(msg1, len1, key1, 1);
+    printf("decrypted: ");
+    for (int i = 0; i < len1; i++) printf("%02X ", msg1[i]);
+    printf("\n");
+    printf("rotl(0xA5,3) = 0x%02X\n", rotate_left(0xA5, 3));
+    printf("rotr(0x2D,3) = 0x%02X\n", rotate_right(0x2D, 3));
+    printf("rotl(rotr(0xA5,3),3) = 0x%02X\n", rotate_left(rotate_right(0xA5, 3), 3));
+    unsigned char msg2[] = "ABCDE";
+    int len2 = 5;
+    unsigned char key2[] = {0x13, 0x37};
+    printf("mini original : ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_encrypt(msg2, len2, key2, 2);
+    printf("mini encrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    mini_decrypt(msg2, len2, key2, 2);
+    printf("mini decrypted: ");
+    for (int i = 0; i < len2; i++) printf("%02X ", msg2[i]);
+    printf("\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+// xor_cipher: buf[i] ^= key[i % klen] (symétrique: encrypt=decrypt)
+// rotate_left(val, n): (val<<n) | (val>>(8-n))
+// rotate_right(val, n): (val>>n) | (val<<(8-n))
+// mini_encrypt: XOR → rotl(3) → XOR
+// mini_decrypt: XOR → rotr(3) → XOR
+// Tester: "Hello" avec clé 0xAA, "ABCDE" avec clé {0x13,0x37}
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "bitwise_ops"
+title = "XOR cipher et opérations bitwise avancées"
+
+[validation]
+expected_output = """
+original : 48 65 6C 6C 6F
+encrypted: E2 CF C6 C6 C5
+decrypted: 48 65 6C 6C 6F
+rotl(0xA5,3) = 0x2D
+rotr(0x2D,3) = 0xA5
+rotl(rotr(0xA5,3),3) = 0xA5
+mini original : 41 42 43 44 45
+mini encrypted: 81 9C 91 AC A1
+mini decrypted: 41 42 43 44 45"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "A ^ K ^ K = A — XOR avec la même clé deux fois restaure l'original"
+heap = []
+label = "XOR cipher: encrypt puis decrypt"
+step_label = "1. XOR"
+
+[[visualizer.steps.call_frames]]
+args = '"Hello", key=0xAA'
+function_name = "xor_cipher"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "'H' (0x48)"
+value = "01001000"
+
+[[visualizer.steps.stack]]
+name = "key 0xAA"
+value = "10101010"
+
+[[visualizer.steps.stack]]
+name = "XOR = 0xE2"
+value = "11100010 (encrypted)"
+
+[[visualizer.steps.stack]]
+name = "XOR 0xAA again"
+value = "01001000 = 'H' (decrypted!)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Rotation = shift circulaire: les bits ne sont pas perdus, ils réapparaissent de l'autre côté"
+heap = []
+label = "Rotation de bits: rotl et rotr"
+step_label = "2. Rotation"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5, 3"
+function_name = "rotate_left"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "0xA5"
+value = "10100101"
+
+[[visualizer.steps.stack]]
+name = "rotl 3"
+value = "00101101 = 0x2D (3 bits MSB → LSB)"
+
+[[visualizer.steps.stack]]
+name = "rotr 3"
+value = "10100101 = 0xA5 (inverse!)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Combiner XOR + rotation crée un cipher plus résistant que XOR seul (confusion + diffusion)"
+heap = []
+label = "Mini-cipher: XOR → rotl → XOR / XOR → rotr → XOR"
+step_label = "3. Mini-cipher"
+
+[[visualizer.steps.call_frames]]
+args = '"ABCDE", key={0x13,0x37}'
+function_name = "mini_encrypt"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "plaintext"
+value = "'A' (0x41)"
+
+[[visualizer.steps.stack]]
+name = "XOR key[0]=0x13"
+value = "0x52"
+
+[[visualizer.steps.stack]]
+name = "rotl 3"
+value = "0x92"
+
+[[visualizer.steps.stack]]
+name = "XOR key[0]=0x13"
+value = "0x81 (encrypted)"
+
+[[visualizer.steps.stack]]
+name = "decrypt: reverse"
+value = "XOR → rotr → XOR = 0x41"

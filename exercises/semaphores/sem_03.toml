@@ -1,0 +1,597 @@
+common_mistake = "Inverser empty et full : post(empty) côté producteur (libère un slot), post(full) côté consommateur → deadlock"
+description = """
+NSY103 — Le pattern producteur-consommateur utilise deux sémaphores : empty (places libres) et full (items disponibles). Le producteur wait(empty) avant d'écrire, post(full) après. Le consommateur wait(full) avant de lire, post(empty) après.
+
+Simulez avec N=3 slots, 2 productions puis 2 consommations.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "empty s'initialise à N (tous les slots sont libres au départ)",
+    "full s'initialise à 0 (aucun item produit au départ)",
+    "Producteur : wait(empty) pour réserver un slot, post(full) pour signaler un item",
+    "Consommateur : wait(full) pour attendre un item, post(empty) pour libérer un slot",
+]
+id = "sem-03"
+kc_ids = ["KC-C11"]
+key_concept = "empty=slots libres (init=N), full=items prêts (init=0) ; wait/post inverses entre producteur et consommateur"
+lang = "c"
+prerequisites = ["sem-02"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    sem_init(&empty, 0, N);
+    sem_init(&full, 0, 0);
+    int val_e, val_f;
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&empty);
+        buf[prod_idx++ % N] = i + 1;
+        sem_post(&full);
+        sem_getvalue(&empty, &val_e);
+        sem_getvalue(&full, &val_f);
+        printf("Produced: empty=%d full=%d\n", val_e, val_f);
+    }
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&full);
+        int item = buf[cons_idx++ % N];
+        sem_post(&empty);
+        printf("Consumed: item=%d\n", item);
+    }
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    sem_init(&empty, 0, ____);  // N slots libres
+    sem_init(&full, 0, ____);   // 0 items
+    int val_e, val_f;
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&____);         // attendre slot libre
+        buf[prod_idx++ % N] = i + 1;
+        sem_post(&____);         // signaler item produit
+        sem_getvalue(&empty, &val_e);
+        sem_getvalue(&full, &val_f);
+        printf("Produced: empty=%d full=%d\n", val_e, val_f);
+    }
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&____);         // attendre item disponible
+        int item = buf[cons_idx++ % N];
+        sem_post(&____);         // libérer slot
+        printf("Consumed: item=%d\n", item);
+    }
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+/* == EXEMPLE ===============================================
+ * Semaphore simple : init a 2, puis attendre 2 fois
+ * Pattern different du producteur-consommateur.
+ * ========================================================= */
+int example_simple_sem(void) {
+    sem_t s;
+    sem_init(&s, 0, 2);
+    int v;
+    sem_getvalue(&s, &v);
+    printf("Initial: %d\n", v);
+    sem_wait(&s);
+    sem_wait(&s);
+    sem_getvalue(&s, &v);
+    printf("After 2 waits: %d\n", v);
+    sem_post(&s);
+    sem_getvalue(&s, &v);
+    printf("After 1 post: %d\n", v);
+    sem_destroy(&s);
+    return 0;
+}
+/* Resultat: Initial: 2, After 2 waits: 0, After 1 post: 1 */
+
+/* == VOTRE EXERCICE ========================================
+ * Producteur-consommateur avec semaphores empty/full
+ * empty=N (slots libres), full=0 (items). Produisez 2, consommez 2.
+ * ========================================================= */
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    /* TODO: sem_init empty=N, full=0 */
+    int val_e, val_f;
+
+    for (int i = 0; i < 2; i++) {
+        /* TODO: sem_wait(&empty) */
+        buf[prod_idx++ % N] = i + 1;
+        /* TODO: sem_post(&full) */
+        sem_getvalue(&empty, &val_e);
+        sem_getvalue(&full, &val_f);
+        printf("Produced: empty=%d full=%d\n", val_e, val_f);
+    }
+
+    for (int i = 0; i < 2; i++) {
+        /* TODO: sem_wait(&full) */
+        int item = buf[cons_idx++ % N];
+        /* TODO: sem_post(&empty) */
+        printf("Consumed: item=%d\n", item);
+    }
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    sem_init(&empty, 0, N);
+    sem_init(&full, 0, 0);
+    int val_e, val_f;
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&empty);
+        buf[prod_idx++ % N] = i + 1;
+        sem_post(&full);
+        sem_getvalue(&empty, &val_e);
+        sem_getvalue(&full, &val_f);
+        printf("Produced: empty=%d full=%d\n", val_e, val_f);
+    }
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&____);         // attendre item disponible
+        int item = buf[cons_idx++ % N];
+        sem_post(&____);         // libérer slot
+        printf("Consumed: item=%d\n", item);
+    }
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    sem_init(&empty, 0, ____);  // N slots libres
+    sem_init(&full, 0, ____);   // 0 items
+    int val_e, val_f;
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&____);         // attendre slot libre
+        buf[prod_idx++ % N] = i + 1;
+        sem_post(&____);         // signaler item produit
+        sem_getvalue(&empty, &val_e);
+        sem_getvalue(&full, &val_f);
+        printf("Produced: empty=%d full=%d\n", val_e, val_f);
+    }
+
+    for (int i = 0; i < 2; i++) {
+        sem_wait(&____);         // attendre item disponible
+        int item = buf[cons_idx++ % N];
+        sem_post(&____);         // libérer slot
+        printf("Consumed: item=%d\n", item);
+    }
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+#define N 3
+int buf[N];
+int prod_idx = 0, cons_idx = 0;
+
+int main(void) {
+    sem_t empty, full;
+    // Initialisez empty=N (slots libres) et full=0 (items disponibles)
+    // Produisez 2 items : wait(empty), écrire buf, post(full), afficher état
+    // Consommez 2 items : wait(full), lire buf, post(empty), afficher item
+    // Sortie: "Produced: empty=2 full=1\nProduced: empty=1 full=2\nConsumed: item=1\nConsumed: item=2\n"
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Sémaphores : producteur-consommateur (empty/full)"
+
+[mission]
+clientId = "nordcloud"
+clientName = "NordCloud"
+contactEmail = "arch@nordcloud.sys"
+failureEmail = """
+Les sémaphores sont inversés. Le producteur doit wait(empty) et post(full), le consommateur wait(full) et post(empty).
+
+Arch @ NordCloud"""
+incidentEmail = """
+Architecte,
+
+Notre système de jobs doit coordonner producteurs (soumission) et consommateurs (exécution) sans polling actif. Le pattern empty/full avec deux sémaphores est requis.
+
+Implémente : N=3 slots, sem empty=N, sem full=0. Produis 2 jobs, consomme 2 jobs.
+
+Arch @ NordCloud"""
+payout = 280
+prereqMissionIds = ["sem-02"]
+receivedTime = "10:30"
+subject = "Queue de jobs NordCloud — producteur-consommateur sémaphores"
+successEmail = """
+Impeccable. Le pattern empty/full élimine l'attente active et garantit la synchronisation producteur-consommateur.
+
+NordCloud Architecture"""
+syscallsInvolved = [
+    "sem_init",
+    "sem_wait",
+    "sem_post",
+    "sem_getvalue",
+    "sem_destroy",
+]
+tier = 3
+
+[validation]
+expected_output = """
+Produced: empty=2 full=1
+Produced: empty=1 full=2
+Consumed: item=1
+Consumed: item=2
+"""
+mode = "output"
+
+[visualizer]
+type = "thread_timeline"
+
+[[visualizer.steps]]
+events = []
+explanation = "empty=N=3 représente les slots libres dans le buffer circulaire ; full=0 car aucun item n'est encore produit. Ce pattern dual-sémaphore est la solution canonique du problème producteur-consommateur : les deux sémaphores sont complémentaires (empty + full = N invariant)."
+label = "sem_init — empty=3, full=0"
+step_label = "Init sémaphores"
+
+[[visualizer.steps.semaphores]]
+name = "empty"
+value = 3
+waiters = []
+
+[[visualizer.steps.semaphores]]
+name = "full"
+value = 0
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "prod"
+label = "producer"
+state = "ready"
+
+[[visualizer.steps.threads]]
+id = "cons"
+label = "consumer"
+state = "ready"
+
+[[visualizer.steps]]
+explanation = "sem_wait(empty) décrémente empty : 3→2 (un slot est réservé). Le producteur écrit buf[0]=1. sem_post(full) incrémente full : 0→1 (un item est disponible). Le consommateur bloqué sur sem_wait(full) reste bloqué car il était bloqué sur full=0 ; maintenant full=1 il pourrait être réveillé mais ici on voit l'état après la 1ère production."
+label = "Producer : sem_wait(empty)→2, écrit buf[0]=1, sem_post(full)→1"
+step_label = "prod → write buf[0]"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[0]=1"
+thread = "prod"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(full)"
+status = "blocked"
+thread = "cons"
+type = "lock"
+
+[[visualizer.steps.semaphores]]
+name = "empty"
+value = 2
+waiters = []
+
+[[visualizer.steps.semaphores]]
+name = "full"
+value = 1
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "prod"
+label = "producer"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "cons"
+label = "consumer"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "2ème production : empty 2→1 (slot réservé), buf[1]=2 écrit, full 1→2 (2 items disponibles). L'invariant empty+full=N=3 est respecté à chaque instant : 1+2=3. Le producteur a terminé ses 2 items et passe à ready. Le consommateur va maintenant pouvoir traiter les 2 items."
+label = "Producer : sem_wait(empty)→1, écrit buf[1]=2, sem_post(full)→2"
+step_label = "prod → write buf[1]"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[0]=1"
+thread = "prod"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[1]=2"
+thread = "prod"
+type = "write"
+value = "2"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(full)"
+status = "blocked"
+thread = "cons"
+type = "lock"
+
+[[visualizer.steps.semaphores]]
+name = "empty"
+value = 1
+waiters = []
+
+[[visualizer.steps.semaphores]]
+name = "full"
+value = 2
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "prod"
+label = "producer"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "cons"
+label = "consumer"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "sem_wait(full) décrémente full : 2→1 (un item consommé). Le consommateur lit buf[0]=1. sem_post(empty) incrémente empty : 1→2 (un slot libéré). L'invariant empty+full=3 est maintenu : 2+1=3. Le producteur (déjà terminé) est en ready — le sem_post(empty) ne réveille personne ici."
+label = "Consumer : sem_wait(full)→1, lit buf[0]=1, sem_post(empty)→2"
+step_label = "cons → read buf[0]"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[0]=1"
+thread = "prod"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[1]=2"
+thread = "prod"
+type = "write"
+value = "2"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(full)"
+thread = "cons"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "read buf[0]"
+thread = "cons"
+type = "read"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(empty)"
+thread = "cons"
+type = "unlock"
+
+[[visualizer.steps.semaphores]]
+name = "empty"
+value = 2
+waiters = []
+
+[[visualizer.steps.semaphores]]
+name = "full"
+value = 1
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "prod"
+label = "producer"
+state = "ready"
+
+[[visualizer.steps.threads]]
+id = "cons"
+label = "consumer"
+state = "running"
+
+[[visualizer.steps]]
+explanation = "2ème consommation : full 1→0 (plus d'items), buf[1]=2 lu, empty 2→3 (retour à l'état initial). État final : empty=N=3, full=0 — identique à l'initialisation. Le cycle est complet : 2 items produits, 2 consommés, buffer vide, aucun deadlock ni starvation."
+label = "Consumer : sem_wait(full)→0, lit buf[1]=2, sem_post(empty)→3"
+step_label = "cons → read buf[1]"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[0]=1"
+thread = "prod"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(empty)"
+thread = "prod"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "buf[1]=2"
+thread = "prod"
+type = "write"
+value = "2"
+
+[[visualizer.steps.events]]
+label = "post(full)"
+thread = "prod"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "producer done"
+thread = "prod"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "wait(full)"
+thread = "cons"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "read buf[0]"
+thread = "cons"
+type = "read"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "post(empty)"
+thread = "cons"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "wait(full)"
+thread = "cons"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "read buf[1]"
+thread = "cons"
+type = "read"
+value = "2"
+
+[[visualizer.steps.events]]
+label = "post(empty)"
+thread = "cons"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "consumer done"
+thread = "cons"
+type = "dead"
+
+[[visualizer.steps.semaphores]]
+name = "empty"
+value = 3
+waiters = []
+
+[[visualizer.steps.semaphores]]
+name = "full"
+value = 0
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "prod"
+label = "producer"
+state = "dead"
+
+[[visualizer.steps.threads]]
+id = "cons"
+label = "consumer"
+state = "running"

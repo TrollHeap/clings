@@ -1,0 +1,277 @@
+common_mistake = "Oublier sizeof(Etudiant) comme 3ème argument de qsort — qsort déplace des blocs de cette taille"
+description = """
+NSY103 — Un tableau de structs permet de manipuler des collections d'objets. On peut trier ce tableau avec `qsort` en définissant un comparateur qui accède aux champs de la struct.
+
+Créez un tableau de 4 étudiants (nom, note), triez-les par note décroissante, puis affichez le classement."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Le comparateur reçoit des `const void *` qu'il faut caster en `const Etudiant *`",
+    "Pour tri décroissant : comparer eb->note avec ea->note (inversé)",
+    "`sizeof(classe) / sizeof(classe[0])` donne le nombre d'éléments",
+]
+id = "struct-array-01"
+kc_ids = ["KC-C03"]
+key_concept = "qsort sur tableau de structs : le comparateur caste void* en struct* pour accéder aux champs"
+lang = "c"
+prerequisites = ["struct-nested-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    char nom[20];
+    int note;
+} Etudiant;
+
+int cmp_note_desc(const void *a, const void *b) {
+    const Etudiant *ea = (const Etudiant *)a;
+    const Etudiant *eb = (const Etudiant *)b;
+    return (eb->note > ea->note) - (eb->note < ea->note);
+}
+
+int main(void) {
+    Etudiant classe[] = {
+        {"Alice", 15},
+        {"Bob", 18},
+        {"Charlie", 12},
+        {"Diana", 17}
+    };
+    int n = sizeof(classe) / sizeof(classe[0]);
+
+    qsort(classe, n, sizeof(Etudiant), cmp_note_desc);
+
+    for (int i = 0; i < n; i++) {
+        printf("%d. %s : %d\n", i + 1, classe[i].nom, classe[i].note);
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    char nom[20];
+    int note;
+} Etudiant;
+
+int cmp_note_desc(const void *a, const void *b) {
+    const Etudiant *ea = (const Etudiant *)____;
+    const Etudiant *eb = (const Etudiant *)____;
+    return ____;
+}
+
+int main(void) {
+    Etudiant classe[] = {
+        {"Alice", 15},
+        {"Bob", 18},
+        {"Charlie", 12},
+        {"Diana", 17}
+    };
+    int n = sizeof(classe) / sizeof(______);
+
+    qsort(classe, n, sizeof(Etudiant), ____);
+
+    for (int i = 0; i < n; i++) {
+        printf("%d. %s : %d\n", i + 1, classe[i].____, classe[i].____);
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Tableau de structs Produit tri par prix croissant
+ * qsort permute des blocs de sizeof(Produit) octets.
+ * =========================================================== */
+typedef struct { char nom[20]; float prix; } Produit;
+
+int example_cmp_prix(const void *a, const void *b) {
+    const Produit *pa = (const Produit *)a;
+    const Produit *pb = (const Produit *)b;
+    return (pa->prix > pb->prix) - (pa->prix < pb->prix);
+}
+void example_demo(void) {
+    Produit shop[] = {{"Cafe", 5.50f}, {"The", 3.20f}, {"Jus", 4.10f}};
+    qsort(shop, 3, sizeof(Produit), example_cmp_prix);
+    for (int i = 0; i < 3; i++)
+        printf("%s : %.2f\n", shop[i].nom, shop[i].prix);
+}
+/* Resultat: The : 3.20 / Jus : 4.10 / Cafe : 5.50 */
+
+/* == VOTRE EXERCICE =========================================
+ * Tableau d'Etudiants tri par note decroissante
+ * =========================================================== */
+typedef struct { char nom[20]; int note; } Etudiant;
+
+int cmp_note_desc(const void *a, const void *b) {
+    (void)a; (void)b;
+    return 0; /* TODO */
+}
+
+int main(void) {
+    Etudiant classe[] = {
+        {"Alice", 15}, {"Bob", 18}, {"Charlie", 12}, {"Diana", 17}
+    };
+    int n = sizeof(classe) / sizeof(classe[0]);
+    qsort(classe, n, sizeof(Etudiant), cmp_note_desc);
+    for (int i = 0; i < n; i++)
+        printf("%d. %s : %d\n", i + 1, classe[i].nom, classe[i].note);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char nom[20]; int note; } Etudiant;
+
+int cmp_note_desc(const void *a, const void *b) {
+    const Etudiant *ea = (const Etudiant *)a;
+    const Etudiant *eb = (const Etudiant *)b;
+    return ____; // tri décroissant : eb->note vs ea->note
+}
+
+int main(void) {
+    Etudiant classe[] = {
+        {"Alice", 15}, {"Bob", 18}, {"Charlie", 12}, {"Diana", 17}
+    };
+    int n = sizeof(classe) / sizeof(classe[0]);
+    qsort(classe, n, sizeof(Etudiant), ____);
+    for (int i = 0; i < n; i++)
+        printf("%d. %s : %d\n", i + 1, classe[i].nom, classe[i].note);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    char nom[20];
+    int note;
+} Etudiant;
+
+int cmp_note_desc(const void *a, const void *b) {
+    const Etudiant *ea = (const Etudiant *)____;
+    const Etudiant *eb = (const Etudiant *)____;
+    return ____;
+}
+
+int main(void) {
+    Etudiant classe[] = {
+        {"Alice", 15},
+        {"Bob", 18},
+        {"Charlie", 12},
+        {"Diana", 17}
+    };
+    int n = sizeof(classe) / sizeof(______);
+
+    qsort(classe, n, sizeof(Etudiant), ____);
+
+    for (int i = 0; i < n; i++) {
+        printf("%d. %s : %d\n", i + 1, classe[i].____, classe[i].____);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { char nom[20]; int note; } Etudiant;
+
+// Comparateur pour tri décroissant par note
+// qsort(classe, n, sizeof(Etudiant), cmp_note_desc)
+int cmp_note_desc(const void *a, const void *b) {
+    return 0; // TODO
+}
+
+int main(void) {
+    // TODO: classe[] = Alice(15), Bob(18), Charlie(12), Diana(17)
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { char nom[20]; int note; } Etudiant;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Tableau de structs avec tri"
+
+[validation]
+expected_output = """
+1. Bob : 18
+2. Diana : 17
+3. Alice : 15
+4. Charlie : 12
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "4 structs Etudiant contigus en mémoire. Chaque struct contient nom[20] + note (int). qsort va permuter des blocs entiers de sizeof(Etudiant) octets."
+heap = []
+label = "Tableau de structs avant tri"
+step_label = "Avant tri — ordre initial"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "classe[0]"
+value = "{Alice, 15}"
+
+[[visualizer.steps.stack]]
+name = "classe[1]"
+value = "{Bob, 18}"
+
+[[visualizer.steps.stack]]
+name = "classe[2]"
+value = "{Charlie, 12}"
+
+[[visualizer.steps.stack]]
+name = "classe[3]"
+value = "{Diana, 17}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "qsort trie en place — les structs entières sont déplacées en mémoire. Pour de grandes structs, il serait plus efficace de trier un tableau de pointeurs."
+heap = []
+label = "Après qsort — tri décroissant par note"
+step_label = "Après tri — Bob(18), Diana(17), Alice(15), Charlie(12)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "classe[0]"
+value = "{Bob, 18}"
+
+[[visualizer.steps.stack]]
+name = "classe[1]"
+value = "{Diana, 17}"
+
+[[visualizer.steps.stack]]
+name = "classe[2]"
+value = "{Alice, 15}"
+
+[[visualizer.steps.stack]]
+name = "classe[3]"
+value = "{Charlie, 12}"

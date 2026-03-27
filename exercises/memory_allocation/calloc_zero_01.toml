@@ -1,0 +1,261 @@
+common_mistake = "Utiliser malloc sans initialiser la mémoire — les valeurs sont indéterminées, pas forcément 0"
+description = """
+NSY103 — `calloc(n, size)` alloue `n * size` octets et les initialise à zéro, contrairement à `malloc` qui laisse la mémoire non initialisée. calloc vérifie aussi le débordement de `n * size`.
+
+Comparez le comportement de malloc et calloc sur un tableau d'entiers."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "`calloc(n, sizeof(int))` équivaut à `malloc(n * sizeof(int))` + `memset(ptr, 0, n * sizeof(int))`",
+    "calloc protège contre le débordement de `n * size` (retourne NULL si overflow)",
+    "Toujours free() chaque allocation, dans l'ordre inverse si possible",
+]
+id = "calloc-zero-01"
+kc_ids = ["KC-C02"]
+key_concept = "calloc = malloc + memset(0) en une opération, avec protection contre le débordement de n*size"
+lang = "c"
+prerequisites = ["malloc-string-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int *alloc_zeros(int n) {
+    return (int *)calloc(n, sizeof(int));
+}
+
+int main(void) {
+    {
+        int *arr = alloc_zeros(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        free(arr);
+    }
+    {
+        int *arr = alloc_zeros(4);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[3]));
+        free(arr);
+    }
+    {
+        int *arr = alloc_zeros(3);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 10; arr[1] = 20; arr[2] = 30;
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+        free(arr);
+    }
+    {
+        int *arr = alloc_zeros(100);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        printf("%d\n", (int)(arr[50]));
+        printf("%d\n", (int)(arr[99]));
+        free(arr);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int *alloc_zeros(int n) {
+    /* TODO: return calloc(n, sizeof(int)) */
+    return NULL;
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Difference entre malloc (non initialise) et calloc (zero)
+ * =========================================================== */
+void example_demo(void) {
+    float *a = calloc(3, sizeof(float));
+    printf("calloc: %.1f %.1f %.1f\n", a[0], a[1], a[2]);
+    free(a);
+}
+/* Resultat: calloc: 0.0 0.0 0.0 */
+
+/* == VOTRE EXERCICE =========================================
+ * Comparez malloc+memset vs calloc sur un tableau d'int
+ * =========================================================== */
+int main(void) {
+    /* TODO: allouer avec malloc+memset et calloc, comparer */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    int n = 5;
+    int *a = malloc(n * sizeof(int));
+    if (!a) return 1;
+    memset(a, 0, n * sizeof(int));
+    int *b = calloc(n, sizeof(int));
+    if (!b) { free(a); return 1; }
+    printf("malloc+memset :");
+    for (int i = 0; i < n; i++) printf(" %d", a[i]);
+    printf("\n");
+    printf("calloc       :");
+    for (int i = 0; i < n; i++) printf(" %d", b[i]);
+    printf("\n");
+    for (int i = 0; i < n; i++) { a[i] = i * 10; b[i] = i * 10; }
+    printf("Remplis      :");
+    for (int i = 0; i < n; i++) printf(" %d", ____[i]);
+    printf("\n");
+    printf("Egaux        : %d\n", ____(a, b, n * sizeof(int)) == 0);
+    free(a); free(b);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    int n = 5;
+
+    int *a = malloc(n * sizeof(int));
+    if (!a) return 1;
+    memset(a, 0, n * sizeof(int));
+
+    int *b = ____(n, sizeof(int));
+    if (!b) { free(a); return 1; }
+
+    printf("malloc+memset :");
+    for (int i = 0; i < n; i++) printf(" %d", a[i]);
+    printf("\n");
+
+    printf("calloc       :");
+    for (int i = 0; i < n; i++) printf(" %d", ____[i]);
+    printf("\n");
+
+    for (int i = 0; i < n; i++) { a[i] = i * 10; b[i] = i * 10; }
+    printf("Remplis      :");
+    for (int i = 0; i < n; i++) printf(" %d", a[i]);
+    printf("\n");
+
+    printf("Egaux        : %d\n", memcmp(a, b, n * sizeof(int)) == 0);
+
+    ____;
+    free(b);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Comparez malloc+memset vs calloc(n, sizeof(int))
+// Remplissez les deux avec i*10, vérifiez avec memcmp
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "calloc vs malloc : zéro-initialisation"
+
+[validation]
+expected_output = """
+1
+1
+0
+0
+0
+1
+10
+20
+30
+1
+0
+0"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "malloc retourne de la mémoire non initialisée — il faut memset explicitement. calloc fait les deux en une seule opération et vérifie aussi le débordement de n*size."
+label = "Après malloc+memset et calloc"
+step_label = "malloc+memset vs calloc — même résultat"
+
+[[visualizer.steps.arrows]]
+from = "a"
+label = "malloc"
+to = "heap_a"
+
+[[visualizer.steps.arrows]]
+from = "b"
+label = "calloc"
+to = "heap_b"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap_a"
+value = "[0, 0, 0, 0, 0] (malloc+memset)"
+
+[[visualizer.steps.heap]]
+address = "heap_b"
+value = "[0, 0, 0, 0, 0] (calloc)"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→heap_a"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→heap_b"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux tableaux contiennent les mêmes valeurs. memcmp retourne 0. Après usage, on libère les deux avec free(). Ne pas oublier de free les deux pointeurs."
+label = "Après remplissage"
+step_label = "Contenu identique — memcmp == 0"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap_a"
+value = "[0, 10, 20, 30, 40]"
+
+[[visualizer.steps.heap]]
+address = "heap_b"
+value = "[0, 10, 20, 30, 40]"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→heap_a"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→heap_b"

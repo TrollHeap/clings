@@ -1,0 +1,316 @@
+common_mistake = "Utiliser atoi au lieu de strtol — atoi ne détecte pas les erreurs et retourne 0 silencieusement"
+description = """
+NSY103 — strtol est la méthode robuste pour convertir des chaînes en entiers. Contrairement à atoi, elle détecte les erreurs via endptr et gère les bases (10, 16, 8, 2). errno doit être vérifié pour détecter les dépassements.
+
+Convertissez des chaînes en entiers avec strtol en vérifiant les erreurs."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "strtol(str, &endptr, base) — endptr pointe vers le premier caractère non parsé",
+    "Si endptr == str, aucun chiffre n'a été lu (erreur)",
+    "Base 16 pour l'hexadécimal, base 10 pour le décimal",
+]
+id = "strtol-parse-01"
+kc_ids = ["KC-C05"]
+key_concept = "strtol > atoi : endptr détecte les erreurs, base paramétrable, errno pour overflow"
+lang = "c"
+prerequisites = ["scanf-validate-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int safe_strtol(const char *s, int base, long *out) {
+    char *endptr;
+    long val = strtol(s, &endptr, base);
+    if (endptr == s) return 0;  /* No conversion */
+    *out = val;
+    return 1;  /* Success */
+}
+
+int main(void) {
+    {
+        long val;
+        int res = safe_strtol("12345", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("0xFF", 16, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("42abc", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val = 999;
+        int res = safe_strtol("hello", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+int safe_strtol(const char *s, int base, long *out) {
+    char *endptr;
+    long val = ____(s, &endptr, base);
+    if (endptr == s) return 0;  /* No conversion */
+    *out = val;
+    return 1;  /* Success */
+}
+
+int main(void) {
+    char *endptr;
+    char *s1 = "12345";
+    char *s2 = "0xFF";
+    char *s3 = "42abc";
+    char *s4 = "hello";
+    long v1 = ____(s1, &endptr, 10);
+    printf("s1: %ld (rest='%s')\n", v1, endptr);
+    long v2 = ____(s2, &endptr, 16);
+    printf("s2: %ld (rest='%s')\n", v2, endptr);
+    long v3 = ____(s3, &endptr, 10);
+    printf("s3: %ld (rest='%s')\n", v3, endptr);
+    long v4 = strtol(s4, &endptr, 10);
+    printf("s4: %ld (rest='%s') %s\n", v4, endptr, (endptr == s4) ? "FAIL" : "OK");
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
+/* == EXEMPLE ================================================
+ * strtol: conversion robuste chaîne → long
+ * =========================================================== */
+void example_strtol(void) {
+    char *end;
+    long val = strtol("99xyz", &end, 10);
+    printf("%ld reste='%s'\n", val, end); /* 99 reste='xyz' */
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Convertir s1-s4, vérifier endptr pour détecter les erreurs
+ * =========================================================== */
+
+int main(void) {
+    char *endptr;
+    char *s1 = "12345";
+    char *s2 = "0xFF";
+    char *s3 = "42abc";
+    char *s4 = "hello";
+    long v1 = strtol(s1, &endptr, 10);
+    printf("s1: %ld (rest='%s')\n", v1, endptr);
+    long v2 = strtol(s2, &endptr, 16);
+    printf("s2: %ld (rest='%s')\n", v2, endptr);
+    /* TODO: s3 en base 10, s4 avec détection d'échec */
+    long v3 = strtol(s3, &endptr, 10);
+    printf("s3: %ld (rest='%s')\n", v3, endptr);
+    long v4 = strtol(s4, &endptr, 10);
+    printf("s4: %ld (rest='%s') %s\n", v4, endptr, (endptr == s4) ? "FAIL" : "OK");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
+int main(void) {
+    char *endptr;
+    char *s1 = "12345";
+    char *s2 = "0xFF";
+    char *s3 = "42abc";
+    char *s4 = "hello";
+    long v1 = strtol(s1, &endptr, 10);
+    printf("s1: %ld (rest='%s')\n", v1, endptr);
+    long v2 = strtol(s2, &endptr, ____);
+    printf("s2: %ld (rest='%s')\n", v2, endptr);
+    long v3 = strtol(s3, &endptr, ____);
+    printf("s3: %ld (rest='%s')\n", v3, endptr);
+    long v4 = strtol(s4, &endptr, 10);
+    printf("s4: %ld (rest='%s') %s\n", v4, endptr, (endptr == s4) ? "FAIL" : "OK");
+    return 0;
+}''',
+    '''
+#include <stdlib.h>
+#include <string.h>
+
+int safe_strtol(const char *s, int base, long *out) {
+    char *endptr;
+    long val = ____(s, &endptr, base);
+    if (endptr == s) return 0;  /* No conversion */
+    *out = val;
+    return 1;  /* Success */
+}
+
+int main(void) {
+    char *endptr;
+    char *s1 = "12345";
+    char *s2 = "0xFF";
+    char *s3 = "42abc";
+    char *s4 = "hello";
+    long v1 = ____(s1, &endptr, 10);
+    printf("s1: %ld (rest='%s')\n", v1, endptr);
+    long v2 = ____(s2, &endptr, 16);
+    printf("s2: %ld (rest='%s')\n", v2, endptr);
+    long v3 = ____(s3, &endptr, 10);
+    printf("s3: %ld (rest='%s')\n", v3, endptr);
+    long v4 = strtol(s4, &endptr, 10);
+    printf("s4: %ld (rest='%s') %s\n", v4, endptr, (endptr == s4) ? "FAIL" : "OK");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int safe_strtol(const char *s, int base, long *out) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    {
+        long val;
+        int res = safe_strtol("12345", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("0xFF", 16, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("42abc", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val = 999;
+        int res = safe_strtol("hello", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int safe_strtol(const char *s, int base, long *out) { return 0; }
+
+int main(void) {
+    {
+        long val;
+        int res = safe_strtol("12345", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("0xFF", 16, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val;
+        int res = safe_strtol("42abc", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    {
+        long val = 999;
+        int res = safe_strtol("hello", 10, &val);
+        printf("%d\n", (int)(res));
+        printf("%d\n", (int)(val));
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Conversion robuste avec strtol"
+
+[validation]
+expected_output = """
+1
+12345
+1
+255
+1
+42
+0
+999"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = '''Quand endptr pointe sur '\0', toute la chaîne a été parsée'''
+heap = []
+label = "strtol parse complète (s1, s2)"
+step_label = "1. Succès"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s1"
+value = '"12345" → 12345'
+
+[[visualizer.steps.stack]]
+name = "endptr"
+value = '"" (fin de chaîne)'
+
+[[visualizer.steps.stack]]
+name = "s2"
+value = '"0xFF" → 255 (base 16)'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "s3: parse partielle (42 lu, abc ignoré). s4: endptr==s4 → aucun chiffre"
+heap = []
+label = "Parse partielle et échec (s3, s4)"
+step_label = "2. Erreurs"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s3"
+value = '"42abc" → 42'
+
+[[visualizer.steps.stack]]
+name = "endptr"
+value = '"abc" (reste)'
+
+[[visualizer.steps.stack]]
+name = "s4"
+value = '"hello" → 0'
+
+[[visualizer.steps.stack]]
+name = "endptr"
+value = '"hello" (== s4 → FAIL)'

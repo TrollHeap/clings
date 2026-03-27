@@ -1,0 +1,291 @@
+common_mistake = "Un seul fork laisse le processus comme leader de session — il peut encore ouvrir un terminal"
+description = """
+NSY103 — Un daemon est un processus en arrière-plan sans terminal de contrôle. La daemonisation classique utilise le double fork : 1) fork + parent exit (détachement du terminal), 2) setsid() (nouvelle session), 3) second fork + parent exit (empêche de récupérer un terminal).
+
+Simulez les étapes de daemonisation et affichez les transitions de manière déterministe via un pipe."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "setsid() crée une nouvelle session — le processus devient leader de session",
+    "Le double fork empêche le daemon de récupérer un terminal de contrôle",
+    "getsid(0) retourne le SID du processus courant",
+]
+id = "proc-daemon-01"
+kc_ids = ["KC-C07"]
+key_concept = "Double fork + setsid : le daemon n'est pas leader de session, ne peut pas récupérer un terminal"
+lang = "c"
+prerequisites = ["proc-env-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) { perror("pipe"); return 1; }
+
+    printf("Step 1: Original process PID=%d\n", getpid());
+
+    pid_t pid1 = fork();
+    if (pid1 == -1) { perror("fork"); return 1; }
+    if (pid1 > 0) {
+        /* Premier parent quitte */
+        close(pipefd[1]);
+        /* Lire les messages du daemon */
+        char buf[256];
+        FILE *f = fdopen(pipefd[0], "r");
+        while (fgets(buf, sizeof(buf), f))
+            printf("%s", buf);
+        fclose(f);
+        waitpid(pid1, NULL, 0);
+        return 0;
+    }
+
+    /* Premier enfant */
+    close(pipefd[0]);
+    FILE *out = fdopen(pipefd[1], "w");
+
+    pid_t sid = setsid();
+    fprintf(out, "Step 2: setsid() new session SID=%d\n", sid);
+
+    pid_t pid2 = fork();
+    if (pid2 > 0) {
+        /* Second parent quitte */
+        fclose(out);
+        _exit(0);
+    }
+
+    /* Processus daemon final */
+    fprintf(out, "Step 3: Daemon PID=%d, SID=%d\n", getpid(), getsid(0));
+    fprintf(out, "Step 4: Daemon detached from terminal\n");
+    fclose(out);
+    _exit(0);
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) { perror("pipe"); return 1; }
+
+    printf("Step 1: Original process PID=%d\n", getpid());
+
+    pid_t pid1 = ____();
+    if (pid1 == -1) { perror("fork"); return 1; }
+    if (pid1 > 0) {
+        /* Premier parent quitte */
+        close(pipefd[1]);
+        /* Lire les messages du daemon */
+        char buf[256];
+        FILE *f = fdopen(pipefd[0], "r");
+        while (fgets(buf, sizeof(buf), f))
+            printf("%s", buf);
+        fclose(f);
+        waitpid(pid1, NULL, 0);
+        return 0;
+    }
+
+    /* Premier enfant */
+    close(pipefd[0]);
+    FILE *out = fdopen(pipefd[1], "w");
+
+    pid_t sid = ____();
+    fprintf(out, "Step 2: setsid() new session SID=%d\n", sid);
+
+    pid_t pid2 = fork();
+    if (pid2 > 0) {
+        /* Second parent quitte */
+        fclose(out);
+        _exit(0);
+    }
+
+    /* Processus daemon final */
+    fprintf(out, "Step 3: Daemon PID=%d, SID=%d\n", getpid(), ____);
+    fprintf(out, "Step 4: Daemon detached from terminal\n");
+    fclose(out);
+    _exit(0);
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Fork simple avec communication par pipe
+ * L'enfant écrit dans le pipe, le parent lit
+ * ================================================= */
+void example_pipe_fork(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t p = fork();
+    if (p == 0) {
+        close(fd[0]);
+        dprintf(fd[1], "message from child\n");
+        close(fd[1]);
+        _exit(0);
+    }
+    close(fd[1]);
+    char buf[64];
+    FILE *f = fdopen(fd[0], "r");
+    while (fgets(buf, sizeof(buf), f)) printf("%s", buf);
+    fclose(f);
+    wait(NULL);
+}
+
+/* == VOTRE EXERCICE ================================
+ * Double fork + setsid pour daemonisation
+ * Utilisez un pipe pour rapporter les étapes.
+ * ================================================= */
+int main(void) {
+    /* TODO: pipe, fork1, setsid, fork2, rapport via pipe */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    if (______(pipefd) == -1) { perror("pipe"); return 1; }
+    printf("Step 1: Original process PID=%d\n", getpid());
+    pid_t pid1 = ____();
+    if (pid1 > 0) {
+        close(pipefd[1]);
+        char buf[256]; FILE *f = fdopen(pipefd[0], "r");
+        while (fgets(buf, sizeof(buf), f)) printf("%s", buf);
+        fclose(f); waitpid(pid1, NULL, 0); return 0;
+    }
+    close(pipefd[0]); FILE *out = fdopen(pipefd[1], "w");
+    pid_t sid = ____();
+    fprintf(out, "Step 2: setsid() new session SID=%d\n", sid);
+    pid_t pid2 = fork();
+    if (pid2 > 0) { fclose(out); _exit(0); }
+    fprintf(out, "Step 3: Daemon PID=%d, SID=%d\n", getpid(), ____(0));
+    fprintf(out, "Step 4: Daemon detached from terminal\n");
+    fclose(out); _exit(0);
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) { perror("pipe"); return 1; }
+    printf("Step 1: Original process PID=%d\n", getpid());
+    pid_t pid1 = ____();
+    if (pid1 == -1) { perror("fork"); return 1; }
+    if (pid1 > 0) {
+        close(pipefd[1]);
+        char buf[256]; FILE *f = fdopen(pipefd[0], "r");
+        while (fgets(buf, sizeof(buf), f)) printf("%s", buf);
+        fclose(f); waitpid(pid1, NULL, 0); return 0;
+    }
+    close(pipefd[0]); FILE *out = fdopen(pipefd[1], "w");
+    pid_t sid = ____();
+    fprintf(out, "Step 2: setsid() new session SID=%d\n", sid);
+    pid_t pid2 = fork();
+    if (pid2 > 0) { fclose(out); _exit(0); }
+    fprintf(out, "Step 3: Daemon PID=%d, SID=%d\n", getpid(), ____);
+    fprintf(out, "Step 4: Daemon detached from terminal\n");
+    fclose(out); _exit(0);
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    // pipe pour communication daemon → parent
+    // fork 1: parent lit le pipe, enfant continue
+    // setsid() dans l'enfant
+    // fork 2: second parent exit, daemon rapporte via pipe
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Daemonisation: double fork + setsid"
+
+[validation]
+expected_output = 'REGEX:(?s)Step 1: Original process PID=\d+.*Step 2: setsid\(\) new session SID=\d+.*Step 3: Daemon PID=\d+, SID=\d+.*Step 4: Daemon detached from terminal'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le premier fork détache le processus du terminal du parent"
+heap = []
+label = "Fork 1 — détachement du parent"
+step_label = "Fork 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Original (parent)"
+value = "exit → orphelin"
+
+[[visualizer.steps.stack]]
+name = "Enfant 1"
+value = "continue"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "setsid crée une nouvelle session sans terminal de contrôle"
+heap = []
+label = "setsid — nouvelle session"
+step_label = "setsid"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (child 1)"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "SID"
+value = "= PID (leader de session)"
+
+[[visualizer.steps.stack]]
+name = "PGID"
+value = "= PID (leader de groupe)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le daemon n'est pas leader de session — ne peut pas ouvrir de terminal"
+heap = []
+label = "Fork 2 — le daemon final"
+step_label = "Fork 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (daemon)"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Enfant 1"
+value = "exit (leader session)"
+
+[[visualizer.steps.stack]]
+name = "Enfant 2 (daemon)"
+value = "PAS leader session"

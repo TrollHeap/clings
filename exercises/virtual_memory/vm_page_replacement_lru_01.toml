@@ -1,0 +1,320 @@
+common_mistake = "Ne pas mettre à jour last_used lors d'un HIT — LRU doit enregistrer t à chaque accès, pas seulement lors des fautes"
+description = """
+NSY103/UTC502 — LRU (Least Recently Used) remplace la page dont l'accès le plus récent est le plus ancien. Il approxime le comportement optimal en exploitant la localité temporelle.
+
+Implémentez LRU avec un tableau last_used[] qui enregistre le timestamp de dernier accès de chaque frame. Référence : {1,2,3,4,1,2,5,1,2,3,4,5}, 3 frames."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "find_lru() compare last_used[i] < last_used[lru] pour trouver la frame la moins récemment utilisée",
+    "Pour chaque accès (hit ou fault), mettez à jour last_used[pos] = t avec le timestamp courant",
+    "Phase de remplissage : tant que filled < FRAMES, utilisez frames[filled++] sans appeler find_lru",
+]
+id = "vm-page-replacement-lru-01"
+kc_ids = ["KC-C14"]
+key_concept = "LRU utilise last_used[] pour identifier la page la moins récemment accédée — meilleur que FIFO, approche l'optimum"
+lang = "c"
+prerequisites = ["vm-page-replacement-fifo-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int find_lru(int last_used[], int n) {
+    int lru = 0;
+    for (int i = 1; i < n; i++)
+        if (last_used[i] < last_used[lru]) lru = i;
+    return lru;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return i;
+    return -1;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    int last_used[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0;
+    int filled = 0;
+
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            int pos = (filled < FRAMES) ? filled++ : find_lru(last_used, FRAMES);
+            frames[pos] = refs[t];
+            last_used[pos] = t;
+            faults++;
+        } else {
+            last_used[idx] = t;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Renvoie l'index de la frame avec le last_used le plus petit */
+int find_lru(int last_used[], int n) {
+    int lru = 0;
+    for (int i = 1; i < n; i++)
+        if (last_used[i] < last_used[____]) lru = i;
+    return lru;
+}
+
+/* Renvoie l'index de page dans frames[], ou -1 si absente */
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return i;
+    return -1;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    int last_used[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0;
+    int filled = 0;
+
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            int pos = (filled < FRAMES) ? filled++ : ____;
+            frames[pos] = refs[t];
+            last_used[pos] = ____;
+            faults++;
+        } else {
+            last_used[idx] = ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 2
+#define REFS 6
+
+/* == EXEMPLE LRU resolu : refs={3,2,1,0,3,2}, 2 frames == */
+int find_lru_ex(int last_used[], int n) {
+    int lru = 0;
+    for (int i = 1; i < n; i++)
+        if (last_used[i] < last_used[lru]) lru = i;
+    return lru;
+}
+
+int in_frames_ex(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return i;
+    return -1;
+}
+
+void example_lru(void) {
+    int refs[] = {3, 2, 1, 0, 3, 2};
+    int frames[FRAMES];
+    int last_used[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0, filled = 0;
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames_ex(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            int pos = (filled < FRAMES) ? filled++ : find_lru_ex(last_used, FRAMES);
+            frames[pos] = refs[t];
+            last_used[pos] = t;
+            faults++;
+        } else {
+            last_used[idx] = t;
+        }
+    }
+    printf("Example LRU faults: %d\n", faults); /* 6 */
+}
+
+/* Maintenant implementez LRU pour refs={1,2,3,4,1,2,5,1,2,3,4,5}, 3 frames */
+int main(void) {
+    example_lru();
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int find_lru(int last_used[], int n) {
+    int lru = 0;
+    for (int i = 1; i < n; i++)
+        if (last_used[i] < last_used[lru]) lru = i;
+    return lru;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return i;
+    return -1;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    int last_used[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0;
+    int filled = 0;
+
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            int pos = (filled < FRAMES) ? filled++ : find_lru(last_used, FRAMES);
+            frames[pos] = refs[t];
+            last_used[pos] = t;
+            faults++;
+        } else {
+            last_used[idx] = ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Renvoie l'index de la frame avec le last_used le plus petit */
+int find_lru(int last_used[], int n) {
+    int lru = 0;
+    for (int i = 1; i < n; i++)
+        if (last_used[i] < last_used[____]) lru = i;
+    return lru;
+}
+
+/* Renvoie l'index de page dans frames[], ou -1 si absente */
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return i;
+    return -1;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    int last_used[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0;
+    int filled = 0;
+
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            int pos = (filled < FRAMES) ? filled++ : ____;
+            frames[pos] = refs[t];
+            last_used[pos] = ____;
+            faults++;
+        } else {
+            last_used[idx] = ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Parcourir last_used[0..n-1], retourner l'index avec la valeur minimale */
+int find_lru(int last_used[], int n) {
+    int lru = 0;
+    /* comparer last_used[i] au minimum courant */
+    return lru;
+}
+
+/* Retourner l'index de page dans frames[], ou -1 si absente */
+int in_frames(int frames[], int n, int page) {
+    /* parcourir frames[], retourner i si frames[i]==page */
+    return -1;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    int last_used[FRAMES];  /* timestamp du dernier acces pour chaque frame */
+    memset(frames, -1, sizeof(frames));
+    memset(last_used, 0, sizeof(last_used));
+    int faults = 0;
+    int filled = 0;
+
+    for (int t = 0; t < REFS; t++) {
+        int idx = in_frames(frames, FRAMES, refs[t]);
+        if (idx == -1) {
+            /* defaut : choisir pos = filled++ si frames pas pleines, sinon find_lru */
+            /* charger refs[t] dans frames[pos], mettre last_used[pos]=t, faults++ */
+        } else {
+            /* HIT : mettre a jour last_used[idx] = t */
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Remplacement de pages : algorithme LRU"
+
+[validation]
+expected_output = """
+Page faults: 10
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Pages 1,2,3 chargées. frames=[1,2,3], last_used=[0,1,2]. 3 défauts."
+label = "Remplissage t=0..2"
+step_label = "Étape 1"
+
+[[visualizer.steps]]
+explanation = "Page 4 absente. find_lru → frames[0]=1 (last_used=0, le plus petit). Remplacé par 4. last_used[0]=3. faults=4."
+label = "Éviction LRU t=3 (page 4)"
+step_label = "Étape 2"
+
+[[visualizer.steps]]
+explanation = "t=7 page 1 HIT, t=8 page 2 HIT. t=9..11 : 3 nouveaux défauts. Total = 10."
+label = "HITs et fin"
+step_label = "Étape 3"

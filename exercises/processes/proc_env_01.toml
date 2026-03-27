@@ -1,0 +1,288 @@
+common_mistake = "Croire qu'un setenv dans l'enfant modifie le parent — chaque processus a sa copie"
+description = """
+NSY103 — Les variables d'environnement sont des paires clé=valeur héritées par les processus enfants. getenv() lit une variable, setenv() la définit, unsetenv() la supprime. environ est le tableau global.
+
+Manipulez les variables d'environnement et observez l'héritage après fork."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    """getenv("VAR") retourne NULL si la variable n'existe pas""",
+    "setenv(name, value, overwrite) — overwrite=1 pour remplacer une existante",
+    "L'enfant reçoit une copie de l'environnement — ses modifications sont isolées",
+]
+id = "proc-env-01"
+kc_ids = ["KC-C07"]
+key_concept = "L'environnement est hérité par fork mais chaque processus a sa propre copie"
+lang = "c"
+prerequisites = ["fork-exec-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    /* Lire une variable existante */
+    const char *home = getenv("HOME");
+    printf("HOME=%s\n", home ? home : "(not set)");
+
+    /* Definir une nouvelle variable */
+    setenv("KF_TEST", "hello", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    /* Modifier (overwrite=1) */
+    setenv("KF_TEST", "world", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    /* L'enfant hérite de l'environnement */
+    pid_t child = fork();
+    if (child == 0) {
+        printf("Child KF_TEST=%s\n", getenv("KF_TEST"));
+        /* Modifier dans l'enfant n'affecte pas le parent */
+        setenv("KF_TEST", "child_only", 1);
+        printf("Child modified KF_TEST=%s\n", getenv("KF_TEST"));
+        _exit(0);
+    }
+    waitpid(child, NULL, 0);
+
+    /* Le parent garde sa valeur */
+    printf("Parent KF_TEST=%s\n", getenv("KF_TEST"));
+
+    /* Supprimer */
+    unsetenv("KF_TEST");
+    const char *val = getenv("KF_TEST");
+    printf("After unset: %s\n", val ? val : "(not set)");
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    /* Lire une variable existante */
+    const char *home = ____( "HOME");
+    printf("HOME=%s\n", home ? home : "(not set)");
+
+    /* Definir une nouvelle variable */
+    ____("KF_TEST", "hello", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    /* Modifier (overwrite=1) */
+    setenv("KF_TEST", "world", ____);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    /* L'enfant hérite de l'environnement */
+    pid_t child = fork();
+    if (child == 0) {
+        printf("Child KF_TEST=%s\n", getenv("KF_TEST"));
+        /* Modifier dans l'enfant n'affecte pas le parent */
+        setenv("KF_TEST", "child_only", 1);
+        printf("Child modified KF_TEST=%s\n", getenv("KF_TEST"));
+        _exit(0);
+    }
+    waitpid(child, NULL, 0);
+
+    /* Le parent garde sa valeur */
+    printf("Parent KF_TEST=%s\n", ____("KF_TEST"));
+
+    /* Supprimer */
+    unsetenv("KF_TEST");
+    const char *val = getenv("KF_TEST");
+    printf("After unset: %s\n", val ? val : "(not set)");
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Lire et modifier PATH
+ * getenv/setenv sur une variable système
+ * ================================================= */
+void example_env(void) {
+    const char *path = getenv("PATH");
+    printf("PATH starts with: %.20s...\n", path ? path : "(null)");
+    setenv("MY_VAR", "42", 1);
+    printf("MY_VAR=%s\n", getenv("MY_VAR"));
+    unsetenv("MY_VAR");
+}
+
+/* == VOTRE EXERCICE ================================
+ * getenv, setenv, fork héritage, unsetenv
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    const char *home = ____("HOME");
+    printf("HOME=%s\n", home ? home : "(not set)");
+    ____("KF_TEST", "hello", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+    setenv("KF_TEST", "world", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+    pid_t child = ____();
+    if (child == 0) {
+        printf("Child KF_TEST=%s\n", getenv("KF_TEST"));
+        setenv("KF_TEST", "child_only", 1);
+        printf("Child modified KF_TEST=%s\n", getenv("KF_TEST"));
+        _exit(0);
+    }
+    waitpid(child, NULL, 0);
+    printf("Parent KF_TEST=%s\n", getenv("KF_TEST"));
+    ____("KF_TEST");
+    const char *val = getenv("KF_TEST");
+    printf("After unset: %s\n", val ? val : "(not set)");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    const char *home = ____("HOME");
+    printf("HOME=%s\n", home ? home : "(not set)");
+
+    ____("KF_TEST", "hello", 1);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    setenv("KF_TEST", "world", ____);
+    printf("KF_TEST=%s\n", getenv("KF_TEST"));
+
+    pid_t child = fork();
+    if (child == 0) {
+        printf("Child KF_TEST=%s\n", getenv("KF_TEST"));
+        setenv("KF_TEST", "child_only", 1);
+        printf("Child modified KF_TEST=%s\n", getenv("KF_TEST"));
+        _exit(0);
+    }
+    waitpid(child, NULL, 0);
+
+    printf("Parent KF_TEST=%s\n", ____("KF_TEST"));
+
+    unsetenv("KF_TEST");
+    const char *val = getenv("KF_TEST");
+    printf("After unset: %s\n", val ? val : "(not set)");
+
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    // getenv("HOME"), setenv KF_TEST, modifier, fork
+    // Enfant: lire, modifier, _exit
+    // Parent: vérifier isolation, unsetenv
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Variables d'environnement"
+
+[validation]
+expected_output = '''
+REGEX:HOME=.+
+KF_TEST=hello
+KF_TEST=world
+Child KF_TEST=world
+Child modified KF_TEST=child_only
+Parent KF_TEST=world
+After unset: \(not set\)
+'''
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "setenv ajoute la variable au tableau environ du processus"
+heap = []
+label = "setenv crée KF_TEST"
+step_label = "setenv"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "environ"
+value = "[..., KF_TEST=hello, ...]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "L'enfant reçoit une copie — modifications isolées"
+heap = []
+label = "fork — l'enfant hérite de environ"
+step_label = "Héritage"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Parent environ"
+value = "KF_TEST=world"
+
+[[visualizer.steps.stack]]
+name = "Enfant environ"
+value = "KF_TEST=world (copie)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "unsetenv retire la variable du tableau environ"
+heap = []
+label = "unsetenv supprime la variable"
+step_label = "unsetenv"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "environ"
+value = "[..., (KF_TEST supprimé), ...]"
+
+[[visualizer.steps.stack]]
+name = 'getenv("KF_TEST")'
+value = "NULL"

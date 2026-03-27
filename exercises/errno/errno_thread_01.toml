@@ -1,0 +1,298 @@
+common_mistake = "Croire que errno est une variable globale partagée — c'est un macro vers une variable TLS"
+description = """
+NSY103 — errno est thread-local (chaque thread a sa propre copie). Deux threads peuvent échouer simultanément sans écraser l'errno de l'autre.
+
+Créez deux threads qui provoquent chacun une erreur différente et vérifiez que errno est bien isolé par thread."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "open() retourne -1 en cas d'erreur",
+    "O_WRONLY pour tenter d'écrire dans un fichier en lecture seule",
+    "pthread_join séquentialise l'exécution pour un output déterministe",
+]
+id = "errno-thread-01"
+kc_ids = ["KC-C15"]
+key_concept = "errno est thread-local (__thread) — chaque thread a sa propre copie isolée"
+lang = "c"
+prerequisites = ["errno-eperm-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+void *thread_enoent(void *arg) {
+    (void)arg;
+    int fd = open("/kf_thread_no_such_file", O_RDONLY);
+    if (fd == -1) {
+        printf("Thread A: errno=%d (%s)\n", errno, strerror(errno));
+    }
+    return NULL;
+}
+void *thread_eacces(void *arg) {
+    (void)arg;
+    int fd = open("/tmp/kf_thread_ro.txt", O_CREAT | O_WRONLY, 0444);
+    if (fd >= 0) { close(fd); }
+    fd = open("/tmp/kf_thread_ro.txt", O_WRONLY);
+    if (fd == -1) {
+        printf("Thread B: errno=%d (%s)\n", errno, strerror(errno));
+    } else { close(fd); }
+    unlink("/tmp/kf_thread_ro.txt");
+    return NULL;
+}
+int main(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, thread_enoent, NULL);
+    pthread_join(ta, NULL);
+    pthread_create(&tb, NULL, thread_eacces, NULL);
+    pthread_join(tb, NULL);
+    printf("errno is thread-local: yes\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+void *thread_enoent(void *arg) {
+    (void)arg;
+    int fd = open("/kf_thread_no_such_file", O_RDONLY);
+    if (fd == ____) {
+        printf("Thread A: errno=%d (%s)\n", errno, strerror(errno));
+    }
+    return NULL;
+}
+
+void *thread_eacces(void *arg) {
+    (void)arg;
+    int fd = open("/tmp/kf_thread_ro.txt", O_CREAT | O_WRONLY, 0444);
+    if (fd >= 0) { close(fd); }
+    fd = open("/tmp/kf_thread_ro.txt", ____);
+    if (fd == -1) {
+        printf("Thread B: errno=%d (%s)\n", errno, strerror(errno));
+    } else { close(fd); }
+    unlink("/tmp/kf_thread_ro.txt");
+    return NULL;
+}
+
+int main(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, thread_enoent, NULL);
+    pthread_join(ta, NULL);
+    pthread_create(&tb, NULL, thread_eacces, NULL);
+    pthread_join(tb, NULL);
+    printf("errno is thread-local: yes\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* == EXEMPLE: errno indépendant par thread =============== */
+void *example_thread(void *arg) {
+    (void)arg;
+    errno = EINVAL;
+    printf("Thread errno: %d\n", errno);
+    return NULL;
+}
+/* Chaque thread a son propre errno */
+
+/* == VOTRE EXERCICE ====================================== */
+void *thread_enoent(void *arg) {
+    (void)arg;
+    int fd = open("/kf_thread_no_such_file", O_RDONLY);
+    if (fd == -1) {
+        printf("Thread A: errno=%d (%s)\n", errno, strerror(errno));
+    }
+    return NULL;
+}
+
+void *thread_eacces(void *arg) {
+    (void)arg;
+    int fd = open("/tmp/kf_thread_ro.txt", O_CREAT | O_WRONLY, 0444);
+    if (fd >= 0) { close(fd); }
+    fd = open("/tmp/kf_thread_ro.txt", O_WRONLY);
+    if (fd == -1) {
+        printf("Thread B: errno=%d (%s)\n", errno, strerror(errno));
+    } else { close(fd); }
+    unlink("/tmp/kf_thread_ro.txt");
+    return NULL;
+}
+
+int main(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, thread_enoent, NULL);
+    pthread_join(ta, NULL);
+    pthread_create(&tb, NULL, thread_eacces, NULL);
+    pthread_join(tb, NULL);
+    printf("errno is thread-local: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+void *thread_enoent(void *arg) {
+    (void)arg;
+    int fd = open("/kf_thread_no_such_file", O_RDONLY);
+    if (fd == -1) {
+        printf("Thread A: errno=%d (%s)\n", errno, strerror(errno));
+    }
+    return NULL;
+}
+
+void *thread_eacces(void *arg) {
+    (void)arg;
+    int fd = open("/tmp/kf_thread_ro.txt", O_CREAT | O_WRONLY, 0444);
+    if (fd >= 0) { close(fd); }
+    fd = open("/tmp/kf_thread_ro.txt", ____);
+    if (fd == -1) {
+        printf("Thread B: errno=%d (%s)\n", errno, strerror(errno));
+    } else { close(fd); }
+    unlink("/tmp/kf_thread_ro.txt");
+    return NULL;
+}
+
+int main(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, thread_enoent, NULL);
+    pthread_join(ta, NULL);
+    pthread_create(&tb, NULL, thread_eacces, NULL);
+    pthread_join(tb, NULL);
+    printf("errno is thread-local: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+void *thread_enoent(void *arg) {
+    (void)arg;
+    int fd = open("/kf_thread_no_such_file", O_RDONLY);
+    if (fd == ____) {
+        printf("Thread A: errno=%d (%s)\n", errno, strerror(errno));
+    }
+    return NULL;
+}
+
+void *thread_eacces(void *arg) {
+    (void)arg;
+    int fd = open("/tmp/kf_thread_ro.txt", O_CREAT | O_WRONLY, 0444);
+    if (fd >= 0) { close(fd); }
+    fd = open("/tmp/kf_thread_ro.txt", ____);
+    if (fd == -1) {
+        printf("Thread B: errno=%d (%s)\n", errno, strerror(errno));
+    } else { close(fd); }
+    unlink("/tmp/kf_thread_ro.txt");
+    return NULL;
+}
+
+int main(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, thread_enoent, NULL);
+    pthread_join(ta, NULL);
+    pthread_create(&tb, NULL, thread_eacces, NULL);
+    pthread_join(tb, NULL);
+    printf("errno is thread-local: yes\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+// Créez deux threads: un provoque ENOENT, l'autre EACCES
+// Vérifiez que errno est isolé par thread
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "Thread-safety de errno"
+
+[validation]
+expected_output = """
+Thread A: errno=2 (No such file or directory)
+Thread B: errno=13 (Permission denied)
+errno is thread-local: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque thread a sa propre copie de errno"
+heap = []
+label = "Thread A: open échoue ENOENT"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void*"
+function_name = "thread_enoent"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "errno (thread A)"
+value = "2 (ENOENT)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "errno de thread B est indépendant de thread A"
+heap = []
+label = "Thread B: open échoue EACCES"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void*"
+function_name = "thread_eacces"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "errno (thread B)"
+value = "13 (EACCES)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "errno utilise __thread (TLS) sur Linux"
+heap = []
+label = "Isolation confirmée"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "thread-local storage"
+value = "__thread errno"

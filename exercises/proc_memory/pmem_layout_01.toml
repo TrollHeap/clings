@@ -1,0 +1,222 @@
+common_mistake = "Confondre data (initialisé) et bss (non-initialisé) — les deux sont globaux"
+description = """
+NSY103 — Un processus C a 5 segments : text (code), data (globals init), bss (globals non-init), heap (malloc), stack (variables locales). Leur ordre en mémoire est déterministe.
+
+Affichez les adresses relatives de chaque segment pour vérifier l'ordre text < data < bss < heap < stack."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "malloc() alloue sur le heap",
+    "g_init est dans le segment data (initialisé), g_bss dans bss (non-initialisé)",
+    "L'ordre classique est: text < data < bss < heap ... stack",
+]
+id = "pmem-layout-01"
+kc_ids = ["KC-C17"]
+key_concept = "Les 5 segments mémoire d'un processus C: text, data, bss, heap, stack"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+int g_init = 42;
+int g_bss;
+void show_text(void) {
+    printf("text:  %p\n", (void *)show_text);
+}
+int main(void) {
+    int local = 1;
+    int *heap = malloc(sizeof(int));
+    show_text();
+    printf("data:  %p\n", (void *)&g_init);
+    printf("bss:   %p\n", (void *)&g_bss);
+    printf("heap:  %p\n", (void *)heap);
+    printf("stack: %p\n", (void *)&local);
+    int order_ok = ((char *)show_text < (char *)&g_init)
+                && ((char *)&g_init < (char *)&g_bss)
+                && ((char *)&g_bss  < (char *)heap);
+    printf("Order text<data<bss<heap: %s\n", order_ok ? "yes" : "no");
+    free(heap);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int g_init = 42;
+int g_bss;
+
+void show_text(void) {
+    printf("text:  %p\n", (void *)show_text);
+}
+
+int main(void) {
+    int local = 1;
+    int *heap = ____((sizeof(int)));
+    show_text();
+    printf("data:  %p\n", (void *)&____);
+    printf("bss:   %p\n", (void *)&____);
+    printf("heap:  %p\n", (void *)heap);
+    printf("stack: %p\n", (void *)&local);
+    int order_ok = ((char *)show_text < (char *)&g_init)
+                && ((char *)&g_init < (char *)&g_bss)
+                && ((char *)&g_bss  < (char *)heap);
+    printf("Order text<data<bss<heap: %s\n", order_ok ? "yes" : "no");
+    free(heap);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE: taille des segments ===================== */
+void example_sizes(void) {
+    printf("sizeof(int) = %zu\n", sizeof(int));
+    printf("sizeof(void*) = %zu\n", sizeof(void *));
+}
+
+int g_init = 42;
+int g_bss;
+void show_text(void) { printf("text:  %p\n", (void *)show_text); }
+int main(void) {
+    int local = 1;
+    int *heap = malloc(sizeof(int));
+    show_text();
+    printf("data:  %p\n", (void *)&g_init);
+    printf("bss:   %p\n", (void *)&g_bss);
+    printf("heap:  %p\n", (void *)heap);
+    printf("stack: %p\n", (void *)&local);
+    int order_ok = ((char *)show_text < (char *)&g_init)
+                && ((char *)&g_init < (char *)&g_bss)
+                && ((char *)&g_bss  < (char *)heap);
+    printf("Order text<data<bss<heap: %s\n", order_ok ? "yes" : "no");
+    free(heap);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+int g_init = 42;
+int g_bss;
+void show_text(void) { printf("text:  %p\n", (void *)show_text); }
+int main(void) {
+    int local = 1;
+    int *heap = malloc(sizeof(int));
+    show_text();
+    printf("data:  %p\n", (void *)&g_init);
+    printf("bss:   %p\n", (void *)&____);
+    printf("heap:  %p\n", (void *)heap);
+    printf("stack: %p\n", (void *)&local);
+    int order_ok = ((char *)show_text < (char *)&g_init)
+                && ((char *)&g_init < (char *)&g_bss)
+                && ((char *)&g_bss  < (char *)heap);
+    printf("Order text<data<bss<heap: %s\n", order_ok ? "yes" : "no");
+    free(heap);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+int g_init = 42;
+int g_bss;
+void show_text(void) { printf("text:  %p\n", (void *)show_text); }
+int main(void) {
+    int local = 1;
+    int *heap = ____((sizeof(int)));
+    show_text();
+    printf("data:  %p\n", (void *)&____);
+    printf("bss:   %p\n", (void *)&____);
+    printf("heap:  %p\n", (void *)heap);
+    printf("stack: %p\n", (void *)&local);
+    int order_ok = ((char *)show_text < (char *)&g_init)
+                && ((char *)&g_init < (char *)&g_bss)
+                && ((char *)&g_bss  < (char *)heap);
+    printf("Order text<data<bss<heap: %s\n", order_ok ? "yes" : "no");
+    free(heap);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int g_init = 42;
+int g_bss;
+
+// Affichez les adresses de chaque segment et vérifiez l'ordre
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Disposition mémoire d'un processus"
+
+[validation]
+expected_output = """
+REGEX:text:  0x[0-9a-f]+
+data:  0x[0-9a-f]+
+bss:   0x[0-9a-f]+
+heap:  0x[0-9a-f]+
+stack: 0x[0-9a-f]+
+Order text<data<bss<heap: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "5 segments: text, data, bss, heap, stack"
+label = "Segments mémoire"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap"
+content = "malloc(4)"
+
+[[visualizer.steps.stack]]
+name = "text"
+value = "code (show_text)"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "g_init = 42"
+
+[[visualizer.steps.stack]]
+name = "bss"
+value = "g_bss = 0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "text < data < bss < heap confirmé"
+label = "Vérification d'ordre"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap"
+content = "malloc(4)"
+
+[[visualizer.steps.stack]]
+name = "order_ok"
+value = "1 (yes)"
+
+[[visualizer.steps.stack]]
+name = "local"
+value = "1 (stack)"

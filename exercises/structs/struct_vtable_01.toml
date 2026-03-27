@@ -1,0 +1,395 @@
+common_mistake = "Oublier de passer l'objet (self/this) comme premier argument des fonctions de la vtable"
+description = """
+NSY103 — En C, on simule le polymorphisme objet avec une vtable : une struct de pointeurs de fonctions. Chaque "classe" fournit sa propre implémentation. L'objet contient un pointeur vers sa vtable, permettant l'appel dynamique.
+
+Implémentez deux formes (Circle, Rect) avec une vtable commune (area, describe) et utilisez-les de manière polymorphe."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "La vtable est un champ `const ShapeVTable *vtable` dans la struct de base Shape",
+    "On caste `const Shape *s` vers `const Circle *` car Circle contient Shape comme premier champ (même adresse)",
+    "L'initialisation `{{&circle_vtable}, 5.0}` : les accolades externes pour Circle, internes pour Shape base",
+]
+id = "struct-vtable-01"
+kc_ids = ["KC-C03"]
+key_concept = "La vtable (struct de pointeurs de fonctions) est le mécanisme fondamental de polymorphisme en C, utilisé dans le noyau Linux"
+lang = "c"
+prerequisites = ["struct-union-01"]
+solution_code = '''
+#include <stdio.h>
+#include <math.h>
+
+typedef struct Shape Shape;
+
+typedef struct {
+    double (*area)(const Shape *);
+    void (*describe)(const Shape *);
+} ShapeVTable;
+
+struct Shape {
+    const ShapeVTable *vtable;
+};
+
+typedef struct {
+    Shape base;
+    double radius;
+} Circle;
+
+typedef struct {
+    Shape base;
+    double width, height;
+} Rect;
+
+double circle_area(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    return 3.14159265 * c->radius * c->radius;
+}
+
+void circle_describe(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    printf("Circle(r=%.1f)\n", c->radius);
+}
+
+double rect_area(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    return r->width * r->height;
+}
+
+void rect_describe(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    printf("Rect(%.1fx%.1f)\n", r->width, r->height);
+}
+
+static const ShapeVTable circle_vtable = {circle_area, circle_describe};
+static const ShapeVTable rect_vtable = {rect_area, rect_describe};
+
+int main(void) {
+    Circle c = {{&circle_vtable}, 5.0};
+    Rect r = {{&rect_vtable}, 3.0, 4.0};
+    Shape *shapes[] = {&c.base, &r.base};
+    for (int i = 0; i < 2; i++) {
+        shapes[i]->vtable->describe(shapes[i]);
+        printf("  area = %.2f\n", shapes[i]->vtable->area(shapes[i]));
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <math.h>
+
+typedef struct Shape Shape;
+
+typedef struct {
+    double (*area)(const Shape *);
+    void (*describe)(const Shape *);
+} ShapeVTable;
+
+struct Shape {
+    const ShapeVTable *____;
+};
+
+typedef struct {
+    Shape base;
+    double radius;
+} Circle;
+
+typedef struct {
+    Shape base;
+    double width, height;
+} Rect;
+
+double circle_area(const Shape *s) {
+    const Circle *c = (const Circle *)____;
+    return 3.14159265 * c->radius * c->radius;
+}
+
+void circle_describe(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    printf("Circle(r=%.1f)\n", c->____);
+}
+
+double rect_area(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    return r->width * r->height;
+}
+
+void rect_describe(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    printf("Rect(%.1fx%.1f)\n", r->width, r->height);
+}
+
+static const ShapeVTable circle_vtable = {____, ____};
+static const ShapeVTable rect_vtable = {rect_area, rect_describe};
+
+int main(void) {
+    Circle c = {{&circle_vtable}, 5.0};
+    Rect r = {{&____}, 3.0, 4.0};
+    Shape *shapes[] = {&c.base, &r.base};
+    for (int i = 0; i < 2; i++) {
+        shapes[i]->vtable->describe(shapes[i]);
+        printf("  area = %.2f\n", shapes[i]->____->area(shapes[i]));
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <math.h>
+
+/* == EXEMPLE ================================================
+ * Mini vtable pour des animaux (speak + legs)
+ * Chaque "classe" fournit sa propre implementation.
+ * =========================================================== */
+typedef struct Animal Animal;
+typedef struct { void (*speak)(const Animal *); int (*legs)(const Animal *); } AnimalVT;
+struct Animal { const AnimalVT *vt; };
+
+typedef struct { Animal base; char name[20]; } Dog;
+typedef struct { Animal base; int indoor; } Cat;
+
+void dog_speak(const Animal *a) { printf("%s: Woof!\n", ((Dog*)a)->name); }
+int dog_legs(const Animal *a) { (void)a; return 4; }
+void cat_speak(const Animal *a) { (void)a; printf("Cat: Meow!\n"); }
+int cat_legs(const Animal *a) { (void)a; return 4; }
+
+static const AnimalVT dog_vt = {dog_speak, dog_legs};
+static const AnimalVT cat_vt = {cat_speak, cat_legs};
+
+void example_demo(void) {
+    Dog d = {{&dog_vt}, "Rex"};
+    Cat c = {{&cat_vt}, 1};
+    Animal *animals[] = {&d.base, &c.base};
+    for (int i = 0; i < 2; i++) {
+        animals[i]->vt->speak(animals[i]);
+        printf("  legs=%d\n", animals[i]->vt->legs(animals[i]));
+    }
+}
+/* Resultat: Rex: Woof! legs=4 / Cat: Meow! legs=4 */
+
+/* == VOTRE EXERCICE =========================================
+ * Vtable pour formes geometriques : Circle et Rect
+ * Fonctions: area() et describe()
+ * =========================================================== */
+typedef struct Shape Shape;
+typedef struct { double (*area)(const Shape *); void (*describe)(const Shape *); } ShapeVTable;
+struct Shape { const ShapeVTable *vtable; };
+typedef struct { Shape base; double radius; } Circle;
+typedef struct { Shape base; double width, height; } Rect;
+
+double circle_area(const Shape *s) { (void)s; return 0; }
+void circle_describe(const Shape *s) { (void)s; }
+double rect_area(const Shape *s) { (void)s; return 0; }
+void rect_describe(const Shape *s) { (void)s; }
+
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <math.h>
+
+typedef struct Shape Shape;
+typedef struct { double (*area)(const Shape *); void (*describe)(const Shape *); } ShapeVTable;
+struct Shape { const ShapeVTable *vtable; };
+typedef struct { Shape base; double radius; } Circle;
+typedef struct { Shape base; double width, height; } Rect;
+
+double circle_area(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    return 3.14159265 * c->radius * c->radius;
+}
+void circle_describe(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    printf("Circle(r=%.1f)\n", c->radius);
+}
+double rect_area(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    return r->width * r->height;
+}
+void rect_describe(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    printf("Rect(%.1fx%.1f)\n", r->width, r->height);
+}
+
+static const ShapeVTable circle_vtable = {circle_area, circle_describe};
+static const ShapeVTable rect_vtable = {rect_area, rect_describe};
+
+int main(void) {
+    Circle c = {{&circle_vtable}, 5.0};
+    Rect r = {{&rect_vtable}, 3.0, 4.0};
+    Shape *shapes[] = {&c.base, &r.base};
+    for (int i = 0; i < 2; i++) {
+        shapes[i]->vtable->____(shapes[i]);
+        printf("  area = %.2f\n", shapes[i]->vtable->____(shapes[i]));
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <math.h>
+
+typedef struct Shape Shape;
+
+typedef struct {
+    double (*area)(const Shape *);
+    void (*describe)(const Shape *);
+} ShapeVTable;
+
+struct Shape {
+    const ShapeVTable *____;
+};
+
+typedef struct {
+    Shape base;
+    double radius;
+} Circle;
+
+typedef struct {
+    Shape base;
+    double width, height;
+} Rect;
+
+double circle_area(const Shape *s) {
+    const Circle *c = (const Circle *)____;
+    return 3.14159265 * c->radius * c->radius;
+}
+
+void circle_describe(const Shape *s) {
+    const Circle *c = (const Circle *)s;
+    printf("Circle(r=%.1f)\n", c->____);
+}
+
+double rect_area(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    return r->width * r->height;
+}
+
+void rect_describe(const Shape *s) {
+    const Rect *r = (const Rect *)s;
+    printf("Rect(%.1fx%.1f)\n", r->width, r->height);
+}
+
+static const ShapeVTable circle_vtable = {____, ____};
+static const ShapeVTable rect_vtable = {rect_area, rect_describe};
+
+int main(void) {
+    Circle c = {{&circle_vtable}, 5.0};
+    Rect r = {{&____}, 3.0, 4.0};
+    Shape *shapes[] = {&c.base, &r.base};
+    for (int i = 0; i < 2; i++) {
+        shapes[i]->vtable->describe(shapes[i]);
+        printf("  area = %.2f\n", shapes[i]->____->area(shapes[i]));
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+typedef struct Shape Shape;
+typedef struct { double (*area)(const Shape *); void (*describe)(const Shape *); } ShapeVTable;
+struct Shape { const ShapeVTable *vtable; };
+typedef struct { Shape base; double radius; } Circle;
+typedef struct { Shape base; double width, height; } Rect;
+
+// Implémentez circle_area, circle_describe, rect_area, rect_describe
+// Créez les vtables et testez le dispatch polymorphe
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+typedef struct Shape Shape;
+typedef struct { double (*area)(const Shape *); void (*describe)(const Shape *); } ShapeVTable;
+struct Shape { const ShapeVTable *vtable; };
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Table de fonctions virtuelles en C"
+
+[validation]
+expected_output = """
+Circle(r=5.0)
+  area = 78.54
+Rect(3.0x4.0)
+  area = 12.00
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Chaque objet commence par un Shape qui contient un pointeur vers sa vtable. Circle et Rect ont des vtables différentes pointant vers leurs implémentations respectives. C'est le même mécanisme que le vptr en C++."
+heap = []
+label = "Objets avec vtable"
+step_label = "Layout mémoire — vtable pointers"
+
+[[visualizer.steps.arrows]]
+from = "c.base.vtable"
+label = "vtable"
+to = "circle_vtable"
+
+[[visualizer.steps.arrows]]
+from = "r.base.vtable"
+label = "vtable"
+to = "rect_vtable"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "c.base.vtable"
+value = "→circle_vtable"
+
+[[visualizer.steps.stack]]
+name = "c.radius"
+value = "5.0"
+
+[[visualizer.steps.stack]]
+name = "r.base.vtable"
+value = "→rect_vtable"
+
+[[visualizer.steps.stack]]
+name = "r.width"
+value = "3.0"
+
+[[visualizer.steps.stack]]
+name = "r.height"
+value = "4.0"
+
+[[visualizer.steps]]
+explanation = "shapes[i]->vtable->area(shapes[i]) : double indirection. D'abord on suit le pointeur vers la vtable, puis on appelle la fonction area stockée dedans, en passant l'objet lui-même. Le bon area() est appelé selon le type réel."
+heap = []
+label = "Appel polymorphe via vtable"
+step_label = "Double indirection — dispatch dynamique"
+
+[[visualizer.steps.arrows]]
+from = "shapes[0]"
+label = "→"
+to = "c.base.vtable"
+
+[[visualizer.steps.arrows]]
+from = "shapes[1]"
+label = "→"
+to = "r.base.vtable"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "shapes[0]"
+value = "→c.base"
+
+[[visualizer.steps.stack]]
+name = "shapes[1]"
+value = "→r.base"

@@ -1,0 +1,372 @@
+common_mistake = "Inverser empty et full dans le producteur -> deadlock immediat (wait sur full=0)"
+description = """
+NSY103 — Le pattern producteur-consommateur utilise 2 semaphores : 'empty' (slots libres, init=N) et 'full' (slots pleins, init=0). Le producteur fait wait(empty)/post(full), le consommateur fait wait(full)/post(empty). Un mutex protege l'acces au buffer.
+
+Implementez un producteur (enfant) qui envoie 3 messages dans un buffer circulaire de 4 slots, et un consommateur (parent) qui les lit apres wait()."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "empty init=CAP (tous les slots libres), full init=0 (aucun message)",
+    "Producteur: wait(empty) puis post(full) — consomme un slot vide, produit un plein",
+    "Consommateur: wait(full) puis post(empty) — consomme un plein, libere un vide",
+]
+id = "sem-prodcons-01"
+kc_ids = ["KC-C11"]
+key_concept = "Producteur-consommateur : 2 semaphores (empty=N, full=0) + mutex pour buffer circulaire"
+lang = "c"
+prerequisites = ["sem-count-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char buf[CAP][MSG_LEN];
+    int head;
+    int tail;
+} ProdCons;
+
+int main(void) {
+    ProdCons *pc = (ProdCons *)mmap(NULL, sizeof(ProdCons),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(pc, 0, sizeof(ProdCons));
+
+    sem_t *empty = sem_open("/kf_sem_empty", O_CREAT | O_EXCL, 0644, CAP);
+    sem_t *full  = sem_open("/kf_sem_full",  O_CREAT | O_EXCL, 0644, 0);
+    sem_t *mutex = sem_open("/kf_sem_pcmtx", O_CREAT | O_EXCL, 0644, 1);
+
+    if (fork() == 0) {
+        const char *msgs[] = {"alpha", "beta", "gamma"};
+        for (int i = 0; i < 3; i++) {
+            sem_wait(empty);
+            sem_wait(mutex);
+            strncpy(pc->buf[pc->tail], msgs[i], MSG_LEN - 1);
+            pc->tail = (pc->tail + 1) % CAP;
+            sem_post(mutex);
+            sem_post(full);
+        }
+        _exit(0);
+    }
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        sem_wait(full);
+        sem_wait(mutex);
+        printf("Consumed: %s\n", pc->buf[pc->head]);
+        pc->head = (pc->head + 1) % CAP;
+        sem_post(mutex);
+        sem_post(empty);
+    }
+
+    sem_close(empty); sem_close(full); sem_close(mutex);
+    sem_unlink("/kf_sem_empty");
+    sem_unlink("/kf_sem_full");
+    sem_unlink("/kf_sem_pcmtx");
+    munmap(pc, sizeof(ProdCons));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char buf[CAP][MSG_LEN];
+    int head;
+    int tail;
+} ProdCons;
+
+int main(void) {
+    ProdCons *pc = (ProdCons *)mmap(NULL, sizeof(ProdCons),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(pc, 0, sizeof(ProdCons));
+
+    sem_t *empty = sem_open("/kf_sem_empty", O_CREAT | O_EXCL, 0644, ____);
+    sem_t *full  = sem_open("/kf_sem_full",  O_CREAT | O_EXCL, 0644, ____);
+    sem_t *mutex = sem_open("/kf_sem_pcmtx", O_CREAT | O_EXCL, 0644, 1);
+
+    if (fork() == 0) {
+        const char *msgs[] = {"alpha", "beta", "gamma"};
+        for (int i = 0; i < 3; i++) {
+            sem_wait(____);
+            sem_wait(mutex);
+            strncpy(pc->buf[pc->tail], msgs[i], MSG_LEN - 1);
+            pc->tail = (pc->tail + 1) % CAP;
+            sem_post(mutex);
+            sem_post(____);
+        }
+        _exit(0);
+    }
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        sem_wait(full);
+        sem_wait(mutex);
+        printf("Consumed: %s\n", pc->buf[pc->head]);
+        pc->head = (pc->head + 1) % CAP;
+        sem_post(mutex);
+        sem_post(empty);
+    }
+
+    sem_close(empty); sem_close(full); sem_close(mutex);
+    sem_unlink("/kf_sem_empty");
+    sem_unlink("/kf_sem_full");
+    sem_unlink("/kf_sem_pcmtx");
+    munmap(pc, sizeof(ProdCons));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+typedef struct { char buf[CAP][MSG_LEN]; int head; int tail; } ProdCons;
+
+/* == EXEMPLE =======================================
+ * Prod-cons simplifie avec 1 message
+ * ================================================= */
+void example_prodcons(void) {
+    sem_t *e = sem_open("/kf_ex_e", O_CREAT|O_EXCL, 0644, 1);
+    sem_t *f = sem_open("/kf_ex_f", O_CREAT|O_EXCL, 0644, 0);
+    char msg[32] = {0};
+    /* produce */ sem_wait(e); strcpy(msg, "hello"); sem_post(f);
+    /* consume */ sem_wait(f); printf("Got: %s\n", msg); sem_post(e);
+    sem_close(e); sem_close(f);
+    sem_unlink("/kf_ex_e"); sem_unlink("/kf_ex_f");
+}
+/* Resultat: Got: hello */
+
+/* == VOTRE EXERCICE ================================
+ * Buffer circulaire, 3 messages, enfant produit, parent consomme.
+ * ================================================= */
+int main(void) {
+    ProdCons *pc = (ProdCons *)mmap(NULL, sizeof(ProdCons), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    memset(pc, 0, sizeof(ProdCons));
+    /* TODO: 3 semaphores (empty=CAP, full=0, mutex=1), fork producer, parent consumes */
+    munmap(pc, sizeof(ProdCons));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+typedef struct { char buf[CAP][MSG_LEN]; int head; int tail; } ProdCons;
+
+int main(void) {
+    ProdCons *pc = (ProdCons *)mmap(NULL, sizeof(ProdCons), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    memset(pc, 0, sizeof(ProdCons));
+    sem_t *empty = sem_open("/kf_sem_empty", O_CREAT|O_EXCL, 0644, CAP);
+    sem_t *full  = sem_open("/kf_sem_full",  O_CREAT|O_EXCL, 0644, 0);
+    sem_t *mutex = sem_open("/kf_sem_pcmtx", O_CREAT|O_EXCL, 0644, 1);
+    if (fork() == 0) {
+        const char *msgs[] = {"alpha", "beta", "gamma"};
+        for (int i = 0; i < 3; i++) {
+            sem_wait(empty); sem_wait(mutex);
+            strncpy(pc->buf[pc->tail], msgs[i], MSG_LEN-1);
+            pc->tail = (pc->tail+1) % CAP;
+            sem_post(mutex); sem_post(full);
+        }
+        _exit(0);
+    }
+    wait(NULL);
+    for (int i = 0; i < 3; i++) {
+        sem_wait(full); sem_wait(mutex);
+        printf("Consumed: %s\n", pc->buf[pc->head]);
+        pc->head = (pc->head+1) % CAP;
+        sem_post(mutex); sem_post(empty);
+    }
+    sem_close(empty); sem_close(full); sem_close(mutex);
+    sem_unlink("/kf_sem_empty"); sem_unlink("/kf_sem_full"); sem_unlink("/kf_sem_pcmtx");
+    munmap(pc, sizeof(ProdCons));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char buf[CAP][MSG_LEN];
+    int head;
+    int tail;
+} ProdCons;
+
+int main(void) {
+    ProdCons *pc = (ProdCons *)mmap(NULL, sizeof(ProdCons),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(pc, 0, sizeof(ProdCons));
+
+    sem_t *empty = sem_open("/kf_sem_empty", O_CREAT | O_EXCL, 0644, ____);
+    sem_t *full  = sem_open("/kf_sem_full",  O_CREAT | O_EXCL, 0644, ____);
+    sem_t *mutex = sem_open("/kf_sem_pcmtx", O_CREAT | O_EXCL, 0644, 1);
+
+    if (fork() == 0) {
+        const char *msgs[] = {"alpha", "beta", "gamma"};
+        for (int i = 0; i < 3; i++) {
+            sem_wait(____);
+            sem_wait(mutex);
+            strncpy(pc->buf[pc->tail], msgs[i], MSG_LEN - 1);
+            pc->tail = (pc->tail + 1) % CAP;
+            sem_post(mutex);
+            sem_post(____);
+        }
+        _exit(0);
+    }
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        sem_wait(full);
+        sem_wait(mutex);
+        printf("Consumed: %s\n", pc->buf[pc->head]);
+        pc->head = (pc->head + 1) % CAP;
+        sem_post(mutex);
+        sem_post(empty);
+    }
+
+    sem_close(empty); sem_close(full); sem_close(mutex);
+    sem_unlink("/kf_sem_empty");
+    sem_unlink("/kf_sem_full");
+    sem_unlink("/kf_sem_pcmtx");
+    munmap(pc, sizeof(ProdCons));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+int main(void) {
+    // ProdCons{buf[4][32], head, tail} en mmap anonyme
+    // 3 semaphores: empty=CAP, full=0, mutex=1
+    // Enfant produit 3 msgs, parent consomme FIFO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Producteur-consommateur avec semaphores"
+
+[validation]
+expected_output = """
+Consumed: alpha
+Consumed: beta
+Consumed: gamma
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+label = "Init: empty=4, full=0, buffer vide"
+
+[[visualizer.steps.nodes]]
+id = "empty"
+label = "sem empty=4"
+
+[[visualizer.steps.nodes]]
+id = "full"
+label = "sem full=0"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "buffer [_, _, _, _]"
+
+[[visualizer.steps]]
+label = "Producteur envoie 3 messages"
+
+[[visualizer.steps.edges]]
+label = "wait(empty)/post(full)"
+source = "prod"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "prod"
+label = "Producteur"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "buffer [alpha, beta, gamma, _]"
+
+[[visualizer.steps.nodes]]
+id = "empty"
+label = "sem empty=1"
+
+[[visualizer.steps.nodes]]
+id = "full"
+label = "sem full=3"
+
+[[visualizer.steps]]
+label = "Consommateur lit 3 messages FIFO"
+
+[[visualizer.steps.edges]]
+label = "wait(full)/post(empty)"
+source = "buf"
+target = "cons"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "buffer [_, _, _, _]"
+
+[[visualizer.steps.nodes]]
+id = "cons"
+label = """
+Consommateur
+alpha, beta, gamma"""
+
+[[visualizer.steps.nodes]]
+id = "empty"
+label = "sem empty=4"
+
+[[visualizer.steps.nodes]]
+id = "full"
+label = "sem full=0"

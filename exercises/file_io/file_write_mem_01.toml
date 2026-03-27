@@ -1,0 +1,201 @@
+common_mistake = "Ne pas appeler fflush() ou fclose() avant de lire le buffer : les données peuvent être encore dans le tampon interne"
+description = """
+NSY103 — fprintf(f, fmt, ...) écrit dans n'importe quel FILE* : stdout, un fichier, ou un buffer mémoire. fmemopen() crée un FILE* depuis un tableau en RAM.
+
+Écrivez des enregistrements CSV dans un buffer via fprintf, puis affichez le résultat."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    'char buf[512] = {0}; FILE *f = fmemopen(buf, sizeof(buf), "w");',
+    'fprintf(f, "nom,age\n"); etc.',
+    'fclose(f); ensuite printf("%s", buf);',
+]
+id = "file-write-mem-01"
+kc_ids = ["KC-C06"]
+key_concept = "FILE* est une abstraction : même API pour stdout, fichier disque, ou buffer mémoire"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w");
+    if (!f) { printf("fmemopen failed\n"); return 1; }
+    fprintf(f, "nom,age,role\n");
+    fprintf(f, "Alice,30,admin\n");
+    fprintf(f, "Bob,25,user\n");
+    fprintf(f, "Carol,35,moderator\n");
+    fclose(f);
+    printf("%s", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(____, ____, "w");
+    if (!f) { printf("fmemopen failed\n"); return 1; }
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fclose(f);
+    printf("%s", buf);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Ecrire du TSV (tab-separated) dans un buffer avec fprintf
+ * fmemopen cree un FILE* depuis un tableau en RAM
+ * =========================================================== */
+void example_tsv(void) {
+    char tbuf[256];
+    memset(tbuf, 0, sizeof(tbuf));
+    FILE *tf = fmemopen(tbuf, sizeof(tbuf), "w");
+    if (!tf) return;
+    fprintf(tf, "fruit\tprix\tstock\n");
+    fprintf(tf, "pomme\t1.20\t50\n");
+    fprintf(tf, "banane\t0.80\t120\n");
+    fclose(tf);  /* flush obligatoire avant de lire tbuf */
+    printf("%s", tbuf);
+}
+/* Resultat: tableau TSV fruit/prix/stock */
+
+/* == VOTRE EXERCICE =========================================
+ * Ecrire du CSV dans un buffer avec fprintf + fmemopen
+ * Inspirez-vous de example_tsv ci-dessus.
+ * Ecrivez 4 lignes CSV (header + 3 enregistrements).
+ * =========================================================== */
+
+int main(void) {
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w");
+    if (!f) { printf("fmemopen failed\n"); return 1; }
+    /* TODO: fprintf(f, "nom,age,role\n"); */
+    /* TODO: fprintf(f, "Alice,30,admin\n"); */
+    /* TODO: fprintf(f, "Bob,25,user\n"); */
+    /* TODO: fprintf(f, "Carol,35,moderator\n"); */
+    fclose(f);
+    printf("%s", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w");
+    if (!f) { printf("fmemopen failed\n"); return 1; }
+    fprintf(f, "nom,age,role\n");
+    fprintf(f, "Alice,30,admin\n");
+    fprintf(f, "____\n"); // Bob,25,user
+    fprintf(f, "____\n"); // Carol,35,moderator
+    fclose(f);
+    printf("%s", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(____, ____, "w");
+    if (!f) { printf("fmemopen failed\n"); return 1; }
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fprintf(f, "____\n");
+    fclose(f);
+    printf("%s", buf);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    // buf[512] initialisé à 0
+    // fmemopen pour créer un FILE* depuis buf
+    // Écrire: "nom,age,role", "Alice,30,admin", "Bob,25,user", "Carol,35,moderator"
+    // fclose puis printf("%s", buf)
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Écrire dans un flux FILE* avec fprintf"
+
+[validation]
+expected_output = """
+nom,age,role
+Alice,30,admin
+Bob,25,user
+Carol,35,moderator
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+heap = []
+label = "buf alloué, fmemopen crée FILE*"
+
+[[visualizer.steps.arrows]]
+from = "f"
+label = "pointe vers"
+to = "buf[512]"
+
+[[visualizer.steps.stack]]
+name = "buf[512]"
+value = "(zéros)"
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* → buf"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "fprintf remplit le buffer"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"nom,age,role\nAlice..."'
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (ouvert)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "fclose flush, printf affiche"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"nom,age,role\n..."'
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (fermé)"

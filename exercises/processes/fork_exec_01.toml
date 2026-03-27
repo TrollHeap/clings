@@ -1,0 +1,314 @@
+common_mistake = "Oublier _exit(127) après exec échoué — l'enfant continue le code du parent"
+description = """
+NSY103 — Le pattern fork+exec+wait est le mécanisme fondamental de création de processus sous UNIX. Le parent fork, l'enfant exec un nouveau programme, le parent wait. C'est ainsi que le shell lance des commandes.
+
+Implémentez une mini-fonction run_command qui exécute une commande et retourne son code de sortie."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "fork() crée l'enfant, execvp() remplace son image, waitpid() attend la fin",
+    'Convention UNIX : code 127 signifie "command not found"',
+    "execvp reçoit argv directement — même tableau que celui passé en paramètre",
+]
+id = "fork-exec-01"
+kc_ids = ["KC-C07"]
+key_concept = "Le pattern fork+exec+wait est la base de tout lancement de processus sous UNIX"
+lang = "c"
+prerequisites = ["waitpid-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int run_command(const char *prog, char *const argv[]) {
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        return -1;
+    }
+    if (pid == 0) {
+        execvp(prog, argv);
+        perror("execvp");
+        _exit(127); /* convention: 127 = command not found */
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+}
+
+int main(void) {
+    int rc;
+
+    char *cmd1[] = {"echo", "Command 1 OK", NULL};
+    rc = run_command("echo", cmd1);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd2[] = {"test", "-f", "/nonexistent", NULL};
+    rc = run_command("test", cmd2);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd3[] = {"echo", "Command 3 OK", NULL};
+    rc = run_command("echo", cmd3);
+    printf("Exit code: %d\n", rc);
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int run_command(const char *prog, char *const argv[]) {
+    pid_t pid = ____();
+    if (pid == -1) {
+        perror("fork");
+        return -1;
+    }
+    if (pid == 0) {
+        execvp(prog, ____);
+        perror("execvp");
+        _exit(127); /* convention: 127 = command not found */
+    }
+    int status;
+    ____(pid, &status, 0);
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+}
+
+int main(void) {
+    int rc;
+
+    char *cmd1[] = {"echo", "Command 1 OK", NULL};
+    rc = run_command("echo", ____);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd2[] = {"test", "-f", "/nonexistent", NULL};
+    rc = run_command("test", cmd2);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd3[] = {"echo", "Command 3 OK", NULL};
+    rc = run_command("echo", cmd3);
+    printf("Exit code: %d\n", rc);
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * system() simplifié — version avec fork+exec+wait
+ * ================================================= */
+int example_system(const char *cmd) {
+    pid_t p = fork();
+    if (p == 0) {
+        execlp("sh", "sh", "-c", cmd, NULL);
+        _exit(127);
+    }
+    int st;
+    waitpid(p, &st, 0);
+    return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+}
+/* example_system("echo hello") → affiche hello, retourne 0 */
+
+/* == VOTRE EXERCICE ================================
+ * run_command(prog, argv) avec execvp au lieu de sh -c
+ * Plus sûr car pas d'interprétation shell.
+ * ================================================= */
+int run_command(const char *prog, char *const argv[]) {
+    (void)prog; (void)argv;
+    /* TODO: fork, execvp(prog, argv), waitpid */
+    return -1;
+}
+
+int main(void) {
+    int rc;
+
+    char *cmd1[] = {"echo", "Command 1 OK", NULL};
+    rc = run_command("echo", cmd1);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd2[] = {"test", "-f", "/nonexistent", NULL};
+    rc = run_command("test", cmd2);
+    printf("Exit code: %d\n", rc);
+
+    char *cmd3[] = {"echo", "Command 3 OK", NULL};
+    rc = run_command("echo", cmd3);
+    printf("Exit code: %d\n", rc);
+
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int run_command(const char *prog, char *const argv[]) {
+    pid_t pid = fork();
+    if (pid == -1) { perror("fork"); return -1; }
+    if (pid == 0) {
+        execvp(prog, argv);
+        perror("execvp");
+        _exit(127);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    return -1;
+}
+
+int main(void) {
+    int rc;
+    char *cmd1[] = {"echo", "Command 1 OK", NULL};
+    rc = run_command("echo", cmd1);
+    printf("Exit code: %d\n", rc);
+    char *cmd2[] = {"test", "-f", "/nonexistent", NULL};
+    rc = run_command("test", ____);
+    printf("Exit code: %d\n", rc);
+    char *cmd3[] = {"echo", "Command 3 OK", NULL};
+    rc = run_command("echo", ____);
+    printf("Exit code: %d\n", rc);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int run_command(const char *prog, char *const argv[]) {
+    pid_t pid = ____(​);
+    if (pid == -1) { perror("fork"); return -1; }
+    if (pid == 0) {
+        ____(prog, ____);
+        perror("execvp");
+        _exit(127);
+    }
+    int status;
+    ____(pid, &status, 0);
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+}
+
+int main(void) {
+    int rc;
+    char *cmd1[] = {"echo", "Command 1 OK", NULL};
+    rc = run_command("echo", cmd1);
+    printf("Exit code: %d\n", rc);
+    char *cmd2[] = {"test", "-f", "/nonexistent", NULL};
+    rc = run_command("test", cmd2);
+    printf("Exit code: %d\n", rc);
+    char *cmd3[] = {"echo", "Command 3 OK", NULL};
+    rc = run_command("echo", cmd3);
+    printf("Exit code: %d\n", rc);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+// int run_command(const char *prog, char *const argv[])
+// fork → enfant: execvp(prog, argv), _exit(127) si échec
+// parent: waitpid, retourner WEXITSTATUS
+
+int main(void) {
+    // echo "Command 1 OK" → code 0
+    // test -f /nonexistent → code 1
+    // echo "Command 3 OK" → code 0
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Pattern fork+exec+wait"
+
+[validation]
+expected_output = """
+Command 1 OK
+Command 3 OK
+Exit code: 0
+Exit code: 1
+Exit code: 0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le pattern fork+exec+wait encapsulé dans une fonction"
+heap = []
+label = "run_command: fork crée l'enfant"
+step_label = "fork"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = '"echo", cmd1'
+function_name = "run_command"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "prog"
+value = '"echo"'
+
+[[visualizer.steps.stack]]
+name = "argv"
+value = '{"echo", "Command 1 OK", NULL}'
+
+[[visualizer.steps.stack]]
+name = "pid"
+value = "enfant PID"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "execvp remplace le code de l'enfant par /bin/echo"
+heap = []
+label = "Enfant execvp — remplacement d'image"
+step_label = "execvp"
+
+[[visualizer.steps.call_frames]]
+args = '"Command 1 OK"'
+function_name = "echo"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Enfant"
+value = '/bin/echo "Command 1 OK"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "waitpid attend l'enfant, WEXITSTATUS extrait le code"
+heap = []
+label = "Parent récupère le code retour"
+step_label = "waitpid"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = '"echo", cmd1'
+function_name = "run_command"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "exit(0)"
+
+[[visualizer.steps.stack]]
+name = "return"
+value = "0"

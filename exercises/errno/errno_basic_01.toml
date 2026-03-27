@@ -1,0 +1,175 @@
+common_mistake = "Ne pas remettre errno à 0 avant un appel système — une ancienne erreur pourrait être lue"
+description = """
+NSY103 — `errno` est une variable globale (thread-local) mise à jour par les appels système en cas d'erreur. `perror()` affiche un message d'erreur basé sur la valeur courante de `errno`.
+
+Mettez `errno` à ENOENT puis à EACCES, et utilisez `perror()` pour afficher les messages correspondants."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "ENOENT vaut 2 sur Linux — utilisez la constante, pas le chiffre",
+    "perror() lit errno et affiche 'préfixe: message d'erreur' sur stderr",
+    "EACCES vaut 13 sur Linux",
+]
+id = "errno-basic-01"
+kc_ids = ["KC-C15"]
+key_concept = "errno est mis à jour par les appels système échoués, perror() affiche le message"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+int main(void) {
+    errno = ENOENT;
+    perror("Test ENOENT");
+    errno = EACCES;
+    perror("Test EACCES");
+    printf("ENOENT=%d, EACCES=%d\n", ENOENT, EACCES);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    errno = ____;
+    perror("Test ENOENT");
+    errno = ____;
+    perror("Test EACCES");
+    printf("ENOENT=%d, EACCES=%d\n", ENOENT, EACCES);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+
+/* == EXEMPLE ===============================================
+ * Afficher un message d'erreur pour EINVAL
+ * errno est une variable globale mise à jour par le noyau.
+ * perror(prefix) affiche: prefix: description de l'erreur
+ * ========================================================= */
+void example_errno(void) {
+    errno = EINVAL;
+    perror("Example EINVAL");
+    printf("EINVAL=%d\n", EINVAL);
+}
+/* Resultat: Example EINVAL: Invalid argument */
+/* Resultat: EINVAL=22 */
+
+/* == VOTRE EXERCICE ========================================
+ * Mettez errno à ENOENT puis EACCES et appelez perror().
+ * Affichez aussi les valeurs numériques de ces constantes.
+ * ========================================================= */
+int main(void) {
+    errno = 0; /* TODO: mettre à ENOENT */
+    perror("Test ENOENT");
+    errno = 0; /* TODO: mettre à EACCES */
+    perror("Test EACCES");
+    printf("ENOENT=%d, EACCES=%d\n", ENOENT, EACCES);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    errno = ENOENT;
+    perror("Test ENOENT");
+    errno = ____; /* EACCES */
+    perror("Test EACCES");
+    printf("ENOENT=%d, EACCES=%d\n", ENOENT, EACCES);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    errno = ____;
+    perror("Test ENOENT");
+    errno = ____;
+    perror("Test EACCES");
+    printf("ENOENT=%d, EACCES=%d\n", ENOENT, EACCES);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    // Mettez errno à ENOENT, appelez perror("Test ENOENT")
+    // Mettez errno à EACCES, appelez perror("Test EACCES")
+    // Affichez "ENOENT=%d, EACCES=%d\n"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "errno et perror basique"
+
+[validation]
+expected_output = """
+ENOENT=2, EACCES=13
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "errno est mis à ENOENT=2, perror lit cette valeur"
+heap = []
+label = "errno = ENOENT (2)"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "2 (ENOENT)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "errno est changé à EACCES=13"
+heap = []
+label = "errno = EACCES (13)"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "13 (EACCES)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les constantes errno sont des entiers définis dans <errno.h>"
+heap = []
+label = "Affichage des constantes"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ENOENT"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "EACCES"
+value = "13"

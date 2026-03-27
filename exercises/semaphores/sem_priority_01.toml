@@ -1,0 +1,326 @@
+common_mistake = "Ne pas proteger l'index idx avec un mecanisme sequentiel -> log dans le desordre"
+description = """
+NSY103 — L'inversion de priorite se produit quand un processus haute priorite attend un semaphore detenu par un processus basse priorite. L'heritage de priorite fait que le detenteur herite temporairement de la priorite du waiter. Ici on simule : 3 taches (low/med/high) avec un semaphore. Low acquiert, high attend, med s'execute entre les deux. On mesure l'ordre d'execution.
+
+Simulez 3 processus sequentiels : low acquiert le semaphore et ecrit, medium ecrit sans semaphore, high attend le semaphore et ecrit. Affichez l'ordre d'execution pour observer l'inversion."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "Le semaphore est initialise a 1 — un seul processus peut le detenir",
+    "sem_wait acquiert la ressource pour low et high, med n'utilise pas le semaphore",
+    "L'ordre low->med->high montre que medium s'execute pendant que high attend (inversion)",
+]
+id = "sem-priority-01"
+kc_ids = ["KC-C11"]
+key_concept = "Inversion de priorite : high bloque sur sem detenu par low ; med preempte high — probleme classique du noyau"
+lang = "c"
+prerequisites = ["sem-dining-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct {
+    char log[3][16];
+    int idx;
+} ExecLog;
+
+int main(void) {
+    ExecLog *el = (ExecLog *)mmap(NULL, sizeof(ExecLog),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(el, 0, sizeof(ExecLog));
+
+    sem_t *resource = sem_open("/kf_sem_prio", O_CREAT | O_EXCL, 0644, 1);
+
+    pid_t low = fork();
+    if (low == 0) {
+        sem_wait(resource);
+        strncpy(el->log[el->idx++], "low-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(low, NULL, 0);
+
+    pid_t med = fork();
+    if (med == 0) {
+        strncpy(el->log[el->idx++], "med-run", 15);
+        _exit(0);
+    }
+    waitpid(med, NULL, 0);
+
+    pid_t high = fork();
+    if (high == 0) {
+        sem_wait(resource);
+        strncpy(el->log[el->idx++], "high-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(high, NULL, 0);
+
+    for (int i = 0; i < 3; i++)
+        printf("[%d] %s\n", i, el->log[i]);
+
+    sem_close(resource);
+    sem_unlink("/kf_sem_prio");
+    munmap(el, sizeof(ExecLog));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct {
+    char log[3][16];
+    int idx;
+} ExecLog;
+
+int main(void) {
+    ExecLog *el = (ExecLog *)mmap(NULL, sizeof(ExecLog),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(el, 0, sizeof(ExecLog));
+
+    sem_t *resource = sem_open("/kf_sem_prio", O_CREAT | O_EXCL, 0644, ____);
+
+    pid_t low = fork();
+    if (low == 0) {
+        ____(resource);
+        strncpy(el->log[el->idx++], "low-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(low, NULL, 0);
+
+    pid_t med = fork();
+    if (med == 0) {
+        strncpy(el->log[el->idx++], "med-run", 15);
+        _exit(0);
+    }
+    waitpid(med, NULL, 0);
+
+    pid_t high = fork();
+    if (high == 0) {
+        ____(resource);
+        strncpy(el->log[el->idx++], "high-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(high, NULL, 0);
+
+    for (int i = 0; i < 3; i++)
+        printf("[%d] %s\n", i, el->log[i]);
+
+    sem_close(resource);
+    sem_unlink("/kf_sem_prio");
+    munmap(el, sizeof(ExecLog));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct { char log[3][16]; int idx; } ExecLog;
+
+/* == EXEMPLE =======================================
+ * 2 taches avec un semaphore partage
+ * ================================================= */
+void example_priority(void) {
+    sem_t *r = sem_open("/kf_ex_prio", O_CREAT|O_EXCL, 0644, 1);
+    sem_wait(r); printf("task-A (holds)\n"); sem_post(r);
+    sem_wait(r); printf("task-B (waits)\n"); sem_post(r);
+    sem_close(r); sem_unlink("/kf_ex_prio");
+}
+/* Resultat: task-A (holds)  task-B (waits) */
+
+/* == VOTRE EXERCICE ================================
+ * 3 taches: low acquiert sem, med s'execute librement,
+ * high attend sem. Observer l'inversion de priorite.
+ * ================================================= */
+int main(void) {
+    ExecLog *el = (ExecLog *)mmap(NULL, sizeof(ExecLog), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    memset(el, 0, sizeof(ExecLog));
+    /* TODO: sem init=1, 3 sequential forks (low/med/high), log order */
+    munmap(el, sizeof(ExecLog));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct { char log[3][16]; int idx; } ExecLog;
+
+int main(void) {
+    ExecLog *el = (ExecLog *)mmap(NULL, sizeof(ExecLog), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    memset(el, 0, sizeof(ExecLog));
+    sem_t *resource = sem_open("/kf_sem_prio", O_CREAT|O_EXCL, 0644, 1);
+    pid_t low = fork();
+    if (low == 0) { sem_wait(resource); strncpy(el->log[el->idx++], "low-acquire", 15); sem_post(resource); _exit(0); }
+    waitpid(low, NULL, 0);
+    pid_t med = fork();
+    if (med == 0) { strncpy(el->log[el->idx++], "med-run", 15); _exit(0); }
+    waitpid(med, NULL, 0);
+    pid_t high = fork();
+    if (high == 0) { ____(resource); strncpy(el->log[el->idx++], "high-acquire", 15); sem_post(resource); _exit(0); }
+    waitpid(high, NULL, 0);
+    for (int i = 0; i < 3; i++) printf("[%d] %s\n", i, el->log[i]);
+    sem_close(resource); sem_unlink("/kf_sem_prio");
+    munmap(el, sizeof(ExecLog));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct {
+    char log[3][16];
+    int idx;
+} ExecLog;
+
+int main(void) {
+    ExecLog *el = (ExecLog *)mmap(NULL, sizeof(ExecLog),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(el, 0, sizeof(ExecLog));
+
+    sem_t *resource = sem_open("/kf_sem_prio", O_CREAT | O_EXCL, 0644, ____);
+
+    pid_t low = fork();
+    if (low == 0) {
+        ____(resource);
+        strncpy(el->log[el->idx++], "low-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(low, NULL, 0);
+
+    pid_t med = fork();
+    if (med == 0) {
+        strncpy(el->log[el->idx++], "med-run", 15);
+        _exit(0);
+    }
+    waitpid(med, NULL, 0);
+
+    pid_t high = fork();
+    if (high == 0) {
+        ____(resource);
+        strncpy(el->log[el->idx++], "high-acquire", 15);
+        sem_post(resource);
+        _exit(0);
+    }
+    waitpid(high, NULL, 0);
+
+    for (int i = 0; i < 3; i++)
+        printf("[%d] %s\n", i, el->log[i]);
+
+    sem_close(resource);
+    sem_unlink("/kf_sem_prio");
+    munmap(el, sizeof(ExecLog));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    // ExecLog{log[3][16], idx} en mmap
+    // Semaphore resource init=1
+    // low: wait/log/post, med: log only, high: wait/log/post
+    // Afficher [0] [1] [2] pour observer l'inversion
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Inversion de priorite et heritage"
+
+[validation]
+expected_output = """
+[0] low-acquire
+[1] med-run
+[2] high-acquire
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "Low acquiert la ressource"
+
+[[visualizer.steps.edges]]
+label = "sem_wait (1->0)"
+source = "low"
+target = "res"
+
+[[visualizer.steps.nodes]]
+id = "low"
+label = "LOW priority"
+
+[[visualizer.steps.nodes]]
+id = "res"
+label = "resource (sem=1)"
+
+[[visualizer.steps]]
+label = "Medium s'execute, High attend (inversion)"
+
+[[visualizer.steps.edges]]
+label = "waits for low's resource"
+source = "high"
+target = "low"
+
+[[visualizer.steps.nodes]]
+id = "low"
+label = "LOW: holding resource"
+
+[[visualizer.steps.nodes]]
+id = "med"
+label = "MED: running freely"
+
+[[visualizer.steps.nodes]]
+id = "high"
+label = "HIGH: BLOCKED on sem"
+
+[[visualizer.steps]]
+edges = []
+label = "Ordre observe: low -> med -> high"
+
+[[visualizer.steps.nodes]]
+id = "result"
+label = """
+[0] low-acquire
+[1] med-run
+[2] high-acquire"""

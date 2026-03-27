@@ -1,0 +1,274 @@
+common_mistake = "Oublier fflush(stdout) avant _exit() dans l'enfant → le buffer printf n'est pas vidé"
+description = """
+NSY103 — dup2(oldfd, newfd) duplique un descripteur de fichier : newfd devient une copie de oldfd. En redirigeant fd[1] vers STDOUT_FILENO, tout printf() de l'enfant passe par le pipe vers le parent.
+
+Créez un pipe, forkez. L'enfant redirige stdout vers fd[1] avec dup2, puis écrit via printf. Le parent lit depuis fd[0]."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "dup2(fd[1], STDOUT_FILENO) fait que STDOUT pointe vers le pipe",
+    "Après dup2, fermer fd[1] car STDOUT est maintenant la copie",
+    "Le parent ferme fd[1] et lit depuis fd[0]",
+]
+id = "pipe-dup2-01"
+kc_ids = ["KC-C10"]
+key_concept = "dup2(oldfd, newfd) redirige newfd vers oldfd ; permet de capturer stdout/stdin via pipe"
+lang = "c"
+prerequisites = ["pipe-basic-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        printf("Hello from child");
+        fflush(stdout);
+        _exit(0);
+    } else {
+        close(fd[1]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        ____(fd[1], ____);
+        close(fd[1]);
+        printf("Hello from child");
+        fflush(stdout);
+        _exit(0);
+    } else {
+        close(fd[____]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Rediriger stderr vers un pipe avec dup2
+ * dup2(fd[1], STDERR_FILENO) fait que fprintf(stderr)
+ * ecrit dans le pipe au lieu de la console.
+ * ================================================= */
+void example_dup2_stderr(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDERR_FILENO);
+        close(fd[1]);
+        fprintf(stderr, "error msg");
+        _exit(0);
+    } else {
+        close(fd[1]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Captured: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+}
+/* Resultat: Captured: error msg */
+
+/* == VOTRE EXERCICE ================================
+ * Rediriger stdout vers un pipe avec dup2
+ * L'enfant utilise printf, le parent lit depuis fd[0].
+ * ================================================= */
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        /* TODO: dup2(fd[1], STDOUT_FILENO) then close fd[1] */
+        printf("Hello from child");
+        fflush(stdout);
+        _exit(0);
+    } else {
+        close(fd[1]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        printf("Hello from child");
+        fflush(stdout);
+        _exit(0);
+    } else {
+        close(fd[____]);  // fermer quel fd ?
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[0]);
+        ____(fd[1], ____);
+        close(fd[1]);
+        printf("Hello from child");
+        fflush(stdout);
+        _exit(0);
+    } else {
+        close(fd[____]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(fd[0]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    // Créez un pipe, forkez
+    // Enfant: dup2 fd[1]→STDOUT, printf "Hello from child", fflush, _exit
+    // Parent: read fd[0], afficher "Parent recu: Hello from child"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Redirection avec dup2"
+
+[validation]
+expected_output = """
+Parent recu: Hello from child
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "dup2(fd[1], STDOUT_FILENO) force le descripteur numéro 1 à pointer vers le pipe. Après cet appel, tout ce que l'enfant envoie via printf() (qui écrit sur fd 1) atterrit dans le buffer kernel du pipe au lieu du terminal."
+label = "dup2(fd[1], STDOUT_FILENO) — redirection"
+step_label = "Étape 1 — dup2() redirige stdout de l'enfant vers le pipe"
+
+[[visualizer.steps.edges]]
+label = "dup2 → same file"
+source = "stdout"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "STDOUT (fd 1)"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe fd[1]"
+
+[[visualizer.steps]]
+explanation = "Grâce à dup2, l'enfant utilise printf() normalement sans savoir qu'il écrit dans un pipe. Le parent lit depuis fd[0] et récupère exactement ce que l'enfant a imprimé — c'est le mécanisme qu'utilise la bibliothèque C pour popen()."
+label = "Enfant: printf → pipe → Parent: read"
+step_label = "Étape 2 — printf() de l'enfant transite par le pipe vers le parent"
+
+[[visualizer.steps.edges]]
+label = "via pipe"
+source = "child"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = 'printf("Hello")'
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = "read(fd[0])"
+
+[[visualizer.steps]]
+explanation = "Après avoir lu le message reçu depuis le pipe, le parent le réaffiche via son propre stdout (qui n'a pas été redirigé). C'est là que wait(NULL) entre en jeu : sans lui, le parent pourrait se terminer avant que l'enfant ait fini d'écrire dans le pipe."
+label = "Parent affiche le message reçu"
+step_label = "Étape 3 — Parent affiche le message reçu du pipe"
+
+[[visualizer.steps.edges]]
+label = "printf"
+source = "buf"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = 'buf = "Hello from child"'
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "stdout parent"

@@ -1,0 +1,241 @@
+common_mistake = "Oublier rewind() ou fseek() avant de relire — le curseur est à la fin après l'écriture"
+description = """
+NSY103 — tmpfile() crée un fichier temporaire anonyme qui est automatiquement supprimé à la fermeture. C'est idéal pour du stockage intermédiaire sans polluer le système de fichiers.
+
+Utilisez tmpfile() pour écrire des données, revenir au début avec rewind(), et les relire."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "tmpfile() retourne un FILE* vers un fichier temporaire anonyme",
+    "rewind(f) repositionne le curseur au début du fichier (équivalent à fseek(f, 0, SEEK_SET))",
+    "fscanf retourne le nombre d'éléments lus avec succès",
+]
+id = "file-tmpfile-01"
+kc_ids = ["KC-C06"]
+key_concept = "tmpfile() crée un fichier temporaire anonyme supprimé automatiquement à fclose()"
+lang = "c"
+prerequisites = ["file-csv-parse-01"]
+solution_code = '''
+#include <stdio.h>
+
+int main(void) {
+    FILE *tmp = tmpfile();
+    if (!tmp) {
+        perror("tmpfile");
+        return 1;
+    }
+
+    /* Ecrire 5 entiers */
+    for (int i = 1; i <= 5; i++)
+        fprintf(tmp, "%d\n", i * i);
+
+    /* Revenir au debut */
+    rewind(tmp);
+
+    /* Relire et afficher */
+    int val;
+    printf("Squares:\n");
+    while (fscanf(tmp, "%d", &val) == 1)
+        printf("  %d\n", val);
+
+    fclose(tmp);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+int main(void) {
+    FILE *tmp = ____();
+    if (!tmp) {
+        perror("tmpfile");
+        return 1;
+    }
+
+    /* Ecrire 5 entiers */
+    for (int i = 1; i <= 5; i++)
+        fprintf(tmp, "%d\n", i * i);
+
+    /* Revenir au debut */
+    ____(tmp);
+
+    /* Relire et afficher */
+    int val;
+    printf("Squares:\n");
+    while (fscanf(tmp, "%d", &____) == 1)
+        printf("  %d\n", val);
+
+    fclose(tmp);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE =======================================
+ * Utiliser tmpfile pour trier des données
+ * tmpfile() + fprintf + rewind + fscanf
+ * ================================================= */
+void example_tmpfile(void) {
+    FILE *t = tmpfile();
+    if (!t) return;
+    fprintf(t, "alpha\nbeta\ngamma\n");
+    rewind(t);
+    char buf[64];
+    while (fgets(buf, sizeof(buf), t)) {
+        buf[strcspn(buf, "\n")] = 0;
+        printf("Read: %s\n", buf);
+    }
+    fclose(t); /* fichier supprimé automatiquement */
+}
+/* Resultat: Read: alpha, Read: beta, Read: gamma */
+
+/* == VOTRE EXERCICE ================================
+ * Écrire les carrés de 1 à 5 dans tmpfile,
+ * revenir au début, relire et afficher.
+ * Inspirez-vous de example_tmpfile.
+ * ================================================= */
+int main(void) {
+    /* TODO: tmpfile, boucle fprintf(i*i), rewind, boucle fscanf */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    FILE *tmp = tmpfile();
+    if (!tmp) { perror("tmpfile"); return 1; }
+    for (int i = 1; i <= 5; i++)
+        fprintf(tmp, "%d\n", i * i);
+    rewind(tmp);
+    int val;
+    printf("Squares:\n");
+    while (fscanf(tmp, "%d", &____) == 1) // quelle variable?
+        printf("  %d\n", val);
+    fclose(tmp);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    FILE *tmp = ____();
+    if (!tmp) {
+        perror("tmpfile");
+        return 1;
+    }
+
+    for (int i = 1; i <= 5; i++)
+        fprintf(tmp, "%d\n", i * i);
+
+    ____(tmp);
+
+    int val;
+    printf("Squares:\n");
+    while (fscanf(tmp, "%d", &____) == 1)
+        printf("  %d\n", val);
+
+    fclose(tmp);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int main(void) {
+    // Créer un fichier temporaire avec tmpfile()
+    // Écrire les carrés de 1 à 5 avec fprintf
+    // rewind() pour revenir au début
+    // fscanf pour relire et afficher
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Fichier temporaire avec tmpfile()"
+
+[validation]
+expected_output = """
+Squares:
+  1
+  4
+  9
+  16
+  25
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "tmpfile crée un fichier temporaire en mode w+b (lecture+écriture binaire)"
+label = "tmpfile() crée un fichier anonyme"
+step_label = "Création"
+
+[[visualizer.steps.arrows]]
+from = "tmp"
+label = "pointe vers"
+to = "/tmp/tmpXXXXXX"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "/tmp/tmpXXXXXX"
+value = "(fichier anonyme, 0 octets)"
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "FILE* (w+b)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le curseur est à la fin après les écritures"
+label = "Après écriture de 5 carrés"
+step_label = "Écriture"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "/tmp/tmpXXXXXX"
+value = '"1\n4\n9\n16\n25\n"'
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "FILE* (pos=fin)"
+
+[[visualizer.steps.stack]]
+name = "i"
+value = "6 (sorti de la boucle)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "rewind ramène le curseur au début, fscanf relit séquentiellement"
+label = "rewind + relecture"
+step_label = "Relecture"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "/tmp/tmpXXXXXX"
+value = '"1\n4\n9\n16\n25\n"'
+
+[[visualizer.steps.stack]]
+name = "tmp"
+value = "FILE* (pos=0)"
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "1, 4, 9, 16, 25"

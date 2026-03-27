@@ -1,0 +1,317 @@
+common_mistake = "Utiliser un seul pipe pour les deux directions → risque de lire ses propres données"
+description = """
+NSY103 — Un pipe est unidirectionnel. Pour une communication bidirectionnelle, on utilise deux pipes : pipe1 (parent→enfant) et pipe2 (enfant→parent).
+
+Créez deux pipes. Le parent envoie 'ping' à l'enfant via pipe1, l'enfant répond 'pong' via pipe2. Le parent affiche la réponse."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "p2c = parent-to-child : parent écrit p2c[1], enfant lit p2c[0]",
+    "c2p = child-to-parent : enfant écrit c2p[1], parent lit c2p[0]",
+    "Chaque processus ferme les extrémités qu'il n'utilise pas (4 close au total)",
+]
+id = "pipe-bidir-01"
+kc_ids = ["KC-C10"]
+key_concept = "Communication bidirectionnelle nécessite 2 pipes car un pipe est unidirectionnel"
+lang = "c"
+prerequisites = ["pipe-multi-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int p2c[2], c2p[2];
+    pipe(p2c);
+    pipe(c2p);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(p2c[1]);
+        close(c2p[0]);
+        char buf[32];
+        ssize_t n = read(p2c[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        const char *reply = "pong";
+        write(c2p[1], reply, strlen(reply));
+        close(p2c[0]);
+        close(c2p[1]);
+        _exit(0);
+    } else {
+        close(p2c[0]);
+        close(c2p[1]);
+        const char *msg = "ping";
+        write(p2c[1], msg, strlen(msg));
+        close(p2c[1]);
+        char buf[32];
+        ssize_t n = read(c2p[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(c2p[0]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int p2c[2], c2p[2];
+    pipe(p2c);
+    pipe(c2p);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(p2c[____]);
+        close(c2p[____]);
+        char buf[32];
+        ssize_t n = read(p2c[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        const char *reply = "pong";
+        write(c2p[____], reply, strlen(reply));
+        close(p2c[0]);
+        close(c2p[1]);
+        _exit(0);
+    } else {
+        close(p2c[____]);
+        close(c2p[____]);
+        const char *msg = "ping";
+        write(p2c[____], msg, strlen(msg));
+        close(p2c[1]);
+        char buf[32];
+        ssize_t n = read(c2p[____], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(c2p[0]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Ping-pong avec un entier via 2 pipes
+ * p2c: parent envoie 42, c2p: enfant renvoie 42+1
+ * ================================================= */
+void example_bidir(void) {
+    int p2c[2], c2p[2];
+    pipe(p2c); pipe(c2p);
+    if (fork() == 0) {
+        close(p2c[1]); close(c2p[0]);
+        int v; read(p2c[0], &v, sizeof(v));
+        v++;
+        write(c2p[1], &v, sizeof(v));
+        close(p2c[0]); close(c2p[1]);
+        _exit(0);
+    }
+    close(p2c[0]); close(c2p[1]);
+    int val = 42;
+    write(p2c[1], &val, sizeof(val));
+    close(p2c[1]);
+    read(c2p[0], &val, sizeof(val));
+    printf("Got back: %d\n", val);
+    close(c2p[0]); wait(NULL);
+}
+/* Resultat: Got back: 43 */
+
+/* == VOTRE EXERCICE ================================
+ * Ping-pong avec des chaines via 2 pipes.
+ * Parent envoie "ping", enfant repond "pong".
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    int p2c[2], c2p[2];
+    pipe(p2c); pipe(c2p);
+    if (fork() == 0) {
+        close(p2c[1]); close(c2p[0]);
+        char buf[32];
+        /* TODO: read from p2c[0], print, write "pong" to c2p[1] */
+        close(p2c[0]); close(c2p[1]);
+        _exit(0);
+    }
+    close(p2c[0]); close(c2p[1]);
+    /* TODO: write "ping" to p2c[1], close, read from c2p[0], print */
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int p2c[2], c2p[2];
+    pipe(p2c); pipe(c2p);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(p2c[1]); close(c2p[0]);
+        char buf[32];
+        ssize_t n = read(p2c[0], buf, sizeof(buf)-1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        const char *reply = "pong";
+        write(c2p[____], reply, strlen(reply));  // quel fd ?
+        close(p2c[0]); close(c2p[1]);
+        _exit(0);
+    } else {
+        close(p2c[0]); close(c2p[1]);
+        const char *msg = "ping";
+        write(p2c[1], msg, strlen(msg));
+        close(p2c[1]);
+        char buf[32];
+        ssize_t n = read(c2p[____], buf, sizeof(buf)-1);  // quel fd ?
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(c2p[0]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int p2c[2], c2p[2];
+    pipe(p2c);
+    pipe(c2p);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(p2c[____]);
+        close(c2p[____]);
+        char buf[32];
+        ssize_t n = read(p2c[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        const char *reply = "pong";
+        write(c2p[____], reply, strlen(reply));
+        close(p2c[0]);
+        close(c2p[1]);
+        _exit(0);
+    } else {
+        close(p2c[____]);
+        close(c2p[____]);
+        const char *msg = "ping";
+        write(p2c[____], msg, strlen(msg));
+        close(p2c[1]);
+        char buf[32];
+        ssize_t n = read(c2p[____], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Parent recu: %s\n", buf);
+        close(c2p[0]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    // 2 pipes: p2c (parent→enfant) et c2p (enfant→parent)
+    // Parent envoie "ping" via p2c, enfant affiche et répond "pong" via c2p
+    // Parent lit et affiche la réponse
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Communication bidirectionnelle (2 pipes)"
+
+[validation]
+expected_output = """
+Enfant recu: ping
+Parent recu: pong
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Comme un pipe est unidirectionnel, la communication bidirectionnelle requiert deux pipes : p2c (parent-to-child) et c2p (child-to-parent). Chaque processus écrit dans son pipe de sortie et lit depuis son pipe d'entrée — c'est l'architecture de popen() en mode lecture+écriture."
+label = "2 pipes : p2c (parent→enfant) et c2p (enfant→parent)"
+step_label = "Étape 1 — Architecture 2 pipes pour la communication bidirectionnelle"
+
+[[visualizer.steps.edges]]
+label = "p2c: ping"
+source = "parent"
+target = "child"
+
+[[visualizer.steps.edges]]
+label = "c2p: pong"
+source = "child"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = "Parent"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = "Enfant"
+
+[[visualizer.steps]]
+explanation = "Le parent écrit dans p2c[1] puis ferme cette extrémité avant de lire c2p[0] — c'est critique pour éviter un deadlock : si le parent gardait p2c[1] ouvert pendant le read(c2p[0]), et que l'enfant attendait d'abord le read(p2c[0]), aucun des deux ne progresserait."
+label = "Parent write p2c[1]='ping' → Enfant read p2c[0]"
+step_label = "Étape 2 — Parent write p2c[1]='ping', enfant read p2c[0]"
+
+[[visualizer.steps.edges]]
+label = "read"
+source = "p2c"
+target = "child"
+
+[[visualizer.steps.nodes]]
+id = "p2c"
+label = "p2c pipe"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = 'Enfant: "ping"'
+
+[[visualizer.steps]]
+explanation = "L'enfant écrit dans c2p[1] puis ferme ses extrémités — le parent peut alors lire depuis c2p[0] et obtenir EOF quand l'enfant se termine. wait(NULL) garantit que le parent attend la fin de l'enfant avant de terminer, évitant un enfant zombie dans la table des processus."
+label = "Enfant write c2p[1]='pong' → Parent read c2p[0]"
+step_label = "Étape 3 — Enfant write c2p[1]='pong', parent read c2p[0]"
+
+[[visualizer.steps.edges]]
+label = "read"
+source = "c2p"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "c2p"
+label = "c2p pipe"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = 'Parent: "pong"'

@@ -1,0 +1,236 @@
+common_mistake = "Ne pas vérifier revents — events est ce qu'on demande, revents est ce qui s'est passé"
+description = """
+NSY103 — poll() surveille plusieurs descripteurs de fichier simultanément. Contrairement à select(), il n'a pas de limite sur le numéro de fd maximum.
+
+Utilisez poll() pour surveiller deux pipes et détectez lesquels sont prêts en lecture."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "POLLIN pour surveiller la disponibilité en lecture",
+    "poll(fds, nfds, timeout_ms) — timeout=0 pour non-bloquant",
+    "revents est rempli par poll() avec les événements détectés",
+]
+id = "fd-poll-01"
+kc_ids = ["KC-C16"]
+key_concept = "poll() surveille N descripteurs avec struct pollfd {fd, events, revents}"
+lang = "c"
+prerequisites = ["fd-pipe-redir-01"]
+solution_code = '''
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1);
+    pipe(pipe2);
+    write(pipe1[1], "data1", 5);
+    close(pipe1[1]);
+    struct pollfd fds[2];
+    fds[0].fd = pipe1[0];
+    fds[0].events = POLLIN;
+    fds[1].fd = pipe2[0];
+    fds[1].events = POLLIN;
+    int ready = poll(fds, 2, 0);
+    printf("Ready: %d\n", ready);
+    printf("pipe1 readable: %d\n", (fds[0].revents & POLLIN) != 0);
+    printf("pipe2 readable: %d\n", (fds[1].revents & POLLIN) != 0);
+    if (fds[0].revents & POLLIN) {
+        char buf[16];
+        ssize_t n = read(pipe1[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("pipe1 data: %s\n", buf);
+    }
+    close(pipe1[0]);
+    close(pipe2[0]);
+    close(pipe2[1]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1);
+    pipe(pipe2);
+    write(pipe1[1], "data1", 5);
+    close(pipe1[1]);
+    struct pollfd fds[2];
+    fds[0].fd = pipe1[0];
+    fds[0].events = ____;
+    fds[1].fd = pipe2[0];
+    fds[1].events = POLLIN;
+    int ready = ____(____, 2, 0);
+    printf("Ready: %d\n", ready);
+    printf("pipe1 readable: %d\n", (fds[0].revents & POLLIN) != 0);
+    printf("pipe2 readable: %d\n", (fds[1].revents & POLLIN) != 0);
+    if (fds[0].revents & POLLIN) {
+        char buf[16];
+        ssize_t n = read(pipe1[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("pipe1 data: %s\n", buf);
+    }
+    close(pipe1[0]);
+    close(pipe2[0]);
+    close(pipe2[1]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    write(pipe1[1], "data1", 5);
+    close(pipe1[1]);
+    struct pollfd fds[2];
+    fds[0].fd = pipe1[0];
+    /* TODO: définir fds[0].events = POLLIN */
+    fds[1].fd = pipe2[0];
+    fds[1].events = POLLIN;
+    /* TODO: appeler poll(fds, 2, 0) pour surveiller avec timeout 0 */
+    int ready = 0;
+    printf("Ready: %d\n", ready);
+    printf("pipe1 readable: %d\n", (fds[0].revents & POLLIN) != 0);
+    printf("pipe2 readable: %d\n", (fds[1].revents & POLLIN) != 0);
+    if (fds[0].revents & POLLIN) {
+        char buf[16];
+        ssize_t n = read(pipe1[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("pipe1 data: %s\n", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(pipe2[1]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    write(pipe1[1], "data1", 5);
+    close(pipe1[1]);
+    struct pollfd fds[2];
+    fds[0].fd = pipe1[0];
+    fds[0].events = ____;
+    fds[1].fd = pipe2[0];
+    fds[1].events = POLLIN;
+    int ready = ____(fds, 2, 0);
+    printf("Ready: %d\n", ready);
+    printf("pipe1 readable: %d\n", (fds[0].revents & POLLIN) != 0);
+    printf("pipe2 readable: %d\n", (fds[1].revents & POLLIN) != 0);
+    if (fds[0].revents & POLLIN) {
+        char buf[16];
+        ssize_t n = read(pipe1[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("pipe1 data: %s\n", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(pipe2[1]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2]; pipe(pipe1); pipe(pipe2);
+    write(pipe1[1], "data1", 5); close(pipe1[1]);
+    struct pollfd fds[2];
+    fds[0].fd = pipe1[0]; fds[0].events = ____;
+    fds[1].fd = pipe2[0]; fds[1].events = POLLIN;
+    int ready = ____(____, 2, 0);
+    printf("Ready: %d\n", ready);
+    printf("pipe1 readable: %d\n", (fds[0].revents & POLLIN) != 0);
+    printf("pipe2 readable: %d\n", (fds[1].revents & POLLIN) != 0);
+    if (fds[0].revents & POLLIN) {
+        char buf[16]; ssize_t n=read(pipe1[0],buf,15); buf[n]='\0';
+        printf("pipe1 data: %s\n", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(pipe2[1]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+
+int main(void) {
+    // Créez 2 pipes, écrivez dans un seul
+    // Utilisez poll() pour détecter lequel a des données
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "poll() sur descripteurs multiples"
+
+[validation]
+expected_output = """
+Ready: 1
+pipe1 readable: 1
+pipe2 readable: 0
+pipe1 data: data1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Deux descripteurs surveillés pour POLLIN"
+heap = []
+label = "Configuration pollfd"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fds[0]"
+value = "{pipe1[0], POLLIN}"
+
+[[visualizer.steps.stack]]
+name = "fds[1]"
+value = "{pipe2[0], POLLIN}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Seul pipe1 a des données"
+heap = []
+label = "poll() → 1 fd prêt"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ready"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "fds[0].revents"
+value = "POLLIN"
+
+[[visualizer.steps.stack]]
+name = "fds[1].revents"
+value = "0"

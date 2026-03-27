@@ -1,0 +1,228 @@
+common_mistake = "Ne pas fermer les fd inutilisés après dup2 — le pipe ne signalerait jamais EOF"
+description = """
+NSY103 — Un pipeline entre deux processus utilise pipe() pour créer le canal et dup2() pour rediriger stdout du producteur et stdin du consommateur.
+
+Créez un pipeline fork+pipe+dup2 où l'enfant écrit et le parent lit."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "dup2(pfd[1], STDOUT_FILENO) redirige stdout de l'enfant vers le pipe",
+    "Le parent ferme pfd[1] (côté écriture) et lit depuis pfd[0]",
+    "printf() pour afficher le résultat (seul stdin est redirigé, pas stdout)",
+]
+id = "fd-pipe-redir-01"
+kc_ids = ["KC-C16"]
+key_concept = "Pipeline: pipe()+fork()+dup2() pour connecter stdout d'un processus à stdin d'un autre"
+lang = "c"
+prerequisites = ["fd-redirect-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+int main(void) {
+    int pfd[2];
+    pipe(pfd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]);
+        dup2(pfd[1], STDOUT_FILENO);
+        close(pfd[1]);
+        printf("hello from child");
+        fflush(stdout);
+        _exit(0);
+    }
+    close(pfd[1]);
+    dup2(pfd[0], STDIN_FILENO);
+    close(pfd[0]);
+    char buf[64];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    wait(NULL);
+    printf("Parent got: %s\n", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pfd[2];
+    pipe(pfd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]);
+        ____(pfd[1], STDOUT_FILENO);
+        close(pfd[1]);
+        printf("hello from child");
+        fflush(stdout);
+        _exit(0);
+    }
+    close(pfd[____]);
+    ____(pfd[0], STDIN_FILENO);
+    close(pfd[0]);
+    char buf[64];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    wait(NULL);
+    printf("Parent got: %s\n", buf);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    int pfd[2];
+    pipe(pfd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]);
+        /* TODO: rediriger stdout de l'enfant vers pfd[1] avec dup2() */
+        close(pfd[1]);
+        printf("hello from child");
+        fflush(stdout);
+        _exit(0);
+    }
+    /* TODO: fermer pfd[1] (côté écriture) dans le parent */
+    close(0);  /* fermer stdin */
+    /* TODO: rediriger stdin du parent vers pfd[0] avec dup2() */
+    close(pfd[0]);
+    char buf[64];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    wait(NULL);
+    printf("Parent got: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pfd[2];
+    pipe(pfd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]);
+        ____(pfd[1], STDOUT_FILENO);
+        close(pfd[1]);
+        printf("hello from child");
+        fflush(stdout);
+        _exit(0);
+    }
+    close(pfd[____]);
+    ____(pfd[0], STDIN_FILENO);
+    close(pfd[0]);
+    char buf[64];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    wait(NULL);
+    printf("Parent got: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pfd[2]; pipe(pfd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]); ____(pfd[1], STDOUT_FILENO); close(pfd[1]);
+        printf("hello from child"); fflush(stdout); _exit(0);
+    }
+    close(pfd[____]); ____(pfd[0], STDIN_FILENO); close(pfd[0]);
+    char buf[64]; ssize_t n = read(STDIN_FILENO, buf, sizeof(buf)-1); buf[n]='\0';
+    wait(NULL); printf("Parent got: %s\n", buf);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    // Créez pipe, fork, enfant redirige stdout→pipe, parent lit stdin←pipe
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "pipe+dup2 pour pipeline"
+
+[validation]
+expected_output = """
+Parent got: hello from child
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "pipe() → pfd[0]/pfd[1]"
+
+[[visualizer.steps.edges]]
+label = "kernel buffer"
+source = "w"
+target = "r"
+
+[[visualizer.steps.nodes]]
+id = "w"
+label = """
+pfd[1]
+(write)"""
+
+[[visualizer.steps.nodes]]
+id = "r"
+label = """
+pfd[0]
+(read)"""
+
+[[visualizer.steps]]
+label = "enfant: dup2(pfd[1], STDOUT)"
+
+[[visualizer.steps.edges]]
+label = "dup2 redirect"
+source = "child"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = """
+enfant
+printf→stdout"""
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps]]
+label = "parent: read(STDIN) via pipe"
+
+[[visualizer.steps.edges]]
+label = "dup2 redirect"
+source = "pipe"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+parent
+read(stdin)"""

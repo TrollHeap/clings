@@ -1,0 +1,263 @@
+common_mistake = 'Ne pas gérer le \t dans le format — utiliser sscanf avec %63[^:]:\t pour sauter séparateurs'
+description = '''
+NSY103 — Le pseudo-filesystem /proc expose les infos de chaque processus. /proc/42/status est un fichier texte avec des paires 'clé:\tvaleur\n'.
+
+Parsez une chaîne simulant /proc/42/status et extrayez Name, Pid, State, VmRSS.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox.'''
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Utiliser fmemopen() pour créer un FILE* depuis la chaîne",
+    'fgets() ligne par ligne, sscanf(line, "%63[^:]:\t%63[^\n]", key, val)',
+    'strcmp(key, "Pid") pour identifier les champs voulus',
+]
+id = "proc-parse-01"
+kc_ids = ["KC-C07"]
+key_concept = '/proc est en lecture seule, format clé:\tvaleur, VmRSS en kB'
+lang = "c"
+prerequisites = ["process-state-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    FILE *f = fmemopen((void *)status, strlen(status), "r");
+    if (!f) return 1;
+    char line[128], key[64], val[64];
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:\t%63[^\n]", key, val) == 2) {
+            if (!strcmp(key, "Name") || !strcmp(key, "Pid") ||
+                !strcmp(key, "State") || !strcmp(key, "VmRSS")) {
+                printf("%s = %s\n", key, val);
+            }
+        }
+    }
+    fclose(f);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    FILE *f = fmemopen((void *)status, strlen(status), "r");
+    if (!f) return 1;
+    char line[128], key[64], val[64];
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:\t%63[^\n]", key, val) == 2) {
+            if (!strcmp(key, ____) || !strcmp(key, ____) ||
+                !strcmp(key, ____) || !strcmp(key, ____)) {
+                printf("%s = %s\n", key, val);
+            }
+        }
+    }
+    fclose(f);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Parser des headers HTTP (cle: valeur)
+ * Meme pattern : fmemopen + fgets + sscanf pour
+ * extraire des paires cle/valeur depuis du texte.
+ * ================================================= */
+void example_parse_headers(void) {
+    const char *headers =
+        "Host: example.com\n"
+        "Content-Type: text/html\n"
+        "Connection: keep-alive\n"
+        "Accept: */*\n";
+    FILE *f = fmemopen((void *)headers, strlen(headers), "r");
+    if (!f) return;
+    char line[128], key[64], val[64];
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]: %63[^\n]", key, val) == 2) {
+            if (!strcmp(key, "Host") || !strcmp(key, "Content-Type")) {
+                printf("%s -> %s\n", key, val);
+            }
+        }
+    }
+    fclose(f);
+}
+/* Resultat: Host -> example.com / Content-Type -> text/html */
+
+/* == VOTRE EXERCICE ================================
+ * Parser le format /proc/N/status (cle:\tvaleur)
+ * Inspirez-vous de example_parse_headers ci-dessus.
+ * Le separateur est :\t au lieu de ": ".
+ * Filtrez Name, Pid, State, VmRSS.
+ * ================================================= */
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    FILE *f = fmemopen((void *)status, strlen(status), "r");
+    if (!f) return 1;
+    char line[128], key[64], val[64];
+    /* TODO: fgets + sscanf pour extraire key/val */
+    /* TODO: filtrer Name, Pid, State, VmRSS */
+    /* TODO: printf("%s = %s\n", key, val) */
+    (void)line; (void)key; (void)val;
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    FILE *f = fmemopen((void *)status, strlen(status), "r");
+    if (!f) return 1;
+    char line[128], key[64], val[64];
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:\t%63[^\n]", key, val) == 2) {
+            if (!strcmp(key, "Name") || !strcmp(key, "Pid") ||
+                !strcmp(key, "State") || !strcmp(key, "VmRSS")) {
+                printf("%s = %s\n", ____, ____); // key et val
+            }
+        }
+    }
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    FILE *f = fmemopen((void *)status, strlen(status), "r");
+    if (!f) return 1;
+    char line[128], key[64], val[64];
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:\t%63[^\n]", key, val) == 2) {
+            if (!strcmp(key, ____) || !strcmp(key, ____) ||
+                !strcmp(key, ____) || !strcmp(key, ____)) {
+                printf("%s = %s\n", key, val);
+            }
+        }
+    }
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *status =
+        "Name:\tclings\n"
+        "Pid:\t42\n"
+        "PPid:\t1\n"
+        "State:\tS (sleeping)\n"
+        "VmRSS:\t4096 kB\n"
+        "Threads:\t3\n";
+    // fmemopen, fgets ligne par ligne
+    // sscanf pour extraire key et val (format "clé:\tval")
+    // Afficher Name, Pid, State, VmRSS uniquement
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Parser le format /proc/N/status"
+
+[validation]
+expected_output = """
+Name = clings
+Pid = 42
+State = S (sleeping)
+VmRSS = 4096 kB
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+heap = []
+label = "fmemopen depuis status string"
+
+[[visualizer.steps.arrows]]
+from = "f"
+label = "lit"
+to = "status"
+
+[[visualizer.steps.stack]]
+name = "status"
+value = '"Name:\tclings\n..."'
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (r)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = 'Parsing ligne "Name:\tclings"'
+
+[[visualizer.steps.stack]]
+name = "key"
+value = '"Name"'
+
+[[visualizer.steps.stack]]
+name = "val"
+value = '"clings"'
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = 'Parsing ligne "VmRSS:\t4096 kB"'
+
+[[visualizer.steps.stack]]
+name = "key"
+value = '"VmRSS"'
+
+[[visualizer.steps.stack]]
+name = "val"
+value = '"4096 kB"'

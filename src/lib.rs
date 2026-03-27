@@ -18,6 +18,7 @@ pub mod mastery;
 pub mod models;
 mod piscine;
 mod progress;
+mod reporting;
 pub mod runner;
 mod search;
 pub mod sync;

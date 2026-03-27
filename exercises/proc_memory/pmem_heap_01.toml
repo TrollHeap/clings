@@ -1,0 +1,219 @@
+common_mistake = "Oublier de mettre le pointeur à NULL après free — risque de use-after-free"
+description = """
+NSY103 — Le tas est la zone mémoire gérée par malloc/calloc/realloc/free. calloc initialise à zéro, malloc ne garantit rien. free() libère la mémoire mais ne remet pas le pointeur à NULL.
+
+Démontrez les différences entre malloc et calloc, et la bonne pratique de mise à NULL après free."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "malloc(size) alloue sans initialiser, calloc(n, size) initialise à zéro",
+    "Après free(), mettre le pointeur à NULL empêche les use-after-free",
+    "calloc prend deux arguments: nombre d'éléments et taille de chaque élément",
+]
+id = "pmem-heap-01"
+kc_ids = ["KC-C17"]
+key_concept = "malloc vs calloc: initialisation à zéro, et toujours NULL après free"
+lang = "c"
+prerequisites = ["pmem-layout-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main(void) {
+    int *a = malloc(5 * sizeof(int));
+    int *b = calloc(5, sizeof(int));
+    memset(a, 0, 5 * sizeof(int));
+    int all_zero_a = 1, all_zero_b = 1;
+    for (int i = 0; i < 5; i++) {
+        if (a[i] != 0) all_zero_a = 0;
+        if (b[i] != 0) all_zero_b = 0;
+    }
+    printf("malloc+memset zeros: %s\n", all_zero_a ? "yes" : "no");
+    printf("calloc zeros: %s\n", all_zero_b ? "yes" : "no");
+    free(a); a = NULL;
+    free(b); b = NULL;
+    printf("a after free: %s\n", a == NULL ? "NULL" : "dangling");
+    printf("b after free: %s\n", b == NULL ? "NULL" : "dangling");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    int *a = ____(5 * sizeof(int));
+    int *b = ____(5, sizeof(int));
+    memset(a, 0, 5 * sizeof(int));
+    int all_zero_a = 1, all_zero_b = 1;
+    for (int i = 0; i < 5; i++) {
+        if (a[i] != 0) all_zero_a = 0;
+        if (b[i] != 0) all_zero_b = 0;
+    }
+    printf("malloc+memset zeros: %s\n", all_zero_a ? "yes" : "no");
+    printf("calloc zeros: %s\n", all_zero_b ? "yes" : "no");
+    free(a); a = ____;
+    free(b); b = NULL;
+    printf("a after free: %s\n", a == NULL ? "NULL" : "dangling");
+    printf("b after free: %s\n", b == NULL ? "NULL" : "dangling");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE: realloc ================================= */
+void example_realloc(void) {
+    int *p = malloc(2 * sizeof(int));
+    p[0] = 10; p[1] = 20;
+    p = realloc(p, 4 * sizeof(int));
+    p[2] = 30; p[3] = 40;
+    printf("realloc: %d %d %d %d\n", p[0], p[1], p[2], p[3]);
+    free(p);
+}
+
+int main(void) {
+    int *a = malloc(5 * sizeof(int));
+    int *b = calloc(5, sizeof(int));
+    memset(a, 0, 5 * sizeof(int));
+    int all_zero_a = 1, all_zero_b = 1;
+    for (int i = 0; i < 5; i++) {
+        if (a[i] != 0) all_zero_a = 0;
+        if (b[i] != 0) all_zero_b = 0;
+    }
+    printf("malloc+memset zeros: %s\n", all_zero_a ? "yes" : "no");
+    printf("calloc zeros: %s\n", all_zero_b ? "yes" : "no");
+    free(a); a = NULL; free(b); b = NULL;
+    printf("a after free: %s\n", a == NULL ? "NULL" : "dangling");
+    printf("b after free: %s\n", b == NULL ? "NULL" : "dangling");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main(void) {
+    int *a = malloc(5 * sizeof(int));
+    int *b = calloc(5, sizeof(int));
+    memset(a, 0, 5 * sizeof(int));
+    int all_zero_a = 1, all_zero_b = 1;
+    for (int i = 0; i < 5; i++) {
+        if (a[i] != 0) all_zero_a = 0;
+        if (b[i] != 0) all_zero_b = 0;
+    }
+    printf("malloc+memset zeros: %s\n", all_zero_a ? "yes" : "no");
+    printf("calloc zeros: %s\n", all_zero_b ? "yes" : "no");
+    free(a); a = ____;
+    free(b); b = NULL;
+    printf("a after free: %s\n", a == NULL ? "NULL" : "dangling");
+    printf("b after free: %s\n", b == NULL ? "NULL" : "dangling");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main(void) {
+    int *a = ____(5 * sizeof(int));
+    int *b = ____(5, sizeof(int));
+    memset(a, 0, 5 * sizeof(int));
+    int all_zero_a = 1, all_zero_b = 1;
+    for (int i = 0; i < 5; i++) {
+        if (a[i] != 0) all_zero_a = 0;
+        if (b[i] != 0) all_zero_b = 0;
+    }
+    printf("malloc+memset zeros: %s\n", all_zero_a ? "yes" : "no");
+    printf("calloc zeros: %s\n", all_zero_b ? "yes" : "no");
+    free(a); a = ____;
+    free(b); b = NULL;
+    printf("a after free: %s\n", a == NULL ? "NULL" : "dangling");
+    printf("b after free: %s\n", b == NULL ? "NULL" : "dangling");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Comparez malloc et calloc, montrez la bonne pratique free+NULL
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Le tas (heap) et malloc/free"
+
+[validation]
+expected_output = """
+malloc+memset zeros: yes
+calloc zeros: yes
+a after free: NULL
+b after free: NULL
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "calloc met à zéro, malloc non"
+label = "malloc + calloc"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "a"
+to = "0x..a"
+
+[[visualizer.steps.arrows]]
+from = "b"
+to = "0x..b"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0x..a"
+content = "5*int (???)"
+
+[[visualizer.steps.heap]]
+address = "0x..b"
+content = "5*int (0,0,0,0,0)"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→ heap (non-init)"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→ heap (zéros)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Bonne pratique: free() puis = NULL"
+heap = []
+label = "free + NULL"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "NULL"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "NULL"

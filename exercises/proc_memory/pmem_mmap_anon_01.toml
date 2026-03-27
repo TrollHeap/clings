@@ -1,0 +1,225 @@
+common_mistake = "Oublier munmap — contrairement à malloc/free, la mémoire mmap n'est pas sur le tas"
+description = """
+NSY103 — mmap avec MAP_ANONYMOUS alloue de la mémoire sans fichier backing. C'est ce que malloc utilise pour les grandes allocations (>128KB typiquement). La mémoire est initialisée à zéro par le noyau.
+
+Allouez de la mémoire via mmap anonyme et vérifiez l'initialisation à zéro."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "mmap avec MAP_ANONYMOUS n'a pas besoin de fichier (-1 pour fd, 0 pour offset)",
+    "MAP_PRIVATE | MAP_ANONYMOUS = allocation privée sans fichier",
+    "munmap(ptr, size) libère la mémoire — équivalent de free pour mmap",
+]
+id = "pmem-mmap-anon-01"
+kc_ids = ["KC-C17"]
+key_concept = "mmap MAP_ANONYMOUS: allocation hors tas, zéro-initialisée, libérée par munmap"
+lang = "c"
+prerequisites = ["pmem-brk-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+int main(void) {
+    size_t size = 4096;
+    void *ptr = mmap(
+        NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1, 0);
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        return 1;
+    }
+    int *arr = (int *)ptr;
+    int all_zero = 1;
+    for (int i = 0; i < 10; i++) {
+        if (arr[i] != 0) all_zero = 0;
+    }
+    printf("Zero-initialized: %s\n", all_zero ? "yes" : "no");
+    arr[0] = 42; arr[1] = 99;
+    printf("arr[0]=%d arr[1]=%d\n", arr[0], arr[1]);
+    printf("size: %zu\n", size);
+    munmap(ptr, size);
+    printf("Unmapped OK\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+
+int main(void) {
+    size_t size = 4096;
+    void *ptr = ____(
+        NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | ____,
+        -1, 0);
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        return 1;
+    }
+    int *arr = (int *)ptr;
+    int all_zero = 1;
+    for (int i = 0; i < 10; i++) {
+        if (arr[i] != 0) all_zero = 0;
+    }
+    printf("Zero-initialized: %s\n", all_zero ? "yes" : "no");
+    arr[0] = 42; arr[1] = 99;
+    printf("arr[0]=%d arr[1]=%d\n", arr[0], arr[1]);
+    printf("size: %zu\n", size);
+    ____(ptr, size);
+    printf("Unmapped OK\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+
+/* == EXEMPLE: mmap + munmap basique =================== */
+void example_mmap(void) {
+    void *p = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (p != MAP_FAILED) {
+        printf("mmap OK at %p\n", p);
+        munmap(p, 4096);
+    }
+}
+
+int main(void) {
+    size_t size = 4096;
+    void *ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (ptr == MAP_FAILED) { perror("mmap"); return 1; }
+    int *arr = (int *)ptr;
+    int all_zero = 1;
+    for (int i = 0; i < 10; i++) { if (arr[i] != 0) all_zero = 0; }
+    printf("Zero-initialized: %s\n", all_zero ? "yes" : "no");
+    arr[0] = 42; arr[1] = 99;
+    printf("arr[0]=%d arr[1]=%d\n", arr[0], arr[1]);
+    printf("size: %zu\n", size);
+    munmap(ptr, size);
+    printf("Unmapped OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+int main(void) {
+    size_t size = 4096;
+    void *ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (ptr == MAP_FAILED) { perror("mmap"); return 1; }
+    int *arr = (int *)ptr;
+    int all_zero = 1;
+    for (int i = 0; i < 10; i++) { if (arr[i] != 0) all_zero = 0; }
+    printf("Zero-initialized: %s\n", all_zero ? "yes" : "no");
+    arr[0] = 42; arr[1] = 99;
+    printf("arr[0]=%d arr[1]=%d\n", arr[0], arr[1]);
+    printf("size: %zu\n", size);
+    ____(ptr, size);
+    printf("Unmapped OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+int main(void) {
+    size_t size = 4096;
+    void *ptr = ____(
+        NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | ____,
+        -1, 0);
+    if (ptr == MAP_FAILED) { perror("mmap"); return 1; }
+    int *arr = (int *)ptr;
+    int all_zero = 1;
+    for (int i = 0; i < 10; i++) { if (arr[i] != 0) all_zero = 0; }
+    printf("Zero-initialized: %s\n", all_zero ? "yes" : "no");
+    arr[0] = 42; arr[1] = 99;
+    printf("arr[0]=%d arr[1]=%d\n", arr[0], arr[1]);
+    printf("size: %zu\n", size);
+    ____(ptr, size);
+    printf("Unmapped OK\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+// Allouez 4096 octets via mmap anonyme, vérifiez les zéros, libérez
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "mmap anonyme: allocation hors tas"
+
+[validation]
+expected_output = """
+Zero-initialized: yes
+arr[0]=42 arr[1]=99
+size: 4096
+Unmapped OK
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "mmap anonyme: mémoire hors tas, init à 0"
+label = "mmap MAP_ANONYMOUS"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "ptr"
+to = "mmap zone"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mmap zone"
+content = "zéros (noyau)"
+
+[[visualizer.steps.stack]]
+name = "ptr"
+value = "→ zone mmap 4096 octets"
+
+[[visualizer.steps.stack]]
+name = "size"
+value = "4096"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Écriture OK, puis munmap libère"
+label = "Écriture + munmap"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mmap zone"
+content = "42, 99, 0, ..."
+
+[[visualizer.steps.stack]]
+name = "arr[0]"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "arr[1]"
+value = "99"

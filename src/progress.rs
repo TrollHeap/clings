@@ -93,6 +93,56 @@ fn migrate_v1(conn: &Connection) -> Result<()> {
         conn.execute_batch(SCHEMA_V1)?;
         conn.pragma_update(None, "user_version", DB_USER_VERSION_CURRENT)?;
     }
+
+    // Additive migration v2: add optional reporting columns to practice_log.
+    // Safe expand: check existence first, only add if missing.
+    add_practice_log_columns_if_missing(conn)?;
+
+    Ok(())
+}
+
+/// Add practice_log columns for reporting if they don't exist yet.
+/// Columns: error_type TEXT, duration_ms INTEGER, hint_count_used INTEGER DEFAULT 0
+fn add_practice_log_columns_if_missing(conn: &Connection) -> Result<()> {
+    // Check if error_type column exists.
+    let has_error_type: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'error_type'",
+        [],
+        |row| row.get::<_, i64>(0).map(|c| c > 0),
+    )?;
+
+    if !has_error_type {
+        conn.execute("ALTER TABLE practice_log ADD COLUMN error_type TEXT", [])?;
+    }
+
+    // Check if duration_ms column exists.
+    let has_duration_ms: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'duration_ms'",
+        [],
+        |row| row.get::<_, i64>(0).map(|c| c > 0),
+    )?;
+
+    if !has_duration_ms {
+        conn.execute(
+            "ALTER TABLE practice_log ADD COLUMN duration_ms INTEGER",
+            [],
+        )?;
+    }
+
+    // Check if hint_count_used column exists.
+    let has_hint_count: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'hint_count_used'",
+        [],
+        |row| row.get::<_, i64>(0).map(|c| c > 0),
+    )?;
+
+    if !has_hint_count {
+        conn.execute(
+            "ALTER TABLE practice_log ADD COLUMN hint_count_used INTEGER DEFAULT 0",
+            [],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -161,6 +211,14 @@ pub fn get_all_subjects(conn: &Connection) -> Result<Vec<Subject>> {
     Ok(subjects)
 }
 
+/// Metadata for a practice log entry.
+#[derive(Default)]
+struct PracticeLogMeta {
+    error_type: Option<String>,
+    duration_ms: Option<u64>,
+    hint_count_used: u32,
+}
+
 /// Insert a practice log entry into the database.
 fn insert_practice_log(
     tx: &rusqlite::Transaction,
@@ -169,11 +227,21 @@ fn insert_practice_log(
     exercise_id: &str,
     success: bool,
     practiced_at: i64,
+    meta: &PracticeLogMeta,
 ) -> Result<()> {
     tx.execute(
-        "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![log_id, subject, exercise_id, success as i32, practiced_at],
+        "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at, error_type, duration_ms, hint_count_used)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            log_id,
+            subject,
+            exercise_id,
+            success as i32,
+            practiced_at,
+            &meta.error_type,
+            meta.duration_ms.map(|d| d as i64),
+            meta.hint_count_used as i32
+        ],
     )?;
     Ok(())
 }
@@ -245,7 +313,15 @@ pub fn record_attempt(
         params![subject],
     )?;
 
-    insert_practice_log(&tx, &log_id, subject, exercise_id, success, now)?;
+    insert_practice_log(
+        &tx,
+        &log_id,
+        subject,
+        exercise_id,
+        success,
+        now,
+        &PracticeLogMeta::default(),
+    )?;
 
     apply_mastery_update(&tx, subject, success, now)?;
     let sub = get_subject(&tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
@@ -384,6 +460,7 @@ fn open_test_db() -> Result<Connection> {
     let conn = Connection::open_in_memory()?;
     conn.execute_batch(SCHEMA)?;
     conn.execute_batch(SCHEMA_V1)?;
+    add_practice_log_columns_if_missing(&conn)?;
     Ok(conn)
 }
 
@@ -1014,7 +1091,7 @@ mod tests {
         ensure_subject(&conn, "pointers")?;
         let now = Utc::now().timestamp();
         conn.execute(
-            "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES ('t1', 'pointers', 'ex1', 1, ?1)",
+            "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at, error_type, duration_ms, hint_count_used) VALUES ('t1', 'pointers', 'ex1', 1, ?1, NULL, NULL, 0)",
             params![now],
         )?;
         assert_eq!(get_streak(&conn)?, 1);
@@ -1029,7 +1106,7 @@ mod tests {
         for (i, id) in ["c1", "c2", "c3"].iter().enumerate() {
             let ts = now - (i as i64) * SECS_PER_DAY;
             conn.execute(
-                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
+                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at, error_type, duration_ms, hint_count_used) VALUES (?1, 'pointers', 'ex1', 1, ?2, NULL, NULL, 0)",
                 params![id, ts],
             )?;
         }
@@ -1045,7 +1122,7 @@ mod tests {
         // Aujourd'hui et il y a 3 jours (pas hier) → streak = 1
         for (id, offset) in [("b1", 0i64), ("b2", 3)] {
             conn.execute(
-                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at) VALUES (?1, 'pointers', 'ex1', 1, ?2)",
+                "INSERT INTO practice_log (id, subject, exercise_id, success, practiced_at, error_type, duration_ms, hint_count_used) VALUES (?1, 'pointers', 'ex1', 1, ?2, NULL, NULL, 0)",
                 params![id, now - offset * SECS_PER_DAY],
             )?;
         }

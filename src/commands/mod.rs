@@ -3,6 +3,7 @@
 mod data;
 mod info;
 mod progress_cmds;
+mod report;
 mod run;
 mod watch;
 
@@ -12,5 +13,6 @@ pub use data::{
 };
 pub use info::{cmd_annales, cmd_hint, cmd_list, cmd_search, cmd_solution};
 pub use progress_cmds::{cmd_progress, cmd_stats};
+pub use report::cmd_report;
 pub use run::{cmd_review, cmd_run};
 pub use watch::cmd_watch;

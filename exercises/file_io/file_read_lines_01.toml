@@ -1,0 +1,247 @@
+common_mistake = 'Oublier que fgets ajoute \0 mais garde \n — comparaisons de chaînes échouent'
+description = '''
+NSY103 — fgets(buf, size, f) lit une ligne depuis un FILE* (s'arrête à \n ou EOF). Idéal pour parser des fichiers ligne par ligne.
+
+Parsez un fichier /etc/passwd simulé (via fmemopen), extrayez login et UID.'''
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "while (fgets(line, sizeof(line), f)) { /* traite line */ }",
+    'Retire le \n : line[strcspn(line, "\n")] = 0;',
+    'Parser avec sscanf(line, "%63[^:]:%*[^:]:%d", login, &uid);',
+]
+id = "file-read-lines-01"
+kc_ids = ["KC-C06"]
+key_concept = 'fgets inclut le \n dans buf — souvent on le retire avec buf[strcspn(buf,"\n")]=0'
+lang = "c"
+prerequisites = ["file-write-mem-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return 1;
+    char line[256], login[64];
+    int uid;
+    printf("login,uid\n");
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:%*[^:]:%d", login, &uid) == 2)
+            printf("%s,%d\n", login, uid);
+    }
+    fclose(f);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return 1;
+    char line[256], login[64];
+    int uid;
+    printf("login,uid\n");
+    while (fgets(____, ____, f)) {
+        line[strcspn(line, "\n")] = ____;
+        if (sscanf(line, "%63[^:]:%*[^:]:%d", login, &uid) == 2)
+            printf("%s,%d\n", ____, ____);
+    }
+    fclose(f);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Lire un fichier de config key=value avec fgets + sscanf
+ * fgets lit jusqu'a \n, strcspn retire le saut de ligne
+ * =========================================================== */
+void example_parse_config(void) {
+    const char *cfg =
+        "host=localhost\n"
+        "port=8080\n"
+        "debug=true\n";
+    FILE *cf = fmemopen((void *)cfg, strlen(cfg), "r");
+    if (!cf) return;
+    char cline[256], key[64], val[64];
+    while (fgets(cline, sizeof(cline), cf)) {
+        cline[strcspn(cline, "\n")] = 0;
+        if (sscanf(cline, "%63[^=]=%63s", key, val) == 2)
+            printf("%s -> %s\n", key, val);
+    }
+    fclose(cf);
+}
+/* Resultat: host -> localhost, port -> 8080, debug -> true */
+
+/* == VOTRE EXERCICE =========================================
+ * Lire et parser /etc/passwd (simule) avec fgets + sscanf
+ * Inspirez-vous de example_parse_config ci-dessus.
+ * Extraire login (champ 1) et uid (champ 3) separes par ':'.
+ * =========================================================== */
+
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return 1;
+    char line[256], login[64];
+    int uid;
+    printf("login,uid\n");
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        /* TODO: sscanf(line, "%63[^:]:%*[^:]:%d", login, &uid) == 2 */
+        (void)login;
+        (void)uid;
+    }
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return 1;
+    char line[256], login[64];
+    int uid;
+    printf("login,uid\n");
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%63[^:]:%*[^:]:%d", ____, ____) == 2) // login et &uid
+            printf("%s,%d\n", login, uid);
+    }
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    FILE *f = fmemopen((void *)data, strlen(data), "r");
+    if (!f) return 1;
+    char line[256], login[64];
+    int uid;
+    printf("login,uid\n");
+    while (fgets(____, ____, f)) {
+        line[strcspn(line, "\n")] = ____;
+        if (sscanf(line, "%63[^:]:%*[^:]:%d", login, &uid) == 2)
+            printf("%s,%d\n", ____, ____);
+    }
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *data =
+        "root:x:0:0:root:/root:/bin/bash\n"
+        "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+        "alice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+    // fmemopen pour créer FILE* en lecture
+    // fgets ligne par ligne, retirer \n
+    // sscanf pour extraire login (champ 1) et uid (champ 3)
+    // Afficher "login,uid\n" puis chaque paire
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Lire et parser des lignes avec fgets"
+
+[validation]
+expected_output = """
+login,uid
+root,0
+daemon,1
+alice,1000
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+heap = []
+label = "fmemopen depuis data string"
+
+[[visualizer.steps.arrows]]
+from = "f"
+label = "lit"
+to = "data"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = '"root:x:0:0..."'
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (r)"
+
+[[visualizer.steps.stack]]
+name = "line[256]"
+value = "(vide)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "fgets lit ligne 1"
+
+[[visualizer.steps.stack]]
+name = "line"
+value = '"root:x:0:0:root:/root:/bin/bash"'
+
+[[visualizer.steps.stack]]
+name = "login"
+value = '"root"'
+
+[[visualizer.steps.stack]]
+name = "uid"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "fgets lit ligne 3"
+
+[[visualizer.steps.stack]]
+name = "line"
+value = '"alice:x:1000:1000:Alice:..."'
+
+[[visualizer.steps.stack]]
+name = "login"
+value = '"alice"'
+
+[[visualizer.steps.stack]]
+name = "uid"
+value = "1000"

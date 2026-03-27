@@ -1,0 +1,229 @@
+common_mistake = "Penser que counter++ est atomique : en réalité c'est lire-modifier-écrire, trois opérations séparables par le scheduler"
+description = """
+UTC502/NSY103 — Sans mutex, plusieurs threads qui modifient la même variable produisent des résultats imprévisibles. C'est une race condition : le résultat dépend de l'ordre d'exécution des threads.
+
+Créez 3 threads. Chaque thread incrémente le compteur global 3 fois, SANS mutex. Observez que le résultat final peut être inférieur à 9 car les threads s'écrasent mutuellement.
+
+Pattern à utiliser dans increment() :
+  int tmp = counter;   /* lecture — thread peut être préempté ici */
+  counter = tmp + 1;   /* écriture — la valeur lue est peut-être obsolète */"""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "pthread_create(&t[i], NULL, increment, NULL) crée un thread sans argument",
+    "pthread_join(t[i], NULL) attend la fin d'un thread",
+    "Le résultat n'est PAS forcément 9 — c'est le comportement attendu d'une race condition",
+    "La race se produit quand deux threads lisent counter=2, incrémentent à 3, et écrivent tous les deux 3 (perte d'un incrément)",
+]
+id = "pthread-race-01"
+kc_ids = ["KC-C09"]
+key_concept = "Sans mutex, les threads écrasent mutuellement leurs incréments — la valeur finale est imprévisible et inférieure ou égale à 9"
+lang = "c"
+prerequisites = ["pthread-args-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 3; i++) {
+        int tmp = counter;
+        counter = tmp + 1;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    for (int i = 0; i < 3; i++)
+        pthread_create(&t[i], NULL, increment, NULL);
+    for (int i = 0; i < 3; i++)
+        pthread_join(t[i], NULL);
+    printf("Counter: %d\n", counter);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+/* Chaque thread incrémente counter 3 fois SANS protection */
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 3; i++) {
+        int tmp = counter;  /* lecture non atomique */
+        counter = tmp + 1;  /* écriture non atomique — race condition ! */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    /* TODO: créer 3 threads appelant increment */
+
+    /* TODO: attendre les 3 threads */
+
+    printf("Counter: %d\n", counter);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Thread qui lit et écrit une variable partagée sans mutex
+ * ========================================================= */
+int balance = 100;
+void *example_withdraw(void *arg) {
+    (void)arg;
+    int tmp = balance;  /* 1. lecture */
+    /* scheduler peut interrompre ici ! */
+    balance = tmp - 10; /* 2. écriture avec valeur potentiellement obsolète */
+    return NULL;
+}
+/* Résultat : deux retraits simultanés peuvent n'en compter qu'un */
+
+/* == VOTRE EXERCICE ========================================
+ * 3 threads incrémentent counter 3 fois sans mutex
+ * ========================================================= */
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 3; i++) {
+        int tmp = counter;  /* lecture */
+        counter = tmp + 1;  /* écriture — race condition */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    /* TODO: créer 3 threads */
+
+    /* TODO: attendre les 3 threads */
+
+    printf("Counter: %d\n", counter);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 3; i++) {
+        int tmp = counter;
+        counter = tmp + 1;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    for (int i = 0; i < 3; i++)
+        pthread_create(&t[i], NULL, increment, NULL);
+    for (int i = 0; i < 3; i++)
+        ____(____);
+    printf("Counter: %d\n", counter);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 3; i++) {
+        int tmp = counter;
+        counter = tmp + 1;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t[3];
+    for (int i = 0; i < 3; i++)
+        ____(____);  /* pthread_create */
+    for (int i = 0; i < 3; i++)
+        ____(____);  /* pthread_join */
+    printf("Counter: %d\n", counter);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// 3 threads sans mutex, chacun lit-modifie-écrit counter 3 fois
+// Résultat peut être < 9 (race condition)
+// Sortie: Counter: N
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Race condition : compteur non protégé"
+
+[validation]
+expected_output = "REGEX:^Counter: [0-9]+$"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "T0 et T1 lisent counter=0 en même temps — chacun va écrire 1"
+heap = []
+label = "T0 lit counter=0, T1 lit counter=0 avant que T0 écrive"
+step_label = "1. Race condition"
+
+[[visualizer.steps.call_frames]]
+args = "T0 + T1 simultanés"
+function_name = "increment"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "T0.tmp"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "T1.tmp"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux threads ont écrit tmp+1=1 : seul un incrément est effectif"
+heap = []
+label = "T0 écrit 1, T1 écrit aussi 1 — un incrément perdu"
+step_label = "2. Perte d'incrément"
+
+[[visualizer.steps.call_frames]]
+args = "après les deux écritures"
+function_name = "increment"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "1 (attendu: 2)"

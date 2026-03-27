@@ -1,0 +1,460 @@
+common_mistake = "Confondre int *fn(int) (fonction retournant int*) avec int (*fn)(int) (pointeur de fonction)"
+description = """
+NSY103 — Un pointeur de fonction stocke l'adresse d'une fonction. Sa syntaxe est `type_retour (*nom)(params)`. On peut passer une fonction en argument d'une autre pour créer des callbacks.
+
+Implémentez une fonction `apply` qui applique une fonction callback à chaque élément d'un tableau."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Syntaxe pointeur de fonction : `int (*fn)(int)` — fn est un pointeur vers une fonction prenant int et retournant int",
+    "Appeler via pointeur : `fn(arr[i])` — pas besoin de `*` pour appeler",
+    "Passer le nom de la fonction directement : `apply(a, 4, doubler)` — le nom se convertit automatiquement en pointeur",
+]
+id = "ptr-arith-03"
+kc_ids = ["KC-C01"]
+key_concept = "int (*fn)(int) déclare un pointeur vers une fonction — callback pattern"
+lang = "c"
+prerequisites = ["ptr-arith-02"]
+solution_code = '''
+#include <stdio.h>
+
+int double_val(int x) { return x * 2; }
+int square_val(int x) { return x * x; }
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    for (int i = 0; i < n; i++) {
+        arr[i] = fn(arr[i]);
+    }
+}
+
+static int negate(int x) { return -x; }
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        apply(arr, 3, double_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {2, 3, 4};
+        apply(arr, 3, square_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {-5, 0, 10};
+        apply(arr, 3, negate);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {7};
+        apply(arr, 1, double_val);
+        printf("%d\n", (int)(arr[0]));
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+int double_val(int x) { return x * 2; }
+int square_val(int x) { return x * x; }
+static int negate(int x) { return -x; }
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    for (int i = 0; i < n; i++) {
+        arr[i] = ____;
+    }
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        apply(arr, 3, ____);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {2, 3, 4};
+        apply(arr, 3, square_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {-5, 0, 10};
+        apply(arr, 3, ____);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {7};
+        apply(arr, 1, double_val);
+        printf("%d\n", (int)(arr[0]));
+    }
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Pointeur de fonction pour choisir une operation
+ * int (*op)(int, int) pointe vers une fonction a 2 args.
+ * =========================================================== */
+int example_add(int a, int b) { return a + b; }
+int example_mul(int a, int b) { return a * b; }
+
+int example_compute(int a, int b, int (*op)(int, int)) {
+    return op(a, b);
+}
+void example_demo(void) {
+    printf("add(3,4) = %d\n", example_compute(3, 4, example_add));
+    printf("mul(3,4) = %d\n", example_compute(3, 4, example_mul));
+}
+/* Resultat: add(3,4) = 7 / mul(3,4) = 12 */
+
+/* == VOTRE EXERCICE =========================================
+ * Appliquer un callback a chaque element d'un tableau
+ * Inspirez-vous de example_compute ci-dessus.
+ * Implementez apply(arr, n, fn) qui fait arr[i] = fn(arr[i]).
+ * =========================================================== */
+int doubler(int x) { return x * 2; }
+int carre(int x) { return x * x; }
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    (void)arr; (void)n; (void)fn; /* TODO */
+}
+
+void print_arr(const int *arr, int n) {
+    for (int i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\n");
+}
+
+int main(void) {
+    int a[] = {1, 2, 3, 4};
+    apply(a, 4, doubler);
+    printf("Doubles : ");
+    print_arr(a, 4);
+    int b[] = {1, 2, 3, 4};
+    apply(b, 4, carre);
+    printf("Carres : ");
+    print_arr(b, 4);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int doubler(int x) { return x * 2; }
+int carre(int x) { return x * x; }
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    for (int i = 0; i < n; i++) {
+        arr[i] = ____; // appeler fn sur arr[i]
+    }
+}
+
+void print_arr(const int *arr, int n) {
+    for (int i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\n");
+}
+
+int main(void) {
+    int a[] = {1, 2, 3, 4};
+    apply(a, 4, ____);
+    printf("Doubles : ");
+    print_arr(a, 4);
+    int b[] = {1, 2, 3, 4};
+    apply(b, 4, ____);
+    printf("Carres : ");
+    print_arr(b, 4);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int double_val(int x) { return x * 2; }
+int square_val(int x) { return x * x; }
+static int negate(int x) { return -x; }
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    for (int i = 0; i < n; i++) {
+        arr[i] = ____;
+    }
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        apply(arr, 3, ____);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {2, 3, 4};
+        apply(arr, 3, square_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {-5, 0, 10};
+        apply(arr, 3, ____);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {7};
+        apply(arr, 1, double_val);
+        printf("%d\n", (int)(arr[0]));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int double_val(int x) {
+    /* TODO */
+    return 0;
+}
+int square_val(int x) {
+    /* TODO */
+    return 0;
+}
+
+void apply(int *arr, int n, int (*fn)(int)) {
+    /* TODO */
+}
+
+static int negate(int x) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        apply(arr, 3, double_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {2, 3, 4};
+        apply(arr, 3, square_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {-5, 0, 10};
+        apply(arr, 3, negate);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {7};
+        apply(arr, 1, double_val);
+        printf("%d\n", (int)(arr[0]));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int double_val(int x) { return 0; }
+int square_val(int x) { return 0; }
+
+void apply(int *arr, int n, int (*fn)(int)) { }
+
+static int negate(int x) { return 0; }
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        apply(arr, 3, double_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {2, 3, 4};
+        apply(arr, 3, square_val);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {-5, 0, 10};
+        apply(arr, 3, negate);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+    }
+    {
+        int arr[] = {7};
+        apply(arr, 1, double_val);
+        printf("%d\n", (int)(arr[0]));
+    }
+    return 0;
+}
+''',
+]
+subject = "pointers"
+title = "Pointeur vers fonction callback"
+
+[validation]
+mode = "test"
+test_code = """
+void test_apply_double(void) {
+    int arr[] = {1, 2, 3};
+    apply(arr, 3, double_val);
+    TEST_ASSERT_EQUAL_INT(2, arr[0]);
+    TEST_ASSERT_EQUAL_INT(4, arr[1]);
+    TEST_ASSERT_EQUAL_INT(6, arr[2]);
+}
+
+void test_apply_square(void) {
+    int arr[] = {2, 3, 4};
+    apply(arr, 3, square_val);
+    TEST_ASSERT_EQUAL_INT(4, arr[0]);
+    TEST_ASSERT_EQUAL_INT(9, arr[1]);
+    TEST_ASSERT_EQUAL_INT(16, arr[2]);
+}
+
+void test_apply_negate(void) {
+    int arr[] = {-5, 0, 10};
+    apply(arr, 3, negate);
+    TEST_ASSERT_EQUAL_INT(5, arr[0]);
+    TEST_ASSERT_EQUAL_INT(0, arr[1]);
+    TEST_ASSERT_EQUAL_INT(-10, arr[2]);
+}
+
+void test_apply_single(void) {
+    int arr[] = {7};
+    apply(arr, 1, double_val);
+    TEST_ASSERT_EQUAL_INT(14, arr[0]);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_apply_double);
+    RUN_TEST(test_apply_square);
+    RUN_TEST(test_apply_negate);
+    RUN_TEST(test_apply_single);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "fn est un pointeur de fonction qui pointe vers doubler. Le nom 'doubler' se convertit implicitement en adresse. fn(arr[i]) appelle doubler(arr[i])."
+heap = []
+label = "Appel apply(a, 4, doubler)"
+step_label = "fn = doubler — pointeur de fonction"
+
+[[visualizer.steps.arrows]]
+from = "fn"
+label = "callback"
+to = "doubler"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "a, 4, doubler"
+function_name = "apply"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "a[0]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "a[1]"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "a[2]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "a[3]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "fn"
+value = "→doubler"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque élément a été remplacé par fn(a[i]) = doubler(a[i]) = a[i]*2. Le même pattern sera utilisé avec carre pour b[]."
+heap = []
+label = "Après apply(a, doubler) — éléments doublés"
+step_label = "Résultat — a[] doublé"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "a[0]"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "a[1]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "a[2]"
+value = "6"
+
+[[visualizer.steps.stack]]
+name = "a[3]"
+value = "8"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Même fonction apply, callback différent. Le pointeur de fonction permet le polymorphisme en C — un seul code pour des comportements variés."
+heap = []
+label = "Après apply(b, carre) — éléments au carré"
+step_label = "Résultat — b[] au carré"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "b[0]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "b[1]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "b[2]"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "b[3]"
+value = "16"

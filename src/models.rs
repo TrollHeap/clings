@@ -557,6 +557,47 @@ mod tests {
     }
 
     #[test]
+    fn test_mastery_score_clamped_below_floor() {
+        assert_eq!(MasteryScore::clamped(-1.0).get(), 0.0);
+        assert_eq!(MasteryScore::clamped(f64::NEG_INFINITY).get(), 0.0);
+    }
+
+    #[test]
+    fn test_mastery_score_clamped_above_cap() {
+        assert_eq!(MasteryScore::clamped(6.0).get(), 5.0);
+        assert_eq!(MasteryScore::clamped(f64::INFINITY).get(), 5.0);
+    }
+
+    #[test]
+    fn test_mastery_score_clamped_at_bounds() {
+        assert_eq!(MasteryScore::clamped(0.0).get(), 0.0);
+        assert_eq!(MasteryScore::clamped(5.0).get(), 5.0);
+    }
+
+    #[test]
+    fn test_mastery_score_clamped_nominal() {
+        let s = MasteryScore::clamped(3.5);
+        assert!((s.get() - 3.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_srs_interval_days_clamped_below_min() {
+        assert_eq!(SrsIntervalDays::clamped(0).get(), 1);
+        assert_eq!(SrsIntervalDays::clamped(-99).get(), 1);
+    }
+
+    #[test]
+    fn test_srs_interval_days_clamped_at_min() {
+        assert_eq!(SrsIntervalDays::clamped(1).get(), 1);
+    }
+
+    #[test]
+    fn test_srs_interval_days_clamped_nominal() {
+        assert_eq!(SrsIntervalDays::clamped(14).get(), 14);
+        assert_eq!(SrsIntervalDays::clamped(60).get(), 60);
+    }
+
+    #[test]
     fn test_subject_new_defaults() {
         let subject = Subject::new("test_subject".to_owned());
         assert_eq!(subject.name, "test_subject");

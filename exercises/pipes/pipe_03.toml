@@ -1,0 +1,301 @@
+common_mistake = "Oublier de fermer p[1] après dup2 → le pipe reste ouvert du côté écriture, read bloque"
+description = """
+NSY103 — dup2(oldfd, newfd) duplique oldfd sur newfd, fermant newfd si ouvert. dup2(p[1], STDOUT_FILENO) redirige stdout vers le pipe.
+
+Redirigez stdout vers un pipe, printf du texte, restaurez stdout, lisez depuis le pipe."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "dup(fd) crée une copie du descripteur sur le plus petit fd disponible",
+    "dup2(oldfd, newfd) duplique oldfd sur newfd exactement (ferme newfd d'abord si ouvert)",
+    "Fermer p[1] après dup2 est crucial : sinon le pipe reste ouvert côté écriture et read bloque",
+    "fflush(stdout) est nécessaire avant de restaurer stdout pour vider le buffer C",
+]
+id = "pipe-03"
+kc_ids = ["KC-C10"]
+key_concept = "dup2(p[1], 1) redirige stdout→pipe ; sauvegarder stdout_fd=dup(1) pour restaurer"
+lang = "c"
+prerequisites = ["pipe-02"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p[2];
+    pipe(p);
+    int saved_stdout = dup(STDOUT_FILENO);
+    dup2(p[1], STDOUT_FILENO);
+    close(p[1]);
+    printf("hello stdout");
+    fflush(stdout);
+    dup2(saved_stdout, STDOUT_FILENO);
+    close(saved_stdout);
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    printf("Captured: %s\n", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p[2];
+    pipe(p);
+    int saved_stdout = ____(STDOUT_FILENO);  // sauvegarder stdout
+    ____(p[1], STDOUT_FILENO);               // redirecter stdout → pipe
+    close(p[1]);
+    printf("hello stdout");
+    fflush(stdout);
+    ____(saved_stdout, STDOUT_FILENO);       // restaurer stdout
+    close(saved_stdout);
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    printf("Captured: %s\n", buf);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Rediriger stderr vers un pipe avec dup2
+ * dup(fd) sauvegarde, dup2(src, dst) redirige.
+ * Meme pattern que stdout mais avec STDERR_FILENO.
+ * ================================================= */
+void example_capture_stderr(void) {
+    int p[2];
+    pipe(p);
+    int saved_stderr = dup(STDERR_FILENO);
+    dup2(p[1], STDERR_FILENO);
+    close(p[1]);
+    fprintf(stderr, "error msg");
+    fflush(stderr);
+    dup2(saved_stderr, STDERR_FILENO);
+    close(saved_stderr);
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    fprintf(stderr, "Caught: %s\n", buf);
+}
+/* Resultat: Caught: error msg (sur stderr) */
+
+/* == VOTRE EXERCICE ================================
+ * Rediriger stdout vers un pipe avec dup2
+ * Inspirez-vous de example_capture_stderr ci-dessus.
+ * Sauvegardez stdout, redirigez vers pipe, printf,
+ * restaurez, lisez le pipe.
+ * ================================================= */
+int main(void) {
+    int p[2];
+    pipe(p);
+    /* TODO: int saved_stdout = dup(STDOUT_FILENO); */
+    /* TODO: dup2(p[1], STDOUT_FILENO); */
+    close(p[1]);
+    printf("hello stdout");
+    fflush(stdout);
+    /* TODO: dup2(saved_stdout, STDOUT_FILENO); */
+    /* TODO: close(saved_stdout); */
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    printf("Captured: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p[2];
+    pipe(p);
+    int saved_stdout = dup(STDOUT_FILENO);
+    dup2(p[1], STDOUT_FILENO);
+    close(p[1]);
+    printf("hello stdout");
+    fflush(stdout);
+    ____(saved_stdout, STDOUT_FILENO);  // restaurer stdout
+    close(saved_stdout);
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    printf("Captured: %s\n", buf);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p[2];
+    pipe(p);
+    int saved_stdout = ____(STDOUT_FILENO);  // sauvegarder stdout
+    ____(p[1], STDOUT_FILENO);               // redirecter stdout → pipe
+    close(p[1]);
+    printf("hello stdout");
+    fflush(stdout);
+    ____(saved_stdout, STDOUT_FILENO);       // restaurer stdout
+    close(saved_stdout);
+    char buf[64];
+    ssize_t n = read(p[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    close(p[0]);
+    printf("Captured: %s\n", buf);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p[2];
+    // Créez un pipe, sauvegardez stdout avec dup()
+    // Redirigez stdout vers p[1] avec dup2(), fermez p[1]
+    // printf "hello stdout", fflush, restaurez stdout, fermez la sauvegarde
+    // Lisez p[0] dans buf, affichez "Captured: hello stdout"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "dup2 : rediriger stdout vers un pipe"
+
+[mission]
+clientId = "nordcloud"
+clientName = "NordCloud"
+contactEmail = "arch@nordcloud.sys"
+failureEmail = """
+La capture n'a pas fonctionné. N'oublie pas de fermer p[1] après dup2 et de fflush avant de restaurer stdout.
+
+Arch @ NordCloud"""
+incidentEmail = """
+Architecte,
+
+Nous devons capturer la sortie stdout d'une sous-routine pour la logger sans modifier son code. La technique est dup2() pour rediriger fd 1 vers un pipe.
+
+Implémente : sauvegarde stdout, dup2 vers pipe, printf, restaure stdout, lis le pipe.
+
+Arch @ NordCloud"""
+payout = 280
+prereqMissionIds = ["pipe-02"]
+receivedTime = "10:15"
+subject = "Capture stdout via dup2 — redirection fd niveau système"
+successEmail = """
+Parfait. La capture stdout via dup2 fonctionne sans modifier le code source de la routine.
+
+NordCloud Architecture"""
+syscallsInvolved = [
+    "pipe",
+    "dup",
+    "dup2",
+    "fflush",
+    "close",
+]
+tier = 3
+
+[validation]
+expected_output = """
+Captured: hello stdout
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "dup(STDOUT_FILENO) crée une copie de fd 1 sur le plus petit fd disponible. Cette sauvegarde est indispensable pour pouvoir restaurer stdout après la redirection — sans elle, on perdrait définitivement l'accès au terminal."
+label = "dup(STDOUT_FILENO) — sauvegarder fd 1"
+step_label = "Étape 1 — dup() sauvegarde stdout avant redirection"
+
+[[visualizer.steps.edges]]
+label = "dup()"
+source = "stdout"
+target = "saved"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = """
+stdout
+(fd 1)"""
+
+[[visualizer.steps.nodes]]
+id = "saved"
+label = """
+saved_stdout
+(fd N)"""
+
+[[visualizer.steps]]
+explanation = "dup2(p[1], STDOUT_FILENO) remplace fd 1 par p[1] — tout appel à printf() passe désormais par le pipe sans que le code source de la routine ne soit modifié. C'est la base de la capture de sortie dans les shells et outils de test."
+label = "dup2(p[1], 1) — stdout→pipe"
+step_label = "Étape 2 — dup2() redirige stdout vers le pipe"
+
+[[visualizer.steps.edges]]
+label = "stdout→p[1]"
+source = "printf"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "printf"
+label = "printf()"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps]]
+explanation = "dup2(saved_stdout, STDOUT_FILENO) rétablit fd 1 vers le terminal. Il faut impérativement appeler fflush(stdout) avant cette restauration pour vider le buffer C de la libc — sinon les données encore en buffer seraient perdues ou envoyées au mauvais fd."
+label = "dup2(saved, 1) — restaurer stdout"
+step_label = "Étape 3 — dup2() restaure stdout vers le terminal"
+
+[[visualizer.steps.edges]]
+label = "dup2()"
+source = "saved"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "saved"
+label = "saved_stdout"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = """
+stdout
+(fd 1)"""
+
+[[visualizer.steps]]
+explanation = """read(p[0]) extrait ce qui a été capturé dans le pipe (la sortie de printf redirigé). Stdout étant restauré au préalable, le printf suivant affiche "Captured: ..." directement sur le terminal — c'est le résultat de toute la séquence de capture."""
+label = "read(p[0]) — capturer"
+step_label = "Étape 4 — read() récupère la sortie capturée"
+
+[[visualizer.steps.edges]]
+label = "n bytes"
+source = "pipe"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "buf[]"

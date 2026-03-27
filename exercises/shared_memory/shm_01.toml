@@ -1,0 +1,234 @@
+common_mistake = "Oublier free() → fuite mémoire ; en vrai IPC oublier shmctl(IPC_RMID) → segment persiste dans le kernel"
+description = """
+NSY103 — En IPC réel, shm_open()+mmap() ou shmget()+shmat() mappent une région partagée entre processus. Sans WASM, on simule avec malloc() qui alloue sur le heap.
+
+Allouez une struct SharedData, initialisez ses champs value=42 et msg='hello shm', affichez, libérez.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "malloc(sizeof(SharedData)) alloue exactement la taille de la struct",
+    "data->value accède au champ int via le pointeur",
+    "free(data) libère la région simulée (= shmdt + shmctl(IPC_RMID) en vrai IPC)",
+    "Exercice suivant (API POSIX réelle) : shm-create-01 — shm_open/mmap/munmap avec vrai segment partagé entre processus",
+]
+id = "shm-01"
+kc_ids = ["KC-C13"]
+key_concept = "shmat() retourne void* vers la région partagée — équivalent à malloc() en simulation ; free() = shmdt()+shmctl(IPC_RMID)"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    int value;
+    char msg[32];
+} SharedData;
+
+int main(void) {
+    SharedData *data = (SharedData *)malloc(sizeof(SharedData));
+    data->value = 42;
+    strncpy(data->msg, "hello shm", 31);
+    printf("data->value = %d\n", data->value);
+    printf("data->msg = %s\n", data->msg);
+    free(data);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int value; char msg[32]; } SharedData;
+
+int main(void) {
+    SharedData *data = (SharedData *)malloc(sizeof(____));  // taille de la struct
+    data->value = 42;
+    strncpy(data->msg, "hello shm", 31);
+    printf("data->value = %d\n", data->____);   // champ entier
+    printf("data->msg = %s\n", data->msg);
+    ____(data);                                  // libérer
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int value; char msg[32]; } SharedData;
+
+/* == EXEMPLE ===============================================
+ * Memoire partagee simulee : struct config avec port + host
+ * malloc simule shmat(), free simule shmdt()+shmctl(IPC_RMID).
+ * ========================================================= */
+typedef struct { int port; char host[32]; } Config;
+
+void example_shared_config(void) {
+    Config *cfg = (Config *)malloc(sizeof(Config));
+    cfg->port = 8080;
+    strncpy(cfg->host, "localhost", 31);
+    printf("cfg->port = %d\n", cfg->port);
+    printf("cfg->host = %s\n", cfg->host);
+    free(cfg);
+}
+/* Resultat: cfg->port = 8080, cfg->host = localhost */
+
+/* == VOTRE EXERCICE ========================================
+ * Memoire partagee : malloc + struct pointer
+ * Inspirez-vous de example_shared_config ci-dessus.
+ * Allouez SharedData, initialisez value=42 et msg="hello shm".
+ * ========================================================= */
+
+int main(void) {
+    SharedData *data = (SharedData *)malloc(sizeof(SharedData));
+    /* TODO: set data->value = 42 */
+    /* TODO: strncpy(data->msg, "hello shm", 31) */
+    printf("data->value = %d\n", data->value);
+    printf("data->msg = %s\n", data->msg);
+    free(data);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int value; char msg[32]; } SharedData;
+
+int main(void) {
+    SharedData *data = (SharedData *)malloc(sizeof(____));  // taille de la struct
+    data->value = 42;
+    strncpy(data->msg, "hello shm", 31);
+    printf("data->value = %d\n", data->____);   // champ entier
+    printf("data->msg = %s\n", data->msg);
+    ____(data);                                  // libérer
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int value; char msg[32]; } SharedData;
+
+int main(void) {
+    SharedData *data = (SharedData *)malloc(sizeof(____));  // taille de la struct
+    data->value = 42;
+    strncpy(data->msg, "hello shm", 31);
+    printf("data->value = %d\n", data->____);   // champ entier
+    printf("data->msg = %s\n", data->msg);
+    ____(data);                                  // libérer
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int value; char msg[32]; } SharedData;
+
+int main(void) {
+    // Allouez SharedData avec malloc
+    // Initialisez value=42 et msg="hello shm" (strncpy, 31 octets)
+    // Affichez les deux champs
+    // Libérez la mémoire
+    // Sortie attendue: "data->value = 42\ndata->msg = hello shm\n"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Mémoire partagée simulée : malloc + struct pointer"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+Les valeurs ne correspondent pas. Vérifie malloc(sizeof(SharedData)), l'initialisation des champs, et free() à la fin.
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+Notre système d'acquisition partage des données entre processus via mémoire partagée POSIX. En simulation WASM, utilisez malloc() comme équivalent de shmat().
+
+Allouez SharedData{value, msg}, initialisez value=42 et msg='hello shm', affichez, libérez.
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = []
+receivedTime = "09:10"
+subject = "Segment mémoire partagée — struct SharedData allocation"
+successEmail = """
+Segment validé. data->value=42 data->msg=hello shm — le pattern malloc/free simule correctement shmat/shmdt.
+
+SensorGrid Ops"""
+syscallsInvolved = [
+    "shmget",
+    "shmat",
+    "shmdt",
+    "shmctl",
+]
+tier = 2
+
+[validation]
+expected_output = """
+data->value = 42
+data->msg = hello shm
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+label = "malloc(sizeof(SharedData)) — allocation heap"
+
+[[visualizer.steps.arrows]]
+from = "data (SharedData*)"
+to = "SharedData"
+
+[[visualizer.steps.heap]]
+address = "0x1000"
+name = "SharedData"
+value = "value=? msg=?"
+
+[[visualizer.steps.stack]]
+name = "data (SharedData*)"
+value = "0xHEAP"
+
+[[visualizer.steps]]
+label = "data->value=42 ; strncpy(msg, 'hello shm')"
+
+[[visualizer.steps.arrows]]
+from = "data (SharedData*)"
+to = "SharedData"
+
+[[visualizer.steps.heap]]
+address = "0x1000"
+name = "SharedData"
+value = "value=42 msg='hello shm'"
+
+[[visualizer.steps.stack]]
+name = "data (SharedData*)"
+value = "0xHEAP"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "free(data) — libération"
+
+[[visualizer.steps.stack]]
+name = "data (SharedData*)"
+value = "dangling"

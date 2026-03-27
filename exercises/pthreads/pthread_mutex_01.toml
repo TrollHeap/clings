@@ -1,0 +1,299 @@
+common_mistake = "Oublier unlock → deadlock, ou ne pas protéger du tout → race condition sur counter"
+description = """
+NSY103 — Un mutex (mutual exclusion) empêche deux threads d'accéder simultanément à une ressource partagée. pthread_mutex_lock/unlock encadrent la section critique.
+
+Utilisez un mutex pour protéger l'incrémentation d'un compteur partagé par 3 threads."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "pthread_mutex_lock(&lock) verrouille le mutex avant la section critique",
+    "pthread_mutex_unlock(&lock) le déverrouille après",
+    "PTHREAD_MUTEX_INITIALIZER initialise statiquement un mutex",
+]
+id = "pthread-mutex-01"
+kc_ids = ["KC-C09"]
+key_concept = "pthread_mutex_lock/unlock protège une section critique — garantit qu'un seul thread modifie la ressource à la fois"
+lang = "c"
+prerequisites = ["pthread-args-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+void *increment_worker(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&lock);
+    counter++;
+    pthread_mutex_unlock(&lock);
+    return NULL;
+}
+
+int main(void) {
+    /* Tester mutex lock/unlock */
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    /* Tester compteur protégé par mutex */
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+void *increment_worker(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&lock);
+    counter++;
+    pthread_mutex_unlock(&lock);
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ================================================
+ * Mutex simple : créer et destroyer un mutex
+ * Afficher les codes de retour (0 = succès)
+ * =========================================================== */
+static pthread_mutex_t simple_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+    printf("Mutex OK: codes de retour à 0\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+void *increment_worker(void *arg) {
+    (void)arg;
+    ____(____);      /* verrouiller lock */
+    counter++;
+    ____(____);      /* déverrouiller lock */
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+void *increment_worker(void *arg) {
+    (void)arg;
+    /* TODO: lock, incrémenter counter, unlock */
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* Déclarez lock (PTHREAD_MUTEX_INITIALIZER) et counter (int) */
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+/* Implémentez increment_worker: lock, counter++, unlock */
+void *increment_worker(void *arg) {
+    /* TODO */
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+void *increment_worker(void *arg) {
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int r1 = pthread_mutex_lock(&m);
+    int r2 = pthread_mutex_unlock(&m);
+    printf("lock=%d unlock=%d\n", r1, r2);
+    pthread_mutex_destroy(&m);
+
+    pthread_t t1, t2;
+    counter = 0;
+    pthread_create(&t1, NULL, increment_worker, NULL);
+    pthread_create(&t2, NULL, increment_worker, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("counter=%d\n", counter);
+    return 0;
+}
+''',
+]
+subject = "pthreads"
+title = "Mutex: protéger un compteur partagé"
+
+[validation]
+expected_output = """
+lock=0 unlock=0
+counter=2"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le compteur est à 0, le mutex est libre"
+heap = []
+label = "État initial — mutex déverrouillé"
+step_label = "1. Init"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "lock"
+value = "UNLOCKED"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "T0 verrouille, incrémente counter à 1, puis déverrouille"
+heap = []
+label = "Thread 0 — lock, incrément, unlock"
+step_label = "2. Section critique"
+
+[[visualizer.steps.call_frames]]
+args = "id=0"
+function_name = "increment"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "lock"
+value = "LOCKED by T0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "3 threads × 3 incréments = 9, grâce au mutex aucune race condition"
+heap = []
+label = "Tous les threads terminés"
+step_label = "3. Final"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "lock"
+value = "UNLOCKED"

@@ -1,0 +1,312 @@
+common_mistake = "Lire le mauvais champ de l'union (ex: .f quand type==VAL_INT) — comportement indéfini"
+description = """
+NSY103 — Une `union` partage le même espace mémoire pour tous ses champs : sa taille est celle du plus grand. Pour savoir quel champ est actif, on ajoute un `enum` tag — c'est le pattern "tagged union" ou "variant type".
+
+Implémentez un type `Value` qui peut contenir un entier, un flottant ou une chaîne, avec affichage dynamique selon le tag."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Le tag `v->type` indique quel champ de l'union est actif",
+    "Accéder au mauvais champ (ex: `v->data.f` quand type == VAL_INT) donne un résultat indéfini",
+    "sizeof(Value) = sizeof(tag) + sizeof(union) + padding — l'union prend la taille du plus grand membre",
+]
+id = "struct-union-01"
+kc_ids = ["KC-C03"]
+key_concept = "Une union tagged combine un enum (discriminant) et une union (données) pour implémenter le polymorphisme en C"
+lang = "c"
+prerequisites = ["linked-list-02"]
+solution_code = '''
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+
+typedef struct {
+    ValType type;
+    union {
+        int i;
+        float f;
+        char s[32];
+    } data;
+} Value;
+
+void print_value(const Value *v) {
+    switch (v->type) {
+        case VAL_INT:   printf("int: %d\n", v->data.i); break;
+        case VAL_FLOAT: printf("float: %.1f\n", v->data.f); break;
+        case VAL_STR:   printf("str: %s\n", v->data.s); break;
+    }
+}
+
+int main(void) {
+    Value vals[3];
+    vals[0].type = VAL_INT;
+    vals[0].data.i = 42;
+    vals[1].type = VAL_FLOAT;
+    vals[1].data.f = 3.14f;
+    vals[2].type = VAL_STR;
+    snprintf(vals[2].data.s, sizeof(vals[2].data.s), "hello");
+
+    printf("sizeof(Value) = %zu\n", sizeof(Value));
+    for (int k = 0; k < 3; k++)
+        print_value(&vals[k]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+
+typedef struct {
+    ValType type;
+    union {
+        int i;
+        float f;
+        char s[32];
+    } data;
+} Value;
+
+void print_value(const Value *v) {
+    switch (v->____) {
+        case VAL_INT:   printf("int: %d\n", v->data.____); break;
+        case VAL_FLOAT: printf("float: %.1f\n", v->data.____); break;
+        case VAL_STR:   printf("str: %s\n", v->data.____); break;
+    }
+}
+
+int main(void) {
+    Value vals[3];
+    vals[0].type = ____;
+    vals[0].data.i = 42;
+    vals[1].type = VAL_FLOAT;
+    vals[1].data.____ = 3.14f;
+    vals[2].type = VAL_STR;
+    snprintf(vals[2].data.s, sizeof(vals[2].data.s), "hello");
+
+    printf("sizeof(Value) = %zu\n", sizeof(Value));
+    for (int k = 0; k < 3; k++)
+        print_value(&vals[k]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Tagged union pour représenter des formes géométriques
+ * Le tag ShapeType indique quel champ de l'union lire.
+ * =========================================================== */
+typedef enum { SHAPE_CIRCLE, SHAPE_RECT } ShapeType;
+typedef struct {
+    ShapeType type;
+    union { float radius; struct { float w, h; } rect; } data;
+} Shape;
+
+void example_demo(void) {
+    Shape shapes[2];
+    shapes[0].type = SHAPE_CIRCLE;
+    shapes[0].data.radius = 5.0f;
+    shapes[1].type = SHAPE_RECT;
+    shapes[1].data.rect.w = 3.0f;
+    shapes[1].data.rect.h = 4.0f;
+    for (int i = 0; i < 2; i++) {
+        if (shapes[i].type == SHAPE_CIRCLE)
+            printf("Circle r=%.1f\n", shapes[i].data.radius);
+        else
+            printf("Rect %.1fx%.1f\n", shapes[i].data.rect.w, shapes[i].data.rect.h);
+    }
+}
+/* Resultat: Circle r=5.0 / Rect 3.0x4.0 */
+
+/* == VOTRE EXERCICE =========================================
+ * Tagged union Value : int, float, ou string
+ * Implémentez print_value avec switch sur le tag.
+ * =========================================================== */
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+typedef struct {
+    ValType type;
+    union { int i; float f; char s[32]; } data;
+} Value;
+
+void print_value(const Value *v) { (void)v; }
+
+int main(void) {
+    Value vals[3];
+    vals[0].type = VAL_INT;   vals[0].data.i = 42;
+    vals[1].type = VAL_FLOAT; vals[1].data.f = 3.14f;
+    vals[2].type = VAL_STR;   snprintf(vals[2].data.s, 32, "hello");
+    printf("sizeof(Value) = %zu\n", sizeof(Value));
+    for (int k = 0; k < 3; k++) print_value(&vals[k]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+typedef struct {
+    ValType type;
+    union { int i; float f; char s[32]; } data;
+} Value;
+
+void print_value(const Value *v) {
+    switch (v->type) {
+        case VAL_INT:   printf("int: %d\n", v->data.i); break;
+        case VAL_FLOAT: printf("float: %.1f\n", v->data.f); break;
+        case VAL_STR:   printf("str: %s\n", v->data.____); break;
+    }
+}
+
+int main(void) {
+    Value vals[3];
+    vals[0].type = VAL_INT;   vals[0].data.i = 42;
+    vals[1].type = VAL_FLOAT; vals[1].data.f = 3.14f;
+    vals[2].type = VAL_STR;   snprintf(vals[2].data.s, 32, "hello");
+    printf("sizeof(Value) = %zu\n", sizeof(Value));
+    for (int k = 0; k < 3; k++) print_value(&vals[k]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+
+typedef struct {
+    ValType type;
+    union {
+        int i;
+        float f;
+        char s[32];
+    } data;
+} Value;
+
+void print_value(const Value *v) {
+    switch (v->____) {
+        case VAL_INT:   printf("int: %d\n", v->data.____); break;
+        case VAL_FLOAT: printf("float: %.1f\n", v->data.____); break;
+        case VAL_STR:   printf("str: %s\n", v->data.____); break;
+    }
+}
+
+int main(void) {
+    Value vals[3];
+    vals[0].type = ____;
+    vals[0].data.i = 42;
+    vals[1].type = VAL_FLOAT;
+    vals[1].data.____ = 3.14f;
+    vals[2].type = VAL_STR;
+    snprintf(vals[2].data.s, sizeof(vals[2].data.s), "hello");
+
+    printf("sizeof(Value) = %zu\n", sizeof(Value));
+    for (int k = 0; k < 3; k++)
+        print_value(&vals[k]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+typedef struct {
+    ValType type;
+    union { int i; float f; char s[32]; } data;
+} Value;
+
+// Implémentez print_value (switch sur type, printf le bon champ)
+int main(void) {
+    // TODO: créer 3 Value (int=42, float=3.14, str="hello"), afficher
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+typedef enum { VAL_INT, VAL_FLOAT, VAL_STR } ValType;
+typedef struct {
+    ValType type;
+    union { int i; float f; char s[32]; } data;
+} Value;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Union tagged (variant type)"
+
+[validation]
+expected_output = """
+sizeof(Value) = 36
+int: 42
+float: 3.1
+str: hello
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque Value fait 36 octets : 4 (enum) + 32 (union, taille du char[32]). L'union partage le même espace — écrire dans .i écrase .f et .s. Le tag type indique quel champ lire."
+heap = []
+label = "Tableau de 3 Value sur la pile"
+step_label = "Tagged union — 3 variants différents"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "vals[0].type"
+value = "VAL_INT (0)"
+
+[[visualizer.steps.stack]]
+name = "vals[0].data"
+value = "i=42"
+
+[[visualizer.steps.stack]]
+name = "vals[1].type"
+value = "VAL_FLOAT (1)"
+
+[[visualizer.steps.stack]]
+name = "vals[1].data"
+value = "f=3.14"
+
+[[visualizer.steps.stack]]
+name = "vals[2].type"
+value = "VAL_STR (2)"
+
+[[visualizer.steps.stack]]
+name = "vals[2].data"
+value = 's="hello"'
+
+[[visualizer.steps]]
+explanation = "Le switch sur v->type sélectionne le bon printf. C'est le pattern fondamental de polymorphisme en C : enum tag + union data. Utilisé dans les interpréteurs, protocoles réseau, etc."
+heap = []
+label = "Dispatch dans print_value"
+step_label = "Switch sur le tag — dispatch polymorphe"
+
+[[visualizer.steps.arrows]]
+from = "v"
+label = "→"
+to = "vals[0].type"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "&vals[0]"
+function_name = "print_value"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "v"
+value = "→vals[0]"
+
+[[visualizer.steps.stack]]
+name = "v->type"
+value = "VAL_INT"
+
+[[visualizer.steps.stack]]
+name = "v->data.i"
+value = "42"

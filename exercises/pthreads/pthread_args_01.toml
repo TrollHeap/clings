@@ -1,0 +1,233 @@
+common_mistake = "Passer l'adresse d'une variable de boucle qui change avant que le thread la lise"
+description = """
+NSY103 — Le 4e argument de pthread_create est un void * passé à la fonction thread. On caste ce pointeur pour accéder aux données. Attention : chaque thread doit avoir sa propre copie ou un pointeur stable.
+
+Passez un entier à chaque thread et affichez-le."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Le cast (int *) convertit void * en pointeur vers int",
+    "Passez &a (adresse de a) comme 4e argument de pthread_create",
+    "Pour un ordre déterministe, join chaque thread avant de créer le suivant",
+]
+id = "pthread-args-01"
+kc_ids = ["KC-C09"]
+key_concept = "Le 4e argument de pthread_create est un void* — on le caste dans la fonction thread pour accéder aux données"
+lang = "c"
+prerequisites = ["pthread-create-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+void *print_num(void *arg) {
+    int num = *(int *)arg;
+    printf("Thread got: %d\n", num);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    int a = 10, b = 20;
+    pthread_create(&t1, NULL, print_num, &a);
+    pthread_join(t1, NULL);
+    pthread_create(&t2, NULL, print_num, &b);
+    pthread_join(t2, NULL);
+    printf("Done.\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+void *print_num(void *arg) {
+    int num = *(____*)arg;
+    printf("Thread got: %d\n", num);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    int a = 10, b = 20;
+    pthread_create(&t1, NULL, print_num, ____);
+    pthread_create(&t2, NULL, print_num, ____);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Done.\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Passer une chaîne à un thread via void *
+ * ========================================================= */
+void *example_greet(void *arg) {
+    char *name = (char *)arg;
+    printf("Hello, %s!\n", name);
+    return NULL;
+}
+void example_demo(void) {
+    pthread_t t;
+    char *msg = "Alice";
+    pthread_create(&t, NULL, example_greet, msg);
+    pthread_join(t, NULL);
+}
+/* Resultat: Hello, Alice! */
+
+/* == VOTRE EXERCICE ========================================
+ * Passez des entiers à deux threads
+ * ========================================================= */
+
+void *print_num(void *arg) {
+    int num = *(int *)arg;
+    printf("Thread got: %d\n", num);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    int a = 10, b = 20;
+    /* TODO: create t1 with &a, join, create t2 with &b, join */
+    printf("Done.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+void *print_num(void *arg) {
+    int num = *(int *)arg;
+    printf("Thread got: %d\n", num);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    int a = 10, b = 20;
+    pthread_create(&t1, NULL, print_num, &a);
+    pthread_join(t1, NULL);
+    pthread_create(&t2, NULL, print_num, ____);
+    ____(t2, NULL);
+    printf("Done.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+void *print_num(void *arg) {
+    int num = *(____*)arg;
+    printf("Thread got: %d\n", num);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    int a = 10, b = 20;
+    pthread_create(&t1, NULL, print_num, ____);
+    pthread_join(t1, NULL);
+    pthread_create(&t2, NULL, print_num, ____);
+    pthread_join(t2, NULL);
+    printf("Done.\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Écrivez print_num(void *arg) qui caste arg en int* et affiche la valeur
+// main: créez 2 threads avec a=10, b=20 (join entre chaque pour l'ordre)
+// Sortie: "Thread got: 10", "Thread got: 20", "Done."
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Passage d'arguments aux threads"
+
+[validation]
+expected_output = """
+Thread got: 10
+Thread got: 20
+Done.
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "a et b sont des variables locales du main, on passe leur adresse au thread"
+heap = []
+label = "Variables sur la pile du main"
+step_label = "1. Déclaration"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "20"
+
+[[visualizer.steps]]
+explanation = "Le thread caste arg en int* et déréférence pour obtenir 10"
+heap = []
+label = "Thread 1 reçoit &a"
+step_label = "2. Thread 1"
+
+[[visualizer.steps.arrows]]
+from = "arg"
+to = "a"
+
+[[visualizer.steps.call_frames]]
+args = "void *arg = &a"
+function_name = "print_num"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "arg"
+value = "&a → 10"
+
+[[visualizer.steps.stack]]
+name = "num"
+value = "10"
+
+[[visualizer.steps]]
+explanation = "Le thread 2 reçoit &b et affiche 20"
+heap = []
+label = "Thread 2 reçoit &b"
+step_label = "3. Thread 2"
+
+[[visualizer.steps.arrows]]
+from = "arg"
+to = "b"
+
+[[visualizer.steps.call_frames]]
+args = "void *arg = &b"
+function_name = "print_num"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "arg"
+value = "&b → 20"
+
+[[visualizer.steps.stack]]
+name = "num"
+value = "20"

@@ -1,0 +1,323 @@
+common_mistake = "Le parent doit fermer les deux fd du pipe sinon l'enfant 2 ne reçoit jamais EOF"
+description = """
+NSY103 — Un pipeline shell 'cmd1 | cmd2' connecte stdout de cmd1 à stdin de cmd2 via un pipe. On simule ce mécanisme avec fork+dup2+pipe : l'enfant 1 écrit des lignes dans le pipe, l'enfant 2 les compte.
+
+Créez un pipeline où le premier enfant écrit 3 lignes et le second les compte et affiche le total."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "L'enfant producteur redirige STDOUT_FILENO vers fd[1] avec dup2",
+    "L'enfant consommateur redirige STDIN_FILENO vers fd[0] avec dup2",
+    "Le parent ferme les deux extrémités du pipe pour que l'enfant 2 reçoive EOF",
+]
+id = "pipe-chain-01"
+kc_ids = ["KC-C10"]
+key_concept = "Un pipeline connecte stdout d'un processus à stdin d'un autre via pipe+dup2"
+lang = "c"
+prerequisites = ["pipe-dup2-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        printf("alpha\n");
+        printf("beta\n");
+        printf("gamma\n");
+        fflush(stdout);
+        _exit(0);
+    }
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        close(fd[1]);
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        int count = 0;
+        char buf[128];
+        while (fgets(buf, sizeof(buf), stdin) != NULL)
+            count++;
+        printf("Lines: %d\n", count);
+        fflush(stdout);
+        _exit(0);
+    }
+
+    close(fd[0]);
+    close(fd[1]);
+    wait(NULL);
+    wait(NULL);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        close(fd[0]);
+        dup2(fd[1], ____);
+        close(fd[1]);
+        printf("alpha\n");
+        printf("beta\n");
+        printf("gamma\n");
+        fflush(stdout);
+        _exit(0);
+    }
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        close(fd[____]);
+        dup2(fd[0], ____);
+        close(fd[0]);
+        int count = 0;
+        char buf[128];
+        while (fgets(buf, sizeof(buf), stdin) != NULL)
+            count++;
+        printf("Lines: %d\n", count);
+        fflush(stdout);
+        _exit(0);
+    }
+
+    close(fd[0]);
+    close(fd[1]);
+    wait(NULL);
+    wait(NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Pipeline : enfant ecrit des nombres, parent les somme
+ * dup2 redirige stdout de l'enfant vers le pipe.
+ * ================================================= */
+void example_pipeline(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t p = fork();
+    if (p == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        printf("10\n20\n30\n");
+        fflush(stdout);
+        _exit(0);
+    }
+    close(fd[1]);
+    FILE *f = fdopen(fd[0], "r");
+    int sum = 0, v;
+    while (fscanf(f, "%d", &v) == 1) sum += v;
+    fclose(f);
+    wait(NULL);
+    printf("Sum: %d\n", sum);
+}
+/* Resultat: Sum: 60 */
+
+/* == VOTRE EXERCICE ================================
+ * Pipeline 2 enfants: producteur ecrit 3 lignes,
+ * consommateur les compte via fgets(stdin).
+ * ================================================= */
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        close(fd[0]);
+        /* TODO: dup2 stdout, print 3 lines, _exit */
+        _exit(0);
+    }
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        close(fd[1]);
+        /* TODO: dup2 stdin, count lines with fgets, print count */
+        _exit(0);
+    }
+    close(fd[0]); close(fd[1]);
+    wait(NULL); wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        printf("alpha\n"); printf("beta\n"); printf("gamma\n");
+        fflush(stdout);
+        _exit(0);
+    }
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        close(fd[1]);
+        dup2(fd[0], ____);  // rediriger vers quel fd standard ?
+        close(fd[0]);
+        int count = 0;
+        char buf[128];
+        while (fgets(buf, sizeof(buf), stdin) != NULL) count++;
+        printf("Lines: %d\n", count);
+        fflush(stdout);
+        _exit(0);
+    }
+    close(fd[0]); close(fd[1]);
+    wait(NULL); wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        close(fd[0]);
+        dup2(fd[1], ____);
+        close(fd[1]);
+        printf("alpha\n");
+        printf("beta\n");
+        printf("gamma\n");
+        fflush(stdout);
+        _exit(0);
+    }
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        close(fd[____]);
+        dup2(fd[0], ____);
+        close(fd[0]);
+        int count = 0;
+        char buf[128];
+        while (fgets(buf, sizeof(buf), stdin) != NULL)
+            count++;
+        printf("Lines: %d\n", count);
+        fflush(stdout);
+        _exit(0);
+    }
+
+    close(fd[0]);
+    close(fd[1]);
+    wait(NULL);
+    wait(NULL);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    // Pipeline de 2 enfants:
+    // Enfant 1: dup2 stdout→fd[1], printf 3 lignes
+    // Enfant 2: dup2 fd[0]→stdin, compte les lignes, affiche "Lines: 3"
+    // Parent: ferme les deux fd, wait deux fois
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Pipeline de 2 commandes (ls|wc style)"
+
+[validation]
+expected_output = """
+Lines: 3
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "L'enfant producteur redirige son STDOUT vers fd[1] du pipe avec dup2, puis toutes ses impressions printf() alimentent directement le buffer kernel du pipe — c'est exactement ce que fait le shell pour implémenter l'opérateur '|'."
+label = "Enfant 1: stdout → fd[1] (producteur)"
+step_label = "Étape 1 — Enfant 1 redirige stdout → pipe (producteur)"
+
+[[visualizer.steps.edges]]
+label = "dup2 STDOUT→fd[1]"
+source = "p1"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = """
+Enfant 1
+printf(3 lines)"""
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps]]
+explanation = "L'enfant consommateur redirige fd[0] vers STDIN_FILENO avec dup2 : fgets(stdin) lit alors depuis le pipe de façon transparente. Le pipe se ferme (EOF) quand le parent ferme ses copies de fd, ce qui termine la boucle fgets."
+label = "Enfant 2: fd[0] → stdin (consommateur)"
+step_label = "Étape 2 — Enfant 2 redirige stdin ← pipe (consommateur)"
+
+[[visualizer.steps.edges]]
+label = "dup2 fd[0]→STDIN"
+source = "pipe"
+target = "p2"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = """
+Enfant 2
+fgets(stdin)"""
+
+[[visualizer.steps]]
+explanation = "Le consommateur obtient EOF sur stdin lorsque le parent ferme ses copies de fd[0] et fd[1] — c'est pourquoi le parent doit fermer les deux extrémités du pipe. La boucle fgets se termine naturellement et le comptage est affiché."
+label = "Résultat: count=3, affiche Lines: 3"
+step_label = "Étape 3 — EOF sur stdin, enfant 2 affiche le comptage"
+
+[[visualizer.steps.edges]]
+label = "printf"
+source = "count"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "count"
+label = "count = 3"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "stdout"

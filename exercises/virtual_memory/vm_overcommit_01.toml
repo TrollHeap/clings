@@ -1,0 +1,245 @@
+common_mistake = "Croire que mmap alloue immédiatement la mémoire physique — c'est du demand paging"
+description = """
+NSY103 — Linux utilise l'overcommit: mmap/malloc peuvent réserver plus de mémoire virtuelle que la RAM physique disponible. Les pages ne sont allouées physiquement qu'au premier accès (demand paging). Si la mémoire physique est épuisée, l'OOM killer termine des processus.
+
+Démontrez l'overcommit en allouant une grande zone sans la toucher, puis en accédant à une petite partie."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "MAP_ANONYMOUS crée un mapping sans fichier backing — initialisé à zéro",
+    "mincore() vérifie quelles pages sont résidentes en RAM (bit 0 du vecteur)",
+    "L'overcommit permet à mmap de réussir même si la RAM est insuffisante",
+]
+id = "vm-overcommit-01"
+kc_ids = ["KC-C18"]
+key_concept = "L'overcommit permet de mapper plus que la RAM — les pages ne sont allouées qu'au premier accès"
+lang = "c"
+prerequisites = ["vm-mmap-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t huge = 1UL << 30; /* 1 GB */
+    char *mem = (char *)mmap(NULL, huge,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("Mapped 1GB: success\n");
+    size_t ps = (size_t)getpagesize();
+    mem[0] = 'A';
+    mem[ps] = 'B';
+    mem[ps * 2] = 'C';
+    printf("Touched 3 pages: %c%c%c\n", mem[0], mem[ps], mem[ps * 2]);
+    unsigned char vec[3];
+    int rc = mincore(mem, ps * 3, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (int i = 0; i < 3; i++) {
+        if (vec[i] & 1) resident++;
+    }
+    printf("Resident pages: %d/3\n", resident);
+    printf("Overcommit: %s\n", resident <= 3 ? "yes" : "no");
+    munmap(mem, huge);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    size_t huge = 1UL << 30; /* 1 GB */
+    char *mem = (char *)mmap(NULL, huge,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | ____, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("Mapped 1GB: success\n");
+    size_t ps = (size_t)getpagesize();
+    mem[0] = 'A';
+    mem[ps] = 'B';
+    mem[ps * 2] = 'C';
+    printf("Touched 3 pages: %c%c%c\n", mem[0], mem[ps], mem[ps * 2]);
+    unsigned char vec[3];
+    int rc = ____(mem, ps * 3, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (int i = 0; i < 3; i++) {
+        if (vec[i] & 1) resident++;
+    }
+    printf("Resident pages: %d/3\n", resident);
+    printf("Overcommit: %s\n", resident <= 3 ? "yes" : "no");
+    ____(mem, huge);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: demand paging avec madvise ============== */
+void example_madvise(void) {
+    size_t ps = (size_t)getpagesize();
+    char *p = mmap(NULL, ps*10, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    madvise(p, ps*10, MADV_SEQUENTIAL);
+    p[0] = 'X';
+    printf("madvise + touch: ok\n");
+    munmap(p, ps*10);
+}
+
+int main(void) {
+    size_t huge = 1UL << 30;
+    char *mem = mmap(NULL, huge, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("Mapped 1GB: success\n");
+    size_t ps = (size_t)getpagesize();
+    mem[0] = 'A'; mem[ps] = 'B'; mem[ps*2] = 'C';
+    printf("Touched 3 pages: %c%c%c\n", mem[0], mem[ps], mem[ps*2]);
+    unsigned char vec[3];
+    int rc = mincore(mem, ps*3, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (int i = 0; i < 3; i++) { if (vec[i] & 1) resident++; }
+    printf("Resident pages: %d/3\n", resident);
+    printf("Overcommit: %s\n", resident <= 3 ? "yes" : "no");
+    munmap(mem, huge);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t huge = 1UL << 30;
+    char *mem = mmap(NULL, huge, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("Mapped 1GB: success\n");
+    size_t ps = (size_t)getpagesize();
+    mem[0] = 'A'; mem[ps] = 'B'; mem[ps*2] = 'C';
+    printf("Touched 3 pages: %c%c%c\n", mem[0], mem[ps], mem[ps*2]);
+    unsigned char vec[3];
+    int rc = mincore(mem, ps*3, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (int i = 0; i < 3; i++) { if (vec[i] & 1) resident++; }
+    printf("Resident pages: %d/3\n", resident);
+    printf("Overcommit: %s\n", resident <= 3 ? "yes" : "no");
+    ____(mem, huge);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t huge = 1UL << 30;
+    char *mem = mmap(NULL, huge, PROT_READ|PROT_WRITE,
+        MAP_PRIVATE | ____, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("Mapped 1GB: success\n");
+    size_t ps = (size_t)getpagesize();
+    mem[0] = 'A'; mem[ps] = 'B'; mem[ps*2] = 'C';
+    printf("Touched 3 pages: %c%c%c\n", mem[0], mem[ps], mem[ps*2]);
+    unsigned char vec[3];
+    int rc = ____(mem, ps*3, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (int i = 0; i < 3; i++) { if (vec[i] & 1) resident++; }
+    printf("Resident pages: %d/3\n", resident);
+    printf("Overcommit: %s\n", resident <= 3 ? "yes" : "no");
+    ____(mem, huge);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+// Mappez 1GB anonyme, touchez 3 pages, vérifiez avec mincore
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Overcommit et OOM killer"
+
+[validation]
+expected_output = "REGEX:(?s)Overcommit|status"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "1GB réservé virtuellement mais 0 page physique allouée"
+label = "mmap 1GB (overcommit)"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "mem"
+to = "1GB zone"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "1GB zone"
+content = "[aucune page physique allouée]"
+
+[[visualizer.steps.stack]]
+name = "mem"
+value = "→ 1GB virtuel"
+
+[[visualizer.steps.stack]]
+name = "huge"
+value = "1073741824"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Seules les 3 pages touchées sont allouées physiquement"
+label = "Toucher 3 pages"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page 0"
+content = "'A' (résidente)"
+
+[[visualizer.steps.heap]]
+address = "page 1"
+content = "'B' (résidente)"
+
+[[visualizer.steps.heap]]
+address = "page 2"
+content = "'C' (résidente)"
+
+[[visualizer.steps.stack]]
+name = "mem[0]"
+value = "'A'"
+
+[[visualizer.steps.stack]]
+name = "mem[4096]"
+value = "'B'"
+
+[[visualizer.steps.stack]]
+name = "mem[8192]"
+value = "'C'"

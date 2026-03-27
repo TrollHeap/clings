@@ -1,0 +1,198 @@
+common_mistake = "Ne pas vérifier le retour de sbrk (-1 indique échec)"
+description = """
+NSY103 — sbrk() déplace le program break (limite haute du tas). sbrk(0) retourne la position actuelle. sbrk(n) étend le tas de n octets et retourne l'ancienne position. C'est le mécanisme bas-niveau que malloc utilise en interne.
+
+Utilisez sbrk pour allouer manuellement de la mémoire et vérifiez que le program break avance."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "sbrk(0) retourne le program break actuel sans le modifier",
+    "sbrk(128) étend le tas de 128 octets, retourne l'ancien break",
+    "sbrk retourne (void *)-1 en cas d'échec",
+]
+id = "pmem-brk-01"
+kc_ids = ["KC-C17"]
+key_concept = "sbrk déplace le program break — malloc l'utilise en interne pour le tas"
+lang = "c"
+prerequisites = ["pmem-heap-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    void *initial = sbrk(0);
+    printf("initial break: %p\n", initial);
+    char *block = (char *)sbrk(128);
+    if (block == (void *)-1) {
+        perror("sbrk");
+        return 1;
+    }
+    strcpy(block, "hello sbrk");
+    void *after = sbrk(0);
+    printf("after break: %p\n", after);
+    printf("data: %s\n", block);
+    printf("grew: %s\n", (char *)after > (char *)initial ? "yes" : "no");
+    long diff = (char *)after - (char *)initial;
+    printf("diff >= 128: %s\n", diff >= 128 ? "yes" : "no");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    void *initial = ____(0);
+    printf("initial break: %p\n", initial);
+    char *block = (char *)sbrk(____);
+    if (block == (void *)-1) {
+        perror("sbrk");
+        return 1;
+    }
+    strcpy(block, "hello sbrk");
+    void *after = sbrk(0);
+    printf("after break: %p\n", after);
+    printf("data: %s\n", block);
+    printf("grew: %s\n", (char *)after > (char *)initial ? "yes" : "no");
+    long diff = (char *)after - (char *)initial;
+    printf("diff >= 128: %s\n", diff >= 128 ? "yes" : "no");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: observer le break ======================= */
+void example_break(void) {
+    void *b1 = sbrk(0);
+    sbrk(64);
+    void *b2 = sbrk(0);
+    printf("break moved by %td\n", (char *)b2 - (char *)b1);
+}
+
+int main(void) {
+    void *initial = sbrk(0);
+    printf("initial break: %p\n", initial);
+    char *block = (char *)sbrk(128);
+    if (block == (void *)-1) { perror("sbrk"); return 1; }
+    strcpy(block, "hello sbrk");
+    void *after = sbrk(0);
+    printf("after break: %p\n", after);
+    printf("data: %s\n", block);
+    printf("grew: %s\n", (char *)after > (char *)initial ? "yes" : "no");
+    long diff = (char *)after - (char *)initial;
+    printf("diff >= 128: %s\n", diff >= 128 ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    void *initial = sbrk(0);
+    printf("initial break: %p\n", initial);
+    char *block = (char *)sbrk(128);
+    if (block == (void *)-1) { perror("sbrk"); return 1; }
+    strcpy(block, "hello sbrk");
+    void *after = ____(0);
+    printf("after break: %p\n", after);
+    printf("data: %s\n", block);
+    printf("grew: %s\n", (char *)after > (char *)initial ? "yes" : "no");
+    long diff = (char *)after - (char *)initial;
+    printf("diff >= 128: %s\n", diff >= 128 ? "yes" : "no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    void *initial = ____(0);
+    printf("initial break: %p\n", initial);
+    char *block = (char *)sbrk(____);
+    if (block == (void *)-1) { perror("sbrk"); return 1; }
+    strcpy(block, "hello sbrk");
+    void *after = sbrk(0);
+    printf("after break: %p\n", after);
+    printf("data: %s\n", block);
+    printf("grew: %s\n", (char *)after > (char *)initial ? "yes" : "no");
+    long diff = (char *)after - (char *)initial;
+    printf("diff >= 128: %s\n", diff >= 128 ? "yes" : "no");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+// Utilisez sbrk pour allouer manuellement et vérifier la croissance du tas
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "sbrk: extension du tas (program break)"
+
+[validation]
+expected_output = """
+REGEX:initial break: 0x[0-9a-f]+
+after break: 0x[0-9a-f]+
+data: hello sbrk
+grew: yes
+diff >= 128: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sbrk(0) lit sans modifier"
+heap = []
+label = "sbrk(0) — position initiale"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "initial"
+value = "program break actuel"
+
+[[visualizer.steps]]
+explanation = "Le tas a grandi de 128 octets"
+label = "sbrk(128) — extension"
+step_label = "Étape 2"
+
+[[visualizer.steps.arrows]]
+from = "block"
+to = "block"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "block"
+content = '"hello sbrk"'
+
+[[visualizer.steps.stack]]
+name = "block"
+value = "→ ancien break"
+
+[[visualizer.steps.stack]]
+name = "after"
+value = "break + 128"

@@ -1,0 +1,215 @@
+common_mistake = "Oublier maxfd+1 comme premier argument → select ne surveille pas tous les fd"
+description = """
+NSY103 — select() surveille plusieurs fd simultanément. FD_SET ajoute un fd à l'ensemble, FD_ISSET teste si un fd est prêt après select. Le timeout limite l'attente.
+
+Utilisez select() pour surveiller deux socketpairs et lire les données disponibles."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "FD_SET(fd, &set) ajoute fd à l'ensemble surveillé",
+    "FD_ISSET(fd, &set) vérifie si fd est prêt après select()",
+    "Le premier argument de select est max_fd + 1",
+]
+id = "sock-select-01"
+kc_ids = ["KC-C14"]
+key_concept = "select() multiplex I/O : surveille plusieurs fd, retourne quand au moins un est prêt"
+lang = "c"
+prerequisites = ["sock-nonblock-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "MSG1", 4, 0);
+    send(sv2[1], "MSG2", 4, 0);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sv1[0], &readfds);
+    FD_SET(sv2[0], &readfds);
+    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;
+    struct timeval tv = {1, 0};
+    int ready = select(maxfd, &readfds, NULL, NULL, &tv);
+    printf("Ready: %d\n", ready);
+    char buf[64];
+    if (FD_ISSET(sv1[0], &readfds)) {
+        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("sv1: %s\n", buf);
+    }
+    if (FD_ISSET(sv2[0], &readfds)) {
+        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("sv2: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]);
+    close(sv2[0]); close(sv2[1]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "MSG1", 4, 0);
+    send(sv2[1], "MSG2", 4, 0);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    ____(sv1[0], &readfds);
+    ____(sv2[0], &readfds);
+    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;
+    struct timeval tv = {1, 0};
+    int ready = select(maxfd, &readfds, NULL, NULL, &tv);
+    printf("Ready: %d\n", ready);
+    char buf[64];
+    if (FD_ISSET(sv1[0], &readfds)) {
+        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("sv1: %s\n", buf);
+    }
+    if (FD_ISSET(sv2[0], &readfds)) {
+        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("sv2: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]);
+    close(sv2[0]); close(sv2[1]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+/* == EXEMPLE ===============================================
+ * select() simple : créer ensemble fd vide
+ * ========================================================= */
+
+int main(void) {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    printf("FD set initialized\n");
+    int test_fd = 5;
+    FD_SET(test_fd, &readfds);
+    printf("FD %d added to set\n", test_fd);
+    printf("FD %d in set: %d\n", test_fd, FD_ISSET(test_fd, &readfds));
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "MSG1", 4, 0);
+    send(sv2[1], "MSG2", 4, 0);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sv1[0], &readfds);
+    FD_SET(sv2[0], &readfds);
+    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;
+    struct timeval tv = {1, 0};
+    int ready = select(maxfd, &readfds, NULL, NULL, &tv);
+    printf("Ready: %d\n", ready);
+    char buf[64];
+    if (____(sv1[0], &readfds)) {
+        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\0';
+        printf("sv1: %s\n", buf);
+    }
+    if (____(sv2[0], &readfds)) {
+        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\0';
+        printf("sv2: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+int main(void) {
+    int sv1[2], sv2[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv1);
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv2);
+    send(sv1[1], "MSG1", 4, 0);
+    send(sv2[1], "MSG2", 4, 0);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    ____(sv1[0], &readfds);
+    ____(sv2[0], &readfds);
+    int maxfd = (sv1[0] > sv2[0] ? sv1[0] : sv2[0]) + 1;
+    struct timeval tv = {1, 0};
+    int ready = select(maxfd, &readfds, NULL, NULL, &tv);
+    printf("Ready: %d\n", ready);
+    char buf[64];
+    if (FD_ISSET(sv1[0], &readfds)) {
+        int n = recv(sv1[0], buf, sizeof(buf) - 1, 0); buf[n] = '\0';
+        printf("sv1: %s\n", buf);
+    }
+    if (FD_ISSET(sv2[0], &readfds)) {
+        int n = recv(sv2[0], buf, sizeof(buf) - 1, 0); buf[n] = '\0';
+        printf("sv2: %s\n", buf);
+    }
+    close(sv1[0]); close(sv1[1]); close(sv2[0]); close(sv2[1]);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+// 2 socketpairs, envoyer MSG1 et MSG2
+// select() pour détecter lesquels sont prêts
+// Sortie: Ready: 2, sv1: MSG1, sv2: MSG2
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sockets"
+title = "Multiplexage avec select()"
+
+[validation]
+expected_output = """
+Ready: 2
+sv1: MSG1
+sv2: MSG2
+"""
+mode = "output"

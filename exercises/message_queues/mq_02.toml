@@ -1,0 +1,385 @@
+common_mistake = "Supposer que msgrcv par type préserve l'ordre FIFO global — il saute les messages d'autre type"
+description = """
+NSY103 — msgrcv(qid, &buf, size, mtype, 0) retire uniquement le premier message de type mtype. Si mtype=0 : premier arrivé. Si mtype>0 : premier de ce type.
+
+Enfilez 3 messages (types 1,2,1), récupérez uniquement le message de type 2.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "msgrcv_typed parcourt la file avec un for ; comparez queue[i].mtype au paramètre `type`",
+    "Après le match, décalez les éléments vers la gauche et décrémenter qtail pour maintenir la cohérence",
+    "Dans main, passez 2 comme second argument de msgrcv_typed pour cibler les messages urgents",
+]
+id = "mq-02"
+kc_ids = ["KC-C12"]
+key_concept = "msgrcv avec mtype>0 filtre par type — utile pour des canaux prioritaires ou spécialisés"
+lang = "c"
+prerequisites = ["mq-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_typed(MsgBuf *out, long type) {
+    for (int i = 0; i < qtail; i++) {
+        if (queue[i].mtype == type) {
+            *out = queue[i];
+            for (int j = i; j < qtail - 1; j++)
+                queue[j] = queue[j+1];
+            qtail--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int main(void) {
+    msgsnd_sim(1, "normal task");
+    msgsnd_sim(2, "urgent task");
+    msgsnd_sim(1, "another task");
+    MsgBuf msg;
+    if (msgrcv_typed(&msg, 2) == 0)
+        printf("Found type %ld: %s\n", msg.mtype, msg.mtext);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_typed(MsgBuf *out, long type) {
+    for (int i = 0; i < qtail; i++) {
+        if (queue[i].mtype == ____) {
+            *out = queue[i];
+            for (int j = i; j < qtail - 1; j++)
+                queue[j] = queue[j+1];
+            qtail--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int main(void) {
+    msgsnd_sim(1, "normal task");
+    msgsnd_sim(2, "urgent task");
+    msgsnd_sim(1, "another task");
+    MsgBuf msg;
+    if (msgrcv_typed(&msg, ____) == 0)
+        printf("Found type %ld: %s\n", msg.mtype, msg.mtext);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+/* == EXEMPLE ===============================================
+ * Filtrage par mtype : extraire les messages de type 3
+ * Scan lineaire + decalage gauche pour retirer l'element.
+ * ========================================================= */
+MsgBuf example_q[QUEUE_LEN];
+int example_tail = 0;
+
+void example_send(long type, const char *text) {
+    example_q[example_tail].mtype = type;
+    strncpy(example_q[example_tail].mtext, text, MSG_SIZE - 1);
+    example_tail++;
+}
+
+int example_recv_typed(MsgBuf *out, long type) {
+    for (int i = 0; i < example_tail; i++) {
+        if (example_q[i].mtype == type) {
+            *out = example_q[i];
+            for (int j = i; j < example_tail - 1; j++)
+                example_q[j] = example_q[j+1];
+            example_tail--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+void example_filter_type3(void) {
+    example_send(1, "alpha");
+    example_send(3, "beta");
+    example_send(1, "gamma");
+    MsgBuf m;
+    if (example_recv_typed(&m, 3) == 0)
+        printf("Got type %ld: %s\n", m.mtype, m.mtext);
+}
+/* Resultat: Got type 3: beta */
+
+/* == VOTRE EXERCICE ========================================
+ * Filtrage par mtype : msgrcv avec type specifique
+ * Inspirez-vous de example_recv_typed ci-dessus.
+ * Enfilez types 1,2,1 puis recuperez uniquement type=2.
+ * ========================================================= */
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_typed(MsgBuf *out, long type) {
+    /* TODO: scan queue, find first mtype==type, copy to *out, shift left, return 0 */
+    (void)out; (void)type;
+    return -1;
+}
+
+int main(void) {
+    msgsnd_sim(1, "normal task");
+    msgsnd_sim(2, "urgent task");
+    msgsnd_sim(1, "another task");
+    MsgBuf msg;
+    if (msgrcv_typed(&msg, 2) == 0)
+        printf("Found type %ld: %s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_typed(MsgBuf *out, long type) {
+    for (int i = 0; i < qtail; i++) {
+        if (queue[i].mtype == type) {
+            *out = queue[i];
+            for (int j = i; j < qtail - 1; j++)
+                queue[j] = queue[j+1];
+            qtail--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int main(void) {
+    msgsnd_sim(1, "normal task");
+    msgsnd_sim(2, "urgent task");
+    msgsnd_sim(1, "another task");
+    MsgBuf msg;
+    if (msgrcv_typed(&msg, ____) == 0)  // quel type récupérer?
+        printf("Found type %ld: %s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+int msgrcv_typed(MsgBuf *out, long type) {
+    for (int i = 0; i < qtail; i++) {
+        if (queue[i].mtype == ____) {
+            *out = queue[i];
+            for (int j = i; j < qtail - 1; j++)
+                queue[j] = queue[j+1];
+            qtail--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int main(void) {
+    msgsnd_sim(1, "normal task");
+    msgsnd_sim(2, "urgent task");
+    msgsnd_sim(1, "another task");
+    MsgBuf msg;
+    if (msgrcv_typed(&msg, ____) == 0)
+        printf("Found type %ld: %s\n", msg.mtype, msg.mtext);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 64
+#define QUEUE_LEN 8
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qtail = 0;
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+// Implémentez msgrcv_typed(MsgBuf *out, long type) :
+//   parcourir la file, trouver le premier message de mtype==type
+//   copier dans *out, décaler les suivants vers la gauche, décrémenter qtail
+//   retourner 0 si trouvé, -1 sinon
+
+int main(void) {
+    // Enfilez types 1, 2, 1 avec textes "normal task", "urgent task", "another task"
+    // Récupérez uniquement le type 2 et affichez
+    // Sortie attendue : "Found type 2: urgent task"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Filtrage par mtype : msgrcv avec type spécifique"
+
+[mission]
+clientId = "nordcloud"
+clientName = "NordCloud"
+contactEmail = "arch@nordcloud.sys"
+failureEmail = """
+Le message urgent n'a pas été filtré correctement. Vérifie que msgrcv_typed compare queue[i].mtype == type et décale les éléments.
+
+Arch @ NordCloud"""
+incidentEmail = """
+Architecte,
+
+Nos services envoient des messages de différents types (normal/urgent). Les messages urgents (type=2) doivent être traités en priorité, indépendamment de l'ordre d'arrivée.
+
+Implémente msgrcv_typed(out, type=2) : scan linéaire, extraction du premier message de type 2, décalage gauche.
+
+Arch @ NordCloud"""
+payout = 280
+prereqMissionIds = ["mq-01"]
+receivedTime = "09:15"
+subject = "Filtrage messages prioritaires — msgrcv par mtype"
+successEmail = """
+Filtrage validé. 'Found type 2: urgent task' — le message urgent est extrait même s'il n'est pas en tête de file.
+
+NordCloud Architecture"""
+syscallsInvolved = [
+    "msgrcv",
+    "msgsnd",
+    "msgget",
+]
+tier = 3
+
+[validation]
+expected_output = """
+Found type 2: urgent task
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+explanation = "Trois messages de types différents sont enfilés dans l'ordre d'arrivée. En POSIX IPC, msgsnd stocke chaque message avec son mtype dans la file du noyau ; le champ mtype ne détermine pas la position, il sert de filtre à la réception."
+label = "msgsnd × 3 — [type1, type2, type1]"
+step_label = "Étape 1 — Enfilement de 3 messages multi-types"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue
+[t1,t2,t1]"""
+
+[[visualizer.steps]]
+explanation = "msgrcv_typed parcourt la file en ordre FIFO et extrait le premier message dont mtype correspond au filtre. En POSIX, msgrcv(qid, &buf, size, mtype=2, 0) implémente exactement ce comportement dans le noyau, permettant de traiter les messages urgents indépendamment de leur ordre d'arrivée."
+label = "msgrcv_typed(type=2) — scan linéaire"
+step_label = "Étape 2 — Filtrage par mtype : scan et extraction"
+
+[[visualizer.steps.edges]]
+label = "i=1, mtype==2"
+source = "q"
+target = "match"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue[0]=t1
+queue[1]=t2"""
+
+[[visualizer.steps.nodes]]
+id = "match"
+label = "match: t2"
+
+[[visualizer.steps]]
+explanation = "Le message de type 2 est extrait et affiché. Les messages de type 1 restent dans la file intacts. Ce mécanisme de filtrage par mtype est fondamental pour implémenter des priorités ou des canaux logiques distincts sans avoir à créer plusieurs files."
+label = "printf Found type 2"
+step_label = "Étape 3 — Affichage du message urgent extrait"
+
+[[visualizer.steps.edges]]
+label = "Found type 2: urgent task"
+source = "match"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "match"
+label = """
+MsgBuf msg
+type=2"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "stdout"

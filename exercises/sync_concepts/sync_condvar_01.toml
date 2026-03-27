@@ -1,0 +1,334 @@
+common_mistake = "Utiliser if au lieu de while pour tester la condition — les spurious wakeups peuvent réveiller le thread sans que la condition soit vraie"
+description = """
+NSY103 — Une variable de condition (condvar) permet à un thread d'attendre qu'une condition soit vraie. pthread_cond_wait libère le mutex et bloque atomiquement. pthread_cond_signal réveille un thread en attente.
+
+Implémentez un producteur-consommateur simple avec une condvar."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "L'initialiseur statique est PTHREAD_COND_INITIALIZER",
+    "pthread_cond_signal prend l'adresse : &cond",
+    "La condition à tester dans le while est data_ready",
+]
+id = "sync-condvar-01"
+kc_ids = ["KC-C22"]
+key_concept = "pthread_cond_wait libère le mutex et bloque atomiquement — toujours dans une boucle while pour les spurious wakeups"
+lang = "c"
+prerequisites = ["sync-mutex-order-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int data_ready = 0;
+int shared_data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    shared_data = 42;
+    data_ready = 1;
+    printf("Producteur: data = %d\n", shared_data);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!data_ready) {
+        pthread_cond_wait(&cond, &mtx);
+    }
+    printf("Consommateur: data = %d\n", shared_data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Synchronisation OK\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = ____;
+int data_ready = 0;
+int shared_data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    shared_data = 42;
+    data_ready = 1;
+    printf("Producteur: data = %d\n", shared_data);
+    pthread_cond_signal(______);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!____) {
+        pthread_cond_wait(&cond, &mtx);
+    }
+    printf("Consommateur: data = %d\n", shared_data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Synchronisation OK\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Condvar : notification de fin de calcul
+ * Un worker signale quand son résultat est prêt.
+ * ========================================================= */
+pthread_mutex_t ex_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t ex_cond = PTHREAD_COND_INITIALIZER;
+int ex_done = 0;
+int ex_result = 0;
+
+void *ex_worker(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&ex_mtx);
+    ex_result = 7 * 6;
+    ex_done = 1;
+    pthread_cond_signal(&ex_cond);
+    pthread_mutex_unlock(&ex_mtx);
+    return NULL;
+}
+
+void example_condvar(void) {
+    pthread_t t;
+    pthread_create(&t, NULL, ex_worker, NULL);
+    pthread_mutex_lock(&ex_mtx);
+    while (!ex_done) {
+        pthread_cond_wait(&ex_cond, &ex_mtx);
+    }
+    printf("Resultat: %d\n", ex_result); /* 42 */
+    pthread_mutex_unlock(&ex_mtx);
+    pthread_join(t, NULL);
+}
+
+/* == VOTRE EXERCICE ========================================
+ * Producteur-consommateur avec condvar.
+ * ========================================================= */
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int data_ready = 0;
+int shared_data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    shared_data = 42;
+    data_ready = 1;
+    printf("Producteur: data = %d\n", shared_data);
+    /* TODO: signaler la condvar */
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!data_ready) {
+        /* TODO: attendre la condvar */
+    }
+    printf("Consommateur: data = %d\n", shared_data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Synchronisation OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int data_ready = 0;
+int shared_data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    shared_data = 42;
+    data_ready = 1;
+    printf("Producteur: data = %d\n", shared_data);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!data_ready) {
+        pthread_cond_wait(&cond, &____); /* quel second argument ? */
+    }
+    printf("Consommateur: data = %d\n", shared_data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Synchronisation OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = ____;
+int data_ready = 0;
+int shared_data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    shared_data = 42;
+    data_ready = 1;
+    printf("Producteur: data = %d\n", shared_data);
+    pthread_cond_signal(______);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!____) {
+        pthread_cond_wait(&cond, &mtx);
+    }
+    printf("Consommateur: data = %d\n", shared_data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Synchronisation OK\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// mutex, condvar, data_ready flag, shared_data
+// producer : lock, set data=42, data_ready=1, signal, unlock
+// consumer : lock, while(!data_ready) cond_wait, print data, unlock
+// main : créer consumer puis producer, joindre, afficher OK
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Variables de condition pthread"
+
+[validation]
+expected_output = """
+Producteur: data = 42
+Consommateur: data = 42
+Synchronisation OK
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le consommateur prend le mutex, vérifie data_ready (faux), appelle cond_wait qui libère le mutex et bloque."
+heap = []
+label = "Consommateur attend"
+step_label = "Attente"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "consumer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "data_ready"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "shared_data"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "consumer"
+value = "bloqué sur cond_wait"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le producteur prend le mutex, écrit 42, met data_ready=1, signale la condvar. Le consommateur se réveille et reprend le mutex."
+heap = []
+label = "Producteur signale"
+step_label = "Signal"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "producer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "data_ready"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "shared_data"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "consumer"
+value = "réveillé"

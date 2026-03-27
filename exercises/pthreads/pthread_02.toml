@@ -1,0 +1,461 @@
+common_mistake = "Oublier pthread_mutex_unlock → deadlock si le même thread tente de locker à nouveau (mutex non récursif par défaut)"
+description = """
+NSY103 — pthread_mutex_t protège une section critique. PTHREAD_MUTEX_INITIALIZER permet une initialisation statique sans appeler pthread_mutex_init(). pthread_mutex_lock() bloque si le verrou est pris, pthread_mutex_unlock() le libère.
+
+Protégez l'incrémentation d'un compteur partagé avec un mutex initialisé statiquement.
+
+Note : le code exécuté est intentionnellement mono-thread (pas de pthread_create) pour garantir une sortie déterministe. Le visualiseur thread_timeline illustre le comportement d'un vrai scénario multi-thread avec mutex — c'est le contexte réel dans lequel ce primitif est utile."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "PTHREAD_MUTEX_INITIALIZER initialise statiquement sans pthread_mutex_init()",
+    "pthread_mutex_lock(&mtx) acquiert le verrou (bloque si déjà pris)",
+    "pthread_mutex_unlock(&mtx) libère le verrou — toujours appeler après lock!",
+]
+id = "pthread-02"
+kc_ids = ["KC-C09"]
+key_concept = "PTHREAD_MUTEX_INITIALIZER init statique ; lock/unlock délimitent la section critique"
+lang = "c"
+prerequisites = ["pthread-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    pthread_mutex_lock(&mtx);
+    printf("Locked\n");
+    counter++;
+    printf("counter = %d\n", counter);
+    pthread_mutex_unlock(&mtx);
+    printf("Unlocked\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    ____(&mtx);
+    printf("Locked\n");
+    counter++;
+    printf("counter = %d\n", counter);
+    ____(&mtx);
+    printf("Unlocked\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Mutex POSIX : proteger un drapeau partage
+ * PTHREAD_MUTEX_INITIALIZER evite pthread_mutex_init().
+ * ========================================================= */
+int flag = 0;
+pthread_mutex_t flag_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void example_toggle_flag(void) {
+    pthread_mutex_lock(&flag_mtx);
+    flag = !flag;
+    printf("flag toggled to %d\n", flag);
+    pthread_mutex_unlock(&flag_mtx);
+}
+/* Resultat: flag toggled to 1 */
+
+/* == VOTRE EXERCICE ========================================
+ * Mutex POSIX : lock, section critique, unlock
+ * Inspirez-vous de example_toggle_flag ci-dessus.
+ * Protegez l'incrementation de counter avec mtx.
+ * ========================================================= */
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    /* TODO: lock mtx, print Locked, increment counter, print counter, unlock mtx, print Unlocked */
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    pthread_mutex_lock(&mtx);
+    printf("Locked\n");
+    counter++;
+    printf("counter = %d\n", counter);
+    ____(&mtx);  // libérer le verrou
+    printf("Unlocked\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    ____(&mtx);
+    printf("Locked\n");
+    counter++;
+    printf("counter = %d\n", counter);
+    ____(&mtx);
+    printf("Unlocked\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    // Acquérez le verrou, incrémentez counter, libérez
+    // Sortie attendue: "Locked\ncounter = 1\nUnlocked\n"
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Mutex POSIX : lock, section critique, unlock"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+Le compteur final ne correspond pas. Vérifie que le mutex est bien locké avant d'incrémenter et unlocké après.
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+Nos sondes IoT cumulent des lectures dans un compteur global. Deux threads l'incrémentent en parallèle et on obtient des résultats incohérents.
+
+Nous avons besoin d'un mutex POSIX pour protéger l'accès. Implémente pthread_mutex_lock/unlock autour de l'incrément.
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = ["pthread-01"]
+receivedTime = "09:30"
+subject = "Race condition sur compteur partagé — mutex POSIX urgent"
+successEmail = """
+Excellent. Le compteur est maintenant déterministe. Le mutex élimine la race condition sur nos capteurs.
+
+Merci — SensorGrid Ops"""
+syscallsInvolved = [
+    "pthread_mutex_init",
+    "pthread_mutex_lock",
+    "pthread_mutex_unlock",
+    "pthread_mutex_destroy",
+]
+tier = 2
+
+[validation]
+expected_output = """
+Locked
+counter = 1
+Unlocked
+"""
+mode = "output"
+
+[visualizer]
+type = "thread_timeline"
+
+[[visualizer.steps]]
+explanation = "pthread_create lance t1 et t2 comme threads indépendants du scheduler OS. main() appelle ensuite pthread_join — sans ce join, la fin de main() terminerait le processus entier avant que t1 et t2 aient fini leur travail."
+label = "pthread_create — spawn t1 et t2"
+step_label = "Création des threads"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t1)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t2)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.locks]]
+name = "mtx"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "t1"
+label = "worker_1"
+state = "ready"
+
+[[visualizer.steps.threads]]
+id = "t2"
+label = "worker_2"
+state = "ready"
+
+[[visualizer.steps]]
+explanation = "pthread_mutex_lock bloque t2 immédiatement : le mutex est déjà détenu par t1. t2 entre dans la file d'attente interne du mutex (state=blocked). Cette exclusion mutuelle garantit qu'un seul thread à la fois exécute la section critique counter++."
+label = "t1 acquiert le mutex — t2 bloqué"
+step_label = "t1 → lock mtx"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t1)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t2)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t1"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+status = "blocked"
+thread = "t2"
+type = "lock"
+
+[[visualizer.steps.locks]]
+holder = "t1"
+name = "mtx"
+waiters = ["t2"]
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "t1"
+label = "worker_1"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "t2"
+label = "worker_2"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "t1 exécute counter++ en exclusivité. Sans mutex, deux threads pourraient lire counter=0 simultanément, calculer 0+1=1 chacun, et écrire 1 au lieu de 2 (race condition classique de type read-modify-write). Le mutex élimine ce risque."
+label = "t1 — section critique counter++"
+step_label = "t1 → counter++"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t1)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t2)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t1"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "counter++"
+thread = "t1"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+status = "blocked"
+thread = "t2"
+type = "lock"
+
+[[visualizer.steps.locks]]
+holder = "t1"
+name = "mtx"
+waiters = ["t2"]
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "t1"
+label = "worker_1"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "t2"
+label = "worker_2"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "pthread_mutex_unlock réveille t2 (qui attendait en sem_wait interne). Le noyau transfère la propriété du mutex à t2 — t2 peut maintenant incrémenter counter à 2. t1 passe à l'état ready (il peut continuer mais n'est plus dans la section critique)."
+label = "t1 unlock — t2 réveillé, acquiert mutex"
+step_label = "t1 → unlock, t2 lock"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t1)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t2)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t1"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "counter++"
+thread = "t1"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "mutex_unlock"
+thread = "t1"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t2"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "counter++"
+thread = "t2"
+type = "write"
+value = "2"
+
+[[visualizer.steps.locks]]
+holder = "t2"
+name = "mtx"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "t1"
+label = "worker_1"
+state = "ready"
+
+[[visualizer.steps.threads]]
+id = "t2"
+label = "worker_2"
+state = "running"
+
+[[visualizer.steps]]
+explanation = "pthread_join bloque main jusqu'à la terminaison de t1 et t2. Sans join, main() terminerait le processus avant que les threads aient fini. counter=2 est garanti déterministe grâce au mutex — sans lui, le résultat pourrait être 1 ou 2 selon l'ordonnancement."
+label = "t2 unlock — pthread_join — counter final = 2"
+step_label = "t2 → unlock, main join"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t1)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "pthread_create(t2)"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t1"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "counter++"
+thread = "t1"
+type = "write"
+value = "1"
+
+[[visualizer.steps.events]]
+label = "mutex_unlock"
+thread = "t1"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "thread exit"
+thread = "t1"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "mutex_lock"
+thread = "t2"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "counter++"
+thread = "t2"
+type = "write"
+value = "2"
+
+[[visualizer.steps.events]]
+label = "mutex_unlock"
+thread = "t2"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "thread exit"
+thread = "t2"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "pthread_join(t1,t2)"
+thread = "main"
+type = "join"
+
+[[visualizer.steps.locks]]
+name = "mtx"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "t1"
+label = "worker_1"
+state = "dead"
+
+[[visualizer.steps.threads]]
+id = "t2"
+label = "worker_2"
+state = "dead"

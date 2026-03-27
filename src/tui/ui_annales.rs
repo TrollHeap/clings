@@ -59,13 +59,8 @@ pub fn run_annales(annales: &[AnnaleSession], exercises: &[Exercise]) -> Result<
         .collect();
 
     if rows_data.is_empty() {
-        terminal.draw(|f| {
-            let area = f.area();
-            let text = "Aucune annale disponible.";
-            f.render_widget(Paragraph::new(text).block(Block::bordered()), area);
-        })?;
-        std::thread::sleep(Duration::from_secs(2));
         ratatui::restore();
+        eprintln!("Aucune annale disponible.");
         return Ok(());
     }
 

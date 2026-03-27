@@ -1,0 +1,319 @@
+common_mistake = "Ouvrir en mode texte ('w'/'r') au lieu de binaire ('wb'/'rb') — peut corrompre les données sur Windows"
+description = """
+NSY103 — `fwrite` et `fread` peuvent lire/écrire une struct entière en une seule opération. La struct est copiée bit à bit vers le fichier. Attention : ce format n'est pas portable (endianness, padding).
+
+Sérialisez un tableau de 3 records dans un fichier binaire, relisez-les et vérifiez l'intégrité."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    '''Mode binaire : `"wb"` pour écriture, `"rb"` pour lecture — le 'b' empêche la traduction \n''',
+    "`fwrite(recs, sizeof(Record), n, f)` écrit n structs d'un coup",
+    "`fread(recs, sizeof(Record), max, f)` retourne le nombre de structs lues",
+]
+id = "struct-serialize-01"
+kc_ids = ["KC-C03"]
+key_concept = "fwrite/fread sérialisent une struct bit à bit — rapide mais non portable entre architectures"
+lang = "c"
+prerequisites = ["struct-vtable-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    char name[20];
+    int age;
+    float score;
+} Record;
+
+int write_records(const char *path, const Record *recs, int n) {
+    FILE *f = fopen(path, "wb");
+    if (!f) return -1;
+    size_t written = fwrite(recs, sizeof(Record), n, f);
+    fclose(f);
+    return (int)written;
+}
+
+int read_records(const char *path, Record *recs, int max) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t nread = fread(recs, sizeof(Record), max, f);
+    fclose(f);
+    return (int)nread;
+}
+
+int main(void) {
+    Record data[] = {
+        {"Alice", 25, 92.5f},
+        {"Bob", 30, 87.3f},
+        {"Charlie", 22, 95.1f}
+    };
+    const char *path = "/tmp/kf_records.bin";
+    int w = write_records(path, data, 3);
+    printf("Written: %d records\n", w);
+
+    Record loaded[3] = {0};
+    int r = read_records(path, loaded, 3);
+    printf("Read: %d records\n", r);
+    for (int i = 0; i < r; i++) {
+        printf("%s, %d, %.1f\n", loaded[i].name, loaded[i].age, loaded[i].score);
+    }
+    printf("Integrity: %d\n", memcmp(data, loaded, sizeof(data)) == 0);
+    remove(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    char name[20];
+    int age;
+    float score;
+} Record;
+
+int write_records(const char *path, const Record *recs, int n) {
+    FILE *f = fopen(path, ____);
+    if (!f) return -1;
+    size_t written = fwrite(recs, sizeof(Record), ____, f);
+    fclose(f);
+    return (int)written;
+}
+
+int read_records(const char *path, Record *recs, int max) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t nread = ____(____, sizeof(Record), max, f);
+    fclose(f);
+    return (int)nread;
+}
+
+int main(void) {
+    Record data[] = {
+        {"Alice", 25, 92.5f},
+        {"Bob", 30, 87.3f},
+        {"Charlie", 22, 95.1f}
+    };
+    const char *path = "/tmp/kf_records.bin";
+    int w = write_records(path, data, 3);
+    printf("Written: %d records\n", w);
+
+    Record loaded[3] = {0};
+    int r = read_records(path, loaded, 3);
+    printf("Read: %d records\n", r);
+    for (int i = 0; i < r; i++) {
+        printf("%s, %d, %.1f\n", loaded[i].name, loaded[i].age, loaded[i].score);
+    }
+    printf("Integrity: %d\n", memcmp(data, loaded, sizeof(data)) == 0);
+    remove(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Sérialisation binaire d'un tableau de Vec2
+ * fwrite/fread copient sizeof(Vec2)*n octets bruts.
+ * =========================================================== */
+typedef struct { float x, y; } Vec2;
+
+void example_demo(void) {
+    Vec2 pts[] = {{1.0f, 2.0f}, {3.0f, 4.0f}};
+    FILE *f = fopen("/tmp/kf_vec2.bin", "wb");
+    fwrite(pts, sizeof(Vec2), 2, f);
+    fclose(f);
+    Vec2 loaded[2] = {0};
+    f = fopen("/tmp/kf_vec2.bin", "rb");
+    fread(loaded, sizeof(Vec2), 2, f);
+    fclose(f);
+    for (int i = 0; i < 2; i++)
+        printf("(%.1f, %.1f)\n", loaded[i].x, loaded[i].y);
+    remove("/tmp/kf_vec2.bin");
+}
+/* Resultat: (1.0, 2.0) / (3.0, 4.0) */
+
+/* == VOTRE EXERCICE =========================================
+ * Sérialisation de Record {name, age, score}
+ * write_records et read_records avec vérification memcmp
+ * =========================================================== */
+typedef struct { char name[20]; int age; float score; } Record;
+
+int write_records(const char *path, const Record *recs, int n) { (void)path; (void)recs; (void)n; return 0; }
+int read_records(const char *path, Record *recs, int max) { (void)path; (void)recs; (void)max; return 0; }
+
+int main(void) {
+    Record data[] = {{"Alice",25,92.5f},{"Bob",30,87.3f},{"Charlie",22,95.1f}};
+    /* TODO: write, read, verify */
+    (void)data;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { char name[20]; int age; float score; } Record;
+
+int write_records(const char *path, const Record *recs, int n) {
+    FILE *f = fopen(path, "wb");
+    if (!f) return -1;
+    size_t written = fwrite(recs, sizeof(Record), n, f);
+    fclose(f);
+    return (int)written;
+}
+
+int read_records(const char *path, Record *recs, int max) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t nread = fread(recs, sizeof(Record), max, f);
+    fclose(f);
+    return (int)nread;
+}
+
+int main(void) {
+    Record data[] = {{"Alice",25,92.5f},{"Bob",30,87.3f},{"Charlie",22,95.1f}};
+    const char *path = "/tmp/kf_records.bin";
+    int w = write_records(path, data, 3);
+    printf("Written: %d records\n", w);
+    Record loaded[3] = {0};
+    int r = read_records(path, loaded, 3);
+    printf("Read: %d records\n", r);
+    for (int i = 0; i < r; i++)
+        printf("%s, %d, %.1f\n", loaded[i].name, loaded[i].age, loaded[i].score);
+    printf("Integrity: %d\n", memcmp(data, loaded, sizeof(data)) == 0);
+    remove(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    char name[20];
+    int age;
+    float score;
+} Record;
+
+int write_records(const char *path, const Record *recs, int n) {
+    FILE *f = fopen(path, ____);
+    if (!f) return -1;
+    size_t written = fwrite(recs, sizeof(Record), ____, f);
+    fclose(f);
+    return (int)written;
+}
+
+int read_records(const char *path, Record *recs, int max) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t nread = ____(____, sizeof(Record), max, f);
+    fclose(f);
+    return (int)nread;
+}
+
+int main(void) {
+    Record data[] = {
+        {"Alice", 25, 92.5f},
+        {"Bob", 30, 87.3f},
+        {"Charlie", 22, 95.1f}
+    };
+    const char *path = "/tmp/kf_records.bin";
+    int w = write_records(path, data, 3);
+    printf("Written: %d records\n", w);
+
+    Record loaded[3] = {0};
+    int r = read_records(path, loaded, 3);
+    printf("Read: %d records\n", r);
+    for (int i = 0; i < r; i++) {
+        printf("%s, %d, %.1f\n", loaded[i].name, loaded[i].age, loaded[i].score);
+    }
+    printf("Integrity: %d\n", memcmp(data, loaded, sizeof(data)) == 0);
+    remove(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { char name[20]; int age; float score; } Record;
+
+// Implémentez write_records (fopen "wb", fwrite) et read_records (fopen "rb", fread)
+int main(void) {
+    Record data[] = {{"Alice",25,92.5f},{"Bob",30,87.3f},{"Charlie",22,95.1f}};
+    // TODO: écrire, relire, afficher, vérifier memcmp
+    (void)data;
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { char name[20]; int age; float score; } Record;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Sérialisation binaire struct vers fichier"
+
+[validation]
+expected_output = """
+Written: 3 records
+Read: 3 records
+Alice, 25, 92.5
+Bob, 30, 87.3
+Charlie, 22, 95.1
+Integrity: 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "3 structs Record contigus sur la pile. fwrite copie sizeof(Record)*3 octets bruts vers le fichier. Le fichier contient la représentation mémoire exacte, y compris le padding."
+heap = []
+label = "Tableau de records en mémoire"
+step_label = "Données source — 3 records contigus"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "data[0]"
+value = "{Alice, 25, 92.5}"
+
+[[visualizer.steps.stack]]
+name = "data[1]"
+value = "{Bob, 30, 87.3}"
+
+[[visualizer.steps.stack]]
+name = "data[2]"
+value = "{Charlie, 22, 95.1}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fread relit les octets bruts et les place dans loaded[]. memcmp vérifie l'identité bit à bit. Ce format n'est pas portable entre architectures (endianness, taille des types, padding)."
+heap = []
+label = "Après fread — données rechargées"
+step_label = "Données rechargées — memcmp == 0"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "loaded[0]"
+value = "{Alice, 25, 92.5}"
+
+[[visualizer.steps.stack]]
+name = "loaded[1]"
+value = "{Bob, 30, 87.3}"
+
+[[visualizer.steps.stack]]
+name = "loaded[2]"
+value = "{Charlie, 22, 95.1}"

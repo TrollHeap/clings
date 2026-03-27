@@ -1268,7 +1268,9 @@ mod tests {
             "path traversal should not create files outside work_dir"
         );
 
-        let _ = std::fs::remove_dir_all(&dir);
+        if let Err(e) = std::fs::remove_dir_all(&dir) {
+            eprintln!("test cleanup warning: {e}");
+        }
     }
 
     #[test]

@@ -1,0 +1,248 @@
+common_mistake = "Oublier le NULL terminal dans argv -- comportement indefini, crash probable"
+description = """
+NSY103 — La famille de fonctions exec remplace l'image du processus courant par un nouveau programme. execvp(file, argv) cherche le programme dans PATH. Apres exec reussi, le code original ne s'execute plus.
+
+Utilisez fork+execvp pour lancer /bin/echo dans un processus enfant."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Le tableau argv doit se terminer par NULL",
+    "execvp cherche le programme dans PATH — pas besoin du chemin complet",
+    "Apres un exec reussi, le code suivant ne s'execute jamais",
+]
+id = "exec-basic-01"
+kc_ids = ["KC-C07"]
+key_concept = "exec remplace l'image du processus -- le code apres exec ne s'execute qu'en cas d'erreur"
+lang = "c"
+prerequisites = ["fork-basic-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before exec\n");
+
+    pid_t child = fork();
+    if (child == -1) { perror("fork"); return 1; }
+
+    if (child == 0) {
+        /* L'enfant lance echo */
+        char *argv[] = {"echo", "Hello from exec!", NULL};
+        execvp("echo", argv);
+        /* Si on arrive ici, exec a echoue */
+        perror("execvp");
+        _exit(1);
+    }
+
+    int status;
+    waitpid(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Child exited: %d\n", WEXITSTATUS(status));
+
+    printf("Parent continues\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before exec\n");
+
+    pid_t child = fork();
+    if (child == -1) { perror("fork"); return 1; }
+
+    if (child == 0) {
+        /* L'enfant lance echo */
+        char *argv[] = {"echo", "Hello from exec!", ____};
+        ____("echo", argv);
+        /* Si on arrive ici, exec a echoue */
+        perror("execvp");
+        _exit(1);
+    }
+
+    int status;
+    ____(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Child exited: %d\n", WEXITSTATUS(status));
+
+    printf("Parent continues\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * fork + execlp (variante de exec avec liste d'args)
+ * execlp("ls", "ls", "-l", NULL)
+ * ================================================= */
+void example_exec(void) {
+    pid_t p = fork();
+    if (p == 0) {
+        execlp("echo", "echo", "example works", NULL);
+        _exit(1);
+    }
+    wait(NULL);
+    printf("example parent done\n");
+}
+/* Resultat: example works, example parent done */
+
+/* == VOTRE EXERCICE ================================
+ * fork + execvp avec tableau argv[]
+ * argv doit finir par NULL.
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before exec\n");
+    /* TODO: fork, enfant execvp("echo", argv), parent waitpid */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before exec\n");
+    pid_t child = ____();
+    if (child == -1) { perror("fork"); return 1; }
+    if (child == ____) {
+        char *argv[] = {"echo", "Hello from exec!", ____};
+        ____("echo", argv);
+        perror("execvp");
+        _exit(1);
+    }
+    int status;
+    ____(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Child exited: %d\n", WEXITSTATUS(status));
+    printf("Parent continues\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Before exec\n");
+
+    pid_t child = fork();
+    if (child == -1) { perror("fork"); return 1; }
+
+    if (child == 0) {
+        char *argv[] = {"echo", "Hello from exec!", ____};
+        ____("echo", argv);
+        perror("execvp");
+        _exit(1);
+    }
+
+    int status;
+    ____(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Child exited: %d\n", WEXITSTATUS(status));
+
+    printf("Parent continues\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    // printf Before exec
+    // fork(), enfant: char *argv[] = {"echo", "Hello from exec!", NULL};
+    // execvp("echo", argv) -- si echec, perror + _exit(1)
+    // Parent: waitpid, afficher code sortie, "Parent continues"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "processes"
+title = "execvp: remplacer le processus"
+
+[validation]
+expected_output = """
+Before exec
+Hello from exec!
+Child exited: 0
+Parent continues
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "L'enfant a une copie exacte du code parent"
+heap = []
+label = "fork() cree l'enfant"
+step_label = "fork"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Parent"
+value = "main() continue"
+
+[[visualizer.steps.stack]]
+name = "Enfant"
+value = "main() copie"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "exec remplace tout : code, donnees, pile -- seul le PID reste"
+heap = []
+label = "execvp remplace l'image de l'enfant"
+step_label = "execvp"
+
+[[visualizer.steps.call_frames]]
+args = '"Hello from exec!"'
+function_name = "echo"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Enfant (avant)"
+value = "main() de notre programme"
+
+[[visualizer.steps.stack]]
+name = "Enfant (apres)"
+value = '/bin/echo "Hello from exec!"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "waitpid attend la fin de echo et recupere son code retour"
+heap = []
+label = "Parent recupere le code de sortie"
+step_label = "waitpid"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "0 (echo success)"

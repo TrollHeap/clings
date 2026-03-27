@@ -1,0 +1,381 @@
+common_mistake = "Ne pas libérer chaque nœud : sauvegarder next avant free(cur)"
+description = """
+NSY103 — Une liste chaînée est une structure récursive : chaque nœud contient une valeur et un pointeur vers le nœud suivant. Le dernier nœud pointe vers NULL.
+
+Implémentez `append(head, val)` et `print_list(head)`, puis libérez la liste."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Struct : `typedef struct Node { int val; struct Node *next; } Node;`",
+    "append : si *head == NULL, le nouveau nœud devient la tête ; sinon parcourir jusqu'à cur->next == NULL",
+    "free_list : sauvegarder `Node *tmp = head->next;` avant `free(head);`",
+]
+id = "linked-list-01"
+kc_ids = ["KC-C03"]
+key_concept = "Chaque nœud alloué séparément ; traversée via ->next jusqu'à NULL"
+lang = "c"
+prerequisites = ["struct-ptr-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct Node { int val; struct Node *next; } Node;
+Node *make_node(int val) {
+    Node *n = malloc(sizeof(Node));
+    if (!n) return NULL;
+    n->val = val; n->next = NULL;
+    return n;
+}
+void append(Node **head, int val) {
+    Node *n = make_node(val);
+    if (!*head) { *head = n; return; }
+    Node *cur = *head;
+    while (cur->next) cur = cur->next;
+    cur->next = n;
+}
+void print_list(Node *head) {
+    for (Node *cur = head; cur; cur = cur->next)
+        printf("%d", cur->val);
+    printf("\n");
+}
+void free_list(Node *head) {
+    while (head) { Node *tmp = head->next; free(head); head = tmp; }
+}
+int list_length(Node *head) {
+    int count = 0;
+    for (Node *cur = head; cur; cur = cur->next) count++;
+    return count;
+}
+int list_sum(Node *head) {
+    int sum = 0;
+    for (Node *cur = head; cur; cur = cur->next) sum += cur->val;
+    return sum;
+}
+Node *list_find(Node *head, int val) {
+    for (Node *cur = head; cur; cur = cur->next)
+        if (cur->val == val) return cur;
+    return NULL;
+}
+
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *make_node(int val) {
+    Node *n = malloc(sizeof(Node));
+    if (!n) return NULL;
+    n->val = val; n->next = NULL;
+    return n;
+}
+
+void append(Node **head, int val) {
+    Node *n = make_node(val);
+    if (!____) { *head = n; return; }
+    Node *cur = ____;
+    while (____->next) cur = cur->next;
+    cur->next = n;
+}
+
+void print_list(Node *head) {
+    for (Node *cur = head; ____; cur = ____)
+        printf("%d", cur->val);
+    printf("\n");
+}
+
+void free_list(Node *head) {
+    while (head) { Node *tmp = head->next; ____; head = tmp; }
+}
+
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Pile (stack) avec push et print via liste chainee
+ * Chaque noeud pointe vers le suivant; push ajoute en tete.
+ * =========================================================== */
+typedef struct SNode { int val; struct SNode *next; } SNode;
+
+SNode *example_push(SNode *top, int val) {
+    SNode *n = malloc(sizeof(SNode));
+    if (!n) return top;
+    n->val = val;
+    n->next = top;
+    return n;
+}
+void example_print_stack(SNode *top) {
+    for (SNode *cur = top; cur; cur = cur->next)
+        printf("%d ", cur->val);
+    printf("\n");
+}
+void example_free_stack(SNode *top) {
+    while (top) { SNode *tmp = top->next; free(top); top = tmp; }
+}
+void example_demo(void) {
+    SNode *stack = NULL;
+    stack = example_push(stack, 10);
+    stack = example_push(stack, 20);
+    stack = example_push(stack, 30);
+    example_print_stack(stack);
+    example_free_stack(stack);
+}
+/* Resultat: 30 20 10 (LIFO: dernier empile, premier affiche) */
+
+/* == VOTRE EXERCICE =========================================
+ * Liste chainee avec append (ajout en fin) et print
+ * Inspirez-vous de example_push ci-dessus.
+ * Implementez make_node, append, print_list, free_list.
+ * =========================================================== */
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *make_node(int val) {
+    (void)val;
+    return NULL; /* TODO */
+}
+void append(Node **head, int val) {
+    (void)head; (void)val; /* TODO */
+}
+void print_list(Node *head) {
+    (void)head; /* TODO */
+}
+void free_list(Node *head) {
+    (void)head; /* TODO */
+}
+
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *make_node(int val) {
+    Node *n = malloc(sizeof(Node));
+    if (!n) return NULL;
+    n->val = val; n->next = NULL;
+    return n;
+}
+void append(Node **head, int val) {
+    Node *n = make_node(val);
+    if (!*head) { *head = n; return; }
+    Node *cur = *head;
+    while (cur->next) cur = cur->next;
+    cur->next = n;
+}
+void print_list(Node *head) {
+    for (Node *cur = head; cur; cur = cur->next)
+        printf("%d", cur->val);
+    printf("\n");
+}
+void free_list(Node *head) {
+    while (head) { Node *tmp = ____; ____; head = tmp; } // libérer chaque nœud
+}
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *make_node(int val) {
+    Node *n = malloc(sizeof(Node));
+    if (!n) return NULL;
+    n->val = val; n->next = NULL;
+    return n;
+}
+
+void append(Node **head, int val) {
+    Node *n = make_node(val);
+    if (!____) { *head = n; return; }
+    Node *cur = ____;
+    while (____->next) cur = cur->next;
+    cur->next = n;
+}
+
+void print_list(Node *head) {
+    for (Node *cur = head; ____; cur = ____)
+        printf("%d", cur->val);
+    printf("\n");
+}
+
+void free_list(Node *head) {
+    while (head) { Node *tmp = head->next; ____; head = tmp; }
+}
+
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int val; struct Node *next; } Node;
+
+// Implémentez make_node, append, print_list, free_list
+// append(&list, val) ajoute en fin de liste
+// print_list affiche les valeurs sans séparateur puis \n
+// free_list libère chaque nœud
+Node *make_node(int val) { return NULL; }
+void append(Node **head, int val) {}
+void print_list(Node *head) {}
+void free_list(Node *head) {}
+
+int main(void) {
+    Node *list = NULL;
+    append(&list, 1); append(&list, 2); append(&list, 3);
+    print_list(list);
+    free_list(list);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *make_node(int val) { return NULL; }
+void append(Node **head, int val) {}
+void print_list(Node *head) {}
+void free_list(Node *head) {}
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Liste chaînée simple — append et print"
+
+[validation]
+expected_output = """
+123
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Premier append : *head == NULL, donc le nouveau nœud devient la tête. list (stack) pointe directement vers Node{1} sur le heap."
+label = "append(&list, 1) — premier nœud"
+step_label = "Étape 1 — tête de liste"
+
+[[visualizer.steps.arrows]]
+from = "list"
+label = "head"
+to = "Node{1}"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "&list, 1"
+function_name = "append"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Node{1}"
+value = "val:1, next:NULL"
+
+[[visualizer.steps.stack]]
+name = "list"
+value = "→Node{1}"
+
+[[visualizer.steps]]
+explanation = "Chaque nœud suivant est alloué séparément sur le heap. La chaîne est parcourue via ->next jusqu'à ce que cur->next == NULL. Les flèches montrent la structure récursive."
+label = "append(&list, 2) et append(&list, 3) — chaîne"
+step_label = "Étape 2 — chaîne complète"
+
+[[visualizer.steps.arrows]]
+from = "list"
+label = "head"
+to = "Node{1}"
+
+[[visualizer.steps.arrows]]
+from = "Node{1}"
+label = "next"
+to = "Node{2}"
+
+[[visualizer.steps.arrows]]
+from = "Node{2}"
+label = "next"
+to = "Node{3}"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "&list, 3"
+function_name = "append"
+
+[[visualizer.steps.call_frames]]
+args = "3"
+function_name = "make_node"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Node{1}"
+value = "val:1, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{2}"
+value = "val:2, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{3}"
+value = "val:3, next:NULL"
+
+[[visualizer.steps.stack]]
+name = "list"
+value = "→Node{1}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "free_list sauvegarde tmp = head->next avant free(head). Sans cette précaution, le pointeur next serait perdu après la libération du nœud courant."
+heap = []
+label = "free_list — libérer nœud par nœud"
+step_label = "Étape 3 — free_list"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "list"
+function_name = "free_list"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "list"
+value = "NULL"

@@ -1,0 +1,444 @@
+common_mistake = "Croire qu'on traite Q1 après le round-robin complet de Q0 — en MLFQ, Q0 est toujours servi en premier à chaque round (goto next_round repart de q=0)"
+description = """
+NSY103 — Le MLFQ (Multi-Level Feedback Queue) est l'algorithme utilisé dans la plupart des OS modernes (Linux CFS en est une variante). Règles : Q0 (prio haute, quantum=1), Q1 (prio moyenne, quantum=2), Q2 (FCFS). Un processus démarre en Q0 ; s'il utilise tout son quantum, il descend d'une file.
+
+Simulez le MLFQ avec 3 processus (P1 burst=4, P2 burst=2, P3 burst=1). Affichez l'ordre d'exécution final."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "MLFQ : Q0 a la priorité la plus haute. On traite toujours Q0 avant Q1 avant Q2 — la boucle externe sur q garantit cela",
+    "Si un processus utilise tout son quantum Q0 (quantum=1), il passe en Q1 (procs[i].queue++) ; s'il utilise Q1 entier (quantum=2), il passe en Q2",
+    "P3 burst=1 : utilise 1 unité en Q0 et termine (burst<=0 donc done++, pas de dégradation)",
+    "Le goto next_round relance la boucle externe depuis q=0 après chaque exécution — Q0 est toujours servi en priorité",
+]
+id = "sched-mlfq-01"
+kc_ids = ["KC-C10"]
+key_concept = "MLFQ : haute priorité = quantum court ; processus CPU-bound descend vers files de prio inférieure"
+lang = "c"
+prerequisites = ["sched-fifo-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+void simulate_mlfq(Proc procs[], int nproc, int quantum[]) {
+    int time = 0, done = 0;
+    while (done < nproc) {
+        for (int q = 0; q <= 2; q++) {
+            for (int i = 0; i < nproc; i++) {
+                if (procs[i].burst <= 0 || procs[i].queue != q) continue;
+                int run = (q < 2 && quantum[q] < procs[i].burst) ? quantum[q] : procs[i].burst;
+                time += run;
+                procs[i].burst -= run;
+                if (procs[i].burst <= 0) done++;
+                else if (q < 2) procs[i].queue++;
+                goto next_round;
+            }
+        }
+        break;
+        next_round:;
+    }
+}
+
+int main(void) {
+    {
+        Proc procs[1] = {{1, 3, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Single process: 3 units in Q0 with quantum=1 */
+        /* T0(1) -> Q1, T1(1) -> Q1, T2(1) -> Q2 */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    {
+        Proc procs[2] = {{1, 1, 0}, {2, 1, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 2, quantum);
+        /* Both short, terminate in Q0 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+    }
+    {
+        Proc procs[3] = {
+        {1, 4, 0},
+        {2, 2, 0},
+        {3, 1, 0}
+        };
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 3, quantum);
+        /* P1: Q0(1) Q1(2) Q2(1) = 4 */
+        /* P2: Q0(1) Q1(1) = 2 */
+        /* P3: Q0(1) = 1 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+        printf("%d\n", (int)(procs[2].burst));
+    }
+    {
+        Proc procs[1] = {{1, 5, 0}};
+        int quantum[] = {2, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Q0: 2 units (demoted) */
+        /* Q1: 2 units (demoted) */
+        /* Q2: 1 unit (done) */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+void simulate_mlfq(Proc procs[], int nproc, int quantum[]) {
+    /* TODO: Boucle while (done < nproc) avec nested for q et for i */
+    /* TODO: run = (q < 2) ? min(quantum[q], burst) : burst */
+    /* TODO: Si burst <= 0 : done++ ; sinon si q < 2 : queue++ */
+    /* TODO: goto next_round pour relancer depuis Q0 */
+}
+
+int main(void) {
+    Proc procs[NPROC] = {{1,4,0},{2,2,0},{3,1,0}};
+    int quantum[] = {1, 2, 0}; /* Q0=1, Q1=2, Q2=FCFS */
+    // while (done < NPROC) :
+    //   for q=0 a 2 : trouver premier procs[i] avec queue==q et burst>0
+    //     run = (q<2 && quantum[q]<burst) ? quantum[q] : burst
+    //     afficher t, pid, q, run
+    //     time+=run ; burst-=run
+    //     si burst==0 : done++ ; sinon si q<2 : queue++
+    //     goto next_round (relance depuis q=0)
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == PRINCIPE MLFQ =================================
+ * Q0 (quantum=1, haute prio) -> Q1 (quantum=2) -> Q2 (FCFS)
+ * Regles :
+ *   1. Q0 est toujours servi avant Q1, Q1 avant Q2
+ *   2. Si processus epuise quantum Q0 -> descend en Q1
+ *   3. Si processus epuise quantum Q1 -> descend en Q2
+ *   4. Processus court termine en Q0 ou Q1 -> pas degrade
+ * Simulation avec P1(burst=4), P2(burst=2), P3(burst=1)
+ * ================================================= */
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+int main(void) {
+    Proc procs[NPROC] = {
+        {1, 4, 0},
+        {2, 2, 0},
+        {3, 1, 0}
+    };
+    int quantum[] = {1, 2, 0};
+    int time = 0, done = 0;
+    /* TODO: boucle while (done < NPROC) */
+    /*   for q de 0 a 2 : chercher premier procs[i] dans queue q */
+    /*     calculer run = min(quantum[q], procs[i].burst) si q<2 */
+    /*     printf("t=%d P%d Q%d runs %d\n", ...) */
+    /*     si burst==0 : done++ ; sinon si q<2 : procs[i].queue++ */
+    /*     goto next_round pour repartir de Q0 */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+int main(void) {
+    Proc procs[NPROC] = {
+        {1, 4, 0},
+        {2, 2, 0},
+        {3, 1, 0}
+    };
+    int quantum[] = {1, 2, 0};
+    int time = 0, done = 0;
+    while (done < NPROC) {
+        for (int q = 0; q <= 2; q++) {
+            for (int i = 0; i < NPROC; i++) {
+                if (procs[i].burst <= 0 || procs[i].queue != q) continue;
+                int run = (q < 2 && quantum[q] < procs[i].burst) ? quantum[q] : procs[i].burst;
+                printf("t=%d P%d Q%d runs %d\n", time, procs[i].pid, q, run);
+                time += run;
+                procs[i].burst -= run;
+                if (procs[i].burst <= 0) done++;
+                else if (q < ____) procs[i].queue++; // quelle limite?
+                goto next_round;
+            }
+        }
+        break;
+        next_round:;
+    }
+    return 0;
+}''',
+    """
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+void simulate_mlfq(Proc procs[], int nproc, int quantum[]) {
+    /* TODO: Boucle while (done < nproc) avec nested for q et for i */
+    /* TODO: run = (q < 2) ? min(quantum[q], burst) : burst */
+    /* TODO: Si burst <= 0 : done++ ; sinon si q < 2 : queue++ */
+    /* TODO: goto next_round pour relancer depuis Q0 */
+}
+
+int main(void) {
+    Proc procs[NPROC] = {{1,4,0},{2,2,0},{3,1,0}};
+    int quantum[] = {1, 2, 0}; /* Q0=1, Q1=2, Q2=FCFS */
+    // while (done < NPROC) :
+    //   for q=0 a 2 : trouver premier procs[i] avec queue==q et burst>0
+    //     run = (q<2 && quantum[q]<burst) ? quantum[q] : burst
+    //     afficher t, pid, q, run
+    //     time+=run ; burst-=run
+    //     si burst==0 : done++ ; sinon si q<2 : queue++
+    //     goto next_round (relance depuis q=0)
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+void simulate_mlfq(Proc procs[], int nproc, int quantum[]) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        Proc procs[1] = {{1, 3, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Single process: 3 units in Q0 with quantum=1 */
+        /* T0(1) -> Q1, T1(1) -> Q1, T2(1) -> Q2 */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    {
+        Proc procs[2] = {{1, 1, 0}, {2, 1, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 2, quantum);
+        /* Both short, terminate in Q0 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+    }
+    {
+        Proc procs[3] = {
+        {1, 4, 0},
+        {2, 2, 0},
+        {3, 1, 0}
+        };
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 3, quantum);
+        /* P1: Q0(1) Q1(2) Q2(1) = 4 */
+        /* P2: Q0(1) Q1(1) = 2 */
+        /* P3: Q0(1) = 1 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+        printf("%d\n", (int)(procs[2].burst));
+    }
+    {
+        Proc procs[1] = {{1, 5, 0}};
+        int quantum[] = {2, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Q0: 2 units (demoted) */
+        /* Q1: 2 units (demoted) */
+        /* Q2: 1 unit (done) */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define NPROC 3
+
+typedef struct { int pid; int burst; int queue; } Proc;
+
+void simulate_mlfq(Proc procs[], int nproc, int quantum[]) { }
+
+int main(void) {
+    {
+        Proc procs[1] = {{1, 3, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Single process: 3 units in Q0 with quantum=1 */
+        /* T0(1) -> Q1, T1(1) -> Q1, T2(1) -> Q2 */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    {
+        Proc procs[2] = {{1, 1, 0}, {2, 1, 0}};
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 2, quantum);
+        /* Both short, terminate in Q0 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+    }
+    {
+        Proc procs[3] = {
+        {1, 4, 0},
+        {2, 2, 0},
+        {3, 1, 0}
+        };
+        int quantum[] = {1, 2, 0};
+        simulate_mlfq(procs, 3, quantum);
+        /* P1: Q0(1) Q1(2) Q2(1) = 4 */
+        /* P2: Q0(1) Q1(1) = 2 */
+        /* P3: Q0(1) = 1 */
+        printf("%d\n", (int)(procs[0].burst));
+        printf("%d\n", (int)(procs[1].burst));
+        printf("%d\n", (int)(procs[2].burst));
+    }
+    {
+        Proc procs[1] = {{1, 5, 0}};
+        int quantum[] = {2, 2, 0};
+        simulate_mlfq(procs, 1, quantum);
+        /* Q0: 2 units (demoted) */
+        /* Q1: 2 units (demoted) */
+        /* Q2: 1 unit (done) */
+        printf("%d\n", (int)(procs[0].burst));
+    }
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "MLFQ : simulation d'un ordonnanceur à files multiples"
+
+[validation]
+expected_output = """
+0
+0
+0
+0
+0
+0
+0"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "MLFQ organise les processus en files de priorité décroissante. Tous les processus démarrent en Q0 (haute priorité, quantum court). Un processus qui consomme tout son quantum est dégradé vers la file inférieure : Q0→Q1→Q2. Cela favorise automatiquement les processus courts (interactifs) qui terminent avant d'atteindre Q2."
+label = "Files initiales : Q0=[P1,P2,P3], Q1=[], Q2=[]"
+step_label = "Étape 1 — Files initiales : tous en Q0 haute priorité"
+
+[[visualizer.steps.edges]]
+label = "dégradation"
+source = "q0"
+target = "q1"
+
+[[visualizer.steps.edges]]
+label = "dégradation"
+source = "q1"
+target = "q2"
+
+[[visualizer.steps.nodes]]
+id = "q0"
+label = """
+Q0 (quantum=1)
+[P1,P2,P3]"""
+
+[[visualizer.steps.nodes]]
+id = "q1"
+label = """
+Q1 (quantum=2)
+[]"""
+
+[[visualizer.steps.nodes]]
+id = "q2"
+label = """
+Q2 (FCFS)
+[]"""
+
+[[visualizer.steps]]
+explanation = "Chaque processus en Q0 s'exécute exactement 1 unité (quantum=1) avant d'être préempté. P1 (burst=4) et P2 (burst=2) n'ont pas fini → ils sont dégradés en Q1. P3 (burst=1) termine exactement en 1 quantum → done++, pas de dégradation. Après chaque exécution, goto next_round relance depuis Q0."
+label = "Tour Q0 : quantum=1 par processus, P3 termine"
+step_label = "Étape 2 — Q0 : 1 quantum chacun, P3 finit, P1 et P2 vers Q1"
+
+[[visualizer.steps.edges]]
+label = "t=1"
+source = "p1q0"
+target = "p2q0"
+
+[[visualizer.steps.edges]]
+label = "t=2"
+source = "p2q0"
+target = "p3q0"
+
+[[visualizer.steps.nodes]]
+id = "p1q0"
+label = """
+P1 Q0
+t=0→1
+burst rest=3→Q1"""
+
+[[visualizer.steps.nodes]]
+id = "p2q0"
+label = """
+P2 Q0
+t=1→2
+burst rest=1→Q1"""
+
+[[visualizer.steps.nodes]]
+id = "p3q0"
+label = """
+P3 Q0
+t=2→3
+burst=0 ✓"""
+
+[[visualizer.steps]]
+explanation = "En Q1 (quantum=2), P1 a burst=3 restant → s'exécute 2 unités → burst=1 restant → dégradé en Q2. P2 a burst=1 restant < quantum=2 → s'exécute entièrement (1 unité) → termine. P2 termine avant P1 bien qu'ayant un burst initial plus grand que P3 — le MLFQ favorise les processus qui libèrent le CPU rapidement."
+label = "Tour Q1 : P1 (quantum=2), P2 finit"
+step_label = "Étape 3 — Q1 : P1 dégradé vers Q2, P2 termine"
+
+[[visualizer.steps.edges]]
+label = "t=5"
+source = "p1q1"
+target = "p2q1"
+
+[[visualizer.steps.nodes]]
+id = "p1q1"
+label = """
+P1 Q1
+t=3→5
+burst rest=1→Q2"""
+
+[[visualizer.steps.nodes]]
+id = "p2q1"
+label = """
+P2 Q1
+t=5→6
+burst=0 ✓"""
+
+[[visualizer.steps]]
+edges = []
+explanation = "En Q2 (FCFS, quantum infini), P1 s'exécute jusqu'à complétion avec son burst restant de 1 unité. Le MLFQ identifie automatiquement P1 comme un processus CPU-bound et le traite avec la priorité la plus basse. Dans Linux, le CFS (Completely Fair Scheduler) implémente un principe similaire via le vruntime : les processus consommant plus de CPU reçoivent une priorité dynamiquement plus faible."
+label = "Q2 FCFS : P1 finit (burst=1 restant)"
+step_label = "Étape 4 — Q2 FCFS : P1 CPU-bound termine en dernière file"
+
+[[visualizer.steps.nodes]]
+id = "p1q2"
+label = """
+P1 Q2
+t=6→7
+burst=0 ✓"""

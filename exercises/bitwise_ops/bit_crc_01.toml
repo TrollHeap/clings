@@ -1,0 +1,441 @@
+common_mistake = "Tester le mauvais bit: CRC-8 teste le MSB (0x80), pas le LSB (0x01)"
+description = """
+NSY103 — Le CRC (Cyclic Redundancy Check) détecte les erreurs de transmission en divisant les données par un polynôme via XOR. Le CRC-8 utilise un polynôme de 8 bits (ex: 0x07 pour CRC-8/CCITT). Pour chaque bit à 1 du MSB, on XOR avec le polynôme.
+
+Implémentez un calcul CRC-8 bit par bit et avec table pré-calculée."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "0x80 teste le bit de poids fort (MSB) — c'est le bit qui décide si on XOR avec le polynôme",
+    "Le polynôme CRC-8/CCITT est 0x07 (x^8 + x^2 + x + 1)",
+    "La version table: l'index est crc ^ data[i], le lookup remplace la boucle de 8 bits",
+]
+id = "bit-crc-01"
+kc_ids = ["KC-C04"]
+key_concept = "CRC = division polynomiale par XOR — si MSB=1: shift+XOR poly, sinon shift. La table précalcule pour O(n) au lieu de O(8n)"
+lang = "c"
+prerequisites = ["bit-perm-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+unsigned char crc8_bitwise(const unsigned char *data, int len, unsigned char poly) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ poly;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+void build_crc8_table(unsigned char table[256], unsigned char poly) {
+    for (int i = 0; i < 256; i++) {
+        unsigned char crc = (unsigned char)i;
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ poly;
+            } else {
+                crc <<= 1;
+            }
+        }
+        table[i] = crc;
+    }
+}
+
+unsigned char crc8_table(const unsigned char *data, int len, const unsigned char table[256]) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc = table[crc ^ data[i]];
+    }
+    return crc;
+}
+
+int main(void) {
+    unsigned char poly = 0x07;
+    unsigned char msg1[] = {0x00};
+    unsigned char msg2[] = {0x01, 0x02, 0x03};
+    const char *msg3 = "Hello";
+    unsigned char msg4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    printf("CRC8 bitwise:\n");
+    printf("  [00]          = 0x%02X\n", crc8_bitwise(msg1, 1, poly));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_bitwise(msg2, 3, poly));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_bitwise((const unsigned char *)msg3, 5, poly));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_bitwise(msg4, 4, poly));
+    unsigned char table[256];
+    build_crc8_table(table, poly);
+    printf("CRC8 table:\n");
+    printf("  [00]          = 0x%02X\n", crc8_table(msg1, 1, table));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_table(msg2, 3, table));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_table((const unsigned char *)msg3, 5, table));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_table(msg4, 4, table));
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+unsigned char crc8_bitwise(const unsigned char *data, int len, unsigned char poly) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0) {
+                crc = (crc << 1) ^ 0;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+void build_crc8_table(unsigned char table[256], unsigned char poly) {
+    for (int i = 0; i < 256; i++) {
+        unsigned char crc = (unsigned char)i;
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ poly;
+            } else {
+                crc <<= 1;
+            }
+        }
+        table[i] = crc;
+    }
+}
+
+unsigned char crc8_table(const unsigned char *data, int len, const unsigned char table[256]) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc = table[crc ^ 0];
+    }
+    return crc;
+}
+
+int main(void) {
+    unsigned char poly = 0x07;
+    unsigned char msg1[] = {0x00};
+    unsigned char msg2[] = {0x01, 0x02, 0x03};
+    const char *msg3 = "Hello";
+    unsigned char msg4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    printf("CRC8 bitwise:\n");
+    printf("  [00]          = 0x%02X\n", crc8_bitwise(msg1, 1, poly));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_bitwise(msg2, 3, poly));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_bitwise((const unsigned char *)msg3, 5, poly));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_bitwise(msg4, 4, poly));
+    unsigned char table[256];
+    build_crc8_table(table, poly);
+    printf("CRC8 table:\n");
+    printf("  [00]          = 0x%02X\n", crc8_table(msg1, 1, table));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_table(msg2, 3, table));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_table((const unsigned char *)msg3, 5, table));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_table(msg4, 4, table));
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * CRC = division polynomiale binaire via XOR
+ * Si MSB=1: shift gauche + XOR avec polynôme
+ * Si MSB=0: shift gauche seulement
+ * =========================================================== */
+void example_crc(void) {
+    unsigned char crc = 0x01;
+    unsigned char poly = 0x07;
+    for (int bit = 0; bit < 8; bit++) {
+        if (crc & 0x80)
+            crc = (crc << 1) ^ poly;
+        else
+            crc <<= 1;
+    }
+    printf("CRC of 0x01 = 0x%02X\n", crc);
+}
+
+/* == VOTRE EXERCICE ========================================= */
+
+unsigned char crc8_bitwise(const unsigned char *data, int len, unsigned char poly) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ poly;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+void build_crc8_table(unsigned char table[256], unsigned char poly) {
+    for (int i = 0; i < 256; i++) {
+        unsigned char crc = (unsigned char)i;
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80)
+                crc = (crc << 1) ^ poly;
+            else
+                crc <<= 1;
+        }
+        table[i] = crc;
+    }
+}
+
+unsigned char crc8_table(const unsigned char *data, int len, const unsigned char table[256]) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++)
+        crc = table[crc ^ data[i]];
+    return crc;
+}
+
+int main(void) {
+    unsigned char poly = 0x07;
+    unsigned char msg1[] = {0x00};
+    unsigned char msg2[] = {0x01, 0x02, 0x03};
+    const char *msg3 = "Hello";
+    unsigned char msg4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    printf("CRC8 bitwise:\n");
+    printf("  [00]          = 0x%02X\n", crc8_bitwise(msg1, 1, poly));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_bitwise(msg2, 3, poly));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_bitwise((const unsigned char *)msg3, 5, poly));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_bitwise(msg4, 4, poly));
+    unsigned char table[256];
+    build_crc8_table(table, poly);
+    printf("CRC8 table:\n");
+    printf("  [00]          = 0x%02X\n", crc8_table(msg1, 1, table));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_table(msg2, 3, table));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_table((const unsigned char *)msg3, 5, table));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_table(msg4, 4, table));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+unsigned char crc8_bitwise(const unsigned char *data, int len, unsigned char poly) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ poly;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+void build_crc8_table(unsigned char table[256], unsigned char poly) {
+    for (int i = 0; i < 256; i++) {
+        unsigned char crc = (unsigned char)i;
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80)
+                crc = (crc << 1) ^ poly;
+            else
+                crc <<= 1;
+        }
+        table[i] = crc;
+    }
+}
+
+unsigned char crc8_table(const unsigned char *data, int len, const unsigned char table[256]) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc = table[crc ____ data[i]];
+    }
+    return crc;
+}
+
+int main(void) {
+    unsigned char poly = 0x07;
+    unsigned char msg1[] = {0x00};
+    unsigned char msg2[] = {0x01, 0x02, 0x03};
+    const char *msg3 = "Hello";
+    unsigned char msg4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    printf("CRC8 bitwise:\n");
+    printf("  [00]          = 0x%02X\n", crc8_bitwise(msg1, 1, poly));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_bitwise(msg2, 3, poly));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_bitwise((const unsigned char *)msg3, 5, poly));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_bitwise(msg4, 4, poly));
+    unsigned char table[256];
+    build_crc8_table(table, poly);
+    printf("CRC8 table:\n");
+    printf("  [00]          = 0x%02X\n", crc8_table(msg1, 1, table));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_table(msg2, 3, table));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_table((const unsigned char *)msg3, 5, table));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_table(msg4, 4, table));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+unsigned char crc8_bitwise(const unsigned char *data, int len, unsigned char poly) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & ____) {
+                crc = (crc << 1) ^ ____;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+void build_crc8_table(unsigned char table[256], unsigned char poly) {
+    for (int i = 0; i < 256; i++) {
+        unsigned char crc = (unsigned char)i;
+        for (int bit = 0; bit < 8; bit++) {
+            if (crc & 0x80)
+                crc = (crc << 1) ^ poly;
+            else
+                crc <<= 1;
+        }
+        table[i] = crc;
+    }
+}
+
+unsigned char crc8_table(const unsigned char *data, int len, const unsigned char table[256]) {
+    unsigned char crc = 0x00;
+    for (int i = 0; i < len; i++) {
+        crc = table[crc ____ data[i]];
+    }
+    return crc;
+}
+
+int main(void) {
+    unsigned char poly = 0x07;
+    unsigned char msg1[] = {0x00};
+    unsigned char msg2[] = {0x01, 0x02, 0x03};
+    const char *msg3 = "Hello";
+    unsigned char msg4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    printf("CRC8 bitwise:\n");
+    printf("  [00]          = 0x%02X\n", crc8_bitwise(msg1, 1, poly));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_bitwise(msg2, 3, poly));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_bitwise((const unsigned char *)msg3, 5, poly));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_bitwise(msg4, 4, poly));
+    unsigned char table[256];
+    build_crc8_table(table, poly);
+    printf("CRC8 table:\n");
+    printf("  [00]          = 0x%02X\n", crc8_table(msg1, 1, table));
+    printf("  [01 02 03]    = 0x%02X\n", crc8_table(msg2, 3, table));
+    printf("  \"Hello\"       = 0x%02X\n", crc8_table((const unsigned char *)msg3, 5, table));
+    printf("  [FF FF FF FF] = 0x%02X\n", crc8_table(msg4, 4, table));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+// CRC-8 avec polynôme 0x07:
+// crc8_bitwise: pour chaque octet, XOR dans crc, puis 8 tours de:
+//   si MSB=1: crc = (crc<<1) ^ poly, sinon crc <<= 1
+// build_crc8_table: pré-calcule CRC de chaque octet 0-255
+// crc8_table: crc = table[crc ^ data[i]] pour chaque octet
+// Tester: [00], [01 02 03], "Hello", [FF FF FF FF]
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "bitwise_ops"
+title = "Calcul CRC-8 avec XOR"
+
+[validation]
+expected_output = """
+CRC8 bitwise:
+  [00]          = 0x00
+  [01 02 03]    = 0x48
+  "Hello"       = 0xF6
+  [FF FF FF FF] = 0xDE
+CRC8 table:
+  [00]          = 0x00
+  [01 02 03]    = 0x48
+  "Hello"       = 0xF6
+  [FF FF FF FF] = 0xDE"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Pour chaque bit: si MSB=1, shift+XOR poly; sinon juste shift. Division polynomiale binaire."
+heap = []
+label = "CRC-8 bitwise: traitement d'un octet"
+step_label = "1. Bitwise"
+
+[[visualizer.steps.call_frames]]
+args = "[0x01], poly=0x07"
+function_name = "crc8_bitwise"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "crc"
+value = "0x00 initial"
+
+[[visualizer.steps.stack]]
+name = "crc ^= 0x01"
+value = "0x01 = 00000001b"
+
+[[visualizer.steps.stack]]
+name = "bit 7: MSB=0"
+value = "crc <<= 1 → 0x02"
+
+[[visualizer.steps.stack]]
+name = "..."
+value = "bits 6-1: MSB=0, shift left"
+
+[[visualizer.steps.stack]]
+name = "bit 0: MSB=0"
+value = "crc = 0x80"
+
+[[visualizer.steps.stack]]
+name = "résultat"
+value = "crc après 8 bits de 0x01"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "La table pré-calcule les 8 tours de boucle — 256x plus rapide sur les gros messages"
+heap = []
+label = "Table CRC: lookup O(1) par octet"
+step_label = "2. Table"
+
+[[visualizer.steps.call_frames]]
+args = "data, table"
+function_name = "crc8_table"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "table[i]"
+value = "CRC de l'octet i seul (256 entrées)"
+
+[[visualizer.steps.stack]]
+name = "crc = table[crc ^ data[0]]"
+value = "XOR combine CRC courant + données"
+
+[[visualizer.steps.stack]]
+name = "crc = table[crc ^ data[1]]"
+value = "Enchaînement: 1 lookup par octet"

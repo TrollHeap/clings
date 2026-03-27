@@ -1,0 +1,230 @@
+common_mistake = "Oublier le & devant la variable — __atomic_add_fetch prend un pointeur, pas une valeur"
+description = """
+NSY103 — Les builtins __atomic de GCC garantissent des opérations indivisibles sur des variables partagées, sans mutex. __atomic_add_fetch effectue une addition atomique et retourne la nouvelle valeur.
+
+Utilisez __atomic_add_fetch pour incrémenter un compteur de manière thread-safe avec deux threads."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Le builtin est __atomic_add_fetch pour addition atomique",
+    "Le premier argument est l'adresse : &counter",
+    "Le résultat attendu est 200000 car les opérations sont atomiques",
+]
+id = "sync-atomic-01"
+kc_ids = ["KC-C22"]
+key_concept = "__atomic_add_fetch(&var, val, order) effectue var += val de manière atomique et retourne la nouvelle valeur"
+lang = "c"
+prerequisites = ["sync-race-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Atomique: %s\n", counter == 200000 ? "OUI" : "NON");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        ____(____counter, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Atomique: %s\n", counter == ____ ? "OUI" : "NON");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Atomique : __atomic_sub_fetch pour décrémenter
+ * On décrémente un compteur partagé de manière atomique.
+ * ========================================================= */
+int shared_val = 1000;
+
+void *decrement_example(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 500; i++) {
+        __atomic_sub_fetch(&shared_val, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
+
+void example_atomic_sub(void) {
+    pthread_t ta, tb;
+    pthread_create(&ta, NULL, decrement_example, NULL);
+    pthread_create(&tb, NULL, decrement_example, NULL);
+    pthread_join(ta, NULL);
+    pthread_join(tb, NULL);
+    printf("shared_val: %d (attendu: 0)\n", shared_val);
+}
+/* Résultat : shared_val vaut toujours exactement 0 */
+
+/* == VOTRE EXERCICE ========================================
+ * Utilisez __atomic_add_fetch pour incrémenter counter.
+ * Inspirez-vous de __atomic_sub_fetch ci-dessus.
+ * ========================================================= */
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        /* TODO: __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST) */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Atomique: %s\n", counter == 200000 ? "OUI" : "NON");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        __atomic_add_fetch(&counter, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Atomique: %s\n", counter == ____ ? "OUI" : "NON"); /* valeur attendue */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        ____(____counter, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Atomique: %s\n", counter == ____ ? "OUI" : "NON");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Variable globale counter = 0
+// Fonction increment : boucle 100000 fois, __atomic_add_fetch
+// main : 2 threads, joindre, afficher counter et vérifier == 200000
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Opérations atomiques avec __atomic builtins"
+
+[validation]
+expected_output = """
+Counter: 200000
+Atomique: OUI
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Avec __atomic_add_fetch, chaque incrémentation est une instruction atomique : read-modify-write en une seule opération indivisible."
+heap = []
+label = "Opération atomique — indivisible"
+step_label = "Atomique"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "0 (global)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Contrairement à counter++, __atomic_add_fetch ne peut pas perdre d'incrémentation. Le résultat est toujours 200000."
+heap = []
+label = "Résultat garanti"
+step_label = "Résultat"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "200000 (exact)"

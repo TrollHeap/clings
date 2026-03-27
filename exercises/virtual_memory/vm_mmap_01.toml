@@ -1,0 +1,245 @@
+common_mistake = "Utiliser MAP_PRIVATE au lieu de MAP_SHARED — les modifications ne seront pas sauvées"
+description = """
+NSY103 — mmap permet de mapper un fichier directement en mémoire. Les lectures/écritures sur la zone mappée sont traduites en I/O fichier par le noyau. C'est plus efficace que read/write pour les gros fichiers.
+
+Mappez un fichier en mémoire, lisez son contenu, modifiez-le via le mapping."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "mmap(NULL, len, prot, MAP_SHARED, fd, 0) mappe le fichier fd",
+    "MAP_SHARED fait que les modifications sont visibles dans le fichier",
+    "munmap libère le mapping — les données sont flushées vers le fichier",
+]
+id = "vm-mmap-01"
+kc_ids = ["KC-C18"]
+key_concept = "mmap MAP_SHARED mappe un fichier en mémoire — modifications visibles dans le fichier"
+lang = "c"
+prerequisites = ["vm-page-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_mmap.txt";
+    int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+    const char *data = "Hello mmap world!";
+    write(fd, data, strlen(data));
+    size_t len = strlen(data);
+    char *mapped = (char *)mmap(NULL, len,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED, fd, 0);
+    if (mapped == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    printf("Mapped: %s\n", mapped);
+    mapped[0] = 'J';
+    printf("Modified: %s\n", mapped);
+    munmap(mapped, len);
+    fd = open(path, O_RDONLY);
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("File after: %s\n", buf);
+    close(fd);
+    unlink(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_mmap.txt";
+    int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+    const char *data = "Hello mmap world!";
+    write(fd, data, strlen(data));
+    size_t len = strlen(data);
+    char *mapped = (char *)____(NULL, len,
+        PROT_READ | ____,
+        MAP_SHARED, fd, 0);
+    if (mapped == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    printf("Mapped: %s\n", mapped);
+    mapped[0] = 'J';
+    printf("Modified: %s\n", mapped);
+    ____(mapped, len);
+    fd = open(path, O_RDONLY);
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("File after: %s\n", buf);
+    close(fd);
+    unlink(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: mmap MAP_PRIVATE ======================== */
+void example_private(void) {
+    const char *p = "/tmp/kf_ex_priv.txt";
+    int fd = open(p, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    write(fd, "private", 7);
+    char *m = mmap(NULL, 7, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+    close(fd);
+    m[0] = 'P';
+    printf("Private mod: %.7s\n", m); /* Pne voit pas dans fichier */
+    munmap(m, 7); unlink(p);
+}
+
+int main(void) {
+    const char *path = "/tmp/kf_mmap.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *data = "Hello mmap world!";
+    write(fd, data, strlen(data));
+    size_t len = strlen(data);
+    char *mapped = (char *)mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mapped == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    printf("Mapped: %s\n", mapped);
+    mapped[0] = 'J';
+    printf("Modified: %s\n", mapped);
+    munmap(mapped, len);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File after: %s\n", buf);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_mmap.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *data = "Hello mmap world!";
+    write(fd, data, strlen(data));
+    size_t len = strlen(data);
+    char *mapped = (char *)mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mapped == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    printf("Mapped: %s\n", mapped);
+    mapped[0] = 'J';
+    printf("Modified: %s\n", mapped);
+    ____(mapped, len);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File after: %s\n", buf);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_mmap.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *data = "Hello mmap world!";
+    write(fd, data, strlen(data));
+    size_t len = strlen(data);
+    char *mapped = (char *)____(NULL, len,
+        PROT_READ | ____,
+        MAP_SHARED, fd, 0);
+    if (mapped == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    printf("Mapped: %s\n", mapped);
+    mapped[0] = 'J';
+    printf("Modified: %s\n", mapped);
+    ____(mapped, len);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File after: %s\n", buf);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+// Mappez un fichier en mémoire, modifiez via le mapping, vérifiez
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "mmap fichier: mapping en mémoire"
+
+[validation]
+expected_output = """
+Mapped: Hello mmap world!
+Modified: Jello mmap world!
+File after: Jello mmap world!
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le fichier est directement accessible en mémoire"
+label = "mmap MAP_SHARED"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "mapped"
+to = "mapping"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mapping"
+content = '"Hello mmap world!"'
+
+[[visualizer.steps.stack]]
+name = "mapped"
+value = "→ fichier en mémoire"
+
+[[visualizer.steps.stack]]
+name = "len"
+value = "17"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "MAP_SHARED: la modification est écrite dans le fichier"
+label = "Modification via mapping"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mapping"
+content = '"Jello mmap world!"'
+
+[[visualizer.steps.stack]]
+name = "mapped[0]"
+value = "'H' → 'J'"

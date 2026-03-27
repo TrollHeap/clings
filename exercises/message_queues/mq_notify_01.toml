@@ -1,0 +1,341 @@
+common_mistake = "Oublier que mq_notify est one-shot — pour des notifications continues il faut réenregistrer dans le callback"
+description = """
+NSY103 — mq_notify() enregistre une notification qui sera déclenchée quand un message arrive dans une file vide. On peut utiliser SIGEV_THREAD pour exécuter une fonction callback dans un nouveau thread. La notification est one-shot : il faut la réenregistrer après chaque déclenchement.
+
+Utilisez mq_notify avec SIGEV_THREAD pour être notifié de l'arrivée d'un message. Le callback lit et affiche le message."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "SIGEV_THREAD fait exécuter la callback dans un nouveau thread",
+    "sigev_notify_function pointe vers la fonction callback",
+    "mq_notify est one-shot : la notification ne se déclenche qu'une fois",
+]
+id = "mq-notify-01"
+kc_ids = ["KC-C12"]
+key_concept = "mq_notify + SIGEV_THREAD : notification asynchrone one-shot quand la file passe de vide à non vide"
+lang = "c"
+prerequisites = ["mq-multiproc-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+static mqd_t g_mq;
+static volatile int g_done = 0;
+
+static void notify_callback(union sigval sv) {
+    (void)sv;
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = mq_receive(g_mq, buf, sizeof(buf), &prio);
+    if (n > 0) {
+        buf[n] = '\0';
+        printf("Notified: %s\n", buf);
+    }
+    g_done = 1;
+}
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    g_mq = mq_open("/kf_mq_notify", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct sigevent sev;
+    sev.sigev_notify = SIGEV_THREAD;
+    sev.sigev_notify_function = notify_callback;
+    sev.sigev_notify_attributes = NULL;
+    mq_notify(g_mq, &sev);
+
+    mq_send(g_mq, "async msg", 9, 0);
+
+    while (!g_done)
+        usleep(10000);
+
+    mq_close(g_mq);
+    mq_unlink("/kf_mq_notify");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+static mqd_t g_mq;
+static volatile int g_done = 0;
+
+static void notify_callback(union sigval sv) {
+    (void)sv;
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(g_mq, buf, sizeof(buf), &prio);
+    if (n > 0) {
+        buf[n] = '\0';
+        printf("Notified: %s\n", buf);
+    }
+    g_done = 1;
+}
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    g_mq = mq_open("/kf_mq_notify", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct sigevent sev;
+    sev.sigev_notify = ____;
+    sev.sigev_notify_function = ____;
+    sev.sigev_notify_attributes = NULL;
+    mq_notify(g_mq, &sev);
+
+    mq_send(g_mq, "async msg", 9, 0);
+
+    while (!g_done)
+        usleep(10000);
+
+    mq_close(g_mq);
+    mq_unlink("/kf_mq_notify");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+/* == EXEMPLE =======================================
+ * Notification avec signal SIGUSR1
+ * mq_notify peut aussi utiliser SIGEV_SIGNAL.
+ * Ici on montre SIGEV_THREAD (plus simple, pas de handler).
+ * ================================================= */
+static mqd_t ex_mq;
+static void ex_callback(union sigval sv) {
+    (void)sv;
+    char buf[64]; mq_receive(ex_mq, buf, sizeof(buf), NULL);
+    buf[4] = '\0';
+    printf("Example got: %s\n", buf);
+}
+void example_notify(void) {
+    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };
+    ex_mq = mq_open("/kf_ex_notify", O_CREAT|O_RDWR, 0644, &a);
+    struct sigevent sev = { .sigev_notify = SIGEV_THREAD,
+                            .sigev_notify_function = ex_callback };
+    mq_notify(ex_mq, &sev);
+    mq_send(ex_mq, "test", 4, 0);
+    usleep(50000);
+    mq_close(ex_mq); mq_unlink("/kf_ex_notify");
+}
+/* Resultat: Example got: test */
+
+/* == VOTRE EXERCICE ================================
+ * mq_notify SIGEV_THREAD pour "async msg".
+ * ================================================= */
+static mqd_t g_mq;
+static volatile int g_done = 0;
+static void notify_callback(union sigval sv) {
+    (void)sv;
+    char buf[128]; unsigned int prio;
+    ssize_t n = mq_receive(g_mq, buf, sizeof(buf), &prio);
+    if (n > 0) { buf[n] = '\0'; printf("Notified: %s\n", buf); }
+    g_done = 1;
+}
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    g_mq = mq_open("/kf_mq_notify", O_CREAT|O_RDWR, 0644, &attr);
+    /* TODO: setup sigevent, mq_notify, mq_send, wait */
+    mq_close(g_mq); mq_unlink("/kf_mq_notify");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+static mqd_t g_mq;
+static volatile int g_done = 0;
+
+static void notify_callback(union sigval sv) {
+    (void)sv;
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(g_mq, buf, sizeof(buf), &prio);
+    if (n > 0) {
+        buf[n] = '\0';
+        printf("Notified: %s\n", buf);
+    }
+    g_done = 1;
+}
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    g_mq = mq_open("/kf_mq_notify", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct sigevent sev;
+    sev.sigev_notify = ____;
+    sev.sigev_notify_function = ____;
+    sev.sigev_notify_attributes = NULL;
+    mq_notify(g_mq, &sev);
+
+    mq_send(g_mq, "async msg", 9, 0);
+
+    while (!g_done)
+        usleep(10000);
+
+    mq_close(g_mq);
+    mq_unlink("/kf_mq_notify");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+static mqd_t g_mq;
+static volatile int g_done = 0;
+
+static void notify_callback(union sigval sv) {
+    (void)sv;
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(g_mq, buf, sizeof(buf), &prio);
+    if (n > 0) {
+        buf[n] = '\0';
+        printf("Notified: %s\n", buf);
+    }
+    g_done = 1;
+}
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    g_mq = mq_open("/kf_mq_notify", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct sigevent sev;
+    sev.sigev_notify = ____;
+    sev.sigev_notify_function = ____;
+    sev.sigev_notify_attributes = NULL;
+    mq_notify(g_mq, &sev);
+
+    mq_send(g_mq, "async msg", 9, 0);
+
+    while (!g_done)
+        usleep(10000);
+
+    mq_close(g_mq);
+    mq_unlink("/kf_mq_notify");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int main(void) {
+    // Créez /kf_mq_notify, définissez un callback SIGEV_THREAD
+    // Enregistrez avec mq_notify, envoyez "async msg"
+    // Attendez que le callback se déclenche et affiche "Notified: async msg"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Notification asynchrone mq_notify"
+
+[validation]
+expected_output = """
+Notified: async msg
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "mq_notify() enregistre une notification auprès du noyau : quand la file passera de vide à non-vide, le noyau créera un nouveau thread et exécutera notify_callback. SIGEV_THREAD est l'une des deux méthodes disponibles (l'autre étant SIGEV_SIGNAL). La notification est one-shot : elle doit être réenregistrée après chaque déclenchement."
+label = "mq_notify — enregistrement SIGEV_THREAD"
+step_label = "Étape 1 — mq_notify() enregistre la callback SIGEV_THREAD"
+
+[[visualizer.steps.edges]]
+label = "mq_notify"
+source = "sev"
+target = "mq"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_notify"
+
+[[visualizer.steps.nodes]]
+id = "sev"
+label = """
+sigevent
+SIGEV_THREAD
+callback"""
+
+[[visualizer.steps]]
+explanation = "mq_send() dépose le message dans la file du noyau. Comme la file était vide et qu'une notification était enregistrée, le noyau crée immédiatement un thread POSIX qui exécute notify_callback(). La notification ne se déclenche que sur la transition vide → non-vide, pas pour chaque message."
+label = "mq_send déclenche la notification"
+step_label = "Étape 2 — mq_send() déclenche la notification kernel"
+
+[[visualizer.steps.edges]]
+label = "file vide → non vide"
+source = "send"
+target = "thread"
+
+[[visualizer.steps.nodes]]
+id = "send"
+label = 'mq_send "async msg"'
+
+[[visualizer.steps.nodes]]
+id = "thread"
+label = """
+nouveau thread
+notify_callback"""
+
+[[visualizer.steps]]
+explanation = "Le callback s'exécute dans un nouveau thread créé par le noyau. Il appelle mq_receive() pour lire le message et affiche le résultat. Le flag g_done permet au thread principal de détecter la fin via une boucle d'attente. Pour des notifications continues, il faudrait rappeler mq_notify() depuis le callback."
+label = "Callback: mq_receive + printf"
+step_label = "Étape 3 — Callback : mq_receive() asynchrone dans le thread"
+
+[[visualizer.steps.edges]]
+label = "mq_receive + printf"
+source = "cb"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "cb"
+label = "notify_callback"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = '"Notified: async msg"'

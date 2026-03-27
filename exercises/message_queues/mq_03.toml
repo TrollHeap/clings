@@ -1,0 +1,432 @@
+common_mistake = "Implémenter un déqueue global (qhead++) sans compteur par type — perd le monitoring"
+description = """
+NSY103 — Un dispatcher traite les messages dans l'ordre FIFO mais compte par type. Enfilez task-A (t1), alert-B (t2), task-C (t1). Défilez dans l'ordre et comptez les occurrences par type.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Dans dispatch_all, `m->mtype` est à la fois l'index pour type_count[] et la valeur à afficher dans printf",
+    "type_count est indexé par mtype directement : type_count[m->mtype]++ incrémente le bon compteur",
+    "Le troisième message est de type 1 comme task-A — vérifiez que type1=2 dans la sortie finale",
+]
+id = "mq-03"
+kc_ids = ["KC-C12"]
+key_concept = "FIFO global + comptage par type = monitoring de trafic réseau ou dispatch de tâches"
+lang = "c"
+prerequisites = ["mq-02"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+void dispatch_all(void) {
+    while (qhead < qtail) {
+        MsgBuf *m = &queue[qhead++];
+        type_count[m->mtype]++;
+        printf("[%ld] %s\n", m->mtype, m->mtext);
+    }
+}
+
+int main(void) {
+    msgsnd_sim(1, "task-A");
+    msgsnd_sim(2, "alert-B");
+    msgsnd_sim(1, "task-C");
+    dispatch_all();
+    printf("type1=%d type2=%d\n", type_count[1], type_count[2]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+void dispatch_all(void) {
+    while (qhead < qtail) {
+        MsgBuf *m = &queue[qhead++];
+        type_count[m->____]++;
+        printf("[%ld] %s\n", m->____, m->mtext);
+    }
+}
+
+int main(void) {
+    msgsnd_sim(1, "task-A");
+    msgsnd_sim(2, "alert-B");
+    msgsnd_sim(____, "task-C");
+    dispatch_all();
+    printf("type1=%d type2=%d\n", type_count[1], type_count[2]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+/* == EXEMPLE ===============================================
+ * Comptage de messages par niveau de priorite
+ * Dispatch FIFO + compteur par priorite (1=low, 2=med, 3=high).
+ * ========================================================= */
+MsgBuf example_q[QUEUE_LEN];
+int example_head = 0, example_tail = 0;
+int prio_count[MAX_TYPE + 1] = {0};
+
+void example_send(long prio, const char *text) {
+    example_q[example_tail].mtype = prio;
+    strncpy(example_q[example_tail].mtext, text, MSG_SIZE - 1);
+    example_tail++;
+}
+
+void example_dispatch(void) {
+    while (example_head < example_tail) {
+        MsgBuf *m = &example_q[example_head++];
+        prio_count[m->mtype]++;
+        printf("[P%ld] %s\n", m->mtype, m->mtext);
+    }
+}
+
+void example_count_by_priority(void) {
+    example_send(2, "check-disk");
+    example_send(3, "cpu-alert");
+    example_send(2, "check-mem");
+    example_dispatch();
+    printf("P2=%d P3=%d\n", prio_count[2], prio_count[3]);
+}
+/* Resultat: [P2] check-disk, [P3] cpu-alert, [P2] check-mem, P2=2 P3=1 */
+
+/* == VOTRE EXERCICE ========================================
+ * File de messages : dispatch FIFO multi-type avec compteur
+ * Inspirez-vous de example_dispatch ci-dessus.
+ * Enfilez task-A(t1), alert-B(t2), task-C(t1), dispatchez, comptez.
+ * ========================================================= */
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+void dispatch_all(void) {
+    /* TODO: while qhead < qtail, dequeue, increment type_count[mtype], printf */
+}
+
+int main(void) {
+    msgsnd_sim(1, "task-A");
+    msgsnd_sim(2, "alert-B");
+    msgsnd_sim(1, "task-C");
+    dispatch_all();
+    printf("type1=%d type2=%d\n", type_count[1], type_count[2]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+void dispatch_all(void) {
+    while (qhead < qtail) {
+        MsgBuf *m = &queue[qhead++];
+        type_count[m->mtype]++;
+        printf("[%ld] %s\n", m->mtype, m->mtext);
+    }
+}
+
+int main(void) {
+    msgsnd_sim(1, "task-A");
+    msgsnd_sim(2, "alert-B");
+    msgsnd_sim(____, "task-C");  // même type que task-A
+    dispatch_all();
+    printf("type1=%d type2=%d\n", type_count[1], type_count[2]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+void dispatch_all(void) {
+    while (qhead < qtail) {
+        MsgBuf *m = &queue[qhead++];
+        type_count[m->____]++;
+        printf("[%ld] %s\n", m->____, m->mtext);
+    }
+}
+
+int main(void) {
+    msgsnd_sim(1, "task-A");
+    msgsnd_sim(2, "alert-B");
+    msgsnd_sim(____, "task-C");
+    dispatch_all();
+    printf("type1=%d type2=%d\n", type_count[1], type_count[2]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define MSG_SIZE 32
+#define QUEUE_LEN 8
+#define MAX_TYPE 3
+
+typedef struct { long mtype; char mtext[MSG_SIZE]; } MsgBuf;
+
+MsgBuf queue[QUEUE_LEN];
+int qhead = 0, qtail = 0;
+int type_count[MAX_TYPE + 1] = {0};
+
+void msgsnd_sim(long type, const char *text) {
+    queue[qtail].mtype = type;
+    strncpy(queue[qtail].mtext, text, MSG_SIZE - 1);
+    qtail++;
+}
+
+// Implémentez dispatch_all(void) :
+//   FIFO sur qhead<qtail, pointer sur &queue[qhead++]
+//   incrémenter type_count[m->mtype]
+//   printf "[mtype] mtext\n"
+
+int main(void) {
+    // Enfilez type=1 "task-A", type=2 "alert-B", type=1 "task-C"
+    // Appelez dispatch_all()
+    // Affichez "type1=X type2=Y" avec les compteurs
+    // Sortie : "[1] task-A\n[2] alert-B\n[1] task-C\ntype1=2 type2=1"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "File de messages : dispatch FIFO multi-type avec compteur"
+
+[mission]
+clientId = "omnicorp"
+clientName = "OmniCorp"
+contactEmail = "cto@omnicorp.sys"
+failureEmail = """
+Les compteurs ou l'ordre FIFO ne sont pas corrects. Vérifie type_count[m->mtype]++ et que qhead avance bien dans dispatch_all.
+
+CTO @ OmniCorp"""
+incidentEmail = """
+Directeur technique,
+
+Notre infrastructure de monitoring doit dispatcher les messages dans l'ordre FIFO tout en maintenant des compteurs par type pour l'analyse de trafic.
+
+Implémente dispatch_all : FIFO global (qhead++) + type_count[mtype]++ + affichage. Résultat attendu : type1=2 type2=1.
+
+CTO @ OmniCorp"""
+payout = 400
+prereqMissionIds = ["mq-02"]
+receivedTime = "09:30"
+subject = "Monitoring trafic réseau — dispatch FIFO avec comptage par type"
+successEmail = """
+Monitoring opérationnel. Le dispatch FIFO avec comptage par type est exactement ce qu'il faut pour notre système d'analyse de trafic réseau.
+
+OmniCorp CTO"""
+syscallsInvolved = [
+    "msgsnd",
+    "msgrcv",
+    "msgget",
+]
+tier = 4
+
+[validation]
+expected_output = """
+[1] task-A
+[2] alert-B
+[1] task-C
+type1=2 type2=1
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+explanation = "Trois messages de types variés sont enfilés dans l'ordre FIFO. Le tableau type_count[] est initialisé à zéro et servira de compteur par canal. En production, ce pattern permet de monitorer la charge par catégorie de message sans perturber l'ordre de traitement."
+label = "msgsnd × 3 : [t1:task-A, t2:alert-B, t1:task-C]"
+step_label = "Étape 1 — Initialisation de la file et des compteurs"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue
+[t1,t2,t1]"""
+
+[[visualizer.steps.nodes]]
+id = "cnt"
+label = """
+type_count
+[0,0,0]"""
+
+[[visualizer.steps]]
+explanation = "Le premier message (mtype=1, task-A) est défilé en FIFO : qhead passe de 0 à 1. Le noyau maintient mtype avec chaque message stocké, permettant ici d'incrémenter le compteur du bon canal et d'afficher le message dans son ordre d'arrivée."
+label = "dispatch [1] task-A — type_count[1]→1"
+step_label = "Étape 2 — Dispatch FIFO : task-A (type 1)"
+
+[[visualizer.steps.edges]]
+label = "type_count[1]++"
+source = "q"
+target = "cnt"
+
+[[visualizer.steps.edges]]
+label = "printf"
+source = "q"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue[0]
+mtype=1 task-A"""
+
+[[visualizer.steps.nodes]]
+id = "cnt"
+label = """
+type_count
+[0,1,0]"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = """
+stdout
+[1] task-A"""
+
+[[visualizer.steps]]
+explanation = "Le second message (mtype=2, alert-B) est dispatché dans l'ordre FIFO global. Malgré son type différent, il est traité à sa position dans la file. type_count[2] passe à 1, permettant de distinguer le volume d'alertes du volume de tâches normales."
+label = "dispatch [2] alert-B — type_count[2]→1"
+step_label = "Étape 3 — Dispatch FIFO : alert-B (type 2)"
+
+[[visualizer.steps.edges]]
+label = "type_count[2]++"
+source = "q"
+target = "cnt"
+
+[[visualizer.steps.edges]]
+label = "printf"
+source = "q"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue[1]
+mtype=2 alert-B"""
+
+[[visualizer.steps.nodes]]
+id = "cnt"
+label = """
+type_count
+[0,1,1]"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = """
+stdout
+[2] alert-B"""
+
+[[visualizer.steps]]
+explanation = "Le troisième message (mtype=1, task-C) est dispatché, portant type_count[1] à 2. Le bilan final montre type1=2 type2=1 : le FIFO global préserve l'ordre d'arrivée tout en permettant une analyse statistique par type, utile pour détecter des déséquilibres de charge en production."
+label = "dispatch [1] task-C — type_count[1]→2 → printf type1=2 type2=1"
+step_label = "Étape 4 — Dispatch final et bilan par type"
+
+[[visualizer.steps.edges]]
+label = "type_count[1]++"
+source = "q"
+target = "cnt"
+
+[[visualizer.steps.edges]]
+label = "type1=2 type2=1"
+source = "cnt"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "q"
+label = """
+queue[2]
+mtype=1 task-C"""
+
+[[visualizer.steps.nodes]]
+id = "cnt"
+label = """
+type_count
+[0,2,1]"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = """
+stdout
+type1=2 type2=1"""

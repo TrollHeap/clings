@@ -1,0 +1,222 @@
+common_mistake = "Oublier le préfixe 0 pour les littéraux octaux — 644 != 0644"
+description = """
+NSY103 — Les permissions Unix sont encodées dans `st_mode` : lecture (r=4), écriture (w=2), exécution (x=1) pour propriétaire, groupe, autres. `chmod()` modifie les permissions. `access()` vérifie les droits effectifs.
+
+Créez un fichier, affichez ses permissions, modifiez-les avec `chmod()`, puis vérifiez avec `stat()`."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Le masque `0777` extrait les 9 bits de permissions de st_mode",
+    "`chmod(chemin, mode)` change les permissions — ex: `chmod(path, 0400)` = lecture seule propriétaire",
+    "`S_IWUSR` est la constante pour le bit d'écriture du propriétaire",
+]
+id = "fs-perms-01"
+kc_ids = ["KC-C19"]
+key_concept = "Permissions Unix en octal : r=4, w=2, x=1 pour user/group/other"
+lang = "c"
+prerequisites = ["fs-stat-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_test_perms";
+    unlink(path);
+    FILE *f = fopen(path, "w");
+    fprintf(f, "secret");
+    fclose(f);
+
+    struct stat sb;
+    stat(path, &sb);
+    printf("Permissions initiales : %o\n", sb.st_mode & 0777);
+
+    chmod(path, 0400);
+
+    stat(path, &sb);
+    printf("Permissions modifiees : %o\n", sb.st_mode & 0777);
+    printf("Lecture proprio : %d\n", (sb.st_mode & S_IRUSR) ? 1 : 0);
+    printf("Ecriture proprio : %d\n", (sb.st_mode & S_IWUSR) ? 1 : 0);
+
+    chmod(path, 0644);
+    remove(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_test_perms";
+    FILE *f = fopen(path, "w");
+    fprintf(f, "secret");
+    fclose(f);
+
+    struct stat sb;
+    stat(path, &sb);
+    printf("Permissions initiales : %o\n", sb.st_mode & ____);
+
+    ____(path, 0400);
+
+    stat(path, &sb);
+    printf("Permissions modifiees : %o\n", sb.st_mode & 0777);
+    printf("Lecture proprio : %d\n", (sb.st_mode & S_IRUSR) ? 1 : 0);
+    printf("Ecriture proprio : %d\n", (sb.st_mode & ____) ? 1 : 0);
+
+    chmod(path, 0644);
+    remove(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+/* == EXEMPLE ================================================
+ * Verifier les permissions d'un repertoire
+ * st_mode & 0777 extrait les bits rwxrwxrwx
+ * S_IRUSR, S_IWUSR, S_IXUSR = bits du proprietaire
+ * =========================================================== */
+void example_check_perms(void) {
+    struct stat sb;
+    stat("/tmp", &sb);
+    printf("Permissions /tmp : %o\n", sb.st_mode & 0777);
+    printf("Ecriture tous : %d\n", (sb.st_mode & S_IWOTH) ? 1 : 0);
+    printf("Sticky bit : %d\n", (sb.st_mode & S_ISVTX) ? 1 : 0);
+}
+/* Resultat: Permissions /tmp : 1777, Ecriture tous : 1, Sticky: 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Creer un fichier, afficher ses permissions,
+ * les modifier avec chmod(), verifier le resultat.
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_test_perms";
+    unlink(path);
+    FILE *f = fopen(path, "w"); fprintf(f, "secret"); fclose(f);
+    struct stat sb;
+    ____(path, &sb);
+    printf("Permissions initiales : %o\n", sb.st_mode & 0777);
+    chmod(path, ____); // lecture seule proprio
+    stat(path, &sb);
+    printf("Permissions modifiees : %o\n", sb.st_mode & 0777);
+    printf("Lecture proprio : %d\n", (sb.st_mode & S_IRUSR) ? 1 : 0);
+    printf("Ecriture proprio : %d\n", (sb.st_mode & S_IWUSR) ? 1 : 0);
+    chmod(path, 0644); remove(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_test_perms";
+    unlink(path);
+    FILE *f = fopen(path, "w"); fprintf(f, "secret"); fclose(f);
+    struct stat sb;
+    stat(path, &sb);
+    printf("Permissions initiales : %o\n", sb.st_mode & ____);
+    ____(path, 0400);
+    stat(path, &sb);
+    printf("Permissions modifiees : %o\n", sb.st_mode & 0777);
+    printf("Lecture proprio : %d\n", (sb.st_mode & S_IRUSR) ? 1 : 0);
+    printf("Ecriture proprio : %d\n", (sb.st_mode & ____) ? 1 : 0);
+    chmod(path, 0644); remove(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    // Creer un fichier /tmp/kf_test_perms
+    // Afficher les permissions (st_mode & 0777)
+    // chmod() en lecture seule proprio (0400)
+    // Verifier S_IRUSR et S_IWUSR
+    // Nettoyer
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Permissions et chmod"
+
+[validation]
+expected_output = """
+Permissions initiales : 644
+Permissions modifiees : 400
+Lecture proprio : 1
+Ecriture proprio : 0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fopen() crée un fichier avec umask par défaut (typiquement 022), donc 0666 & ~022 = 0644. Les permissions sont : rw- (proprio), r-- (groupe), r-- (autres)."
+heap = []
+label = "Permissions initiales"
+step_label = "Permissions 0644 — rw-r--r--"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "st_mode & 0777"
+value = "0644"
+
+[[visualizer.steps.stack]]
+name = "rwxrwxrwx"
+value = "rw-r--r--"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "chmod(path, 0400) ne garde que le bit de lecture propriétaire. 4=lecture, 0=rien pour groupe et autres. Le fichier est en lecture seule pour le propriétaire."
+heap = []
+label = "Après chmod(0400)"
+step_label = "chmod(0400) — lecture seule propriétaire"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "st_mode & 0777"
+value = "0400"
+
+[[visualizer.steps.stack]]
+name = "rwxrwxrwx"
+value = "r--------"
+
+[[visualizer.steps.stack]]
+name = "S_IRUSR"
+value = "1 (actif)"
+
+[[visualizer.steps.stack]]
+name = "S_IWUSR"
+value = "0 (inactif)"

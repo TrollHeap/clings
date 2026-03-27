@@ -1,0 +1,358 @@
+common_mistake = "free(student) sans free(student->name) : fuite mémoire du champ chaîne"
+description = """
+NSY103 — Les structs avec des champs `char *` nécessitent deux allocations : une pour la struct elle-même, une pour chaque chaîne.
+
+Implémentez `Student` avec `char *name` (alloué dynamiquement) et `int grade`. Créez `make_student()`, `free_student()` et `print_student()`."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    '''Utilisez `malloc(strlen(name) + 1)` pour allouer la chaîne (+1 pour le '\0')''',
+    "free_student doit : `free(s->name); free(s);` dans cet ordre",
+    "Vérifier le retour de chaque malloc — si le 2ème échoue, libérer le 1er",
+]
+id = "malloc-struct-01"
+kc_ids = ["KC-C02"]
+key_concept = "Chaque malloc correspond à exactement un free — libérer les champs avant la struct"
+lang = "c"
+prerequisites = ["malloc-array-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) {
+    Student *s = malloc(sizeof(Student));
+    if (!s) return NULL;
+    s->name = malloc(strlen(name) + 1);
+    if (!s->name) { free(s); return NULL; }
+    strcpy(s->name, name);
+    s->grade = grade;
+    return s;
+}
+
+void free_student(Student *s) {
+    if (s) { free(s->name); free(s); }
+}
+
+int main(void) {
+    {
+        Student *s = make_student("Alice", 18);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        free_student(s);
+    }
+    {
+        Student *s = make_student("Bob", 15);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        printf("%s\n", s->name);
+        free_student(s);
+    }
+    {
+        Student *s = make_student("Charlie", 20);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        printf("%d\n", (int)(s->grade));
+        free_student(s);
+    }
+    {
+        Student *alice = make_student("Alice", 18);
+        Student *bob = make_student("Bob", 15);
+        printf("%d\n", (alice) != NULL ? 1 : 0);
+        printf("%d\n", (bob) != NULL ? 1 : 0);
+        printf("%s\n", alice->name);
+        printf("%s\n", bob->name);
+        free_student(alice);
+        free_student(bob);
+    }
+    {
+        Student *s = make_student("Test", 10);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        free_student(s);
+    }
+    return 0;
+}'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) {
+    /* TODO: malloc Student, malloc name string, strcpy, set grade */
+    return NULL;
+}
+
+void free_student(Student *s) {
+    /* TODO: free name, then free s */
+}
+
+int main(void) {
+    Student *alice = make_student("Alice", 18);
+    Student *bob   = make_student("Bob",   15);
+    print_student(alice);
+    print_student(bob);
+    free_student(alice);
+    free_student(bob);
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Struct avec champ dynamique int* (tableau de notes)
+ * Double allocation : struct + champ pointeur separe.
+ * =========================================================== */
+typedef struct { char *label; int *scores; int count; } Team;
+
+Team *example_make_team(const char *label, int count) {
+    Team *t = malloc(sizeof(Team));
+    if (!t) return NULL;
+    t->label = malloc(strlen(label) + 1);
+    if (!t->label) { free(t); return NULL; }
+    strcpy(t->label, label);
+    t->scores = malloc(count * sizeof(int));
+    if (!t->scores) { free(t->label); free(t); return NULL; }
+    t->count = count;
+    return t;
+}
+void example_free_team(Team *t) {
+    if (t) { free(t->scores); free(t->label); free(t); }
+}
+void example_demo(void) {
+    Team *t = example_make_team("Alpha", 2);
+    if (!t) return;
+    t->scores[0] = 90; t->scores[1] = 85;
+    printf("%s : %d, %d\n", t->label, t->scores[0], t->scores[1]);
+    example_free_team(t);
+}
+/* Resultat: Alpha : 90, 85 */
+
+/* == VOTRE EXERCICE =========================================
+ * Struct Student avec champ char* dynamique
+ * Inspirez-vous de example_make_team ci-dessus.
+ * Implementez make_student, free_student, print_student.
+ * =========================================================== */
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) {
+    (void)name; (void)grade;
+    return NULL; /* TODO */
+}
+void free_student(Student *s) { (void)s; /* TODO */ }
+void print_student(const Student *s) { (void)s; /* TODO */ }
+
+int main(void) {
+    Student *alice = make_student("Alice", 18);
+    Student *bob   = make_student("Bob",   15);
+    print_student(alice);
+    print_student(bob);
+    free_student(alice);
+    free_student(bob);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) {
+    Student *s = malloc(sizeof(Student));
+    if (!s) return NULL;
+    s->name = malloc(strlen(name) + 1);
+    if (!s->name) { free(s); return NULL; }
+    strcpy(s->name, name);
+    s->grade = grade;
+    return s;
+}
+void free_student(Student *s) {
+    if (s) { ____; ____; } // libérer name PUIS s
+}
+void print_student(const Student *s) { printf("%s : %d\n", s->name, s->grade); }
+int main(void) {
+    Student *alice = make_student("Alice", 18);
+    Student *bob   = make_student("Bob",   15);
+    print_student(alice);
+    print_student(bob);
+    free_student(alice);
+    free_student(bob);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) {
+    Student *s = ____;
+    if (!s) return NULL;
+    s->name = ____;
+    if (!s->name) { ____; return NULL; }
+    strcpy(s->name, name);
+    s->grade = grade;
+    return s;
+}
+
+void free_student(Student *s) {
+    if (s) { ____; ____; }
+}
+
+void print_student(const Student *s) {
+    printf("%s : %d\n", s->name, s->grade);
+}
+
+int main(void) {
+    Student *alice = make_student("Alice", 18);
+    Student *bob   = make_student("Bob",   15);
+    print_student(alice);
+    print_student(bob);
+    free_student(alice);
+    free_student(bob);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+// Implémentez make_student, free_student, print_student
+// make_student alloue la struct ET duplique la chaîne name
+// free_student libère name puis s
+Student *make_student(const char *name, int grade) { return NULL; }
+void free_student(Student *s) {}
+void print_student(const Student *s) {}
+
+int main(void) {
+    Student *alice = make_student("Alice", 18);
+    Student *bob   = make_student("Bob",   15);
+    print_student(alice);
+    print_student(bob);
+    free_student(alice);
+    free_student(bob);
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char *name; int grade; } Student;
+
+Student *make_student(const char *name, int grade) { return NULL; }
+void free_student(Student *s) {}
+void print_student(const Student *s) {}
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Struct avec champs dynamiques"
+
+[validation]
+expected_output = """
+1
+1
+Bob
+1
+20
+1
+1
+Alice
+Bob
+1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Premier malloc : alloue la struct Student sur le heap. s (stack) pointe vers le bloc heap alloué."
+label = "malloc(sizeof(Student))"
+step_label = "Étape 1 — malloc struct"
+
+[[visualizer.steps.arrows]]
+from = "s"
+label = "malloc(sizeof)"
+to = "Student"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = '"Alice", 18'
+function_name = "make_student"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Student"
+value = "{name: ?, grade: ?}"
+
+[[visualizer.steps.stack]]
+name = "s"
+value = "→heap:Student"
+
+[[visualizer.steps]]
+explanation = "Deuxième malloc : alloue la chaîne 'Alice' séparément. Student.name pointe vers ce second bloc — double indirection via s→Student→name_str."
+label = "malloc(strlen(name)+1) — double indirection"
+step_label = "Étape 2 — malloc champ"
+
+[[visualizer.steps.arrows]]
+from = "s"
+label = "s"
+to = "Student"
+
+[[visualizer.steps.arrows]]
+from = "Student"
+label = "name"
+to = "name_str"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = '"Alice", 18'
+function_name = "make_student"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Student"
+value = "{name→name_str, grade:18}"
+
+[[visualizer.steps.heap]]
+address = "name_str"
+value = '"Alice"'
+
+[[visualizer.steps.stack]]
+name = "s"
+value = "→heap:Student"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Libérer name AVANT s — sinon le pointeur s->name est perdu et la chaîne fuit. Chaque malloc correspond à exactement un free."
+heap = []
+label = "free_student : free(s->name) puis free(s)"
+step_label = "Étape 3 — free dans l'ordre"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "alice"
+function_name = "free_student"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s"
+value = "freed"

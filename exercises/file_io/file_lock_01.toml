@@ -1,0 +1,404 @@
+common_mistake = "Les advisory locks ne sont pas obligatoires — un autre processus peut ignorer le verrou"
+description = """
+NSY103 — Le verrouillage de fichiers empêche les accès concurrents. fcntl() avec struct flock permet un verrouillage par région (advisory locking). F_SETLK tente sans bloquer, F_SETLKW bloque.
+
+Simulez un verrou sur un fichier temporaire et affichez les transitions de verrouillage."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "fl.l_type prend F_RDLCK (lecture), F_WRLCK (écriture), ou F_UNLCK (libérer)",
+    "F_SETLK tente le verrou sans bloquer, F_SETLKW bloque jusqu'à obtention",
+    "F_GETLK teste si un verrou serait possible — remplace l_type par F_UNLCK si oui",
+]
+id = "file-lock-01"
+kc_ids = ["KC-C06"]
+key_concept = "fcntl advisory locking : F_RDLCK partagé, F_WRLCK exclusif, F_UNLCK libère"
+lang = "c"
+prerequisites = ["file-mmap-01"]
+solution_code = '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+void show_lock(int fd, const char *label) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0; /* fichier entier */
+    if (fcntl(fd, F_GETLK, &fl) == -1) {
+        perror("fcntl F_GETLK");
+        return;
+    }
+    if (fl.l_type == F_UNLCK)
+        printf("%s: unlocked\n", label);
+    else
+        printf("%s: locked by PID %d (type=%s)\n", label, fl.l_pid,
+               fl.l_type == F_RDLCK ? "READ" : "WRITE");
+}
+
+int set_lock(int fd, short type) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = type;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    return fcntl(fd, F_SETLK, &fl);
+}
+
+int main(void) {
+    char path[] = "/tmp/kf_lock_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path); /* supprime le nom, fd reste valide */
+
+    show_lock(fd, "Initial");
+
+    /* Poser un verrou lecture */
+    if (set_lock(fd, F_RDLCK) == 0)
+        printf("Read lock acquired\n");
+
+    /* Liberer le verrou */
+    if (set_lock(fd, F_UNLCK) == 0)
+        printf("Lock released\n");
+
+    show_lock(fd, "After release");
+
+    /* Poser un verrou ecriture */
+    if (set_lock(fd, F_WRLCK) == 0)
+        printf("Write lock acquired\n");
+
+    if (set_lock(fd, F_UNLCK) == 0)
+        printf("Lock released\n");
+
+    close(fd);
+    printf("Done\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+void show_lock(int fd, const char *label) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0; /* fichier entier */
+    if (fcntl(fd, F_GETLK, &fl) == -1) {
+        perror("fcntl F_GETLK");
+        return;
+    }
+    if (fl.l_type == F_UNLCK)
+        printf("%s: unlocked\n", label);
+    else
+        printf("%s: locked by PID %d (type=%s)\n", label, fl.l_pid,
+               fl.l_type == F_RDLCK ? "READ" : "WRITE");
+}
+
+int set_lock(int fd, short type) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = ____;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    return fcntl(fd, ____, &fl);
+}
+
+int main(void) {
+    char path[] = "/tmp/kf_lock_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path); /* supprime le nom, fd reste valide */
+
+    show_lock(fd, "Initial");
+
+    /* Poser un verrou lecture */
+    if (set_lock(fd, ____) == 0)
+        printf("Read lock acquired\n");
+
+    /* Liberer le verrou */
+    if (set_lock(fd, ____) == 0)
+        printf("Lock released\n");
+
+    show_lock(fd, "After release");
+
+    /* Poser un verrou ecriture */
+    if (set_lock(fd, ____) == 0)
+        printf("Write lock acquired\n");
+
+    if (set_lock(fd, F_UNLCK) == 0)
+        printf("Lock released\n");
+
+    close(fd);
+    printf("Done\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Verrou simple avec flock (BSD-style)
+ * flock est plus simple que fcntl mais moins précis
+ * ================================================= */
+#include <sys/file.h>
+void example_flock(void) {
+    char p[] = "/tmp/kf_ex_XXXXXX";
+    int fd = mkstemp(p);
+    if (fd == -1) return;
+    unlink(p);
+    if (flock(fd, LOCK_EX | LOCK_NB) == 0)
+        printf("flock: exclusive lock acquired\n");
+    if (flock(fd, LOCK_UN) == 0)
+        printf("flock: lock released\n");
+    close(fd);
+}
+/* Resultat: flock: exclusive lock acquired, flock: lock released */
+
+/* == VOTRE EXERCICE ================================
+ * Verrouillage avec fcntl (POSIX, par region)
+ * Plus puissant que flock: verrous par byte range.
+ * Implementez show_lock et set_lock.
+ * ================================================= */
+void show_lock(int fd, const char *label) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = F_WRLCK; fl.l_whence = SEEK_SET;
+    /* TODO: fcntl(fd, F_GETLK, &fl) */
+    (void)fd; (void)label;
+}
+
+int set_lock(int fd, short type) {
+    /* TODO: remplir struct flock, fcntl(fd, F_SETLK, &fl) */
+    (void)fd; (void)type;
+    return -1;
+}
+
+int main(void) {
+    char path[] = "/tmp/kf_lock_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path);
+
+    show_lock(fd, "Initial");
+    if (set_lock(fd, F_RDLCK) == 0) printf("Read lock acquired\n");
+    if (set_lock(fd, F_UNLCK) == 0) printf("Lock released\n");
+    show_lock(fd, "After release");
+    if (set_lock(fd, F_WRLCK) == 0) printf("Write lock acquired\n");
+    if (set_lock(fd, F_UNLCK) == 0) printf("Lock released\n");
+    printf("Done\n");
+    close(fd);
+    return 0;
+}''',
+    '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+void show_lock(int fd, const char *label) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    if (fcntl(fd, F_GETLK, &fl) == -1) { perror("fcntl"); return; }
+    if (fl.l_type == F_UNLCK)
+        printf("%s: unlocked\n", label);
+    else
+        printf("%s: locked by PID %d (type=%s)\n", label, fl.l_pid,
+               fl.l_type == F_RDLCK ? "READ" : "WRITE");
+}
+
+int set_lock(int fd, short type) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = type;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    return fcntl(fd, ____, &fl); // F_SETLK ou F_SETLKW?
+}
+
+int main(void) {
+    char path[] = "/tmp/kf_lock_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path);
+    show_lock(fd, "Initial");
+    if (set_lock(fd, F_RDLCK) == 0) printf("Read lock acquired\n");
+    if (set_lock(fd, F_UNLCK) == 0) printf("Lock released\n");
+    show_lock(fd, "After release");
+    if (set_lock(fd, ____) == 0) printf("Write lock acquired\n"); // quel type?
+    if (set_lock(fd, F_UNLCK) == 0) printf("Lock released\n");
+    close(fd);
+    printf("Done\n");
+    return 0;
+}''',
+    '''
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+void show_lock(int fd, const char *label) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    if (fcntl(fd, F_GETLK, &fl) == -1) { perror("fcntl"); return; }
+    if (fl.l_type == F_UNLCK)
+        printf("%s: unlocked\n", label);
+    else
+        printf("%s: locked by PID %d (type=%s)\n", label, fl.l_pid,
+               fl.l_type == F_RDLCK ? "READ" : "WRITE");
+}
+
+int set_lock(int fd, short type) {
+    struct flock fl;
+    memset(&fl, 0, sizeof(fl));
+    fl.l_type = ____;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    return fcntl(fd, ____, &fl);
+}
+
+int main(void) {
+    char path[] = "/tmp/kf_lock_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path);
+    show_lock(fd, "Initial");
+    if (set_lock(fd, ____) == 0) printf("Read lock acquired\n");
+    if (set_lock(fd, ____) == 0) printf("Lock released\n");
+    show_lock(fd, "After release");
+    if (set_lock(fd, ____) == 0) printf("Write lock acquired\n");
+    if (set_lock(fd, F_UNLCK) == 0) printf("Lock released\n");
+    close(fd);
+    printf("Done\n");
+    return 0;
+}''',
+    """
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+// Implémenter show_lock(fd, label) avec F_GETLK
+// Implémenter set_lock(fd, type) avec F_SETLK
+// main: mkstemp, unlink, séquence read lock → release → write lock → release
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Verrouillage avec flock/fcntl"
+
+[validation]
+expected_output = """
+Initial: unlocked
+Read lock acquired
+Lock released
+After release: unlocked
+Write lock acquired
+Lock released
+Done
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "mkstemp crée le fichier, unlink supprime le nom mais le fd reste valide"
+heap = []
+label = "Fichier temporaire créé et unlinked"
+step_label = "Création"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "3 (tmpfile)"
+
+[[visualizer.steps.stack]]
+name = "path"
+value = "(unlinked)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le verrou lecture permet plusieurs lecteurs simultanés"
+heap = []
+label = "Verrou F_RDLCK posé"
+step_label = "Read lock"
+
+[[visualizer.steps.call_frames]]
+args = "fd, F_RDLCK"
+function_name = "set_lock"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fl.l_type"
+value = "F_RDLCK"
+
+[[visualizer.steps.stack]]
+name = "fl.l_start"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "fl.l_len"
+value = "0 (tout)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le verrou écriture est exclusif — aucun autre verrou possible"
+heap = []
+label = "Verrou F_WRLCK posé"
+step_label = "Write lock"
+
+[[visualizer.steps.call_frames]]
+args = "fd, F_WRLCK"
+function_name = "set_lock"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fl.l_type"
+value = "F_WRLCK"
+
+[[visualizer.steps.stack]]
+name = "fl.l_len"
+value = "0 (exclusif)"

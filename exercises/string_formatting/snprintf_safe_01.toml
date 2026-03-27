@@ -1,0 +1,314 @@
+common_mistake = "Ignorer la valeur de retour de snprintf → ne pas détecter la troncature silencieuse"
+description = '''
+NSY103 — snprintf limite l'écriture à N-1 caractères + '\0'. Contrairement à sprintf, il ne peut pas déborder. La valeur de retour indique le nombre de caractères qui auraient été écrits (troncature si retour >= N).
+
+Utilisez snprintf pour construire des chaînes en vérifiant la troncature.'''
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    '''snprintf(buf, size, fmt, ...) écrit au max size-1 chars + '\0'''',
+    '''Le retour de snprintf = nombre total de chars voulus (sans '\0'). Si ret >= size → troncature''',
+    "Chaînage: snprintf(buf+written, remaining, ...) permet de construire incrémentalement",
+]
+id = "snprintf-safe-01"
+kc_ids = ["KC-C05"]
+key_concept = "snprintf est la version sûre de sprintf — toujours vérifier ret >= size pour détecter la troncature"
+lang = "c"
+prerequisites = ["format-table-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+    int ret;
+    ret = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    ret = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+}
+
+int build_path(char *path, size_t sz) {
+    int written = 0;
+    written += snprintf(path + written, sz - written, "/home/");
+    written += snprintf(path + written, sz - written, "%s/", "user");
+    written += snprintf(path + written, sz - written, "%s", "documents/files/report.txt");
+    return written;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+    int ret;
+    ret = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    ret = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+}
+
+int build_path(char *path, size_t sz) {
+    int written = 0;
+    written += snprintf(path + written, sz - written, "/home/");
+    written += snprintf(path + written, sz - written, "%s/", "user");
+    written += snprintf(path + written, sz - written, "%s", "documents/files/report.txt");
+    return written;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * snprintf: sprintf sûr avec limite de taille
+ * =========================================================== */
+void example_snprintf(char *buf, size_t sz) {
+    int ret = snprintf(buf, sz, "ABCDEFGHIJ");
+    /* If ret >= sz: tronqué */
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Testez snprintf avec troncature et chaînage
+ * =========================================================== */
+
+void test_truncation(char *small, char *big) {
+    /* TODO: implementation */
+}
+
+int build_path(char *path, size_t sz) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+    int ret;
+    ret = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    ret = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+}
+
+int build_path(char *path, size_t sz) {
+    int written = 0;
+    written += snprintf(path + written, sz - written, "/home/");
+    written += snprintf(path + written, sz - written, "%s/", "user");
+    written += snprintf(path + written, ____, "____, ____", ____) ;
+    return written;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+    int ret;
+    ret = snprintf(small, ____, "____, ____, ____", ____, ____);
+    ret = snprintf(big, ____, "____, ____, ____", ____, ____);
+}
+
+int build_path(char *path, size_t sz) {
+    int written = 0;
+    written += snprintf(path + written, sz - written, "/home/");
+    written += snprintf(path + written, sz - written, "%s/", "user");
+    written += snprintf(path + written, sz - written, "%s", "documents/files/report.txt");
+    return written;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+    (void)small; (void)big;
+}
+
+int build_path(char *path, size_t sz) {
+    (void)path; (void)sz;
+    return 0;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+void test_truncation(char *small, char *big) {
+}
+
+int build_path(char *path, size_t sz) {
+    return 0;
+}
+
+int main(void) {
+    char small[16], big[64], path[32];
+    /* Test truncation */
+    int r1 = snprintf(small, 16, "Hello, %s! Score=%d", "clings", 100);
+    int r2 = snprintf(big, 64, "Hello, %s! Score=%d", "clings", 100);
+    printf("%d\n", (int)strlen(small));   /* 15 */
+    printf("%s\n", big);
+    /* Test build_path */
+    int written = build_path(path, sizeof(path));
+    printf("%d\n", written > 0 ? 1 : 0);
+    printf("%d\n", strstr(path, "/home/") ? 1 : 0);
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "snprintf et prévention buffer overflow"
+
+[validation]
+expected_output = """
+15
+Hello, clings! Score=100
+1
+1"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "snprintf ne dépasse jamais la taille — il tronque proprement"
+heap = []
+label = "snprintf avec buffer trop petit → troncature"
+step_label = "1. Troncature"
+
+[[visualizer.steps.call_frames]]
+args = "small, big"
+function_name = "test_truncation"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "small[16]"
+value = '''"Hello, clings! " + '\0''''
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "24 (voulu)"
+
+[[visualizer.steps.stack]]
+name = "troncature"
+value = "24 >= 16 → YES"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Quand le buffer est assez grand, pas de troncature"
+heap = []
+label = "snprintf avec buffer suffisant"
+step_label = "2. Complet"
+
+[[visualizer.steps.call_frames]]
+args = "small, big"
+function_name = "test_truncation"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "big[64]"
+value = '"Hello, clings! Score=100"'
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "24 (complet)"
+
+[[visualizer.steps.stack]]
+name = "troncature"
+value = "24 < 64 → NO"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Construire un path par morceaux — written compte le total voulu"
+heap = []
+label = "Chaînage snprintf incrémental"
+step_label = "3. Chaînage"
+
+[[visualizer.steps.call_frames]]
+args = "path, sz"
+function_name = "build_path"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "path[32]"
+value = '"/home/user/documents/files/re"'
+
+[[visualizer.steps.stack]]
+name = "written"
+value = "37 (voulu total)"
+
+[[visualizer.steps.stack]]
+name = "troncature"
+value = "37 >= 32 → YES"

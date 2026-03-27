@@ -1,0 +1,239 @@
+common_mistake = "Oublier sem_unlink laisse le semaphore dans /dev/shm apres la fin du programme"
+description = """
+NSY103 — Un semaphore nomme est cree avec sem_open() et visible par tous les processus via son nom (commence par /). sem_wait() decremente (bloque si 0), sem_post() incremente. sem_close() libere le descripteur, sem_unlink() supprime le semaphore du systeme.
+
+Creez un semaphore nomme avec une valeur initiale de 1. Faites sem_wait (decremente a 0), puis sem_post (re-incremente a 1). Affichez la valeur avec sem_getvalue a chaque etape."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "sem_open cree le semaphore avec une valeur initiale (ici 1)",
+    "sem_wait decremente: 1 -> 0 (ne bloque pas car > 0)",
+    "sem_post incremente: 0 -> 1",
+]
+id = "sem-named-01"
+kc_ids = ["KC-C11"]
+key_concept = "sem_open cree un semaphore nomme ; sem_wait decremente (bloque si 0) ; sem_post incremente"
+lang = "c"
+prerequisites = ["sem-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *sem = sem_open("/kf_sem_named", O_CREAT | O_EXCL, 0644, 1);
+    int val;
+
+    sem_getvalue(sem, &val);
+    printf("Initial: %d\n", val);
+
+    sem_wait(sem);
+    sem_getvalue(sem, &val);
+    printf("After wait: %d\n", val);
+
+    sem_post(sem);
+    sem_getvalue(sem, &val);
+    printf("After post: %d\n", val);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_named");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *sem = sem_open("/kf_sem_named", O_CREAT | O_EXCL, 0644, ____);
+    int val;
+
+    sem_getvalue(sem, &val);
+    printf("Initial: %d\n", val);
+
+    ____(sem);
+    sem_getvalue(sem, &val);
+    printf("After wait: %d\n", val);
+
+    ____(sem);
+    sem_getvalue(sem, &val);
+    printf("After post: %d\n", val);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_named");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+/* == EXEMPLE =======================================
+ * sem_open + sem_post + sem_getvalue
+ * ================================================= */
+void example_sem(void) {
+    sem_t *s = sem_open("/kf_ex_named", O_CREAT | O_EXCL, 0644, 0);
+    int v;
+    sem_getvalue(s, &v);
+    printf("Before: %d\n", v);
+    sem_post(s);
+    sem_getvalue(s, &v);
+    printf("After post: %d\n", v);
+    sem_close(s);
+    sem_unlink("/kf_ex_named");
+}
+/* Resultat: Before: 0  After post: 1 */
+
+/* == VOTRE EXERCICE ================================
+ * sem_open(val=1), sem_wait, sem_post, afficher a chaque etape.
+ * ================================================= */
+int main(void) {
+    /* TODO: sem_open val=1, getvalue, wait, getvalue, post, getvalue, cleanup */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *sem = sem_open("/kf_sem_named", O_CREAT | O_EXCL, 0644, 1);
+    int val;
+    sem_getvalue(sem, &val);
+    printf("Initial: %d\n", val);
+    ____(sem);  // decrementer
+    sem_getvalue(sem, &val);
+    printf("After wait: %d\n", val);
+    ____(sem);  // incrementer
+    sem_getvalue(sem, &val);
+    printf("After post: %d\n", val);
+    sem_close(sem);
+    sem_unlink("/kf_sem_named");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *sem = sem_open("/kf_sem_named", O_CREAT | O_EXCL, 0644, ____);
+    int val;
+
+    sem_getvalue(sem, &val);
+    printf("Initial: %d\n", val);
+
+    ____(sem);
+    sem_getvalue(sem, &val);
+    printf("After wait: %d\n", val);
+
+    ____(sem);
+    sem_getvalue(sem, &val);
+    printf("After post: %d\n", val);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_named");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    // sem_open("/kf_sem_named", O_CREAT|O_EXCL, 0644, 1)
+    // sem_getvalue, printf, sem_wait, sem_post
+    // sem_close, sem_unlink
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Semaphore nomme: sem_open/close/unlink"
+
+[validation]
+expected_output = """
+Initial: 1
+After wait: 0
+After post: 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "sem_open cree un semaphore nomme dans /dev/shm. La valeur initiale est 1 (semaphore disponible)."
+label = "sem_open: semaphore cree avec valeur 1"
+step_label = "create"
+
+[[visualizer.steps.arrows]]
+from = "sem (sem_t*)"
+to = "semaphore /kf_sem_named"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore /kf_sem_named"
+value = "val=1"
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t*)"
+value = "0xSEM"
+
+[[visualizer.steps]]
+explanation = "sem_wait decremente atomiquement. Si la valeur etait 0, le processus bloquerait. Ici 1->0, pas de blocage."
+label = "sem_wait decremente: 1 -> 0"
+step_label = "wait"
+
+[[visualizer.steps.arrows]]
+from = "sem (sem_t*)"
+to = "semaphore /kf_sem_named"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore /kf_sem_named"
+value = "val=0"
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t*)"
+value = "0xSEM"
+
+[[visualizer.steps]]
+explanation = "sem_post incremente atomiquement. Si un processus etait bloque sur sem_wait, il serait reveille."
+label = "sem_post incremente: 0 -> 1"
+step_label = "post"
+
+[[visualizer.steps.arrows]]
+from = "sem (sem_t*)"
+to = "semaphore /kf_sem_named"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore /kf_sem_named"
+value = "val=1"
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t*)"
+value = "0xSEM"

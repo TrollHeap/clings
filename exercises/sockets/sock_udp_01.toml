@@ -1,0 +1,310 @@
+common_mistake = "Utiliser send/recv au lieu de sendto/recvfrom pour UDP sans connect()"
+description = """
+NSY103 — UDP est sans connexion : sendto() envoie un datagramme à une adresse, recvfrom() reçoit et retourne l'adresse de l'expéditeur. Pas de connect/accept nécessaire.
+
+Envoyez un message UDP depuis un enfant forké et recevez-le dans le parent."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "sendto(fd, msg, len, 0, dest_addr, addrlen) envoie un datagramme UDP",
+    "recvfrom(fd, buf, len, 0, from_addr, &addrlen) reçoit et stocke l'adresse source",
+    "Pas besoin de connect/listen/accept pour UDP",
+]
+id = "sock-udp-01"
+kc_ids = ["KC-C14"]
+key_concept = "UDP est sans connexion : sendto envoie un datagramme avec adresse, recvfrom reçoit avec adresse source"
+lang = "c"
+prerequisites = ["sock-server-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in dest = {0};
+        dest.sin_family = AF_INET;
+        dest.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &dest.sin_addr);
+        char *msg = "UDP_HELLO";
+        sendto(fd, msg, strlen(msg), 0, (struct sockaddr *)&dest, sizeof(dest));
+        close(fd);
+        return 0;
+    }
+    char buf[64];
+    struct sockaddr_in from;
+    socklen_t flen = sizeof(from);
+    int n = recvfrom(srv, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&from, &flen);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    printf("Protocol: UDP\n");
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in dest = {0};
+        dest.sin_family = AF_INET;
+        dest.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &dest.sin_addr);
+        char *msg = "UDP_HELLO";
+        ____(fd, msg, strlen(msg), 0, (struct sockaddr *)&dest, sizeof(dest));
+        close(fd);
+        return 0;
+    }
+    char buf[64];
+    struct sockaddr_in from;
+    socklen_t flen = sizeof(from);
+    int n = ____(srv, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&from, &flen);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    printf("Protocol: UDP\n");
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+/* == VOTRE EXERCICE ========================================
+ * UDP sendto/recvfrom entre parent et enfant
+ * ========================================================= */
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in dest = {0};
+        dest.sin_family = AF_INET;
+        dest.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &dest.sin_addr);
+        char *msg = "UDP_HELLO";
+        /* TODO: sendto(fd, msg, strlen(msg), 0, ...) */
+        close(fd);
+        return 0;
+    }
+    char buf[64];
+    struct sockaddr_in from;
+    socklen_t flen = sizeof(from);
+    /* TODO: recvfrom(srv, buf, ...) */
+    int n = 0;
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    printf("Protocol: UDP\n");
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in dest = {0};
+        dest.sin_family = AF_INET;
+        dest.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &dest.sin_addr);
+        char *msg = "UDP_HELLO";
+        sendto(fd, msg, strlen(msg), 0, (struct sockaddr *)&dest, sizeof(dest));
+        close(fd);
+        return 0;
+    }
+    char buf[64];
+    struct sockaddr_in from;
+    socklen_t flen = sizeof(from);
+    int n = ____(srv, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&from, &flen);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    printf("Protocol: UDP\n");
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in dest = {0};
+        dest.sin_family = AF_INET;
+        dest.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &dest.sin_addr);
+        char *msg = "UDP_HELLO";
+        ____(fd, msg, strlen(msg), 0, (struct sockaddr *)&dest, sizeof(dest));
+        close(fd);
+        return 0;
+    }
+    char buf[64];
+    struct sockaddr_in from;
+    socklen_t flen = sizeof(from);
+    int n = ____(srv, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&from, &flen);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    printf("Protocol: UDP\n");
+    close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+// UDP: enfant envoie "UDP_HELLO" avec sendto
+// Parent reçoit avec recvfrom
+// Sortie: Received: UDP_HELLO, Protocol: UDP
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sockets"
+title = "UDP sendto/recvfrom"
+
+[validation]
+expected_output = """
+Received: UDP_HELLO
+Protocol: UDP
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "Client sendto → datagramme"
+
+[[visualizer.steps.edges]]
+label = """
+UDP datagram
+"UDP_HELLO""""
+source = "client"
+target = "server"
+
+[[visualizer.steps.nodes]]
+id = "client"
+label = """
+Client
+sendto()"""
+
+[[visualizer.steps.nodes]]
+id = "server"
+label = """
+Server
+recvfrom()"""
+
+[[visualizer.steps]]
+label = "Server reçoit le datagramme"
+
+[[visualizer.steps.edges]]
+label = "source addr"
+source = "from"
+target = "server"
+
+[[visualizer.steps.nodes]]
+id = "server"
+label = """
+Server
+buf="UDP_HELLO""""
+
+[[visualizer.steps.nodes]]
+id = "from"
+label = "from: 127.0.0.1"

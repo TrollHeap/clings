@@ -1,0 +1,526 @@
+common_mistake = "Relâcher rw_mutex avant entry_mutex dans le rédacteur → perte de la priorité écrivain"
+description = """
+NSY103 — Problème lecteurs-rédacteurs : starvation des rédacteurs
+
+Dans la solution classique (sem_readers_01), un flot continu de lecteurs empêche les rédacteurs d'accéder à la donnée indéfiniment : c'est la "starvation des rédacteurs".
+
+Solution "writer-prefer" avec trois sémaphores :
+- rw_mutex : exclusion écrivain/lecteur (comme sem_readers_01)
+- entry_mutex : bloque les nouveaux lecteurs quand un rédacteur attend
+- read_mutex : protège le compteur readers
+
+Quand un rédacteur arrive, il acquiert entry_mutex avant rw_mutex. Les lecteurs suivants bloquent sur entry_mutex — le rédacteur passe en priorité.
+
+Note: cet exercice utilise des threads séquentiels (join immédiat) pour garantir un output déterministe. Il enseigne la STRUCTURE correcte du pattern writer-prefer. La starvation réelle n'est observable qu'avec des threads concurrents créés sans join intermédiaire.
+
+Complétez les sem_wait/sem_post manquants dans la fonction writer()."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "entry_mutex bloque les nouveaux lecteurs — le rédacteur doit le prendre AVANT rw_mutex",
+    "Après avoir acquis rw_mutex, relâche entry_mutex pour permettre aux autres rédacteurs de se mettre en file",
+    "Le blocage des lecteurs est assuré par entry_mutex (pris par le rédacteur avant rw_mutex), pas par writers_waiting. Le compteur writers_waiting est un indicateur de monitoring, pas un mécanisme de synchronisation ici.",
+]
+id = "sync-readers-starvation-01"
+kc_ids = ["KC-C26"]
+key_concept = "entry_mutex bloque les nouveaux lecteurs dès qu'un rédacteur attend — priorité rédacteur garantie"
+lang = "c"
+prerequisites = ["sem-readers-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+static int data = 0;
+static int readers = 0;
+static int writers_waiting = 0;
+
+static sem_t rw_mutex;
+static sem_t entry_mutex;
+static sem_t read_mutex;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+
+    sem_wait(&entry_mutex);
+    sem_wait(&read_mutex);
+    readers++;
+    if (readers == 1) sem_wait(&rw_mutex);
+    sem_post(&read_mutex);
+    sem_post(&entry_mutex);
+
+    printf("Reader %d: data=%d\n", id, data);
+
+    sem_wait(&read_mutex);
+    readers--;
+    if (readers == 0) sem_post(&rw_mutex);
+    sem_post(&read_mutex);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    int id = *(int *)arg;
+    __sync_fetch_and_add(&writers_waiting, 1);
+    sem_wait(&entry_mutex);   /* bloque nouveaux lecteurs */
+    sem_wait(&rw_mutex);      /* attend accès exclusif */
+    sem_post(&entry_mutex);   /* relâche l'entrée */
+    __sync_fetch_and_sub(&writers_waiting, 1);
+
+    data = id * 10;
+    printf("Writer %d: data=%d\n", id, data);
+
+    sem_post(&rw_mutex);
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&entry_mutex, 0, 1);
+    sem_init(&read_mutex, 0, 1);
+
+    pthread_t r1, r2, w1;
+    int id1 = 1, id2 = 2, wid = 1;
+
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+
+    pthread_create(&w1, NULL, writer, &wid);
+    pthread_join(w1, NULL);
+
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+
+    sem_destroy(&rw_mutex);
+    sem_destroy(&entry_mutex);
+    sem_destroy(&read_mutex);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+static int data = 0;
+static int readers = 0;
+static int writers_waiting = 0;
+
+static sem_t rw_mutex;
+static sem_t entry_mutex;
+static sem_t read_mutex;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+
+    sem_wait(&entry_mutex);
+    sem_wait(&read_mutex);
+    readers++;
+    if (readers == 1) sem_wait(&rw_mutex);
+    sem_post(&read_mutex);
+    sem_post(&entry_mutex);
+
+    printf("Reader %d: data=%d\n", id, data);
+
+    sem_wait(&read_mutex);
+    readers--;
+    if (readers == 0) sem_post(&rw_mutex);
+    sem_post(&read_mutex);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    int id = *(int *)arg;
+    __sync_fetch_and_add(&writers_waiting, 1);
+    ____(____);       /* bloque nouveaux lecteurs */
+    ____(____);       /* attend accès exclusif */
+    ____(____);       /* relâche l'entrée */
+    __sync_fetch_and_sub(&writers_waiting, 1);
+
+    data = id * 10;
+    printf("Writer %d: data=%d\n", id, data);
+
+    ____(____);       /* libère l'accès rédacteur */
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&entry_mutex, 0, 1);
+    sem_init(&read_mutex, 0, 1);
+
+    pthread_t r1, r2, w1;
+    int id1 = 1, id2 = 2, wid = 1;
+
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+
+    pthread_create(&w1, NULL, writer, &wid);
+    pthread_join(w1, NULL);
+
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+
+    sem_destroy(&rw_mutex);
+    sem_destroy(&entry_mutex);
+    sem_destroy(&read_mutex);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+/* == SOLUTION CLASSIQUE (lecteurs préférés) ====================
+ * Problème : si les lecteurs arrivent sans cesse, le rédacteur
+ * attend indéfiniment → starvation.
+ *
+ * sem_t rw_mutex;   // exclusion écrivain/lecteur
+ * sem_t read_mutex; // protège compteur readers
+ *
+ * reader: wait(read_mutex); readers++; if(readers==1) wait(rw);
+ *         post(read_mutex); [lecture]; wait(read_mutex);
+ *         readers--; if(readers==0) post(rw); post(read_mutex);
+ *
+ * writer: wait(rw_mutex); [écriture]; post(rw_mutex);
+ *
+ * == SOLUTION WRITER-PREFER (votre exercice) =================
+ * Ajout : entry_mutex + writers_waiting
+ * Le rédacteur prend entry_mutex avant rw_mutex.
+ * Les lecteurs bloquent sur entry_mutex si un rédacteur attend.
+ * ============================================================= */
+
+static int data = 0;
+static int readers = 0;
+static int writers_waiting = 0;
+
+static sem_t rw_mutex;
+static sem_t entry_mutex;   /* nouveau : bloque nouveaux lecteurs */
+static sem_t read_mutex;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    /* entry_mutex bloque si writers_waiting > 0 */
+    sem_wait(&entry_mutex);
+    sem_wait(&read_mutex);
+    readers++;
+    if (readers == 1) sem_wait(&rw_mutex);
+    sem_post(&read_mutex);
+    sem_post(&entry_mutex);
+
+    printf("Reader %d: data=%d\n", id, data);
+
+    sem_wait(&read_mutex);
+    readers--;
+    if (readers == 0) sem_post(&rw_mutex);
+    sem_post(&read_mutex);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    int id = *(int *)arg;
+    __sync_fetch_and_add(&writers_waiting, 1);
+    /* TODO: sem_wait entry_mutex, sem_wait rw_mutex,
+     *       sem_post entry_mutex, puis écrire, puis sem_post rw_mutex */
+    __sync_fetch_and_sub(&writers_waiting, 1);
+    data = id * 10;
+    printf("Writer %d: data=%d\n", id, data);
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&entry_mutex, 0, 1);
+    sem_init(&read_mutex, 0, 1);
+
+    pthread_t r1, r2, w1;
+    int id1 = 1, id2 = 2, wid = 1;
+
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w1, NULL, writer, &wid);
+    pthread_join(w1, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+
+    sem_destroy(&rw_mutex);
+    sem_destroy(&entry_mutex);
+    sem_destroy(&read_mutex);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+static int data = 0;
+static int readers = 0;
+static int writers_waiting = 0;
+
+static sem_t rw_mutex;
+static sem_t entry_mutex;
+static sem_t read_mutex;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    sem_wait(&entry_mutex);
+    sem_wait(&read_mutex);
+    readers++;
+    if (readers == 1) sem_wait(&rw_mutex);
+    sem_post(&read_mutex);
+    sem_post(&entry_mutex);
+
+    printf("Reader %d: data=%d\n", id, data);
+
+    sem_wait(&read_mutex);
+    readers--;
+    if (readers == 0) sem_post(&rw_mutex);
+    sem_post(&read_mutex);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    int id = *(int *)arg;
+    __sync_fetch_and_add(&writers_waiting, 1);
+    sem_wait(&entry_mutex);   /* bloque nouveaux lecteurs */
+    sem_wait(&rw_mutex);      /* attend accès exclusif */
+    sem_post(&entry_mutex);   /* relâche l'entrée */
+    __sync_fetch_and_sub(&writers_waiting, 1);
+
+    data = id * 10;
+    printf("Writer %d: data=%d\n", id, data);
+
+    /* TODO: libérer rw_mutex */
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&entry_mutex, 0, 1);
+    sem_init(&read_mutex, 0, 1);
+
+    pthread_t r1, r2, w1;
+    int id1 = 1, id2 = 2, wid = 1;
+
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w1, NULL, writer, &wid);
+    pthread_join(w1, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+
+    sem_destroy(&rw_mutex);
+    sem_destroy(&entry_mutex);
+    sem_destroy(&read_mutex);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+static int data = 0;
+static int readers = 0;
+static int writers_waiting = 0;
+
+static sem_t rw_mutex;
+static sem_t entry_mutex;
+static sem_t read_mutex;
+
+void *reader(void *arg) {
+    int id = *(int *)arg;
+    sem_wait(&entry_mutex);
+    sem_wait(&read_mutex);
+    readers++;
+    if (readers == 1) sem_wait(&rw_mutex);
+    sem_post(&read_mutex);
+    sem_post(&entry_mutex);
+
+    printf("Reader %d: data=%d\n", id, data);
+
+    sem_wait(&read_mutex);
+    readers--;
+    if (readers == 0) sem_post(&rw_mutex);
+    sem_post(&read_mutex);
+    return NULL;
+}
+
+void *writer(void *arg) {
+    int id = *(int *)arg;
+    __sync_fetch_and_add(&writers_waiting, 1);
+    ____(____);       /* bloque nouveaux lecteurs */
+    ____(____);       /* attend accès exclusif */
+    ____(____);       /* relâche l'entrée */
+    __sync_fetch_and_sub(&writers_waiting, 1);
+
+    data = id * 10;
+    printf("Writer %d: data=%d\n", id, data);
+
+    ____(____);       /* libère l'accès rédacteur */
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&entry_mutex, 0, 1);
+    sem_init(&read_mutex, 0, 1);
+
+    pthread_t r1, r2, w1;
+    int id1 = 1, id2 = 2, wid = 1;
+
+    pthread_create(&r1, NULL, reader, &id1);
+    pthread_join(r1, NULL);
+    pthread_create(&w1, NULL, writer, &wid);
+    pthread_join(w1, NULL);
+    pthread_create(&r2, NULL, reader, &id2);
+    pthread_join(r2, NULL);
+
+    sem_destroy(&rw_mutex);
+    sem_destroy(&entry_mutex);
+    sem_destroy(&read_mutex);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+// data=0, readers=0, writers_waiting=0
+// sem_t rw_mutex, entry_mutex, read_mutex
+// reader: entry_mutex → read_mutex → readers++ → (si 1er: wait rw) → post read → post entry
+//         [lecture] → read_mutex → readers-- → (si dernier: post rw) → post read
+// writer: writers_waiting++ → wait entry → wait rw → post entry → writers_waiting--
+//         [écriture] → post rw
+// main: init sems, r1 join, w1 join, r2 join, destroy
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Starvation des rédacteurs : solution writers_waiting"
+
+[mission]
+clientId = "threadmaster"
+clientName = "ThreadMaster"
+incidentEmail = "Nos rédacteurs n'arrivent jamais à écrire : un flot continu de lecteurs les affame indéfiniment. Implémentez la solution writer-prefer avec writers_waiting et entry_mutex pour garantir que les rédacteurs passent en priorité dès qu'ils attendent."
+payout = 500
+subject = "Synchronisation — starvation rédacteurs, solution writer-prefer"
+tier = 4
+
+[validation]
+expected_output = """
+Reader 1: data=0
+Writer 1: data=10
+Reader 2: data=10
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Reader 1 : entry_mutex libre (writers_waiting=0), acquiert rw_mutex via le compteur readers, lit data=0."
+heap = []
+label = "Reader 1 — accès libre (pas de rédacteur en attente)"
+step_label = "Read1"
+
+[[visualizer.steps.call_frames]]
+args = "id=1"
+function_name = "reader"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "writers_waiting"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "readers"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "entry_mutex"
+value = "acquis → relâché"
+
+[[visualizer.steps.stack]]
+name = "rw_mutex"
+value = "acquis par reader"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Writer 1 : incrémente writers_waiting, prend entry_mutex (bloque tout nouveau lecteur), attend rw_mutex, relâche entry_mutex, écrit data=10."
+heap = []
+label = "Writer 1 — acquiert entry_mutex, bloque nouveaux lecteurs"
+step_label = "Write"
+
+[[visualizer.steps.call_frames]]
+args = "id=1"
+function_name = "writer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "writers_waiting"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "entry_mutex"
+value = "acquis par writer"
+
+[[visualizer.steps.stack]]
+name = "rw_mutex"
+value = "acquis par writer"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "0 → 10"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Reader 2 : entry_mutex libre, rédacteur terminé, lit data=10. Sans writer-prefer, Reader 2 aurait pu passer avant Writer 1."
+heap = []
+label = "Reader 2 — lit la nouvelle valeur après le rédacteur"
+step_label = "Read2"
+
+[[visualizer.steps.call_frames]]
+args = "id=2"
+function_name = "reader"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "writers_waiting"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "readers"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "entry_mutex"
+value = "libre"
+
+[[visualizer.steps.stack]]
+name = "rw_mutex"
+value = "acquis par reader"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "10"

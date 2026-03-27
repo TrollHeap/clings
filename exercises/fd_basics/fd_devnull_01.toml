@@ -1,0 +1,185 @@
+common_mistake = "Oublier de sauvegarder stderr avant la redirection — impossible de le restaurer"
+description = """
+NSY103 — /dev/null est un fichier spécial qui absorbe tout ce qu'on y écrit et retourne EOF en lecture. Rediriger stderr vers /dev/null supprime les messages d'erreur.
+
+Redirigez stderr vers /dev/null, vérifiez que les messages sont absorbés, puis restaurez."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "dup(STDERR_FILENO) sauvegarde stderr",
+    "O_WRONLY pour ouvrir /dev/null en écriture",
+    "dup2(devnull, STDERR_FILENO) redirige stderr vers /dev/null",
+]
+id = "fd-devnull-01"
+kc_ids = ["KC-C16"]
+key_concept = "/dev/null absorbe tout — utile pour supprimer stderr ou stdout temporairement"
+lang = "c"
+prerequisites = ["fd-redirect-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+int main(void) {
+    printf("Step 1: stderr active\n");
+    int saved_stderr = dup(STDERR_FILENO);
+    int devnull = open("/dev/null", O_WRONLY);
+    dup2(devnull, STDERR_FILENO);
+    close(devnull);
+    fprintf(stderr, "This should be suppressed\n");
+    printf("Step 2: stderr suppressed\n");
+    dup2(saved_stderr, STDERR_FILENO);
+    close(saved_stderr);
+    printf("Step 3: stderr restored\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    printf("Step 1: stderr active\n");
+    int saved_stderr = ____(STDERR_FILENO);
+    int devnull = open("/dev/null", ____);
+    ____(devnull, STDERR_FILENO);
+    close(devnull);
+    fprintf(stderr, "This should be suppressed\n");
+    printf("Step 2: stderr suppressed\n");
+    ____(saved_stderr, STDERR_FILENO);
+    close(saved_stderr);
+    printf("Step 3: stderr restored\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    printf("Step 1: stderr active\n");
+    int saved_stderr = /* TODO: sauvegarder STDERR avec dup() */ -1;
+    int devnull = open("/dev/null", /* TODO: mode lecture/écriture */ 0);
+    /* TODO: rediriger STDERR vers devnull avec dup2() */
+    close(devnull);
+    fprintf(stderr, "This should be suppressed\n");
+    printf("Step 2: stderr suppressed\n");
+    /* TODO: restaurer STDERR avec dup2() */
+    close(saved_stderr);
+    printf("Step 3: stderr restored\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    printf("Step 1: stderr active\n");
+    int saved_stderr = ____(STDERR_FILENO);
+    int devnull = open("/dev/null", ____);
+    ____(devnull, STDERR_FILENO);
+    close(devnull);
+    fprintf(stderr, "This should be suppressed\n");
+    printf("Step 2: stderr suppressed\n");
+    ____(saved_stderr, STDERR_FILENO);
+    close(saved_stderr);
+    printf("Step 3: stderr restored\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    printf("Step 1: stderr active\n");
+    int saved_stderr = ____(STDERR_FILENO);
+    int devnull = open("/dev/null", ____);
+    ____(devnull, STDERR_FILENO); close(devnull);
+    fprintf(stderr, "This should be suppressed\n");
+    printf("Step 2: stderr suppressed\n");
+    ____(saved_stderr, STDERR_FILENO); close(saved_stderr);
+    printf("Step 3: stderr restored\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    // Redirigez stderr vers /dev/null, vérifiez la suppression, restaurez
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "Redirection vers /dev/null"
+
+[validation]
+expected_output = """
+Step 1: stderr active
+Step 2: stderr suppressed
+Step 3: stderr restored
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "stderr affiche normalement"
+heap = []
+label = "stderr → terminal"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "STDERR_FILENO"
+value = "2 → terminal"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les écritures sur stderr sont absorbées"
+heap = []
+label = "stderr → /dev/null"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "STDERR_FILENO"
+value = "2 → /dev/null"
+
+[[visualizer.steps.stack]]
+name = "saved_stderr"
+value = "→ terminal"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "stderr restauré via dup2"
+heap = []
+label = "stderr → terminal (restauré)"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "STDERR_FILENO"
+value = "2 → terminal"

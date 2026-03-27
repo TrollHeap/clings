@@ -1,0 +1,305 @@
+common_mistake = "Allouer de la mémoire sur un thread puis l'utiliser sur un autre CPU/noeud — latence accrue"
+description = """
+NSY103 — Sur les systèmes NUMA (Non-Uniform Memory Access), chaque CPU a de la mémoire locale (rapide) et distante (lente). Le noyau alloue par défaut sur le noeud local (first-touch policy). get_mempolicy() et set_mempolicy() permettent de contrôler le placement.
+
+Explorez la topologie NUMA du système et démontrez l'impact du placement mémoire."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "sched_getcpu() retourne le numéro du CPU sur lequel le thread tourne actuellement",
+    "_SC_PHYS_PAGES donne le nombre total de pages physiques, _SC_NPROCESSORS_ONLN le nombre de CPUs en ligne",
+    "La politique first-touch alloue la page sur le noeud NUMA du CPU qui la touche en premier",
+]
+id = "vm-numa-01"
+kc_ids = ["KC-C18"]
+key_concept = "NUMA: la mémoire locale est plus rapide — first-touch alloue sur le noeud du CPU courant"
+lang = "c"
+prerequisites = [
+    "vm-tlb-01",
+    "vm-overcommit-01",
+]
+solution_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sched.h>
+#include <errno.h>
+int main(void) {
+    int cpu = sched_getcpu();
+    printf("Current CPU: %d\n", cpu);
+    long pages_total = sysconf(_SC_PHYS_PAGES);
+    long pages_avail = sysconf(_SC_AVPHYS_PAGES);
+    long ps = sysconf(_SC_PAGESIZE);
+    long total_mb = (pages_total * ps) / (1024 * 1024);
+    long avail_mb = (pages_avail * ps) / (1024 * 1024);
+    printf("Total RAM: %ld MB\n", total_mb);
+    printf("Available RAM: %ld MB\n", avail_mb);
+    int ncpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    printf("Online CPUs: %d\n", ncpus);
+    size_t size = 4096 * 1024; /* 4MB */
+    char *local = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (local == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(local, 'L', size);
+    printf("Local alloc: %c (first-touch on CPU %d)\n", local[0], cpu);
+    int populated = 1;
+    for (size_t i = 0; i < size; i += (size_t)ps) {
+        if (local[i] != 'L') { populated = 0; break; }
+    }
+    printf("All pages populated: %s\n", populated ? "yes" : "no");
+    printf("NUMA awareness: %s\n",
+        ncpus > 1 ? "multi-cpu system" : "single-cpu system");
+    munmap(local, size);
+    return 0;
+}'''
+starter_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sched.h>
+#include <errno.h>
+
+int main(void) {
+    int cpu = ____();
+    printf("Current CPU: %d\n", cpu);
+    long pages_total = sysconf(____);
+    long pages_avail = sysconf(_SC_AVPHYS_PAGES);
+    long ps = sysconf(_SC_PAGESIZE);
+    long total_mb = (pages_total * ps) / (1024 * 1024);
+    long avail_mb = (pages_avail * ps) / (1024 * 1024);
+    printf("Total RAM: %ld MB\n", total_mb);
+    printf("Available RAM: %ld MB\n", avail_mb);
+    int ncpus = (int)sysconf(____);
+    printf("Online CPUs: %d\n", ncpus);
+    size_t size = 4096 * 1024; /* 4MB */
+    char *local = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (local == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(local, 'L', size);
+    printf("Local alloc: %c (first-touch on CPU %d)\n", local[0], cpu);
+    int populated = 1;
+    for (size_t i = 0; i < size; i += (size_t)ps) {
+        if (local[i] != 'L') { populated = 0; break; }
+    }
+    printf("All pages populated: %s\n", populated ? "yes" : "no");
+    printf("NUMA awareness: %s\n",
+        ncpus > 1 ? "multi-cpu system" : "single-cpu system");
+    ____(local, size);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sched.h>
+#include <errno.h>
+
+/* == EXEMPLE: détecter le CPU et la mémoire système === */
+void example_system_info(void) {
+    printf("CPU actuel: %d\n", sched_getcpu());
+    long ps = sysconf(_SC_PAGESIZE);
+    long phys = sysconf(_SC_PHYS_PAGES);
+    printf("RAM totale: %ld MB\n", (phys * ps) / (1024*1024));
+    printf("CPUs en ligne: %ld\n", sysconf(_SC_NPROCESSORS_ONLN));
+}
+
+int main(void) {
+    int cpu = sched_getcpu();
+    printf("Current CPU: %d\n", cpu);
+    long pages_total = sysconf(_SC_PHYS_PAGES);
+    long pages_avail = sysconf(_SC_AVPHYS_PAGES);
+    long ps = sysconf(_SC_PAGESIZE);
+    long total_mb = (pages_total * ps) / (1024*1024);
+    long avail_mb = (pages_avail * ps) / (1024*1024);
+    printf("Total RAM: %ld MB\n", total_mb);
+    printf("Available RAM: %ld MB\n", avail_mb);
+    int ncpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    printf("Online CPUs: %d\n", ncpus);
+    size_t size = 4096*1024;
+    char *local = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (local == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(local, 'L', size);
+    printf("Local alloc: %c (first-touch on CPU %d)\n", local[0], cpu);
+    int populated = 1;
+    for (size_t i = 0; i < size; i += (size_t)ps) { if (local[i] != 'L') { populated = 0; break; } }
+    printf("All pages populated: %s\n", populated ? "yes" : "no");
+    printf("NUMA awareness: %s\n", ncpus > 1 ? "multi-cpu system" : "single-cpu system");
+    munmap(local, size);
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sched.h>
+#include <errno.h>
+int main(void) {
+    int cpu = sched_getcpu();
+    printf("Current CPU: %d\n", cpu);
+    long pages_total = sysconf(_SC_PHYS_PAGES);
+    long pages_avail = sysconf(_SC_AVPHYS_PAGES);
+    long ps = sysconf(_SC_PAGESIZE);
+    long total_mb = (pages_total * ps) / (1024*1024);
+    long avail_mb = (pages_avail * ps) / (1024*1024);
+    printf("Total RAM: %ld MB\n", total_mb);
+    printf("Available RAM: %ld MB\n", avail_mb);
+    int ncpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    printf("Online CPUs: %d\n", ncpus);
+    size_t size = 4096*1024;
+    char *local = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (local == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(local, 'L', size);
+    printf("Local alloc: %c (first-touch on CPU %d)\n", local[0], cpu);
+    int populated = 1;
+    for (size_t i = 0; i < size; i += (size_t)ps) { if (local[i] != 'L') { populated = 0; break; } }
+    printf("All pages populated: %s\n", populated ? "yes" : "no");
+    printf("NUMA awareness: %s\n", ncpus > 1 ? "multi-cpu system" : "single-cpu system");
+    ____(local, size);
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sched.h>
+#include <errno.h>
+int main(void) {
+    int cpu = ____();
+    printf("Current CPU: %d\n", cpu);
+    long pages_total = sysconf(____);
+    long pages_avail = sysconf(_SC_AVPHYS_PAGES);
+    long ps = sysconf(_SC_PAGESIZE);
+    long total_mb = (pages_total * ps) / (1024*1024);
+    long avail_mb = (pages_avail * ps) / (1024*1024);
+    printf("Total RAM: %ld MB\n", total_mb);
+    printf("Available RAM: %ld MB\n", avail_mb);
+    int ncpus = (int)sysconf(____);
+    printf("Online CPUs: %d\n", ncpus);
+    size_t size = 4096*1024;
+    char *local = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (local == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(local, 'L', size);
+    printf("Local alloc: %c (first-touch on CPU %d)\n", local[0], cpu);
+    int populated = 1;
+    for (size_t i = 0; i < size; i += (size_t)ps) { if (local[i] != 'L') { populated = 0; break; } }
+    printf("All pages populated: %s\n", populated ? "yes" : "no");
+    printf("NUMA awareness: %s\n", ncpus > 1 ? "multi-cpu system" : "single-cpu system");
+    ____(local, size);
+    return 0;
+}''',
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <sched.h>
+
+// Explorez CPU, RAM, NUMA: sched_getcpu, sysconf, first-touch allocation
+int main(void) {
+    return 0;
+}""",
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "NUMA et affinité mémoire"
+
+[validation]
+expected_output = "REGEX:(?s)NUMA|Available"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque noeud NUMA a sa propre RAM locale"
+label = "Topologie NUMA"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Noeud 0"
+content = "RAM locale (rapide)"
+
+[[visualizer.steps.heap]]
+address = "Noeud 1"
+content = "RAM distante (lente)"
+
+[[visualizer.steps.stack]]
+name = "cpu"
+value = "sched_getcpu()"
+
+[[visualizer.steps.stack]]
+name = "ncpus"
+value = "sysconf(_SC_NPROCESSORS_ONLN)"
+
+[[visualizer.steps]]
+explanation = "memset touche les pages → allouées sur le noeud du CPU courant"
+label = "First-touch policy"
+step_label = "Étape 2"
+
+[[visualizer.steps.arrows]]
+from = "local"
+to = "Noeud local"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Noeud local"
+content = "4MB de 'L' (first-touch)"
+
+[[visualizer.steps.stack]]
+name = "local"
+value = "→ 4MB alloué"
+
+[[visualizer.steps.stack]]
+name = "memset"
+value = "touche toutes les pages"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Toutes les pages sont bien allouées et peuplées"
+heap = []
+label = "Vérification"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "populated"
+value = "yes"
+
+[[visualizer.steps.stack]]
+name = "NUMA"
+value = "multi-cpu ou single-cpu"

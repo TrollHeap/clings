@@ -1,0 +1,564 @@
+common_mistake = "Oublier de soustraire BLOCK_SIZE du pointeur pour retrouver le header lors du free — cela corrompt la free-list"
+description = """
+NSY103 — Capstone avancé sur la gestion mémoire. Implémentez un allocateur mémoire simplifié avec une free-list explicite. L'allocateur utilise un buffer statique (simulant le heap) et maintient une liste chaînée de blocs libres. Implémentez my_malloc (first-fit), my_free (avec coalescing des blocs adjacents), et affichez l'état du heap.
+
+⚠ Cet exercice combine : pointeurs, arithmétique de pointeurs, structures chaînées, gestion de la fragmentation."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "Chaque bloc a un header (Block) suivi des données. Le pointeur retourné est (char*)block + BLOCK_SIZE",
+    "Pour le split : si le bloc libre est assez grand, créez un nouveau Block header après les données allouées",
+    "Le coalescing fusionne les blocs libres adjacents : curr->size += BLOCK_SIZE + next->size, puis saute next",
+]
+id = "capstone-allocator-01"
+kc_ids = ["KC-CAP"]
+key_concept = "Un allocateur mémoire = free-list + split (subdiviser les blocs) + coalescing (fusionner les blocs libres adjacents)"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+#define HEAP_SIZE 256
+
+typedef struct Block {
+    size_t size;
+    int free;
+    struct Block *next;
+} Block;
+
+#define BLOCK_SIZE sizeof(Block)
+
+static char heap[HEAP_SIZE];
+static Block *free_list = NULL;
+
+void heap_init(void) {
+    free_list = (Block *)heap;
+    free_list->size = HEAP_SIZE - BLOCK_SIZE;
+    free_list->free = 1;
+    free_list->next = NULL;
+}
+
+void *my_malloc(size_t size) {
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->size >= size) {
+            if (curr->size >= size + BLOCK_SIZE + 8) {
+                Block *new_block = (Block *)((char *)curr + BLOCK_SIZE + size);
+                new_block->size = curr->size - size - BLOCK_SIZE;
+                new_block->free = 1;
+                new_block->next = curr->next;
+                curr->size = size;
+                curr->next = new_block;
+            }
+            curr->free = 0;
+            return (char *)curr + BLOCK_SIZE;
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Block *block = (Block *)((char *)ptr - BLOCK_SIZE);
+    block->free = 1;
+
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += BLOCK_SIZE + curr->next->size;
+            curr->next = curr->next->next;
+            continue;
+        }
+        curr = curr->next;
+    }
+}
+
+void heap_dump(void) {
+    Block *curr = free_list;
+    int idx = 0;
+    while (curr) {
+        printf("  [%d] %s size=%zu\n", idx,
+               curr->free ? "FREE" : "USED", curr->size);
+        curr = curr->next;
+        idx++;
+    }
+}
+
+int main(void) {
+    heap_init();
+    printf("=== init ===\n");
+    heap_dump();
+
+    printf("=== malloc 32, 64, 16 ===\n");
+    void *a = my_malloc(32);
+    void *b = my_malloc(64);
+    void *c = my_malloc(16);
+    memset(a, 'A', 32);
+    memset(b, 'B', 64);
+    memset(c, 'C', 16);
+    heap_dump();
+
+    printf("=== free b (64) ===\n");
+    my_free(b);
+    heap_dump();
+
+    printf("=== malloc 24 (dans trou de b) ===\n");
+    void *d = my_malloc(24);
+    memset(d, 'D', 24);
+    heap_dump();
+
+    printf("=== free a, free d, free c ===\n");
+    my_free(a);
+    my_free(d);
+    my_free(c);
+    heap_dump();
+
+    printf("=== coalesce final ===\n");
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += BLOCK_SIZE + curr->next->size;
+            curr->next = curr->next->next;
+            continue;
+        }
+        curr = curr->next;
+    }
+    heap_dump();
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+#define HEAP_SIZE 256
+
+typedef struct Block {
+    size_t size;
+    int free;
+    struct Block *next;
+} Block;
+
+#define BLOCK_SIZE sizeof(Block)
+
+static char heap[HEAP_SIZE];
+static Block *free_list = NULL;
+
+void heap_init(void) {
+    free_list = (Block *)heap;
+    free_list->size = HEAP_SIZE - BLOCK_SIZE;
+    free_list->free = ____;
+    free_list->next = ____;
+}
+
+void *my_malloc(size_t size) {
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size) {
+            if (curr->size >= size + BLOCK_SIZE + 8) {
+                Block *new_block = (Block *)((char *)curr + BLOCK_SIZE + size);
+                new_block->size = curr->size - size - BLOCK_SIZE;
+                new_block->free = 1;
+                new_block->next = curr->next;
+                curr->size = size;
+                curr->next = new_block;
+            }
+            curr->free = ____;
+            return (char *)curr + BLOCK_SIZE;
+        }
+        curr = curr->____;
+    }
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Block *block = (Block *)((char *)ptr - ____);
+    block->free = ____;
+
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += BLOCK_SIZE + curr->next->size;
+            curr->next = curr->next->next;
+            continue;
+        }
+        curr = curr->next;
+    }
+}
+
+void heap_dump(void) {
+    Block *curr = free_list;
+    int idx = 0;
+    while (curr) {
+        printf("  [%d] %s size=%zu\n", idx,
+               curr->free ? "FREE" : "USED", curr->size);
+        curr = curr->next;
+        idx++;
+    }
+}
+
+int main(void) {
+    heap_init();
+    printf("=== init ===\n");
+    heap_dump();
+
+    printf("=== malloc 32, 64, 16 ===\n");
+    void *a = my_malloc(32);
+    void *b = my_malloc(64);
+    void *c = my_malloc(16);
+    memset(a, 'A', 32);
+    memset(b, 'B', 64);
+    memset(c, 'C', 16);
+    heap_dump();
+
+    printf("=== free b (64) ===\n");
+    my_free(b);
+    heap_dump();
+
+    printf("=== malloc 24 (dans trou de b) ===\n");
+    void *d = my_malloc(24);
+    memset(d, 'D', 24);
+    heap_dump();
+
+    printf("=== free a, free d, free c ===\n");
+    my_free(a);
+    my_free(d);
+    my_free(c);
+    heap_dump();
+
+    printf("=== coalesce final ===\n");
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += BLOCK_SIZE + curr->next->size;
+            curr->next = curr->next->next;
+            continue;
+        }
+        curr = curr->next;
+    }
+    heap_dump();
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+/* == EXEMPLE =======================================
+ * Pool allocateur simple (taille fixe)
+ * Pattern: buffer statique + bitmap d'occupation
+ * ================================================= */
+#define POOL_SLOTS 4
+#define SLOT_SIZE 16
+static char pool[POOL_SLOTS * SLOT_SIZE];
+static int pool_used[POOL_SLOTS] = {0};
+
+void *pool_alloc(void) {
+    for (int i = 0; i < POOL_SLOTS; i++)
+        if (!pool_used[i]) { pool_used[i] = 1; return &pool[i*SLOT_SIZE]; }
+    return NULL;
+}
+void pool_free(void *ptr) {
+    int idx = ((char*)ptr - pool) / SLOT_SIZE;
+    if (idx >= 0 && idx < POOL_SLOTS) pool_used[idx] = 0;
+}
+void example_pool(void) {
+    void *a = pool_alloc(); void *b = pool_alloc();
+    memset(a, 'X', SLOT_SIZE); memset(b, 'Y', SLOT_SIZE);
+    printf("Slots used: %d, %d\n", pool_used[0], pool_used[1]);
+    pool_free(a);
+    printf("After free: %d, %d\n", pool_used[0], pool_used[1]);
+}
+/* Resultat: Slots used: 1, 1 / After free: 0, 1 */
+
+/* == VOTRE EXERCICE ================================
+ * Allocateur complet avec free-list et coalescing
+ * Buffer statique 256 octets, blocs de taille variable
+ * my_malloc (first-fit + split) + my_free (coalescing)
+ * ================================================= */
+
+#define HEAP_SIZE 256
+typedef struct Block { size_t size; int free; struct Block *next; } Block;
+#define BLOCK_SIZE sizeof(Block)
+static char heap[HEAP_SIZE];
+static Block *free_list = NULL;
+
+int main(void) {
+    /* TODO: heap_init, malloc, free, coalesce, heap_dump */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+#define HEAP_SIZE 256
+typedef struct Block { size_t size; int free; struct Block *next; } Block;
+#define BLOCK_SIZE sizeof(Block)
+static char heap[HEAP_SIZE];
+static Block *free_list = NULL;
+
+void heap_init(void) {
+    free_list = (Block *)heap;
+    free_list->size = HEAP_SIZE - BLOCK_SIZE;
+    free_list->free = 1;
+    free_list->next = NULL;
+}
+
+void *my_malloc(size_t size) {
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->size >= size) {
+            if (curr->size >= size + BLOCK_SIZE + 8) {
+                Block *nb = (Block *)((char *)curr + BLOCK_SIZE + size);
+                nb->size = curr->size - size - BLOCK_SIZE;
+                nb->free = 1; nb->next = curr->next;
+                curr->size = size; curr->next = nb;
+            }
+            curr->free = ____; /* marquer comme utilise */
+            return (char *)curr + BLOCK_SIZE;
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Block *block = (Block *)((char *)ptr - ____); /* retrouver le header */
+    block->free = 1;
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += BLOCK_SIZE + curr->next->size;
+            curr->next = curr->next->next;
+            continue;
+        }
+        curr = curr->next;
+    }
+}
+
+void heap_dump(void) {
+    Block *curr = free_list; int idx = 0;
+    while (curr) { printf("  [%d] %s size=%zu\n", idx, curr->free?"FREE":"USED", curr->size); curr = curr->next; idx++; }
+}
+
+int main(void) {
+    heap_init();
+    printf("=== init ===\n"); heap_dump();
+    printf("=== malloc 32, 64, 16 ===\n");
+    void *a=my_malloc(32); void *b=my_malloc(64); void *c=my_malloc(16);
+    memset(a,'A',32); memset(b,'B',64); memset(c,'C',16); heap_dump();
+    printf("=== free b (64) ===\n"); my_free(b); heap_dump();
+    printf("=== malloc 24 (dans trou de b) ===\n"); void *d=my_malloc(24); memset(d,'D',24); heap_dump();
+    printf("=== free a, free d, free c ===\n"); my_free(a); my_free(d); my_free(c); heap_dump();
+    printf("=== coalesce final ===\n");
+    Block *curr=free_list; while(curr){if(curr->free&&curr->next&&curr->next->free){curr->size+=BLOCK_SIZE+curr->next->size;curr->next=curr->next->next;continue;}curr=curr->next;}
+    heap_dump();
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+#define HEAP_SIZE 256
+typedef struct Block { size_t size; int free; struct Block *next; } Block;
+#define BLOCK_SIZE sizeof(Block)
+static char heap[HEAP_SIZE];
+static Block *free_list = NULL;
+
+void heap_init(void) {
+    free_list = (Block *)heap;
+    free_list->size = HEAP_SIZE - BLOCK_SIZE;
+    free_list->free = ____;
+    free_list->next = ____;
+}
+
+void *my_malloc(size_t size) {
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size) {
+            if (curr->size >= size + BLOCK_SIZE + 8) {
+                Block *new_block = (Block *)((char *)curr + BLOCK_SIZE + size);
+                new_block->size = curr->size - size - BLOCK_SIZE;
+                new_block->free = 1;
+                new_block->next = curr->next;
+                curr->size = size;
+                curr->next = new_block;
+            }
+            curr->free = ____;
+            return (char *)curr + BLOCK_SIZE;
+        }
+        curr = curr->____;
+    }
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Block *block = (Block *)((char *)ptr - ____);
+    block->free = ____;
+    Block *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += ____ + curr->next->size;
+            curr->next = curr->next->____;
+            continue;
+        }
+        curr = curr->next;
+    }
+}
+
+void heap_dump(void) {
+    Block *curr = free_list; int idx = 0;
+    while (curr) { printf("  [%d] %s size=%zu\n", idx, curr->free?"FREE":"USED", curr->size); curr=curr->next; idx++; }
+}
+
+int main(void) {
+    heap_init();
+    printf("=== init ===\n"); heap_dump();
+    printf("=== malloc 32, 64, 16 ===\n");
+    void *a=my_malloc(32); void *b=my_malloc(64); void *c=my_malloc(16);
+    memset(a,'A',32); memset(b,'B',64); memset(c,'C',16); heap_dump();
+    printf("=== free b (64) ===\n"); my_free(b); heap_dump();
+    printf("=== malloc 24 (dans trou de b) ===\n"); void *d=my_malloc(24); memset(d,'D',24); heap_dump();
+    printf("=== free a, free d, free c ===\n"); my_free(a); my_free(d); my_free(c); heap_dump();
+    printf("=== coalesce final ===\n");
+    Block *curr=free_list; while(curr){if(curr->free&&curr->next&&curr->next->free){curr->size+=BLOCK_SIZE+curr->next->size;curr->next=curr->next->next;continue;}curr=curr->next;}
+    heap_dump();
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+// Allocateur memoire avec free-list
+// Buffer statique 256 octets, header Block (size, free, next)
+// heap_init: un seul bloc libre de 232 octets
+// my_malloc: first-fit, split si assez grand
+// my_free: marquer libre, coalescing des blocs adjacents
+// heap_dump: afficher tous les blocs
+// Test: alloc 32+64+16, free 64, alloc 24, free tout, coalesce
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "capstones"
+title = "Allocateur mémoire complet"
+
+[validation]
+expected_output = """
+=== init ===
+  [0] FREE size=232
+=== malloc 32, 64, 16 ===
+  [0] USED size=32
+  [1] USED size=64
+  [2] USED size=16
+  [3] FREE size=48
+=== free b (64) ===
+  [0] USED size=32
+  [1] FREE size=64
+  [2] USED size=16
+  [3] FREE size=48
+=== malloc 24 (dans trou de b) ===
+  [0] USED size=32
+  [1] USED size=24
+  [2] FREE size=16
+  [3] USED size=16
+  [4] FREE size=48
+=== free a, free d, free c ===
+  [0] FREE size=232
+=== coalesce final ===
+  [0] FREE size=232
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le heap de 256 octets moins le header (24) = 232 octets disponibles dans un seul bloc."
+label = "Heap initialisé : un seul bloc libre"
+step_label = "init"
+
+[[visualizer.steps.arrows]]
+from = "free_list"
+label = "head"
+to = "Block 0"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "heap_init"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Block 0"
+value = "{size=232, free=1, next=NULL}"
+
+[[visualizer.steps.stack]]
+name = "free_list"
+value = "-> Block 0"
+
+[[visualizer.steps]]
+explanation = "Le bloc libre est splitté : 32 octets alloués + nouveau bloc libre avec le reste."
+label = "Après malloc(32) : bloc splitté"
+step_label = "split"
+
+[[visualizer.steps.arrows]]
+from = "Block 0"
+label = "next"
+to = "Block 1"
+
+[[visualizer.steps.call_frames]]
+args = "32"
+function_name = "my_malloc"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Block 0"
+value = "{size=32, free=0}"
+
+[[visualizer.steps.heap]]
+name = "Block 1"
+value = "{size=176, free=1}"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "-> données 32 octets"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Tous les blocs sont libres et adjacents. Le coalescing les fusionne en un seul bloc de 232 octets."
+label = "Coalescing : fusion des blocs libres adjacents"
+step_label = "coalesce"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Block 0"
+value = "{size=232, free=1, next=NULL}"
+
+[[visualizer.steps.stack]]
+name = "free_list"
+value = "-> Block 0"

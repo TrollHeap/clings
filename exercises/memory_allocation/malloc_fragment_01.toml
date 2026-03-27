@@ -1,0 +1,447 @@
+common_mistake = "Confondre fragmentation interne (padding dans un bloc) et externe (trous entre blocs) — cet exercice traite la fragmentation externe"
+description = """
+NSY103 — La fragmentation mémoire survient quand la mémoire libre est divisée en petits morceaux non contigus. Même si la mémoire totale libre suffit, aucun bloc contigu n'est assez grand. C'est un problème critique pour les systèmes embarqués et les allocateurs de longue durée.
+
+Simulez la fragmentation avec un mini-allocateur et mesurez le taux de fragmentation."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "La fragmentation = 1 - (plus_grand_bloc_libre / total_libre). 0% = pas de fragmentation, 100% = totalement fragmenté",
+    "Après free(b1) et free(b3), il y a 80 octets libres mais en 3 morceaux de 32+32+16 — aucun ne fait 48",
+    "Les solutions : compaction (coûteux), coalescence (fusionner les blocs adjacents), ou arena (pas de free individuel)",
+]
+id = "malloc-fragment-01"
+kc_ids = ["KC-C02"]
+key_concept = "La fragmentation rend la mémoire inutilisable même si le total libre suffit — problème critique des allocateurs généralistes"
+lang = "c"
+prerequisites = ["malloc-internals-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+
+typedef struct {
+    int offset;
+    int size;
+    int used;
+} Block;
+
+typedef struct {
+    char heap[HEAP_SIZE];
+    Block blocks[MAX_BLOCKS];
+    int nblocks;
+} Allocator;
+
+void alloc_init(Allocator *a) {
+    memset(a, 0, sizeof(Allocator));
+}
+
+int alloc_malloc(Allocator *a, int size) {
+    int offset = 0;
+    for (int i = 0; i < a->nblocks; i++) {
+        if (a->blocks[i].used)
+            offset = a->blocks[i].offset + a->blocks[i].size;
+    }
+    if (offset + size > HEAP_SIZE) return -1;
+    if (a->nblocks >= MAX_BLOCKS) return -1;
+    int idx = a->nblocks++;
+    a->blocks[idx].offset = offset;
+    a->blocks[idx].size = size;
+    a->blocks[idx].used = 1;
+    return idx;
+}
+
+void alloc_free(Allocator *a, int idx) {
+    if (idx >= 0 && idx < a->nblocks)
+        a->blocks[idx].used = 0;
+}
+
+void alloc_stats(const Allocator *a) {
+    int used = 0, free_total = 0, largest_free = 0;
+    int pos = 0;
+    for (int i = 0; i < a->nblocks; i++) {
+        if (a->blocks[i].used) {
+            int gap = a->blocks[i].offset - pos;
+            if (gap > 0) { free_total += gap; if (gap > largest_free) largest_free = gap; }
+            used += a->blocks[i].size;
+            pos = a->blocks[i].offset + a->blocks[i].size;
+        }
+    }
+    int tail = HEAP_SIZE - pos;
+    free_total += tail;
+    if (tail > largest_free) largest_free = tail;
+    printf("Used: %d/%d octets\n", used, HEAP_SIZE);
+    printf("Free total: %d octets\n", free_total);
+    printf("Largest free: %d octets\n", largest_free);
+    printf("Fragmentation: %.0f%%\n",
+           free_total > 0 ? (1.0 - (double)largest_free / free_total) * 100.0 : 0.0);
+}
+
+int main(void) {
+    Allocator a; alloc_init(&a);
+    int b0=alloc_malloc(&a,16), b1=alloc_malloc(&a,32);
+    int b2=alloc_malloc(&a,16), b3=alloc_malloc(&a,32);
+    int b4=alloc_malloc(&a,16);
+    printf("=== Apres 5 allocs ===\n"); alloc_stats(&a);
+    alloc_free(&a,b1); alloc_free(&a,b3);
+    printf("\n=== Apres free b1 et b3 ===\n"); alloc_stats(&a);
+    int big = alloc_malloc(&a, 48);
+    printf("\nAlloc 48 octets: %s\n", big >= 0 ? "OK" : "ECHEC (fragmentation!)");
+    (void)b0; (void)b2; (void)b4;
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <string.h>
+
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+
+typedef struct {
+    int offset;
+    int size;
+    int used;
+} Block;
+
+typedef struct {
+    char heap[HEAP_SIZE];
+    Block blocks[MAX_BLOCKS];
+    int nblocks;
+} Allocator;
+
+void alloc_init(Allocator *a) {
+    /* TODO: initialize allocator with memset */
+}
+
+int alloc_malloc(Allocator *a, int size) {
+    /* TODO: find next free offset after used blocks, allocate, return block index or -1 on failure */
+    return -1;
+}
+
+void alloc_free(Allocator *a, int idx) {
+    /* TODO: mark block at idx as free (used = 0) */
+}
+
+void alloc_stats(const Allocator *a) {
+    /* TODO: calculate and print used, free_total, largest_free, and fragmentation % */
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Fragmentation avec 4 slots de taille fixe
+ * Alloc/free alternee cree des trous.
+ * =========================================================== */
+void example_demo(void) {
+    int slots[8] = {0}; /* 0=libre, 1=occupe */
+    slots[0]=1; slots[1]=1; slots[2]=1; slots[3]=1;
+    slots[1]=0; slots[3]=0; /* libere 1 et 3 */
+    int libre=0, max_contig=0, cur=0;
+    for (int i = 0; i < 8; i++) {
+        if (!slots[i]) { libre++; cur++; if (cur>max_contig) max_contig=cur; }
+        else cur=0;
+    }
+    printf("libre=%d max_contig=%d frag=%.0f%%\n",
+           libre, max_contig, (1.0-(double)max_contig/libre)*100);
+}
+/* Resultat: libre=6 max_contig=4 frag=33% */
+
+/* == VOTRE EXERCICE =========================================
+ * Allocateur simplifie avec mesure de fragmentation
+ * =========================================================== */
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+typedef struct { int offset, size, used; } Block;
+typedef struct { char heap[HEAP_SIZE]; Block blocks[MAX_BLOCKS]; int nblocks; } Allocator;
+
+void alloc_init(Allocator *a) { memset(a, 0, sizeof(Allocator)); }
+int alloc_malloc(Allocator *a, int size) { (void)a; (void)size; return -1; }
+void alloc_free(Allocator *a, int idx) { (void)a; (void)idx; }
+void alloc_stats(const Allocator *a) { (void)a; }
+
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+typedef struct { int offset, size, used; } Block;
+typedef struct { char heap[HEAP_SIZE]; Block blocks[MAX_BLOCKS]; int nblocks; } Allocator;
+
+void alloc_init(Allocator *a) { memset(a, 0, sizeof(Allocator)); }
+
+int alloc_malloc(Allocator *a, int size) {
+    int offset = 0;
+    for (int i = 0; i < a->nblocks; i++)
+        if (a->blocks[i].used) offset = a->blocks[i].offset + a->blocks[i].____;
+    if (offset + size > ____ || a->nblocks >= ____) return -1;
+    int idx = a->____++;
+    a->blocks[idx].offset = offset;
+    a->blocks[idx].size = size;
+    a->blocks[idx].used = 1;
+    return idx;
+}
+void alloc_free(Allocator *a, int idx) {
+    if (idx >= 0 && idx < a->nblocks) a->blocks[idx].____ = 0;
+}
+void alloc_stats(const Allocator *a) {
+    int used=0, free_total=0, largest_free=0, pos=0;
+    for (int i = 0; i < a->nblocks; i++) {
+        if (a->blocks[i].used) {
+            int gap = a->blocks[i].offset - pos;
+            if (gap > 0) { free_total += gap; if (gap > largest_free) largest_free = gap; }
+            used += a->blocks[i].size;
+            pos = a->blocks[i].offset + a->blocks[i].size;
+        }
+    }
+    int tail = HEAP_SIZE - pos; free_total += tail;
+    if (tail > largest_free) largest_free = tail;
+    printf("Used: %d/%d octets\n", used, HEAP_SIZE);
+    printf("Free total: %d octets\n", free_total);
+    printf("Largest free: %d octets\n", largest_free);
+    printf("Fragmentation: %.0f%%\n",
+           free_total > 0 ? (1.0 - (double)largest_free / free_total) * 100.0 : 0.0);
+}
+
+int main(void) {
+    Allocator a; alloc_init(&a);
+    int b0=alloc_malloc(&a,16), b1=alloc_malloc(&a,32);
+    int b2=alloc_malloc(&a,16), b3=alloc_malloc(&a,32);
+    int b4=alloc_malloc(&a,16);
+    printf("=== Apres 5 allocs ===\n"); alloc_stats(&a);
+    alloc_free(&a,b1); alloc_free(&a,b3);
+    printf("\n=== Apres free b1 et b3 ===\n"); alloc_stats(&a);
+    int big = alloc_malloc(&a, 48);
+    printf("\nAlloc 48 octets: %s\n", big >= 0 ? "OK" : "ECHEC (fragmentation!)");
+    (void)b0; (void)b2; (void)b4;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+
+typedef struct {
+    int offset;
+    int size;
+    int used;
+} Block;
+
+typedef struct {
+    char heap[HEAP_SIZE];
+    Block blocks[MAX_BLOCKS];
+    int nblocks;
+} Allocator;
+
+void alloc_init(Allocator *a) {
+    memset(a, 0, sizeof(Allocator));
+}
+
+int alloc_malloc(Allocator *a, int size) {
+    int offset = 0;
+    for (int i = 0; i < a->nblocks; i++) {
+        if (a->blocks[i].used)
+            offset = a->blocks[i].offset + a->blocks[i].____;
+    }
+    if (offset + size > HEAP_SIZE) return -1;
+    if (a->nblocks >= MAX_BLOCKS) return -1;
+    int idx = a->____++;
+    a->blocks[idx].offset = offset;
+    a->blocks[idx].size = size;
+    a->blocks[idx].used = 1;
+    return idx;
+}
+
+void alloc_free(Allocator *a, int idx) {
+    if (idx >= 0 && idx < a->nblocks)
+        a->blocks[idx].____ = 0;
+}
+
+void alloc_stats(const Allocator *a) {
+    int used = 0, free_total = 0, largest_free = 0;
+    int pos = 0;
+    for (int i = 0; i < a->nblocks; i++) {
+        if (a->blocks[i].used) {
+            int gap = a->blocks[i].offset - pos;
+            if (gap > 0) { free_total += gap; if (gap > largest_free) largest_free = gap; }
+            used += a->blocks[i].size;
+            pos = a->blocks[i].offset + a->blocks[i].size;
+        }
+    }
+    int tail = HEAP_SIZE - pos;
+    free_total += tail;
+    if (tail > largest_free) largest_free = tail;
+    printf("Used: %d/%d octets\n", used, HEAP_SIZE);
+    printf("Free total: %d octets\n", free_total);
+    printf("Largest free: %d octets\n", largest_free);
+    printf("Fragmentation: %.0f%%\n",
+           free_total > 0 ? (1.0 - (double)largest_free / free_total) * 100.0 : 0.0);
+}
+
+int main(void) {
+    Allocator a;
+    alloc_init(&a);
+
+    int b0 = alloc_malloc(&a, 16);
+    int b1 = alloc_malloc(&a, 32);
+    int b2 = alloc_malloc(&a, 16);
+    int b3 = alloc_malloc(&a, 32);
+    int b4 = alloc_malloc(&a, 16);
+    printf("=== Apres 5 allocs ===\n");
+    alloc_stats(&a);
+
+    alloc_free(&a, b1);
+    alloc_free(&a, b3);
+    printf("\n=== Apres free b1 et b3 ===\n");
+    alloc_stats(&a);
+
+    int big = alloc_malloc(&a, 48);
+    printf("\nAlloc 48 octets: %s\n", big >= 0 ? "OK" : "ECHEC (fragmentation!)");
+
+    (void)b0; (void)b2; (void)b4;
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define HEAP_SIZE 128
+#define MAX_BLOCKS 16
+typedef struct { int offset, size, used; } Block;
+typedef struct { char heap[HEAP_SIZE]; Block blocks[MAX_BLOCKS]; int nblocks; } Allocator;
+
+// Implémentez alloc_init, alloc_malloc, alloc_free, alloc_stats
+// Démontrez la fragmentation avec alloc/free alternés
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Fragmentation mémoire"
+
+[validation]
+expected_output = """
+=== Apres 5 allocs ===
+Used: 112/128 octets
+Free total: 16 octets
+Largest free: 16 octets
+Fragmentation: 0%
+
+=== Apres free b1 et b3 ===
+Used: 48/128 octets
+Free total: 80 octets
+Largest free: 32 octets
+Fragmentation: 60%
+
+Alloc 48 octets: ECHEC (fragmentation!)"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "112 octets utilisés sur 128. 16 octets libres à la fin. Pas de fragmentation (un seul bloc libre contigu)."
+label = "5 blocs alloués contiguement"
+step_label = "Pas de fragmentation — 0%"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0-15"
+value = "b0 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "16-47"
+value = "b1 (32) USED"
+
+[[visualizer.steps.heap]]
+address = "48-63"
+value = "b2 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "64-95"
+value = "b3 (32) USED"
+
+[[visualizer.steps.heap]]
+address = "96-111"
+value = "b4 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "112-127"
+value = "(libre: 16)"
+
+[[visualizer.steps.stack]]
+name = "a.nblocks"
+value = "5"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "80 octets libres au total mais le plus grand bloc contigu fait seulement 32. Impossible d'allouer 48 octets ! Fragmentation = 1 - 32/80 = 60%. Solution : compacter ou fusionner les blocs adjacents."
+label = "Après free(b1, b3) — trous"
+step_label = "Fragmentation 60% — alloc 48 impossible"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0-15"
+value = "b0 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "16-47"
+value = "LIBRE (32)"
+
+[[visualizer.steps.heap]]
+address = "48-63"
+value = "b2 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "64-95"
+value = "LIBRE (32)"
+
+[[visualizer.steps.heap]]
+address = "96-111"
+value = "b4 (16) USED"
+
+[[visualizer.steps.heap]]
+address = "112-127"
+value = "LIBRE (16)"
+
+[[visualizer.steps.stack]]
+name = "free total"
+value = "80 octets"
+
+[[visualizer.steps.stack]]
+name = "largest free"
+value = "32 octets"

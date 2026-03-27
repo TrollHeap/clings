@@ -1,0 +1,258 @@
+common_mistake = 'Mélanger mode texte ("w") et binaire : sur Windows crée des problèmes de \r\n. Utiliser "wb"/"rb" en binaire.'
+description = """
+NSY103 — fwrite() et fread() opèrent en binaire : ils copient directement les octets d'une struct. Plus rapide que le texte, mais non-portable entre architectures.
+
+Écrivez 3 structs ProcessRecord dans un buffer binaire via fwrite, puis relisez-les avec fread."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    'char buf[1024] = {0}; FILE *fw = fmemopen(buf, sizeof(buf), "w+");',
+    "fwrite(&record, sizeof(record), 1, fw);",
+    "Rembobiner : rewind(fw); ou fseek(fw, 0, SEEK_SET);",
+]
+id = "file-binary-01"
+kc_ids = ["KC-C06"]
+key_concept = "fwrite(&s, sizeof(s), 1, f) écrit sizeof(s) octets bruts"
+lang = "c"
+prerequisites = ["file-read-lines-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+int main(void) {
+    char buf[1024];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w+");
+    if (!f) return 1;
+    ProcessRecord procs[] = {
+        {1,    0, "init"},
+        {42,   1000, "bash"},
+        {1337, 1000, "clings"}
+    };
+    for (int i = 0; i < 3; i++)
+        fwrite(&procs[i], sizeof(ProcessRecord), 1, f);
+    rewind(f);
+    ProcessRecord r;
+    printf("pid  uid  cmd\n");
+    while (fread(&r, sizeof(ProcessRecord), 1, f) == 1)
+        printf("%-4d %-4d %s\n", r.pid, r.uid, r.cmd);
+    fclose(f);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    char buf[1024];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w+");
+    if (!f) return 1;
+    ProcessRecord procs[] = {
+        {1,    0,    "init"},
+        {42,   1000, "bash"},
+        {1337, 1000, "clings"}
+    };
+    for (int i = 0; i < 3; i++)
+        fwrite(____, ____, ____, f);
+    rewind(f);
+    ProcessRecord r;
+    printf("pid  uid  cmd\n");
+    while (fread(____, ____, ____, f) == 1)
+        printf("%-4d %-4d %s\n", r.pid, r.uid, r.cmd);
+    fclose(f);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Ecrire/lire des structs binaires avec fwrite/fread
+ * fwrite(&s, sizeof(s), 1, f) ecrit sizeof(s) octets bruts
+ * =========================================================== */
+typedef struct { int id; float temp; } SensorReading;
+
+void example_binary_sensor(void) {
+    char sbuf[512];
+    memset(sbuf, 0, sizeof(sbuf));
+    FILE *sf = fmemopen(sbuf, sizeof(sbuf), "w+");
+    if (!sf) return;
+    SensorReading sensors[] = {
+        {1, 22.5f}, {2, 18.3f}, {3, 30.1f}
+    };
+    for (int i = 0; i < 3; i++)
+        fwrite(&sensors[i], sizeof(SensorReading), 1, sf);
+    rewind(sf);
+    SensorReading s;
+    while (fread(&s, sizeof(SensorReading), 1, sf) == 1)
+        printf("Sensor %d: %.1f C\n", s.id, s.temp);
+    fclose(sf);
+}
+/* Resultat: Sensor 1: 22.5 C, Sensor 2: 18.3 C, Sensor 3: 30.1 C */
+
+/* == VOTRE EXERCICE =========================================
+ * Ecrire/lire des ProcessRecord en binaire avec fwrite/fread
+ * Inspirez-vous de example_binary_sensor ci-dessus.
+ * Meme pattern : fwrite en boucle, rewind, fread en boucle.
+ * =========================================================== */
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    char buf[1024];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w+");
+    if (!f) return 1;
+    ProcessRecord procs[] = {
+        {1,    0,    "init"},
+        {42,   1000, "bash"},
+        {1337, 1000, "clings"}
+    };
+    /* TODO: fwrite each proc */
+    (void)procs;
+    rewind(f);
+    ProcessRecord r;
+    printf("pid  uid  cmd\n");
+    /* TODO: while (fread(&r, sizeof(ProcessRecord), 1, f) == 1) printf(...) */
+    (void)r;
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    char buf[1024];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w+");
+    if (!f) return 1;
+    ProcessRecord procs[] = {
+        {1,    0,    "init"},
+        {42,   1000, "bash"},
+        {1337, 1000, "clings"}
+    };
+    for (int i = 0; i < 3; i++)
+        fwrite(&procs[i], sizeof(ProcessRecord), 1, f);
+    rewind(f);
+    ProcessRecord r;
+    printf("pid  uid  cmd\n");
+    while (fread(____, ____, ____, f) == 1) // &r, sizeof(ProcessRecord), 1
+        printf("%-4d %-4d %s\n", r.pid, r.uid, r.cmd);
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    char buf[1024];
+    memset(buf, 0, sizeof(buf));
+    FILE *f = fmemopen(buf, sizeof(buf), "w+");
+    if (!f) return 1;
+    ProcessRecord procs[] = {
+        {1,    0,    "init"},
+        {42,   1000, "bash"},
+        {1337, 1000, "clings"}
+    };
+    for (int i = 0; i < 3; i++)
+        fwrite(____, ____, ____, f);
+    rewind(f);
+    ProcessRecord r;
+    printf("pid  uid  cmd\n");
+    while (fread(____, ____, ____, f) == 1)
+        printf("%-4d %-4d %s\n", r.pid, r.uid, r.cmd);
+    fclose(f);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    // buf[1024] + fmemopen en mode "w+"
+    // fwrite 3 ProcessRecord en binaire
+    // rewind puis fread en boucle
+    // Afficher "pid  uid  cmd" puis chaque struct
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+
+typedef struct { int pid; int uid; char cmd[32]; } ProcessRecord;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "fwrite/fread binaire avec structs"
+
+[validation]
+expected_output = """
+pid  uid  cmd
+1    0    init
+42   1000 bash
+1337 1000 clings
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+heap = []
+label = "fmemopen buf en mode w+"
+
+[[visualizer.steps.arrows]]
+from = "f"
+to = "buf[1024]"
+
+[[visualizer.steps.stack]]
+name = "buf[1024]"
+value = "(zéros)"
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (w+)"
+
+[[visualizer.steps.stack]]
+name = "procs[3]"
+value = "structs ProcessRecord"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "fwrite 3 structs en binaire"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = "[octets bruts pid+uid+cmd x3]"
+
+[[visualizer.steps.stack]]
+name = "position"
+value = "3 * sizeof(ProcessRecord)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "rewind puis fread"
+
+[[visualizer.steps.stack]]
+name = "position"
+value = "0 (remis au début)"
+
+[[visualizer.steps.stack]]
+name = "r"
+value = "ProcessRecord lu depuis buf"

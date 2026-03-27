@@ -1,0 +1,349 @@
+common_mistake = "Oublier le cas idle (elected == -1) : sans `time++` dans ce cas, la boucle tourne infiniment si aucun processus n'est encore arrivé"
+description = """
+NSY103/UTC502 — Ordonnancement par priorités préemptives. A chaque tick, le processus eligible (arrivé, non terminé) avec la valeur de priorité minimale prend le CPU. Si un processus plus prioritaire arrive, il préempte immédiatement le processus en cours.
+
+Processus (priorité : valeur min = plus haute priorité) :
+- P1 : arrivée=4, burst=6, priorité=2
+- P2 : arrivée=0, burst=2, priorité=1 (la plus haute — démarre en premier)
+- P3 : arrivée=0, burst=4, priorité=4 (la plus basse — attend P1 et P4)
+- P4 : arrivée=8, burst=6, priorité=3
+
+Gantt préemptif (tick-by-tick) :
+t=0-2  : P2 (prio=1, plus prioritaire à t=0) -> complete a t=2
+t=2-4  : P3 (prio=4, seul disponible)
+t=4    : P1 arrive (prio=2) -> préempte P3 (prio=4, 2 unités restantes)
+t=4-10 : P1 s'exécute (burst=6)
+t=8    : P4 arrive (prio=3) mais prio=3 > P1 prio=2 -> pas de préemption
+t=10-16: P4 s'exécute (prio=3 meilleure que P3 prio=4)
+t=16-18: P3 reprend (2 unités restantes)
+
+Temps de réponse = finish_time - arrival_time :
+  P1 : 10 - 4 = 6
+  P2 : 2 - 0 = 2
+  P3 : 18 - 0 = 18
+  P4 : 16 - 8 = 8
+
+Implémentez le simulateur tick-by-tick avec une struct Proc."""
+difficulty = 3
+exercise_type = "complete"
+files = []
+hints = [
+    "A chaque tick, parcourez tous les processus et sélectionnez celui avec `arrival <= time` et `remaining > 0` ayant la `priority` minimale : `if (elected == -1 || p[i].priority < p[elected].priority)`",
+    "Si aucun processus n'est eligible (elected == -1), avancez `time++` — le CPU est idle jusqu'à la prochaine arrivée",
+    "Le temps de réponse est `completion - arrival` : P3 (prio=4, la plus basse) attend que P1 et P4 finissent avant de reprendre ses 2 unités restantes",
+]
+id = "sched-priority-arrival-01"
+kc_ids = ["KC-C6"]
+key_concept = "Simulateur préemptif tick-by-tick : à chaque tick, élire le processus eligible avec priority minimale ; si aucun, avancer time (CPU idle)"
+lang = "c"
+prerequisites = ["sched-priority-01"]
+solution_code = '''
+#include <stdio.h>
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;
+    int remaining;
+    int completion;
+} Proc;
+
+void simulate_priority_arrival(Proc p[], int n) {
+    int time = 0, done = 0;
+    while (done < n) {
+        int elected = -1;
+        for (int i = 0; i < n; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                if (elected == -1 || p[i].priority < p[elected].priority)
+                    elected = i;
+            }
+        }
+        if (elected == -1) {
+            time++;
+            continue;
+        }
+        p[elected].remaining--;
+        time++;
+        if (p[elected].remaining == 0) {
+            p[elected].completion = time;
+            done++;
+        }
+    }
+}
+
+int main(void) {
+    Proc p[N] = {
+        {4, 6, 2, 6, 0},
+        {0, 2, 1, 2, 0},
+        {0, 4, 4, 4, 0},
+        {8, 6, 3, 6, 0},
+    };
+    int time = 0, done = 0;
+
+    while (done < N) {
+        int elected = -1;
+        for (int i = 0; i < N; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                if (elected == -1 || p[i].priority < p[elected].priority)
+                    elected = i;
+            }
+        }
+        if (elected == -1) { time++; continue; }
+        p[elected].remaining--;
+        time++;
+        if (p[elected].remaining == 0) {
+            p[elected].completion = time;
+            done++;
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, p[i].completion - p[i].arrival);
+    return 0;
+}
+'''
+starter_code = """
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;
+    int remaining;
+    int completion;
+} Proc;
+
+void simulate_priority_arrival(Proc p[], int n) {
+    /* TODO: Boucle while (done < n) tick-by-tick */
+    /* TODO: Cherchez elected = processus eligible avec priority minimale */
+    /* TODO: Si elected==-1, avancez time (CPU idle) */
+    /* TODO: Sinon, decrementez remaining, incrementez time */
+    /* TODO: Si remaining==0, enregistrez completion et done++ */
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;   /* valeur min = priorite la plus haute */
+    int remaining;  /* burst restant */
+    int completion; /* instant de fin */
+} Proc;
+
+/* Simulateur tick-by-tick preemptif :
+ *  A chaque tick :
+ *    1. Chercher le processus eligible (arrival<=time, remaining>0) avec priority minimale
+ *    2. Si aucun (elected==-1) : time++ (CPU idle)
+ *    3. Sinon : p[elected].remaining-- ; time++
+ *       Si remaining==0 : completion=time, done++
+ */
+int main(void) {
+    Proc p[N] = {
+        {4, 6, 2, 6, 0},
+        {0, 2, 1, 2, 0},
+        {0, 4, 4, 4, 0},
+        {8, 6, 3, 6, 0},
+    };
+    int time = 0, done = 0;
+
+    while (done < N) {
+        int elected = -1;
+        for (int i = 0; i < N; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                if (elected == -1 || p[i].priority < p[elected].priority)
+                    elected = i;
+            }
+        }
+        if (elected == -1) { time++; continue; }
+        p[elected].remaining--;
+        time++;
+        if (p[elected].remaining == 0) {
+            p[elected].completion = time;
+            done++;
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, p[i].completion - p[i].arrival);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 4
+
+typedef struct {
+    int arrival, burst, priority, remaining, completion;
+} Proc;
+
+int main(void) {
+    Proc p[N] = {
+        {4, 6, 2, 6, 0}, {0, 2, 1, 2, 0},
+        {0, 4, 4, 4, 0}, {8, 6, 3, 6, 0},
+    };
+    int time = 0, done = 0;
+
+    while (done < N) {
+        int elected = -1;
+        for (int i = 0; i < N; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                /* Elire si priorite plus haute (valeur min) */
+                if (elected == ____ || p[i].priority < p[elected].priority)
+                    elected = ____;
+            }
+        }
+        if (elected == -1) { ____; continue; } /* idle */
+        ____; /* decrementer remaining */
+        ____; /* incrementer time */
+        if (p[elected].remaining == 0) {
+            p[elected].completion = ____;
+            done++;
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, p[i].completion - p[i].arrival);
+    return 0;
+}''',
+    """
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;
+    int remaining;
+    int completion;
+} Proc;
+
+void simulate_priority_arrival(Proc p[], int n) {
+    /* TODO: Boucle while (done < n) tick-by-tick */
+    /* TODO: Cherchez elected = processus eligible avec priority minimale */
+    /* TODO: Si elected==-1, avancez time (CPU idle) */
+    /* TODO: Sinon, decrementez remaining, incrementez time */
+    /* TODO: Si remaining==0, enregistrez completion et done++ */
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;
+    int remaining;
+    int completion;
+} Proc;
+
+void simulate_priority_arrival(Proc p[], int n) {
+    /* TODO */
+}
+
+int main(void) {
+    Proc p[N] = {
+        {4, 6, 2, 6, 0},
+        {0, 2, 1, 2, 0},
+        {0, 4, 4, 4, 0},
+        {8, 6, 3, 6, 0},
+    };
+    int time = 0, done = 0;
+
+    while (done < N) {
+        int elected = -1;
+        for (int i = 0; i < N; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                if (elected == -1 || p[i].priority < p[elected].priority)
+                    elected = i;
+            }
+        }
+        if (elected == -1) { time++; continue; }
+        p[elected].remaining--;
+        time++;
+        if (p[elected].remaining == 0) {
+            p[elected].completion = time;
+            done++;
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, p[i].completion - p[i].arrival);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 4
+
+typedef struct {
+    int arrival;
+    int burst;
+    int priority;
+    int remaining;
+    int completion;
+} Proc;
+
+void simulate_priority_arrival(Proc p[], int n) { }
+
+int main(void) {
+    Proc p[N] = {
+        {4, 6, 2, 6, 0},
+        {0, 2, 1, 2, 0},
+        {0, 4, 4, 4, 0},
+        {8, 6, 3, 6, 0},
+    };
+    int time = 0, done = 0;
+
+    while (done < N) {
+        int elected = -1;
+        for (int i = 0; i < N; i++) {
+            if (p[i].arrival <= time && p[i].remaining > 0) {
+                if (elected == -1 || p[i].priority < p[elected].priority)
+                    elected = i;
+            }
+        }
+        if (elected == -1) { time++; continue; }
+        p[elected].remaining--;
+        time++;
+        if (p[elected].remaining == 0) {
+            p[elected].completion = time;
+            done++;
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, p[i].completion - p[i].arrival);
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "Priorités préemptives avec dates d'arrivée"
+
+[validation]
+expected_output = """
+Response time P1: 6
+Response time P2: 2
+Response time P3: 18
+Response time P4: 8"""
+mode = "output"
+
+[visualizer]
+steps = []
+type = "dataflow"

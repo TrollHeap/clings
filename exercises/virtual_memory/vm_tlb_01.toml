@@ -1,0 +1,333 @@
+common_mistake = "Ne pas utiliser volatile — le compilateur peut supprimer les lectures non utilisées"
+description = """
+NSY103 — Le TLB (Translation Lookaside Buffer) est un cache matériel des traductions adresse virtuelle → physique. Un accès séquentiel (bonne localité spatiale) réutilise les mêmes entrées TLB. Un accès aléatoire provoque des TLB misses coûteux.
+
+Mesurez la différence de performance entre accès séquentiel et accès à grands pas (stride) pour démontrer l'impact du TLB."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "CLOCK_MONOTONIC est l'horloge haute résolution non affectée par les changements d'heure",
+    "Le stride fait sauter l'accès entre pages distantes — provoquant des TLB misses",
+    "volatile empêche le compilateur d'optimiser les lectures en boucle",
+]
+id = "vm-tlb-01"
+kc_ids = ["KC-C18"]
+key_concept = "Le TLB est un cache de traductions — la localité spatiale réduit les TLB misses"
+lang = "c"
+prerequisites = [
+    "vm-hugepage-01",
+    "vm-page-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+
+long elapsed_ns(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) * 1000000000L +
+           (end.tv_nsec - start.tv_nsec);
+}
+
+int main(void) {
+    size_t size = 64UL * 1024 * 1024; /* 64MB */
+    size_t ps = (size_t)getpagesize();
+    char *mem = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, size);
+    size_t pages = size / ps;
+    printf("Pages: %zu\n", pages);
+    struct timespec t0, t1;
+    volatile char sink;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) {
+        sink = mem[i * ps];
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long seq_ns = elapsed_ns(t0, t1);
+    printf("Sequential: %ld ns\n", seq_ns);
+    size_t stride = 512; /* sauter 512 pages = 2MB */
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) {
+        size_t idx = (i * stride) % pages;
+        sink = mem[idx * ps];
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long stride_ns = elapsed_ns(t0, t1);
+    printf("Stride %zu: %ld ns\n", stride, stride_ns);
+    double ratio = (double)stride_ns / (double)seq_ns;
+    printf("Stride/Sequential ratio: %.1f\n", ratio);
+    printf("TLB impact: %s\n", ratio > 1.0 ? "yes" : "no");
+    (void)sink;
+    munmap(mem, size);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+
+long elapsed_ns(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) * 1000000000L +
+           (end.tv_nsec - start.tv_nsec);
+}
+
+int main(void) {
+    size_t size = 64UL * 1024 * 1024; /* 64MB */
+    size_t ps = (size_t)getpagesize();
+    char *mem = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, size);
+    size_t pages = size / ps;
+    printf("Pages: %zu\n", pages);
+    struct timespec t0, t1;
+    volatile char sink;
+    clock_gettime(____,  &t0);
+    for (size_t i = 0; i < pages; i++) {
+        sink = mem[i * ps];
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long seq_ns = elapsed_ns(t0, t1);
+    printf("Sequential: %ld ns\n", seq_ns);
+    size_t stride = 512; /* sauter 512 pages = 2MB */
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) {
+        size_t idx = (i * ____) % pages;
+        sink = mem[idx * ps];
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long stride_ns = elapsed_ns(t0, t1);
+    printf("Stride %zu: %ld ns\n", stride, stride_ns);
+    double ratio = (double)stride_ns / (double)seq_ns;
+    printf("Stride/Sequential ratio: %.1f\n", ratio);
+    printf("TLB impact: %s\n", ratio > 1.0 ? "yes" : "no");
+    (void)sink;
+    ____(mem, size);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+
+/* == EXEMPLE: mesurer le temps avec clock_gettime ====== */
+void example_timing(void) {
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    volatile int sum = 0;
+    for (int i = 0; i < 1000000; i++) sum += i;
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long ns = (t1.tv_sec-t0.tv_sec)*1000000000L + (t1.tv_nsec-t0.tv_nsec);
+    printf("1M additions: %ld ns\n", ns);
+    (void)sum;
+}
+
+long elapsed_ns(struct timespec s, struct timespec e) {
+    return (e.tv_sec-s.tv_sec)*1000000000L + (e.tv_nsec-s.tv_nsec);
+}
+int main(void) {
+    size_t size = 64UL*1024*1024;
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, size);
+    size_t pages = size / ps;
+    printf("Pages: %zu\n", pages);
+    struct timespec t0, t1;
+    volatile char sink;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) sink = mem[i*ps];
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long seq_ns = elapsed_ns(t0, t1);
+    printf("Sequential: %ld ns\n", seq_ns);
+    size_t stride = 512;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) { size_t idx = (i*stride)%pages; sink = mem[idx*ps]; }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long stride_ns = elapsed_ns(t0, t1);
+    printf("Stride %zu: %ld ns\n", stride, stride_ns);
+    double ratio = (double)stride_ns/(double)seq_ns;
+    printf("Stride/Sequential ratio: %.1f\n", ratio);
+    printf("TLB impact: %s\n", ratio > 1.0 ? "yes" : "no");
+    (void)sink;
+    munmap(mem, size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+long elapsed_ns(struct timespec s, struct timespec e) {
+    return (e.tv_sec-s.tv_sec)*1000000000L + (e.tv_nsec-s.tv_nsec);
+}
+int main(void) {
+    size_t size = 64UL*1024*1024;
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, size);
+    size_t pages = size / ps;
+    printf("Pages: %zu\n", pages);
+    struct timespec t0, t1;
+    volatile char sink;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) sink = mem[i*ps];
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long seq_ns = elapsed_ns(t0, t1);
+    printf("Sequential: %ld ns\n", seq_ns);
+    size_t stride = 512;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) { size_t idx = (i*____)%pages; sink = mem[idx*ps]; }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long stride_ns = elapsed_ns(t0, t1);
+    printf("Stride %zu: %ld ns\n", stride, stride_ns);
+    double ratio = (double)stride_ns/(double)seq_ns;
+    printf("Stride/Sequential ratio: %.1f\n", ratio);
+    printf("TLB impact: %s\n", ratio > 1.0 ? "yes" : "no");
+    (void)sink;
+    ____(mem, size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+long elapsed_ns(struct timespec s, struct timespec e) {
+    return (e.tv_sec-s.tv_sec)*1000000000L + (e.tv_nsec-s.tv_nsec);
+}
+int main(void) {
+    size_t size = 64UL*1024*1024;
+    size_t ps = (size_t)getpagesize();
+    char *mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, size);
+    size_t pages = size / ps;
+    printf("Pages: %zu\n", pages);
+    struct timespec t0, t1;
+    volatile char sink;
+    clock_gettime(____, &t0);
+    for (size_t i = 0; i < pages; i++) sink = mem[i*ps];
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long seq_ns = elapsed_ns(t0, t1);
+    printf("Sequential: %ld ns\n", seq_ns);
+    size_t stride = 512;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (size_t i = 0; i < pages; i++) { size_t idx = (i*____)%pages; sink = mem[idx*ps]; }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long stride_ns = elapsed_ns(t0, t1);
+    printf("Stride %zu: %ld ns\n", stride, stride_ns);
+    double ratio = (double)stride_ns/(double)seq_ns;
+    printf("Stride/Sequential ratio: %.1f\n", ratio);
+    printf("TLB impact: %s\n", ratio > 1.0 ? "yes" : "no");
+    (void)sink;
+    ____(mem, size);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+
+// Mesurez accès séquentiel vs stride pour démontrer l'impact TLB
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <time.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "TLB et localité mémoire"
+
+[validation]
+expected_output = "REGEX:(?s)TLB|entries"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Accès linéaire: chaque entrée TLB est réutilisée pour la page suivante"
+label = "Accès séquentiel"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "64MB"
+content = "page 0 → 1 → 2 → 3 → ..."
+
+[[visualizer.steps.stack]]
+name = "pages"
+value = "16384"
+
+[[visualizer.steps.stack]]
+name = "stride"
+value = "1 (séquentiel)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Sauts de 2MB: le TLB ne peut pas cacher toutes les traductions"
+label = "Accès avec stride 512"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "64MB"
+content = "page 0 → 512 → 1024 → ..."
+
+[[visualizer.steps.stack]]
+name = "stride"
+value = "512 (2MB gaps)"
+
+[[visualizer.steps.stack]]
+name = "i*stride%pages"
+value = "0, 512, 1024, ..."
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le stride provoque des TLB misses coûteux"
+heap = []
+label = "Résultat"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ratio"
+value = "> 1.0"
+
+[[visualizer.steps.stack]]
+name = "TLB impact"
+value = "yes"

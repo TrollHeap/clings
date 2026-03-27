@@ -1,0 +1,396 @@
+common_mistake = "Libérer l'ancienne version avant que tous les lecteurs aient terminé — use-after-free garanti"
+description = """
+NSY103 — RCU (Read-Copy-Update) est un mécanisme de synchronisation où les lecteurs accèdent aux données sans verrou. L'écrivain crée une copie modifiée, puis remplace atomiquement le pointeur. L'ancienne version est libérée après que tous les lecteurs aient terminé (grâce period = join des threads lecteurs).
+
+Implémentez un RCU simplifié avec un pointeur atomique. La grâce period est simulée par le join des threads lecteurs."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "rcu_read charge le pointeur global_data atomiquement avec __atomic_load_n",
+    "copy->value reçoit le paramètre new_value, puis __atomic_store_n publie copy",
+    "rcu_update retourne l'ancien pointeur — on le libère après que les lecteurs aient fini (grâce period = join)",
+]
+id = "sync-rcu-01"
+kc_ids = ["KC-C22"]
+key_concept = "RCU : lecteurs sans verrou (load atomique), écrivain copie-modifie-remplace, libération après grâce period (join)"
+lang = "c"
+prerequisites = [
+    "sync-spinlock-01",
+    "sync-barrier-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+typedef struct {
+    int version;
+    int value;
+} Data;
+
+Data *global_data = NULL;
+
+void rcu_read(int reader_id) {
+    Data *local = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    printf("Lecteur %d: v%d val=%d\n", reader_id,
+           local->version, local->value);
+}
+
+Data *rcu_update(int new_value) {
+    Data *old = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    Data *copy = malloc(sizeof(Data));
+    memcpy(copy, old, sizeof(Data));
+    copy->version = old->version + 1;
+    copy->value = new_value;
+    __atomic_store_n(&global_data, copy, __ATOMIC_RELEASE);
+    printf("Update: v%d val=%d\n", copy->version, copy->value);
+    return old;
+}
+
+void *reader_thread(void *arg) {
+    int id = *(int *)arg;
+    rcu_read(id);
+    return NULL;
+}
+
+int main(void) {
+    global_data = malloc(sizeof(Data));
+    global_data->version = 1;
+    global_data->value = 100;
+    printf("Init: v%d val=%d\n", global_data->version, global_data->value);
+
+    /* Update: copy-on-write */
+    Data *old = rcu_update(200);
+
+    /* Lecteurs voient la nouvelle version */
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, reader_thread, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+
+    /* Grâce period terminée: tous les lecteurs finis, libérer l'ancien */
+    free(old);
+
+    printf("Final: v%d val=%d\n",
+           global_data->version, global_data->value);
+    free(global_data);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+typedef struct {
+    int version;
+    int value;
+} Data;
+
+Data *global_data = NULL;
+
+void rcu_read(int reader_id) {
+    Data *local = __atomic_load_n(&____, __ATOMIC_ACQUIRE);
+    printf("Lecteur %d: v%d val=%d\n", reader_id,
+           local->version, local->value);
+}
+
+Data *rcu_update(int new_value) {
+    Data *old = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    Data *copy = malloc(sizeof(Data));
+    memcpy(copy, old, sizeof(Data));
+    copy->version = old->version + 1;
+    copy->value = ____;
+    __atomic_store_n(&global_data, ____, __ATOMIC_RELEASE);
+    printf("Update: v%d val=%d\n", copy->version, copy->value);
+    return ____; /* retourner l'ancien pointeur pour libération après grâce period */
+}
+
+void *reader_thread(void *arg) {
+    int id = *(int *)arg;
+    rcu_read(id);
+    return NULL;
+}
+
+int main(void) {
+    global_data = malloc(sizeof(Data));
+    global_data->version = 1;
+    global_data->value = 100;
+    printf("Init: v%d val=%d\n", global_data->version, global_data->value);
+
+    /* Update: copy-on-write */
+    Data *old = rcu_update(200);
+
+    /* Lecteurs voient la nouvelle version */
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, reader_thread, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+
+    /* Grâce period terminée: tous les lecteurs finis, libérer l'ancien */
+    ____(old);
+
+    printf("Final: v%d val=%d\n",
+           global_data->version, global_data->value);
+    free(global_data);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Remplacement atomique de pointeur simple
+ * Un pointeur global est remplacé atomiquement.
+ * ========================================================= */
+int *ex_ptr = NULL;
+
+void example_atomic_ptr(void) {
+    int *old_val = malloc(sizeof(int));
+    *old_val = 10;
+    ex_ptr = old_val;
+    int *new_val = malloc(sizeof(int));
+    *new_val = 20;
+    __atomic_store_n(&ex_ptr, new_val, __ATOMIC_RELEASE);
+    printf("Ancien: %d, Nouveau: %d\n", *old_val, *ex_ptr);
+    free(old_val);
+    free(new_val);
+}
+/* store_n remplace le pointeur atomiquement */
+
+/* == VOTRE EXERCICE ========================================
+ * RCU simplifié : read sans verrou, copy-update, grâce period.
+ * La grâce period = join des threads lecteurs.
+ * ========================================================= */
+
+typedef struct { int version; int value; } Data;
+Data *global_data = NULL;
+
+void rcu_read(int reader_id) {
+    Data *local = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    printf("Lecteur %d: v%d val=%d\n", reader_id, local->version, local->value);
+}
+
+Data *rcu_update(int new_value) {
+    Data *old = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    Data *copy = malloc(sizeof(Data));
+    memcpy(copy, old, sizeof(Data));
+    copy->version = old->version + 1;
+    copy->value = new_value;
+    __atomic_store_n(&global_data, copy, __ATOMIC_RELEASE);
+    printf("Update: v%d val=%d\n", copy->version, copy->value);
+    return old;
+}
+
+void *reader_thread(void *arg) {
+    int id = *(int *)arg;
+    rcu_read(id);
+    return NULL;
+}
+
+int main(void) {
+    global_data = malloc(sizeof(Data));
+    global_data->version = 1;
+    global_data->value = 100;
+    printf("Init: v%d val=%d\n", global_data->version, global_data->value);
+    Data *old = rcu_update(200);
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, reader_thread, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+    free(old); /* grâce period terminée */
+    printf("Final: v%d val=%d\n", global_data->version, global_data->value);
+    free(global_data);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+typedef struct { int version; int value; } Data;
+Data *global_data = NULL;
+
+void rcu_read(int reader_id) {
+    Data *local = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    printf("Lecteur %d: v%d val=%d\n", reader_id, local->version, local->value);
+}
+
+Data *rcu_update(int new_value) {
+    Data *old = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    Data *copy = malloc(sizeof(Data));
+    memcpy(copy, old, sizeof(Data));
+    copy->version = old->version + 1;
+    copy->value = new_value;
+    __atomic_store_n(&global_data, ____, __ATOMIC_RELEASE); /* quel pointeur ? */
+    printf("Update: v%d val=%d\n", copy->version, copy->value);
+    return old;
+}
+
+void *reader_thread(void *arg) {
+    int id = *(int *)arg;
+    rcu_read(id);
+    return NULL;
+}
+
+int main(void) {
+    global_data = malloc(sizeof(Data));
+    global_data->version = 1;
+    global_data->value = 100;
+    printf("Init: v%d val=%d\n", global_data->version, global_data->value);
+    Data *old = rcu_update(200);
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, reader_thread, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+    free(old);
+    printf("Final: v%d val=%d\n", global_data->version, global_data->value);
+    free(global_data);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+typedef struct { int version; int value; } Data;
+Data *global_data = NULL;
+
+void rcu_read(int reader_id) {
+    Data *local = __atomic_load_n(&____, __ATOMIC_ACQUIRE);
+    printf("Lecteur %d: v%d val=%d\n", reader_id, local->version, local->value);
+}
+
+Data *rcu_update(int new_value) {
+    Data *old = __atomic_load_n(&global_data, __ATOMIC_ACQUIRE);
+    Data *copy = malloc(sizeof(Data));
+    memcpy(copy, old, sizeof(Data));
+    copy->version = old->version + 1;
+    copy->value = ____;
+    __atomic_store_n(&global_data, ____, __ATOMIC_RELEASE);
+    printf("Update: v%d val=%d\n", copy->version, copy->value);
+    return ____;
+}
+
+void *reader_thread(void *arg) {
+    int id = *(int *)arg;
+    rcu_read(id);
+    return NULL;
+}
+
+int main(void) {
+    global_data = malloc(sizeof(Data));
+    global_data->version = 1;
+    global_data->value = 100;
+    printf("Init: v%d val=%d\n", global_data->version, global_data->value);
+    Data *old = rcu_update(200);
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, reader_thread, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+    ____(old);
+    printf("Final: v%d val=%d\n", global_data->version, global_data->value);
+    free(global_data);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+// struct Data { version, value }
+// rcu_read : load atomique du pointeur, lire sans verrou
+// rcu_update : copier, modifier, store atomique, retourner ancien pointeur
+// main : init data v1/100, update à 200, 2 lecteurs, join = grâce period, free ancien, afficher final
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Read-Copy-Update simplifié"
+
+[validation]
+expected_output = "REGEX:(?s)(?=.*Init: v1 val=100)(?=.*Update: v2 val=200)(?=.*Lecteur 0: v2 val=200)(?=.*Lecteur 1: v2 val=200)(?=.*Final: v2 val=200).*"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le lecteur charge atomiquement le pointeur et lit les données. Pas de verrou, pas de blocage."
+label = "RCU — Read : pas de verrou"
+step_label = "Read"
+
+[[visualizer.steps.arrows]]
+from = "global_data"
+to = "Data"
+
+[[visualizer.steps.call_frames]]
+args = "id"
+function_name = "rcu_read"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Data"
+value = "{version=1, value=100}"
+
+[[visualizer.steps.stack]]
+name = "global_data"
+value = "→ Data(v1, 100)"
+
+[[visualizer.steps]]
+explanation = "L'écrivain copie, modifie, puis remplace atomiquement le pointeur. L'ancien est libéré après la grâce period (join des lecteurs)."
+label = "RCU — Copy-Update"
+step_label = "Update"
+
+[[visualizer.steps.arrows]]
+from = "global_data"
+to = "Data (nouveau)"
+
+[[visualizer.steps.call_frames]]
+args = "200"
+function_name = "rcu_update"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Data (ancien)"
+value = "{version=1, value=100}"
+
+[[visualizer.steps.heap]]
+name = "Data (nouveau)"
+value = "{version=2, value=200}"
+
+[[visualizer.steps.stack]]
+name = "global_data"
+value = "→ Data(v2, 200) [nouveau]"
+
+[[visualizer.steps.stack]]
+name = "old"
+value = "→ Data(v1, 100) [à libérer]"

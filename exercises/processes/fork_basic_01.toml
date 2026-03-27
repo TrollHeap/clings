@@ -1,0 +1,246 @@
+common_mistake = "Utiliser exit() au lieu de _exit() dans l'enfant — double flush des buffers stdio"
+description = """
+NSY103 — fork() crée un processus enfant identique au parent. Le parent reçoit le PID de l'enfant, l'enfant reçoit 0. getpid() et getppid() retournent le PID du processus courant et de son parent.
+
+Créez un enfant avec fork() et affichez les relations parent-enfant de manière déterministe."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "fork() retourne 0 dans l'enfant, le PID de l'enfant dans le parent",
+    "getppid() retourne le PID du processus parent",
+    "_exit() dans l'enfant évite de flusher les buffers stdio du parent",
+]
+id = "fork-basic-01"
+kc_ids = ["KC-C07"]
+key_concept = "fork() retourne 0 dans l'enfant et le PID enfant dans le parent — c'est la seule différence"
+lang = "c"
+prerequisites = ["process-state-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Parent PID: %d\n", getpid());
+
+    pid_t child = fork();
+    if (child == -1) {
+        perror("fork");
+        return 1;
+    }
+
+    if (child == 0) {
+        /* Processus enfant */
+        printf("Child: my PID=%d, parent PID=%d\n", getpid(), getppid());
+        _exit(42);
+    }
+
+    /* Processus parent */
+    int status;
+    waitpid(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Parent: child %d exited with code %d\n", child, WEXITSTATUS(status));
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Parent PID: %d\n", getpid());
+
+    pid_t child = ____();
+    if (child == -1) {
+        perror("fork");
+        return 1;
+    }
+
+    if (child == ____) {
+        /* Processus enfant */
+        printf("Child: my PID=%d, parent PID=%d\n", getpid(), ____);
+        _exit(42);
+    }
+
+    /* Processus parent */
+    int status;
+    waitpid(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Parent: child %d exited with code %d\n", child, WEXITSTATUS(____));
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * fork minimal: parent et enfant affichent un message
+ * Le parent attend l'enfant avec wait()
+ * ================================================= */
+void example_fork(void) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        printf("example child\n");
+        _exit(0);
+    }
+    wait(NULL);
+    printf("example parent done\n");
+}
+/* Resultat: example child, example parent done */
+
+/* == VOTRE EXERCICE ================================
+ * fork() + getpid/getppid + waitpid + WEXITSTATUS
+ * L'enfant quitte avec code 42.
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Parent PID: %d\n", getpid());
+    /* TODO: fork, enfant affiche PID/PPID et _exit(42) */
+    /* TODO: parent waitpid et affiche le code de sortie */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Parent PID: %d\n", getpid());
+
+    pid_t child = ____();
+    if (child == -1) { perror("fork"); return 1; }
+
+    if (child == ____) {
+        printf("Child: my PID=%d, parent PID=%d\n", getpid(), ____);
+        ____(42);
+    }
+
+    int status;
+    ____(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Parent: child %d exited with code %d\n", child, ____(status));
+
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    printf("Parent PID: %d\n", getpid());
+
+    pid_t child = ____();
+    if (child == -1) { perror("fork"); return 1; }
+
+    if (child == ____) {
+        printf("Child: my PID=%d, parent PID=%d\n", getpid(), ____);
+        _exit(42);
+    }
+
+    int status;
+    waitpid(child, &status, 0);
+    if (WIFEXITED(status))
+        printf("Parent: child %d exited with code %d\n", child, WEXITSTATUS(____));
+
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    // Afficher le PID parent
+    // fork() — vérifier erreur
+    // Enfant: afficher PID et PPID, _exit(42)
+    // Parent: waitpid, afficher code de sortie avec WEXITSTATUS
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "processes"
+title = "fork() et getpid/getppid"
+
+[validation]
+expected_output = '''
+REGEX:Parent PID: \d+
+Child: my PID=\d+, parent PID=\d+
+Parent: child \d+ exited with code 42
+'''
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Un seul processus existe, il affiche son PID"
+heap = []
+label = "Avant fork() — un seul processus"
+step_label = "Avant fork"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "PID"
+value = "parent (ex: 1234)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fork duplique le processus — même code, valeur de retour différente"
+heap = []
+label = "Après fork() — deux processus"
+step_label = "Après fork"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Parent: child"
+value = "PID enfant (ex: 1235)"
+
+[[visualizer.steps.stack]]
+name = "Enfant: child"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le parent attend l'enfant et récupère son code de sortie"
+heap = []
+label = "waitpid récupère le code de sortie"
+step_label = "waitpid"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "status"
+value = "encode exit(42)"
+
+[[visualizer.steps.stack]]
+name = "WEXITSTATUS"
+value = "42"

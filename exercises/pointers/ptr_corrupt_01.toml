@@ -1,0 +1,438 @@
+common_mistake = "Oublier d'ajouter sizeof(uint32_t) pour la sentinelle arrière dans le malloc"
+description = """
+NSY103 — Les sentinelles (canary values) sont des valeurs magiques placées avant et après un bloc mémoire alloué. Après utilisation, on vérifie que les sentinelles sont intactes — si elles sont modifiées, il y a eu un buffer overflow.
+
+Implémentez un allocateur avec sentinelles qui détecte les corruptions mémoire."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "`offsetof(GuardedBlock, data)` donne le décalage en octets du champ data dans la struct",
+    "La sentinelle arrière est placée à `blk->data + size` — juste après les données utilisateur",
+    "Pour revenir de data vers le bloc : `(char *)ptr - offsetof(GuardedBlock, data)`",
+]
+id = "ptr-corrupt-01"
+kc_ids = ["KC-C01"]
+key_concept = "Les sentinelles (canary) détectent les buffer overflows en vérifiant des valeurs magiques aux bornes"
+lang = "c"
+prerequisites = ["ptr-restrict-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+void *guarded_alloc(size_t size) {
+    GuardedBlock *blk = malloc(sizeof(GuardedBlock) + size + sizeof(uint32_t));
+    if (!blk) return NULL;
+    blk->front_canary = CANARY;
+    blk->size = size;
+    uint32_t *back = (uint32_t *)(blk->data + size);
+    *back = CANARY;
+    return blk->data;
+}
+
+int guarded_check(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    if (blk->front_canary != CANARY) return -1;
+    uint32_t *back = (uint32_t *)(blk->data + blk->size);
+    if (*back != CANARY) return -2;
+    return 0;
+}
+
+void guarded_free(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    free(blk);
+}
+
+int main(void) {
+    char *buf = guarded_alloc(8);
+    if (!buf) return 1;
+    strcpy(buf, "OK");
+    printf("Check apres ecriture normale : %d\n", guarded_check(buf));
+    char *buf2 = guarded_alloc(4);
+    if (!buf2) { guarded_free(buf); return 1; }
+    strcpy(buf2, "ABCDEFGH");
+    printf("Check apres overflow : %d\n", guarded_check(buf2));
+    guarded_free(buf);
+    guarded_free(buf2);
+    printf("Canary : 0x%X\n", CANARY);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+void *guarded_alloc(size_t size) {
+    GuardedBlock *blk = malloc(sizeof(GuardedBlock) + size + sizeof(uint32_t));
+    if (!blk) return NULL;
+    blk->front_canary = CANARY;
+    blk->size = size;
+    uint32_t *back = (uint32_t *)(blk->data + size);
+    *back = ____;
+    return blk->data;
+}
+
+int guarded_check(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    if (blk->front_canary != ____) return -1;
+    uint32_t *back = (uint32_t *)(blk->data + blk->size);
+    if (*back != ____) return -2;
+    return 0;
+}
+
+void guarded_free(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    free(____);
+}
+
+int main(void) {
+    char *buf = guarded_alloc(8);
+    if (!buf) return 1;
+    strcpy(buf, "OK");
+    printf("Check apres ecriture normale : %d\n", guarded_check(buf));
+    char *buf2 = guarded_alloc(4);
+    if (!buf2) { guarded_free(buf); return 1; }
+    strcpy(buf2, "ABCDEFGH");
+    printf("Check apres overflow : %d\n", guarded_check(buf2));
+    guarded_free(buf);
+    guarded_free(buf2);
+    printf("Canary : 0x%X\n", CANARY);
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+/* == EXEMPLE ================================================
+ * Bloc memoire avec header et magic number
+ * Verification d'integrite via une valeur connue.
+ * =========================================================== */
+#define MAGIC 0xCAFEBABE
+
+typedef struct { uint32_t magic; size_t size; } Header;
+
+void *example_alloc(size_t size) {
+    Header *h = malloc(sizeof(Header) + size);
+    if (!h) return NULL;
+    h->magic = MAGIC;
+    h->size = size;
+    return (char *)h + sizeof(Header);
+}
+int example_check(void *ptr) {
+    Header *h = (Header *)((char *)ptr - sizeof(Header));
+    return h->magic == MAGIC ? 0 : -1;
+}
+void example_demo(void) {
+    char *p = example_alloc(16);
+    strcpy(p, "test");
+    printf("check: %d\n", example_check(p));
+    free((char *)p - sizeof(Header));
+}
+/* Resultat: check: 0 */
+
+/* == VOTRE EXERCICE =========================================
+ * Allocateur avec sentinelles avant ET apres
+ * front_canary | size | data[] | back_canary
+ * Detecte les overflows en verifiant back_canary.
+ * =========================================================== */
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+void *guarded_alloc(size_t size) {
+    (void)size;
+    return NULL; /* TODO */
+}
+int guarded_check(void *ptr) {
+    (void)ptr;
+    return 0; /* TODO */
+}
+void guarded_free(void *ptr) {
+    (void)ptr; /* TODO */
+}
+
+int main(void) {
+    char *buf = guarded_alloc(8);
+    if (!buf) return 1;
+    strcpy(buf, "OK");
+    printf("Check apres ecriture normale : %d\n", guarded_check(buf));
+    char *buf2 = guarded_alloc(4);
+    if (!buf2) { guarded_free(buf); return 1; }
+    strcpy(buf2, "ABCDEFGH");
+    printf("Check apres overflow : %d\n", guarded_check(buf2));
+    guarded_free(buf);
+    guarded_free(buf2);
+    printf("Canary : 0x%X\n", CANARY);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+void *guarded_alloc(size_t size) {
+    GuardedBlock *blk = malloc(sizeof(GuardedBlock) + size + sizeof(uint32_t));
+    if (!blk) return NULL;
+    blk->front_canary = CANARY;
+    blk->size = size;
+    uint32_t *back = (uint32_t *)(blk->data + size);
+    *back = CANARY;
+    return blk->data;
+}
+
+int guarded_check(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    if (blk->front_canary != CANARY) return -1;
+    uint32_t *back = (uint32_t *)(blk->data + blk->size);
+    if (*back != ____) return ____;
+    return 0;
+}
+
+void guarded_free(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    free(____);
+}
+
+int main(void) {
+    char *buf = guarded_alloc(8);
+    if (!buf) return 1;
+    strcpy(buf, "OK");
+    printf("Check apres ecriture normale : %d\n", guarded_check(buf));
+    char *buf2 = guarded_alloc(4);
+    if (!buf2) { guarded_free(buf); return 1; }
+    strcpy(buf2, "ABCDEFGH");
+    printf("Check apres overflow : %d\n", guarded_check(buf2));
+    guarded_free(buf);
+    guarded_free(buf2);
+    printf("Canary : 0x%X\n", CANARY);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+void *guarded_alloc(size_t size) {
+    GuardedBlock *blk = malloc(sizeof(GuardedBlock) + size + sizeof(____));
+    if (!blk) return NULL;
+    blk->front_canary = ____;
+    blk->size = size;
+    uint32_t *back = (uint32_t *)(blk->data + ____);
+    *back = CANARY;
+    return ____;
+}
+
+int guarded_check(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - ______);
+    if (blk->front_canary != CANARY) return -1;
+    uint32_t *back = (uint32_t *)(blk->data + blk->size);
+    if (*back != ____) return -2;
+    return 0;
+}
+
+void guarded_free(void *ptr) {
+    GuardedBlock *blk = (GuardedBlock *)((char *)ptr - offsetof(GuardedBlock, data));
+    free(____);
+}
+
+int main(void) {
+    char *buf = guarded_alloc(8);
+    if (!buf) return 1;
+    strcpy(buf, "OK");
+    printf("Check apres ecriture normale : %d\n", guarded_check(buf));
+    char *buf2 = guarded_alloc(4);
+    if (!buf2) { guarded_free(buf); return 1; }
+    strcpy(buf2, "ABCDEFGH");
+    printf("Check apres overflow : %d\n", guarded_check(buf2));
+    guarded_free(buf);
+    guarded_free(buf2);
+    printf("Canary : 0x%X\n", CANARY);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#define CANARY 0xDEADBEEF
+
+typedef struct {
+    uint32_t front_canary;
+    size_t size;
+    char data[];
+} GuardedBlock;
+
+// Implémentez guarded_alloc, guarded_check, guarded_free
+// Layout: [front_canary | size | data[size] | back_canary]
+// guarded_check retourne 0=OK, -1=front, -2=back
+void *guarded_alloc(size_t size) { (void)size; return NULL; }
+int guarded_check(void *ptr) { (void)ptr; return 0; }
+void guarded_free(void *ptr) { (void)ptr; }
+
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "Détection de corruption mémoire via sentinelles"
+
+[validation]
+expected_output = """
+Check apres ecriture normale : 0
+Check apres overflow : -2
+Canary : 0xDEADBEEF"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le bloc alloué contient : [front_canary | size | data[0..7] | back_canary]. L'utilisateur reçoit un pointeur vers data. Les sentinelles encadrent la zone utilisable."
+label = "guarded_alloc(8) — layout mémoire"
+step_label = "Layout — sentinelles avant et après data"
+
+[[visualizer.steps.arrows]]
+from = "buf"
+label = "pointeur utilisateur"
+to = "data[0..7]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "front_canary"
+value = "0xDEADBEEF"
+
+[[visualizer.steps.heap]]
+address = "size"
+value = "8"
+
+[[visualizer.steps.heap]]
+address = "data[0..7]"
+value = '"OK\0....."'
+
+[[visualizer.steps.heap]]
+address = "back_canary"
+value = "0xDEADBEEF"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = "→data"
+
+[[visualizer.steps]]
+explanation = "strcpy écrit 9 octets dans un buffer de 4. Les 5 octets excédentaires écrasent la sentinelle arrière. guarded_check détecte que back_canary != CANARY → retourne -2."
+label = "Overflow sur buf2 — back_canary écrasé"
+step_label = "Overflow — sentinelle arrière corrompue"
+
+[[visualizer.steps.arrows]]
+from = "buf2"
+label = "overflow →"
+to = "data[0..3]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "front_canary"
+value = "0xDEADBEEF"
+
+[[visualizer.steps.heap]]
+address = "size"
+value = "4"
+
+[[visualizer.steps.heap]]
+address = "data[0..3]"
+value = '"ABCD"'
+
+[[visualizer.steps.heap]]
+address = "back_canary"
+value = "0x48474645 (EFGH)"
+
+[[visualizer.steps.stack]]
+name = "buf2"
+value = "→data"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "guarded_check vérifie front et back canary. -1 = front corrompu (underflow), -2 = back corrompu (overflow). Ce mécanisme est utilisé par glibc (MALLOC_CHECK_) et les outils comme Electric Fence."
+heap = []
+label = "guarded_check — détection"
+step_label = "Détection — 0=OK, -1=underflow, -2=overflow"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "result_buf1"
+value = "0 (OK)"
+
+[[visualizer.steps.stack]]
+name = "result_buf2"
+value = "-2 (back corrupt)"

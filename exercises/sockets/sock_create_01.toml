@@ -1,0 +1,218 @@
+common_mistake = "Confondre SOCK_STREAM (TCP) et SOCK_DGRAM (UDP)"
+description = """
+NSY103 — socket() crée un point de communication. Les paramètres (AF_INET, SOCK_STREAM, 0) créent un socket TCP IPv4. Le descripteur retourné est un entier positif.
+
+Créez un socket TCP et un socket UDP, affichez leurs descripteurs, puis fermez-les."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "SOCK_STREAM = TCP (connexion fiable, ordonnée)",
+    "SOCK_DGRAM = UDP (datagrammes, sans connexion)",
+    "socket() retourne -1 en cas d'erreur, sinon un fd >= 0",
+]
+id = "sock-create-01"
+kc_ids = ["KC-C14"]
+key_concept = "socket(AF_INET, SOCK_STREAM, 0) crée un TCP; SOCK_DGRAM crée un UDP — toujours close() après usage"
+lang = "c"
+prerequisites = ["sockets-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    printf("TCP socket: fd=%d\n", tcp_fd >= 0 ? 1 : 0);
+    printf("UDP socket: fd=%d\n", udp_fd >= 0 ? 1 : 0);
+    printf("TCP type: SOCK_STREAM\n");
+    printf("UDP type: SOCK_DGRAM\n");
+    close(tcp_fd);
+    close(udp_fd);
+    printf("Sockets closed.\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    int tcp_fd = socket(AF_INET, ____, 0);
+    int udp_fd = socket(AF_INET, ____, 0);
+    printf("TCP socket: fd=%d\n", tcp_fd >= 0 ? 1 : 0);
+    printf("UDP socket: fd=%d\n", udp_fd >= 0 ? 1 : 0);
+    printf("TCP type: SOCK_STREAM\n");
+    printf("UDP type: SOCK_DGRAM\n");
+    close(tcp_fd);
+    close(udp_fd);
+    printf("Sockets closed.\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+/* == EXEMPLE ===============================================
+ * Créer un socket raw (nécessite root)
+ * ========================================================= */
+void example_raw(void) {
+    int raw = socket(AF_INET, SOCK_RAW, 0);
+    printf("Raw socket: %s\n", raw >= 0 ? "ok" : "need root");
+    if (raw >= 0) close(raw);
+}
+
+/* == VOTRE EXERCICE ========================================
+ * Créez un socket TCP et un socket UDP
+ * ========================================================= */
+
+int main(void) {
+    /* TODO: socket(AF_INET, SOCK_STREAM, 0) pour TCP */
+    /* TODO: socket(AF_INET, SOCK_DGRAM, 0) pour UDP */
+    int tcp_fd = -1, udp_fd = -1;
+    printf("TCP socket: fd=%d\n", tcp_fd >= 0 ? 1 : 0);
+    printf("UDP socket: fd=%d\n", udp_fd >= 0 ? 1 : 0);
+    printf("TCP type: SOCK_STREAM\n");
+    printf("UDP type: SOCK_DGRAM\n");
+    if (tcp_fd >= 0) close(tcp_fd);
+    if (udp_fd >= 0) close(udp_fd);
+    printf("Sockets closed.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int udp_fd = socket(AF_INET, ____, 0);  // UDP
+    printf("TCP socket: fd=%d\n", tcp_fd >= 0 ? 1 : 0);
+    printf("UDP socket: fd=%d\n", udp_fd >= 0 ? 1 : 0);
+    printf("TCP type: SOCK_STREAM\n");
+    printf("UDP type: SOCK_DGRAM\n");
+    close(tcp_fd);
+    close(udp_fd);
+    printf("Sockets closed.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    int tcp_fd = socket(AF_INET, ____, 0);
+    int udp_fd = socket(AF_INET, ____, 0);
+    printf("TCP socket: fd=%d\n", tcp_fd >= 0 ? 1 : 0);
+    printf("UDP socket: fd=%d\n", udp_fd >= 0 ? 1 : 0);
+    printf("TCP type: SOCK_STREAM\n");
+    printf("UDP type: SOCK_DGRAM\n");
+    close(tcp_fd);
+    close(udp_fd);
+    printf("Sockets closed.\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+// Créez un socket TCP (SOCK_STREAM) et UDP (SOCK_DGRAM)
+// Affichez si chaque fd >= 0 (1 ou 0), le type, puis fermez
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/socket.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sockets"
+title = "socket() et struct sockaddr_in"
+
+[validation]
+expected_output = """
+TCP socket: fd=1
+UDP socket: fd=1
+TCP type: SOCK_STREAM
+UDP type: SOCK_DGRAM
+Sockets closed.
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque appel socket() retourne un file descriptor du noyau"
+heap = []
+label = "socket() crée un descripteur"
+step_label = "1. Création"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "tcp_fd"
+value = "3 (fd)"
+
+[[visualizer.steps.stack]]
+name = "udp_fd"
+value = "4 (fd)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "STREAM = connexion TCP, DGRAM = datagramme UDP"
+heap = []
+label = "Types de sockets"
+step_label = "2. Types"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "SOCK_STREAM"
+value = "TCP (fiable, ordonné)"
+
+[[visualizer.steps.stack]]
+name = "SOCK_DGRAM"
+value = "UDP (datagramme)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Toujours fermer les sockets pour libérer les ressources noyau"
+heap = []
+label = "close() libère les descripteurs"
+step_label = "3. Fermeture"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "tcp_fd"
+value = "fermé"
+
+[[visualizer.steps.stack]]
+name = "udp_fd"
+value = "fermé"

@@ -1,0 +1,337 @@
+common_mistake = "Utiliser if au lieu de while pour tester la condition → bug sur spurious wakeup"
+description = """
+NSY103 — Les variables de condition permettent à un thread d'attendre qu'une condition soit remplie. pthread_cond_wait libère le mutex et bloque; pthread_cond_signal réveille un thread en attente.
+
+Implémentez un producteur qui signale un consommateur quand une donnée est prête."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "pthread_cond_wait(&cond, &mtx) libère le mutex atomiquement et attend le signal",
+    "pthread_cond_signal(&cond) réveille un thread en attente sur la condition",
+    "Toujours utiliser while(!ready) et non if(!ready) — réveils spurieux possibles",
+]
+id = "pthread-cond-01"
+kc_ids = ["KC-C09"]
+key_concept = "cond_wait libère le mutex et bloque; cond_signal réveille — toujours tester la condition dans un while"
+lang = "c"
+prerequisites = ["pthread-mutex-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready = 0;
+int data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    data = 42;
+    ready = 1;
+    printf("Producer: data = %d\n", data);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!ready)
+        pthread_cond_wait(&cond, &mtx);
+    printf("Consumer: got %d\n", data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Done.\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready = 0;
+int data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    data = 42;
+    ready = 1;
+    printf("Producer: data = %d\n", data);
+    ____(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!ready)
+        ____(&cond, &mtx);
+    printf("Consumer: got %d\n", data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Done.\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Condition variable : attendre qu'un flag passe à 1
+ * ========================================================= */
+pthread_mutex_t ex_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t ex_cond = PTHREAD_COND_INITIALIZER;
+int ex_flag = 0;
+void *example_waiter(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&ex_mtx);
+    while (!ex_flag) pthread_cond_wait(&ex_cond, &ex_mtx);
+    printf("Waiter: flag is now %d\n", ex_flag);
+    pthread_mutex_unlock(&ex_mtx);
+    return NULL;
+}
+/* Resultat: le waiter attend jusqu'au signal */
+
+/* == VOTRE EXERCICE ========================================
+ * Producer/Consumer avec condition variable
+ * ========================================================= */
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready = 0;
+int data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    data = 42;
+    ready = 1;
+    printf("Producer: data = %d\n", data);
+    /* TODO: pthread_cond_signal(&cond); */
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!ready)
+        /* TODO: pthread_cond_wait(&cond, &mtx); */;
+    printf("Consumer: got %d\n", data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Done.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready = 0;
+int data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    data = 42;
+    ready = 1;
+    printf("Producer: data = %d\n", data);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!ready)
+        ____(&cond, &mtx);  // attendre le signal
+    printf("Consumer: got %d\n", data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Done.\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready = 0;
+int data = 0;
+
+void *producer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    data = 42;
+    ready = 1;
+    printf("Producer: data = %d\n", data);
+    ____(&cond);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    while (!ready)
+        ____(&cond, &mtx);
+    printf("Consumer: got %d\n", data);
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tp, tc;
+    pthread_create(&tc, NULL, consumer, NULL);
+    pthread_create(&tp, NULL, producer, NULL);
+    pthread_join(tp, NULL);
+    pthread_join(tc, NULL);
+    printf("Done.\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Producer met data=42 et signale
+// Consumer attend avec cond_wait puis lit data
+// Sortie: Producer: data = 42, Consumer: got 42, Done.
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Condition variable basique"
+
+[validation]
+expected_output = """
+Producer: data = 42
+Consumer: got 42
+Done.
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le consumer appelle cond_wait, libère le mutex et dort"
+heap = []
+label = "Consumer attend sur la condition"
+step_label = "1. Attente"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "consumer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ready"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "consumer"
+value = "BLOQUÉ sur cond_wait"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le producer met data=42, ready=1, puis signale la condition"
+heap = []
+label = "Producer signale la donnée"
+step_label = "2. Signal"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "producer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ready"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "producer"
+value = "cond_signal()"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "cond_wait retourne, re-verrouille le mutex, consumer lit data"
+heap = []
+label = "Consumer réveillé, lit la donnée"
+step_label = "3. Réveil"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "consumer"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "ready"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "consumer"
+value = "got 42"

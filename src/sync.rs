@@ -221,7 +221,7 @@ pub fn commit_and_push(clings_dir: &Path, cfg: &SyncConfig) -> Result<()> {
 pub fn status(clings_dir: &Path, cfg: &SyncConfig) -> Result<SyncStatus> {
     let last_commit = if is_git_repo(clings_dir) {
         git_output(clings_dir, &["log", "-1", "--format=%ci %s"])
-            .ok()
+            .ok() // git log may fail on empty repo — None is the safe fallback
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
     } else {
@@ -300,7 +300,7 @@ fn git_timeout(dir: &Path, args: &[&str], timeout: Duration) -> std::io::Result<
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
-        tx.send(result).ok();
+        tx.send(result).ok(); // receiver may be dropped if main thread timed out — discard silently
     });
 
     match rx.recv_timeout(timeout) {
@@ -370,7 +370,7 @@ fn resolve_hostname(cfg: &SyncConfig) -> String {
     }
     Command::new("hostname")
         .output()
-        .ok()
+        .ok() // hostname command may be unavailable — fallback to "unknown"
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())

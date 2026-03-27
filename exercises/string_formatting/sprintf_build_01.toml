@@ -1,0 +1,321 @@
+common_mistake = "Buffer trop petit → overflow silencieux (sprintf n'a aucune protection de taille)"
+description = """
+NSY103 — snprintf écrit dans un buffer au lieu de stdout. C'est la façon C de construire des chaînes formatées. Attention au buffer overflow — toujours dimensionner suffisamment.
+
+Construisez des chaînes formatées avec snprintf et affichez-les."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "snprintf(buf, size, format, ...) écrit dans buf au lieu de stdout",
+    '''snprintf retourne le nombre de caractères écrits (sans le '\0')''',
+    "On peut chaîner les snprintf — buf3 utilise buf1 et buf2",
+]
+id = "sprintf-build-01"
+kc_ids = ["KC-C05"]
+key_concept = "snprintf écrit dans un char[] au lieu de stdout — utile pour construire des chaînes formatées en mémoire"
+lang = "c"
+prerequisites = ["printf-precision-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    int code = 404;
+    char *status = "Not Found";
+    double temp = 36.6;
+    snprintf(buf1, sz, "Error %d: %s", code, status);
+    snprintf(buf2, sz, "Temp: %.1f C", temp);
+    snprintf(buf3, sz, "%s | %s", buf1, buf2);
+    return strlen(buf1);
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    int code = 404;
+    char *status = "Not Found";
+    double temp = 36.6;
+    snprintf(buf1, sz, "Error %d: %s", code, status);
+    snprintf(buf2, sz, "Temp: %.1f C", temp);
+    snprintf(buf3, sz, "%s | %s", buf1, buf2);
+    return strlen(buf1);
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * snprintf construit des chaînes en mémoire
+ * =========================================================== */
+int example_sprintf(char *buf, size_t sz) {
+    return snprintf(buf, sz, "User %s (id=%d)", "root", 0);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Construisez 3 buffers avec snprintf, puis retournez length
+ * =========================================================== */
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    int code = 404;
+    char *status = "Not Found";
+    double temp = 36.6;
+    snprintf(buf1, sz, "Error %d: %s", code, status);
+    snprintf(buf2, sz, "Temp: ____ C", ____);
+    snprintf(buf3, sz, "%s | %s", buf1, buf2);
+    return strlen(buf1);
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    int code = 404;
+    char *status = "Not Found";
+    double temp = 36.6;
+    snprintf(buf1, sz, "Error %d: %s", code, status);
+    snprintf(buf2, sz, "Temp: %.1f C", temp);
+    snprintf(buf3, sz, "____, ____ ", ____);
+    return strlen(buf1);
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+    (void)buf1; (void)buf2; (void)buf3; (void)sz;
+    return 0;
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int build_messages(char *buf1, char *buf2, char *buf3, size_t sz) {
+}
+
+int main(void) {
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf1);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf2);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        build_messages(buf1, buf2, buf3, 64);
+        printf("%s\n", buf3);
+    }
+    {
+        char buf1[64], buf2[64], buf3[64];
+        int len = build_messages(buf1, buf2, buf3, 64);
+        printf("%d\n", (int)(len));
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Construction de chaînes avec snprintf"
+
+[validation]
+expected_output = """
+Error 404: Not Found
+Temp: 36.6 C
+Error 404: Not Found | Temp: 36.6 C
+20"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "snprintf formate dans le buffer au lieu d'écrire sur stdout"
+heap = []
+label = "snprintf écrit dans buf1"
+step_label = "1. snprintf buf1"
+
+[[visualizer.steps.call_frames]]
+args = "buf1, buf2, buf3, sz"
+function_name = "build_messages"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "buf1[64]"
+value = '"Error 404: Not Found"'
+
+[[visualizer.steps.stack]]
+name = "code"
+value = "404"
+
+[[visualizer.steps.stack]]
+name = "status"
+value = '"Not Found"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On peut utiliser des buffers déjà remplis comme arguments %s"
+heap = []
+label = "Chaînage: buf3 combine buf1 et buf2"
+step_label = "2. Chaînage"
+
+[[visualizer.steps.call_frames]]
+args = "buf1, buf2, buf3, sz"
+function_name = "build_messages"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "buf1"
+value = '"Error 404: Not Found"'
+
+[[visualizer.steps.stack]]
+name = "buf2"
+value = '"Temp: 36.6 C"'
+
+[[visualizer.steps.stack]]
+name = "buf3"
+value = '"Error 404: Not Found | Temp: 36.6 C"'

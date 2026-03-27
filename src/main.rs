@@ -12,6 +12,7 @@ mod mastery;
 mod models;
 mod piscine;
 mod progress;
+mod reporting;
 mod runner;
 mod search;
 mod sync;
@@ -26,8 +27,8 @@ use colored::Colorize;
 
 use crate::commands::{
     cmd_annales, cmd_config, cmd_export, cmd_hint, cmd_import, cmd_list, cmd_new, cmd_progress,
-    cmd_reset, cmd_review, cmd_run, cmd_schema, cmd_search, cmd_solution, cmd_stats, cmd_sync_init,
-    cmd_sync_now, cmd_sync_status, cmd_watch,
+    cmd_report, cmd_reset, cmd_review, cmd_run, cmd_schema, cmd_search, cmd_solution, cmd_stats,
+    cmd_sync_init, cmd_sync_now, cmd_sync_status, cmd_watch,
 };
 
 #[derive(Parser)]
@@ -102,6 +103,12 @@ enum Commands {
         /// Affichage détaillé : sparkline d'activité + breakdown par sujet
         #[arg(long, short = 'd')]
         detailed: bool,
+    },
+    /// Rapport d'apprentissage par chapitre
+    Report {
+        /// Restreindre à un seul chapitre (1-16)
+        #[arg(long, short = 'c')]
+        chapter: Option<u8>,
     },
     /// Afficher les annales NSY103 et leur correspondance avec les exercices
     Annales,
@@ -206,6 +213,7 @@ fn main() {
         Some(Commands::Piscine { chapter, timed }) => piscine::cmd_piscine(chapter, timed),
         Some(Commands::Review) => cmd_review(),
         Some(Commands::Stats { detailed }) => cmd_stats(detailed),
+        Some(Commands::Report { chapter }) => cmd_report(chapter),
         Some(Commands::Annales) => cmd_annales(),
         Some(Commands::Exam { session, list }) => exam::cmd_exam(session.as_deref(), list),
         Some(Commands::Export { output }) => cmd_export(output.as_deref()),
@@ -253,6 +261,10 @@ fn main() {
                     mode: tui::ui_launcher::LaunchMode::Piscine,
                     chapter,
                 } => piscine::cmd_piscine(chapter, None),
+                tui::ui_launcher::LaunchChoice::Start {
+                    mode: tui::ui_launcher::LaunchMode::Nsy103,
+                    chapter: _,
+                } => exam::cmd_exam(None, false),
                 tui::ui_launcher::LaunchChoice::Quit => Ok(()),
             }
         })(),

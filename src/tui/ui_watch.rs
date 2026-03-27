@@ -11,7 +11,7 @@ use crate::tui::app::AppState;
 use crate::tui::common;
 
 /// Point d'entrée du rendu watch (appelé par App::run_watch).
-pub fn view(f: &mut Frame, state: &AppState) {
+pub fn view(f: &mut Frame, state: &mut AppState) {
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)

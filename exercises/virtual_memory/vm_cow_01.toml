@@ -1,0 +1,316 @@
+common_mistake = "Utiliser MAP_SHARED au lieu de MAP_PRIVATE — avec MAP_SHARED les modifications sont visibles par les deux processus"
+description = """
+NSY103 — Après fork(), parent et enfant partagent les mêmes pages physiques en lecture seule (copy-on-write). Quand l'un écrit, la MMU génère un page fault et le noyau copie la page concernée. Cela rend fork() quasi-instantané même pour les gros processus.
+
+Démontrez le COW: après fork, vérifiez que les données sont identiques puis que les modifications sont isolées."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "fork() duplique le processus — les pages MAP_PRIVATE sont copiées en COW",
+    "waitpid(pid, &status, 0) attend la fin du processus enfant",
+    "MAP_PRIVATE + COW: l'écriture de l'enfant ne modifie pas la copie du parent",
+]
+id = "vm-cow-01"
+kc_ids = ["KC-C18"]
+key_concept = "Le COW retarde la copie des pages après fork — la copie n'a lieu qu'à la première écriture"
+lang = "c"
+prerequisites = [
+    "vm-protect-01",
+    "vm-mmap-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *shared = (char *)mmap(NULL, ps,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (shared == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(shared, "before fork");
+    printf("Parent before fork: %s\n", shared);
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        /* enfant */
+        printf("Child sees: %s\n", shared);
+        strcpy(shared, "child wrote");
+        printf("Child after write: %s\n", shared);
+        fflush(stdout);
+        _exit(0);
+    }
+    /* parent */
+    int status;
+    waitpid(pid, &status, 0);
+    printf("Parent after child: %s\n", shared);
+    printf("COW isolated: %s\n",
+        strcmp(shared, "before fork") == 0 ? "yes" : "no");
+    munmap(shared, ps);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *shared = (char *)mmap(NULL, ps,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (shared == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(shared, "before fork");
+    printf("Parent before fork: %s\n", shared);
+    fflush(stdout);
+    pid_t pid = ____();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        /* enfant */
+        printf("Child sees: %s\n", shared);
+        strcpy(shared, "child wrote");
+        printf("Child after write: %s\n", shared);
+        fflush(stdout);
+        _exit(0);
+    }
+    /* parent */
+    int status;
+    ____(pid, &status, 0);
+    printf("Parent after child: %s\n", shared);
+    printf("COW isolated: %s\n",
+        strcmp(shared, "before fork") == 0 ? "yes" : "no");
+    munmap(shared, ps);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: MAP_SHARED vs MAP_PRIVATE après fork ==== */
+void example_shared_fork(void) {
+    size_t ps = (size_t)getpagesize();
+    char *s = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    strcpy(s, "shared");
+    pid_t p = fork();
+    if (p == 0) { strcpy(s, "child"); fflush(stdout);
+        _exit(0); }
+    waitpid(p, NULL, 0);
+    printf("MAP_SHARED: parent voit '%s' (modifié par enfant)\n", s);
+    munmap(s, ps);
+}
+
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *shared = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (shared == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(shared, "before fork");
+    printf("Parent before fork: %s\n", shared);
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        printf("Child sees: %s\n", shared);
+        strcpy(shared, "child wrote");
+        printf("Child after write: %s\n", shared);
+        fflush(stdout);
+        _exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    printf("Parent after child: %s\n", shared);
+    printf("COW isolated: %s\n", strcmp(shared,"before fork")==0?"yes":"no");
+    munmap(shared, ps);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *shared = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (shared == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(shared, "before fork");
+    printf("Parent before fork: %s\n", shared);
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        printf("Child sees: %s\n", shared);
+        strcpy(shared, "child wrote");
+        printf("Child after write: %s\n", shared);
+        fflush(stdout);
+        _exit(0);
+    }
+    int status;
+    ____(pid, &status, 0);
+    printf("Parent after child: %s\n", shared);
+    printf("COW isolated: %s\n", strcmp(shared,"before fork")==0?"yes":"no");
+    munmap(shared, ps);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    size_t ps = (size_t)getpagesize();
+    char *shared = mmap(NULL, ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (shared == MAP_FAILED) { perror("mmap"); return 1; }
+    strcpy(shared, "before fork");
+    printf("Parent before fork: %s\n", shared);
+    fflush(stdout);
+    pid_t pid = ____();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        printf("Child sees: %s\n", shared);
+        strcpy(shared, "child wrote");
+        printf("Child after write: %s\n", shared);
+        fflush(stdout);
+        _exit(0);
+    }
+    int status;
+    ____(pid, &status, 0);
+    printf("Parent after child: %s\n", shared);
+    printf("COW isolated: %s\n", strcmp(shared,"before fork")==0?"yes":"no");
+    munmap(shared, ps);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+// mmap MAP_PRIVATE, fork, enfant écrit, vérifiez l'isolation COW
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Copy-on-write et fork"
+
+[validation]
+expected_output = """
+Parent before fork: before fork
+Child sees: before fork
+Child after write: child wrote
+Parent after child: before fork
+COW isolated: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Une seule copie de la page en mémoire"
+label = "Avant fork"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "shared"
+to = "page"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page"
+content = '"before fork" (RW)'
+
+[[visualizer.steps.stack]]
+name = "shared"
+value = '→ page "before fork"'
+
+[[visualizer.steps]]
+explanation = "Les deux processus partagent la même page physique"
+label = "Après fork (COW)"
+step_label = "Étape 2"
+
+[[visualizer.steps.arrows]]
+from = "parent:shared"
+to = "page"
+
+[[visualizer.steps.arrows]]
+from = "child:shared"
+to = "page"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (child)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page"
+content = '"before fork" (partagée, lecture seule)'
+
+[[visualizer.steps.stack]]
+name = "parent:shared"
+value = "→ page (R-only COW)"
+
+[[visualizer.steps.stack]]
+name = "child:shared"
+value = "→ même page (R-only COW)"
+
+[[visualizer.steps]]
+explanation = "Le noyau copie la page avant l'écriture — isolation garantie"
+label = "Enfant écrit → copie"
+step_label = "Étape 3"
+
+[[visualizer.steps.arrows]]
+from = "parent:shared"
+to = "page originale"
+
+[[visualizer.steps.arrows]]
+from = "child:shared"
+to = "copie enfant"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "page originale"
+content = '"before fork"'
+
+[[visualizer.steps.heap]]
+address = "copie enfant"
+content = '"child wrote"'
+
+[[visualizer.steps.stack]]
+name = "parent:shared"
+value = "→ page originale"
+
+[[visualizer.steps.stack]]
+name = "child:shared"
+value = "→ copie privée"

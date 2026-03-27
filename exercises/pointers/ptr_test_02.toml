@@ -1,0 +1,100 @@
+common_mistake = "Oublier de déréférencer : écrire `a = b` au lieu de `*a = *b` ne modifie que la copie locale du pointeur."
+description = """
+Implémentez deux fonctions :
+- `void swap_int(int *a, int *b)` — échange les valeurs pointées par `a` et `b`.
+- `void set_via_ptr(int **pp, int val)` — affecte `val` à la variable pointée par `*pp` (double indirection)."""
+difficulty = 2
+exercise_type = "complete"
+files = []
+hints = [
+    "Pour swap : utilisez une variable temporaire — `int tmp = *a; *a = *b; *b = tmp;`",
+    "Pour set_via_ptr : `*pp` est un `int*`, donc `**pp` est l'entier lui-même. Affectez directement : `**pp = val;`",
+]
+id = "ptr-test-02"
+kc_ids = [
+    "ptr-deref",
+    "ptr-double-indir",
+    "ptr-swap",
+]
+key_concept = "Passer un pointeur en argument permet de modifier la variable originale. La double indirection `int **pp` permet de modifier ce que pointe un pointeur."
+lang = "c"
+prerequisites = ["ptr-test-01"]
+solution_code = '''
+#include <stdio.h>
+
+void swap_int(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+void set_via_ptr(int **pp, int val) {
+    **pp = val;
+}
+
+int main(void) {
+    {
+        int x = 3, y = 7;
+        swap_int(&x, &y);
+        printf("%d\n", (int)(x));
+        printf("%d\n", (int)(y));
+    }
+    {
+        int x = 5, y = 5;
+        swap_int(&x, &y);
+        printf("%d\n", (int)(x));
+        printf("%d\n", (int)(y));
+    }
+    {
+        int x = -10, y = 42;
+        swap_int(&x, &y);
+        printf("%d\n", (int)(x));
+        printf("%d\n", (int)(y));
+    }
+    {
+        int target = 0;
+        int *p = &target;
+        set_via_ptr(&p, 99);
+        printf("%d\n", (int)(target));
+    }
+    {
+        int val = 1000;
+        int *p = &val;
+        set_via_ptr(&p, -1);
+        printf("%d\n", (int)(val));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+/* Échange les valeurs pointées par a et b. */
+void swap_int(int *a, int *b) {
+    /* TODO */
+}
+
+/* Écrit val dans *(*pp) via double indirection. */
+void set_via_ptr(int **pp, int val) {
+    /* TODO */
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+subject = "pointers"
+title = "Pointeurs : swap et double indirection"
+
+[validation]
+expected_output = """
+7
+3
+5
+5
+42
+-10
+99
+-1"""
+mode = "output"

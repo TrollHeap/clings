@@ -1,0 +1,222 @@
+common_mistake = "Supposer que la pile croît vers le haut — c'est l'inverse sur x86"
+description = """
+NSY103 — La pile (stack) croît vers les adresses basses sur x86. Chaque appel de fonction crée un stack frame contenant les variables locales, l'adresse de retour et le frame pointer.
+
+Démontrez la croissance vers le bas de la pile en comparant les adresses de variables locales dans des fonctions imbriquées."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Sur x86/x86_64, la pile croît vers les adresses basses (décroissantes)",
+    "L'opérateur < compare les adresses: si level1 < main, la pile descend",
+    "Passez l'adresse de la variable locale courante au niveau suivant",
+]
+id = "pmem-stack-01"
+kc_ids = ["KC-C17"]
+key_concept = "La pile croît vers les adresses basses — chaque appel crée un frame en dessous"
+lang = "c"
+prerequisites = ["pmem-layout-01"]
+solution_code = '''
+#include <stdio.h>
+void level2(char *prev) {
+    int local2 = 2;
+    printf("level2: %p\n", (void *)&local2);
+    printf("Stack grows down: %s\n", (char *)&local2 < (char *)prev ? "yes" : "no");
+}
+void level1(char *prev) {
+    int local1 = 1;
+    printf("level1: %p\n", (void *)&local1);
+    printf("Stack grows down: %s\n", (char *)&local1 < (char *)prev ? "yes" : "no");
+    level2((char *)&local1);
+}
+int main(void) {
+    int local0 = 0;
+    printf("main:   %p\n", (void *)&local0);
+    level1((char *)&local0);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+void level2(char *prev) {
+    int local2 = 2;
+    printf("level2: %p\n", (void *)&local2);
+    printf("Stack grows down: %s\n", (char *)&local2 ____ (char *)prev ? "yes" : "no");
+}
+
+void level1(char *prev) {
+    int local1 = 1;
+    printf("level1: %p\n", (void *)&local1);
+    printf("Stack grows down: %s\n", (char *)&local1 < (char *)prev ? "yes" : "no");
+    level2((char *)&____);
+}
+
+int main(void) {
+    int local0 = 0;
+    printf("main:   %p\n", (void *)&local0);
+    level1((char *)&____);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE: taille d'un frame ======================= */
+void example_frame(void) {
+    int a, b, c;
+    printf("a=%p b=%p c=%p\n", (void*)&a, (void*)&b, (void*)&c);
+    printf("Espacement: %td octets\n", (char*)&a - (char*)&c);
+}
+
+void level2(char *prev) {
+    int local2 = 2;
+    printf("level2: %p\n", (void *)&local2);
+    printf("Stack grows down: %s\n", (char *)&local2 < (char *)prev ? "yes" : "no");
+}
+void level1(char *prev) {
+    int local1 = 1;
+    printf("level1: %p\n", (void *)&local1);
+    printf("Stack grows down: %s\n", (char *)&local1 < (char *)prev ? "yes" : "no");
+    level2((char *)&local1);
+}
+int main(void) {
+    int local0 = 0;
+    printf("main:   %p\n", (void *)&local0);
+    level1((char *)&local0);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+void level2(char *prev) {
+    int local2 = 2;
+    printf("level2: %p\n", (void *)&local2);
+    printf("Stack grows down: %s\n", (char *)&local2 < (char *)prev ? "yes" : "no");
+}
+void level1(char *prev) {
+    int local1 = 1;
+    printf("level1: %p\n", (void *)&local1);
+    printf("Stack grows down: %s\n", (char *)&local1 < (char *)prev ? "yes" : "no");
+    level2((char *)&____);
+}
+int main(void) {
+    int local0 = 0;
+    printf("main:   %p\n", (void *)&local0);
+    level1((char *)&local0);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+void level2(char *prev) {
+    int local2 = 2;
+    printf("level2: %p\n", (void *)&local2);
+    printf("Stack grows down: %s\n", (char *)&local2 ____ (char *)prev ? "yes" : "no");
+}
+void level1(char *prev) {
+    int local1 = 1;
+    printf("level1: %p\n", (void *)&local1);
+    printf("Stack grows down: %s\n", (char *)&local1 < (char *)prev ? "yes" : "no");
+    level2((char *)&____);
+}
+int main(void) {
+    int local0 = 0;
+    printf("main:   %p\n", (void *)&local0);
+    level1((char *)&____);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+// Démontrez la croissance de la pile avec 3 fonctions imbriquées
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "La pile d'appels (stack frames)"
+
+[validation]
+expected_output = 'REGEX:(?s)main:\s+0x[0-9a-f]+.*level1: 0x[0-9a-f]+\nStack grows down: yes\nlevel2: 0x[0-9a-f]+\nStack grows down: yes'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Premier frame, adresse la plus haute"
+heap = []
+label = "main() — sommet de pile"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "local0"
+value = "0 (adresse haute)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "local1 < local0: la pile descend"
+heap = []
+label = "level1() empilé"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "prev"
+function_name = "level1"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "local0"
+value = "0 (haute)"
+
+[[visualizer.steps.stack]]
+name = "local1"
+value = "1 (plus basse)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "local2 < local1 < local0: croissance confirmée"
+heap = []
+label = "level2() empilé"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "prev"
+function_name = "level1"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "prev"
+function_name = "level2"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "local0"
+value = "0 (haute)"
+
+[[visualizer.steps.stack]]
+name = "local1"
+value = "1 (milieu)"
+
+[[visualizer.steps.stack]]
+name = "local2"
+value = "2 (basse)"

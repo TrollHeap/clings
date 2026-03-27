@@ -1,0 +1,311 @@
+common_mistake = "En vrai shared_memory sans sémaphore : race condition si producteur écrit pendant que consommateur lit — toujours combiner shm + sem"
+description = """
+NSY103 — En IPC réel, deux processus accèdent au même segment via shmat(). Ici, un ring buffer simulé avec calloc montre le pattern producteur/consommateur via un pointeur partagé.
+
+Producteur écrit 2 items dans buf[], consommateur lit les 2 items. Affichez chaque opération.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "shm->count est à la fois l'index d'écriture et le compteur d'items produits",
+    "Le consommateur lit shm->items[0] et shm->items[1] dans l'ordre",
+    "En vrai IPC, shm serait obtenu via shmat(shmid, NULL, 0) dans les deux processus",
+]
+id = "shm-03"
+kc_ids = ["KC-C13"]
+key_concept = "Ring buffer sur heap = mémoire partagée simulée ; en vrai IPC les deux processus obtiendraient le même pointeur via shmat()"
+lang = "c"
+prerequisites = ["shm-02"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+
+typedef struct {
+    int items[RING_SIZE];
+    int count;
+} RingBuf;
+
+int main(void) {
+    RingBuf *shm = (RingBuf *)calloc(1, sizeof(RingBuf));
+
+    // Producteur
+    for (int i = 0; i < 2; i++) {
+        shm->items[shm->count] = i + 1;
+        printf("Producer wrote: item=%d seq=%d\n", i + 1, shm->count);
+        shm->count++;
+    }
+
+    // Consommateur
+    for (int i = 0; i < 2; i++) {
+        printf("Consumer read: item=%d\n", shm->items[i]);
+    }
+
+    free(shm);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+typedef struct { int items[RING_SIZE]; int count; } RingBuf;
+
+int main(void) {
+    RingBuf *shm = (RingBuf *)calloc(1, sizeof(RingBuf));
+
+    // Producteur
+    for (int i = 0; i < 2; i++) {
+        shm->items[shm->____] = i + 1;          // écrire à la position count
+        printf("Producer wrote: item=%d seq=%d\n", i + 1, shm->count);
+        shm->____++;                              // avancer count
+    }
+
+    // Consommateur
+    for (int i = 0; i < ____; i++) {             // 2 items à consommer
+        printf("Consumer read: item=%d\n", shm->items[i]);
+    }
+
+    free(shm);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+typedef struct { int items[RING_SIZE]; int count; } RingBuf;
+
+/* == EXEMPLE ===============================================
+ * Circular log buffer sur memoire partagee simulee
+ * Ecrit des entries dans un ring buffer, lit ensuite.
+ * ========================================================= */
+typedef struct { char entries[RING_SIZE][16]; int idx; } LogBuf;
+
+void example_circular_log(void) {
+    LogBuf *log = (LogBuf *)calloc(1, sizeof(LogBuf));
+    const char *msgs[] = {"boot", "ready"};
+    for (int i = 0; i < 2; i++) {
+        snprintf(log->entries[log->idx], 16, "%s", msgs[i]);
+        printf("Log wrote: entry=%s seq=%d\n", msgs[i], log->idx);
+        log->idx++;
+    }
+    for (int i = 0; i < 2; i++) {
+        printf("Log read: entry=%s\n", log->entries[i]);
+    }
+    free(log);
+}
+/* Resultat: Log wrote boot seq=0, Log wrote ready seq=1, Log read boot, Log read ready */
+
+/* == VOTRE EXERCICE ========================================
+ * Ring buffer entre producteur et consommateur
+ * Inspirez-vous de example_circular_log ci-dessus.
+ * Producteur ecrit 2 items a items[count], consommateur lit.
+ * ========================================================= */
+
+int main(void) {
+    RingBuf *shm = (RingBuf *)calloc(1, sizeof(RingBuf));
+
+    /* Producteur */
+    for (int i = 0; i < 2; i++) {
+        /* TODO: shm->items[shm->count] = i + 1 */
+        printf("Producer wrote: item=%d seq=%d\n", i + 1, shm->count);
+        /* TODO: shm->count++ */
+    }
+
+    /* Consommateur */
+    for (int i = 0; i < 2; i++) {
+        printf("Consumer read: item=%d\n", shm->items[i]);
+    }
+
+    free(shm);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+typedef struct { int items[RING_SIZE]; int count; } RingBuf;
+
+int main(void) {
+    RingBuf *shm = (RingBuf *)calloc(1, sizeof(RingBuf));
+
+    // Producteur
+    for (int i = 0; i < 2; i++) {
+        shm->items[shm->____] = i + 1;          // écrire à la position count
+        printf("Producer wrote: item=%d seq=%d\n", i + 1, shm->count);
+        shm->____++;                              // avancer count
+    }
+
+    // Consommateur
+    for (int i = 0; i < ____; i++) {             // 2 items à consommer
+        printf("Consumer read: item=%d\n", shm->items[i]);
+    }
+
+    free(shm);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+typedef struct { int items[RING_SIZE]; int count; } RingBuf;
+
+int main(void) {
+    RingBuf *shm = (RingBuf *)calloc(1, sizeof(RingBuf));
+
+    // Producteur
+    for (int i = 0; i < 2; i++) {
+        shm->items[shm->____] = i + 1;          // écrire à la position count
+        printf("Producer wrote: item=%d seq=%d\n", i + 1, shm->count);
+        shm->____++;                              // avancer count
+    }
+
+    // Consommateur
+    for (int i = 0; i < ____; i++) {             // 2 items à consommer
+        printf("Consumer read: item=%d\n", shm->items[i]);
+    }
+
+    free(shm);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RING_SIZE 4
+typedef struct { int items[RING_SIZE]; int count; } RingBuf;
+
+int main(void) {
+    // Allouez RingBuf avec calloc
+    // Producteur : boucle 2 fois, écrit i+1 à items[count], affiche, incrémente count
+    // Consommateur : boucle 2 fois, lit items[i] et affiche
+    // Libérez la mémoire
+    // Sortie attendue:
+    // "Producer wrote: item=1 seq=0"
+    // "Producer wrote: item=2 seq=1"
+    // "Consumer read: item=1"
+    // "Consumer read: item=2"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Mémoire partagée : ring buffer entre producteur et consommateur"
+
+[mission]
+clientId = "omnicorp"
+clientName = "OmniCorp"
+contactEmail = "cto@omnicorp.sys"
+failureEmail = """
+Le ring buffer ne fonctionne pas correctement. Vérifie que le producteur écrit à items[count] puis incrémente count avant que le consommateur lise.
+
+CTO @ OmniCorp"""
+incidentEmail = """
+Directeur technique,
+
+Notre pipeline de traitement de données critiques nécessite un ring buffer en mémoire partagée entre processus producteur et consommateur.
+
+Implémente RingBuf{items[4], count} via calloc. Producteur écrit 2 items (count comme index), consommateur lit les 2. Affichez chaque opération.
+
+CTO @ OmniCorp"""
+payout = 400
+prereqMissionIds = ["shm-02"]
+receivedTime = "09:45"
+subject = "Ring buffer mémoire partagée — producteur/consommateur OmniCorp"
+successEmail = """
+Ring buffer opérationnel. Producer/Consumer synchronisés correctement — exactement ce qu'il faut pour notre pipeline critique.
+
+OmniCorp CTO"""
+syscallsInvolved = [
+    "shmget",
+    "shmat",
+    "shmdt",
+    "shmctl",
+]
+tier = 4
+
+[validation]
+expected_output = """
+Producer wrote: item=1 seq=0
+Producer wrote: item=2 seq=1
+Consumer read: item=1
+Consumer read: item=2
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+label = "calloc → RingBuf{items=[0,0,0,0], count=0}"
+
+[[visualizer.steps.nodes]]
+id = "shm"
+label = """
+RingBuf
+count=0"""
+
+[[visualizer.steps]]
+label = "Produce item=1 → items[0]=1, count=1"
+
+[[visualizer.steps.edges]]
+label = "write 1"
+source = "prod"
+target = "shm"
+
+[[visualizer.steps.nodes]]
+id = "prod"
+label = "Producteur"
+
+[[visualizer.steps.nodes]]
+id = "shm"
+label = """
+items[0]=1
+count=1"""
+
+[[visualizer.steps]]
+label = "Produce item=2 → items[1]=2, count=2"
+
+[[visualizer.steps.edges]]
+label = "write 2"
+source = "prod"
+target = "shm"
+
+[[visualizer.steps.nodes]]
+id = "prod"
+label = "Producteur"
+
+[[visualizer.steps.nodes]]
+id = "shm"
+label = """
+items[1]=2
+count=2"""
+
+[[visualizer.steps]]
+label = "Consume: read items[0]=1, items[1]=2"
+
+[[visualizer.steps.edges]]
+label = "read 1,2"
+source = "shm"
+target = "cons"
+
+[[visualizer.steps.nodes]]
+id = "shm"
+label = "items[0..1]"
+
+[[visualizer.steps.nodes]]
+id = "cons"
+label = "Consommateur"

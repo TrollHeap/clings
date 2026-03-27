@@ -1,0 +1,347 @@
+common_mistake = "Passer int* au lieu de int** : la valeur du pointeur ne peut pas être modifiée depuis la fonction"
+description = """
+NSY103 — Un pointeur vers un pointeur (`int **pp`) permet de modifier un pointeur depuis une fonction. Cela permet par exemple d'implémenter `swap` qui échange réellement les valeurs.
+
+Implémentez `swap(int *a, int *b)` qui échange les valeurs pointées, et démontrez l'utilisation de `int **pp`."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Pour swap : `int tmp = *a; *a = *b; *b = tmp;`",
+    "Pour déclarer un pointeur vers pointeur : `int **pp = &p;`",
+    "`**pp` lit la valeur finale, `*pp` lit le pointeur intermédiaire",
+]
+id = "ptr-ptr-01"
+kc_ids = ["KC-C01"]
+key_concept = "int **pp : pointeur vers pointeur vers int — indispensable pour modifier un pointeur depuis une fonction (passage par adresse de pointeur)"
+lang = "c"
+prerequisites = ["ptr-deref-01"]
+solution_code = '''
+#include <stdio.h>
+
+void swap_int_ptr(int **a, int **b) {
+    int *tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+int main(void) {
+    {
+        int x = 10, y = 20;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int a = -5, b = 15;
+        int *pa = &a, *pb = &b;
+        swap_int_ptr(&pa, &pb);
+        printf("%d\n", (int)(*pa));
+        printf("%d\n", (int)(*pb));
+    }
+    {
+        int z = 99;
+        int *p = &z, *q = &z;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int x = 1, y = 2;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+void swap_int_ptr(int **a, int **b) {
+}
+
+int main(void) {
+    int x = 10, y = 20;
+    printf("Avant : x=%d y=%d\n", x, y);
+    // TODO: appeler swap, puis démo **pp
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Rediriger un pointeur via double pointeur
+ * int **pp permet de modifier la cible d'un pointeur *p.
+ * =========================================================== */
+void example_redirect(int **pp, int *new_target) {
+    *pp = new_target;
+}
+void example_demo(void) {
+    int a = 100, b = 200;
+    int *p = &a;
+    printf("Avant redirect : *p = %d\n", *p);
+    example_redirect(&p, &b);
+    printf("Apres redirect : *p = %d\n", *p);
+}
+/* Resultat: Avant redirect : *p = 100, Apres redirect : *p = 200 */
+
+/* == VOTRE EXERCICE =========================================
+ * Swap via pointeurs + demo double pointeur
+ * Inspirez-vous de example_redirect ci-dessus.
+ * Implementez swap(int *a, int *b) qui echange les valeurs.
+ * =========================================================== */
+void swap(int *a, int *b) {
+    (void)a; (void)b; /* TODO */
+}
+
+int main(void) {
+    int x = 10, y = 20;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(&x, &y);
+    printf("Apres swap : x=%d y=%d\n", x, y);
+    int val = 99;
+    int *p = &val;
+    int **pp = &p;
+    printf("Via **pp : %d\n", **pp);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = ____;
+    *b = ____;
+}
+int main(void) {
+    int x = 10, y = 20;
+    printf("Avant : x=%d y=%d\n", x, y);
+    swap(&x, &y);
+    printf("Apres swap : x=%d y=%d\n", x, y);
+    int val = 99;
+    int *p = &val;
+    int **pp = &p;
+    printf("Via **pp : %d\n", ____); // double déréférencement
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+void swap_int_ptr(int **a, int **b) {
+}
+
+int main(void) {
+    int x = 10, y = 20;
+    printf("Avant : x=%d y=%d\n", x, y);
+    // TODO: appeler swap, puis démo **pp
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void swap_int_ptr(int **a, int **b) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        int x = 10, y = 20;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int a = -5, b = 15;
+        int *pa = &a, *pb = &b;
+        swap_int_ptr(&pa, &pb);
+        printf("%d\n", (int)(*pa));
+        printf("%d\n", (int)(*pb));
+    }
+    {
+        int z = 99;
+        int *p = &z, *q = &z;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int x = 1, y = 2;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+void swap_int_ptr(int **a, int **b) { }
+
+int main(void) {
+    {
+        int x = 10, y = 20;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int a = -5, b = 15;
+        int *pa = &a, *pb = &b;
+        swap_int_ptr(&pa, &pb);
+        printf("%d\n", (int)(*pa));
+        printf("%d\n", (int)(*pb));
+    }
+    {
+        int z = 99;
+        int *p = &z, *q = &z;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        printf("%d\n", (int)(*q));
+    }
+    {
+        int x = 1, y = 2;
+        int *p = &x, *q = &y;
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+        swap_int_ptr(&p, &q);
+        printf("%d\n", (int)(*p));
+    }
+    return 0;
+}
+''',
+]
+subject = "pointers"
+title = "Double pointeur — swap via **pp"
+
+[validation]
+mode = "test"
+test_code = """
+void test_swap_pointers_basic(void) {
+    int x = 10, y = 20;
+    int *p = &x, *q = &y;
+    swap_int_ptr(&p, &q);
+    TEST_ASSERT_EQUAL_INT(20, *p);
+    TEST_ASSERT_EQUAL_INT(10, *q);
+}
+
+void test_swap_pointers_negative(void) {
+    int a = -5, b = 15;
+    int *pa = &a, *pb = &b;
+    swap_int_ptr(&pa, &pb);
+    TEST_ASSERT_EQUAL_INT(15, *pa);
+    TEST_ASSERT_EQUAL_INT(-5, *pb);
+}
+
+void test_swap_pointers_same_target(void) {
+    int z = 99;
+    int *p = &z, *q = &z;
+    swap_int_ptr(&p, &q);
+    TEST_ASSERT_EQUAL_INT(99, *p);
+    TEST_ASSERT_EQUAL_INT(99, *q);
+}
+
+void test_swap_pointers_double_swap(void) {
+    int x = 1, y = 2;
+    int *p = &x, *q = &y;
+    swap_int_ptr(&p, &q);
+    TEST_ASSERT_EQUAL_INT(2, *p);
+    swap_int_ptr(&p, &q);
+    TEST_ASSERT_EQUAL_INT(1, *p);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_swap_pointers_basic);
+    RUN_TEST(test_swap_pointers_negative);
+    RUN_TEST(test_swap_pointers_same_target);
+    RUN_TEST(test_swap_pointers_double_swap);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "x et y sont des variables locales sur la pile. Pour échanger leurs valeurs depuis une fonction, il faut passer leurs adresses (&x, &y) — pas les valeurs."
+heap = []
+label = "Avant swap"
+step_label = "Avant swap"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "20"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "swap(int *a, int *b) reçoit &x et &y. À l'intérieur, *a et *b déréférencent vers x et y dans main. L'échange via tmp modifie les valeurs originales — résultat visible dans main après le retour."
+heap = []
+label = "Après swap(&x, &y)"
+step_label = "Après swap(&x, &y)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "20"
+
+[[visualizer.steps.stack]]
+name = "y"
+value = "10"
+
+[[visualizer.steps]]
+explanation = "int **pp = &p — pp pointe vers p, qui pointe vers val. *pp donne p, **pp donne val=99. Chaque * ajoute un niveau de déréférencement."
+heap = []
+label = "Double pointeur pp→p→val"
+step_label = "Double pointeur pp→p→val"
+
+[[visualizer.steps.arrows]]
+from = "pp"
+label = "*pp"
+to = "p"
+
+[[visualizer.steps.arrows]]
+from = "p"
+label = "**pp"
+to = "val"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "99"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→val"
+
+[[visualizer.steps.stack]]
+name = "pp"
+value = "→p"

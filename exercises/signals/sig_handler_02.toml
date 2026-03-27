@@ -1,0 +1,261 @@
+common_mistake = "Confondre SIG_BLOCK (ajouter au masque) et SIG_SETMASK (remplacer le masque entier)"
+description = """
+NSY103 — sigprocmask() contrôle le masque de signaux du processus. Un signal masqué (bloqué) est retenu par le noyau mais pas délivré tant qu'il reste bloqué. sigpending() vérifie les signaux en attente.
+
+Masquez SIGUSR1, envoyez-le, vérifiez qu'il est en attente, puis démasquez-le."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "SIG_BLOCK ajoute au masque, SIG_UNBLOCK retire, SIG_SETMASK remplace",
+    "sigpending(&set) remplit le set avec les signaux en attente",
+    "Un signal bloqué puis envoyé est délivré dès le déblocage",
+]
+id = "sig-handler-02"
+kc_ids = ["KC-C08"]
+key_concept = "sigprocmask contrôle la délivrance — un signal bloqué est retenu, pas perdu"
+lang = "c"
+prerequisites = ["sig-handler-01"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t got_signal = 0;
+
+void handler(int sig) {
+    (void)sig;
+    got_signal = 1;
+}
+
+int main(void) {
+    signal(SIGUSR1, handler);
+
+    /* Masquer SIGUSR1 */
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &block_set, &old_set);
+    printf("SIGUSR1 blocked\n");
+
+    /* Envoyer le signal (il sera retenu) */
+    raise(SIGUSR1);
+    printf("After raise: got_signal=%d\n", got_signal);
+
+    /* Verifier qu'il est en attente */
+    sigset_t pending;
+    sigpending(&pending);
+    if (sigismember(&pending, SIGUSR1))
+        printf("SIGUSR1 is pending\n");
+
+    /* Demasquer */
+    sigprocmask(SIG_UNBLOCK, &block_set, NULL);
+    printf("After unblock: got_signal=%d\n", got_signal);
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t got_signal = 0;
+
+void handler(int sig) {
+    (void)sig;
+    got_signal = 1;
+}
+
+int main(void) {
+    signal(SIGUSR1, handler);
+
+    /* Masquer SIGUSR1 */
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, ____);
+    sigprocmask(____, &block_set, &old_set);
+    printf("SIGUSR1 blocked\n");
+
+    /* Envoyer le signal (il sera retenu) */
+    raise(SIGUSR1);
+    printf("After raise: got_signal=%d\n", got_signal);
+
+    /* Verifier qu'il est en attente */
+    sigset_t pending;
+    ____(______);
+    if (sigismember(&pending, SIGUSR1))
+        printf("SIGUSR1 is pending\n");
+
+    /* Demasquer */
+    sigprocmask(____, &block_set, NULL);
+    printf("After unblock: got_signal=%d\n", got_signal);
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <signal.h>
+
+/* == EXEMPLE =======================================
+ * Bloquer SIGINT temporairement
+ * ================================================= */
+void example_block(void) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+    printf("SIGINT blocked (Ctrl+C ignored)\n");
+    /* ... section critique ... */
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+    printf("SIGINT unblocked\n");
+}
+
+/* == VOTRE EXERCICE ================================
+ * Bloquer SIGUSR1, raise, vérifier pending, débloquer
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t got_signal = 0;
+void handler(int sig) { (void)sig; got_signal = 1; }
+
+int main(void) {
+    ____(SIGUSR1, handler);
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    ____(block_set, SIGUSR1);
+    sigprocmask(____, &block_set, &old_set);
+    printf("SIGUSR1 blocked\n");
+    raise(SIGUSR1);
+    printf("After raise: got_signal=%d\n", got_signal);
+    sigset_t pending;
+    ____(______);
+    if (sigismember(&pending, SIGUSR1))
+        printf("SIGUSR1 is pending\n");
+    sigprocmask(____, &block_set, NULL);
+    printf("After unblock: got_signal=%d\n", got_signal);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t got_signal = 0;
+void handler(int sig) { (void)sig; got_signal = 1; }
+
+int main(void) {
+    signal(SIGUSR1, handler);
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, ____);
+    sigprocmask(____, &block_set, &old_set);
+    printf("SIGUSR1 blocked\n");
+    raise(SIGUSR1);
+    printf("After raise: got_signal=%d\n", got_signal);
+    sigset_t pending;
+    ____(______);
+    if (sigismember(&pending, SIGUSR1))
+        printf("SIGUSR1 is pending\n");
+    sigprocmask(____, &block_set, NULL);
+    printf("After unblock: got_signal=%d\n", got_signal);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+
+// handler pour SIGUSR1 qui set got_signal=1
+// main: sigprocmask SIG_BLOCK, raise, sigpending, SIG_UNBLOCK
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "Masquage avec sigprocmask"
+
+[validation]
+expected_output = """
+SIGUSR1 blocked
+After raise: got_signal=0
+SIGUSR1 is pending
+After unblock: got_signal=1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "SIGUSR1 est bloqué — tout raise(SIGUSR1) sera retenu"
+heap = []
+label = "sigprocmask(SIG_BLOCK) masque SIGUSR1"
+step_label = "Masquage"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "masque signaux"
+value = "{SIGUSR1}"
+
+[[visualizer.steps.stack]]
+name = "got_signal"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le signal est en attente mais pas délivré tant qu'il est bloqué"
+heap = []
+label = "raise(SIGUSR1) — signal retenu"
+step_label = "Signal retenu"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "signaux pending"
+value = "{SIGUSR1}"
+
+[[visualizer.steps.stack]]
+name = "got_signal"
+value = "0 (handler pas appelé)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le déblocage provoque immédiatement la délivrance du signal retenu"
+heap = []
+label = "SIG_UNBLOCK — le handler est appelé"
+step_label = "Démasquage"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "got_signal"
+value = "1 (handler appelé)"
+
+[[visualizer.steps.stack]]
+name = "signaux pending"
+value = "{}"

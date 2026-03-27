@@ -1,0 +1,279 @@
+common_mistake = "Oublier que ftell retourne long, pas int — problème pour fichiers > 2 Go"
+description = """
+NSY103 — fseek(f, offset, whence) déplace le curseur de lecture/écriture. whence peut être SEEK_SET (début), SEEK_CUR (position courante), SEEK_END (fin). ftell(f) retourne la position courante.
+
+Naviguez dans un buffer mémoire pour lire des enregistrements à des positions spécifiques."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "SEEK_END positionne le curseur à la fin — utile pour connaître la taille du fichier",
+    "SEEK_SET positionne depuis le début du fichier (offset absolu)",
+    "SEEK_CUR est relatif à la position courante — offset négatif = reculer",
+]
+id = "file-seek-01"
+kc_ids = ["KC-C06"]
+key_concept = "fseek(SEEK_SET) = absolu, fseek(SEEK_CUR) = relatif, fseek(SEEK_END) = depuis la fin"
+lang = "c"
+prerequisites = ["file-tmpfile-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    /* Chaque enregistrement fait exactement 10 chars */
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    FILE *f = fmemopen((void *)records, strlen(records), "r");
+    if (!f) return 1;
+
+    char buf[11];
+    long size;
+
+    /* Taille totale */
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    printf("Size: %ld bytes\n", size);
+    printf("Records: %ld\n", size / 10);
+
+    /* Lire enregistrement 3 (index 2, offset 20) */
+    fseek(f, 2 * 10, SEEK_SET);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Record 3: %s\n", buf);
+
+    /* Position courante */
+    printf("Position: %ld\n", ftell(f));
+
+    /* Reculer de 10 pour relire le meme */
+    fseek(f, -10, SEEK_CUR);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Re-read: %s\n", buf);
+
+    fclose(f);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    /* Chaque enregistrement fait exactement 10 chars */
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    FILE *f = fmemopen((void *)records, strlen(records), "r");
+    if (!f) return 1;
+
+    char buf[11];
+    long size;
+
+    /* Taille totale */
+    fseek(f, 0, ____);
+    size = ftell(f);
+    printf("Size: %ld bytes\n", size);
+    printf("Records: %ld\n", size / 10);
+
+    /* Lire enregistrement 3 (index 2, offset 20) */
+    fseek(f, 2 * 10, ____);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Record 3: %s\n", buf);
+
+    /* Position courante */
+    printf("Position: %ld\n", ____(f));
+
+    /* Reculer de 10 pour relire le meme */
+    fseek(f, -10, ____);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Re-read: %s\n", buf);
+
+    fclose(f);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Naviguer dans un fichier de mots de 5 lettres
+ * fseek(SEEK_SET) pour accès direct par index
+ * ================================================= */
+void example_seek(void) {
+    const char *words = "alphabravocharl";
+    FILE *f = fmemopen((void *)words, 15, "r");
+    if (!f) return;
+    char w[6];
+    fseek(f, 5, SEEK_SET); /* mot index 1 */
+    fread(w, 1, 5, f); w[5] = 0;
+    printf("Word 2: %s\n", w); /* bravo */
+    fseek(f, 0, SEEK_SET); /* retour au debut */
+    fread(w, 1, 5, f); w[5] = 0;
+    printf("Word 1: %s\n", w); /* alpha */
+    fclose(f);
+}
+
+/* == VOTRE EXERCICE ================================
+ * 5 enregistrements de 10 chars chacun
+ * Utiliser SEEK_END/ftell pour la taille,
+ * SEEK_SET pour accès direct,
+ * SEEK_CUR pour reculer.
+ * ================================================= */
+int main(void) {
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    /* TODO: fmemopen, fseek/ftell pour taille, accès direct record 3, recul relatif */
+    (void)records;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    FILE *f = fmemopen((void *)records, strlen(records), "r");
+    if (!f) return 1;
+    char buf[11];
+    long size;
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    printf("Size: %ld bytes\n", size);
+    printf("Records: %ld\n", size / 10);
+    fseek(f, 2 * 10, SEEK_SET);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Record 3: %s\n", buf);
+    printf("Position: %ld\n", ftell(f));
+    fseek(f, ____, SEEK_CUR); // combien reculer?
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Re-read: %s\n", buf);
+    fclose(f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    FILE *f = fmemopen((void *)records, strlen(records), "r");
+    if (!f) return 1;
+
+    char buf[11];
+    long size;
+
+    fseek(f, 0, ____);
+    size = ftell(f);
+    printf("Size: %ld bytes\n", size);
+    printf("Records: %ld\n", size / 10);
+
+    fseek(f, 2 * 10, ____);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Record 3: %s\n", buf);
+
+    printf("Position: %ld\n", ____(f));
+
+    fseek(f, -10, ____);
+    fread(buf, 1, 10, f);
+    buf[10] = 0;
+    printf("Re-read: %s\n", buf);
+
+    fclose(f);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *records = "AAAAAAAAAA" "BBBBBBBBBB" "CCCCCCCCCC" "DDDDDDDDDD" "EEEEEEEEEE";
+    // fmemopen en lecture
+    // fseek(SEEK_END) + ftell pour la taille
+    // fseek(SEEK_SET) pour accéder au record 3
+    // ftell pour la position
+    // fseek(SEEK_CUR, -10) pour reculer et relire
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "Navigation avec fseek/ftell"
+
+[validation]
+expected_output = """
+Size: 50 bytes
+Records: 5
+Record 3: CCCCCCCCCC
+Position: 30
+Re-read: CCCCCCCCCC
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fseek à la fin puis ftell donne la taille totale"
+heap = []
+label = "fseek(SEEK_END) + ftell pour la taille"
+step_label = "Taille"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (pos=50)"
+
+[[visualizer.steps.stack]]
+name = "size"
+value = "50"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Accès direct : index * taille_record donne l'offset"
+heap = []
+label = "fseek(20, SEEK_SET) — accès direct record 3"
+step_label = "Accès direct"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (pos=20)"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"CCCCCCCCCC"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "SEEK_CUR avec offset négatif recule le curseur"
+heap = []
+label = "fseek(-10, SEEK_CUR) — recul relatif"
+step_label = "Recul relatif"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "f"
+value = "FILE* (pos=30→20)"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"CCCCCCCCCC"'

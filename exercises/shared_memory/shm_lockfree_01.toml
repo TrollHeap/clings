@@ -1,0 +1,330 @@
+common_mistake = "Utiliser un int normal au lieu d'atomic_int → race condition car read-modify-write n'est pas atomique"
+description = """
+NSY103 — Les opérations atomiques (stdatomic.h) permettent la synchronisation sans mutex. __atomic_fetch_add() incrémente un compteur de manière atomique (instruction CPU lock xadd). Un flag atomic_int avec __atomic_store et __atomic_load implémente un spinlock minimaliste.
+
+Créez un compteur atomique en mémoire partagée. 4 enfants incrémentent chacun 1000 fois avec __atomic_fetch_add. Le parent vérifie que le total est 4000."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "atomic_fetch_add(&counter, 1) incrémente de manière atomique (pas de race)",
+    "atomic_load et atomic_store pour lire/écrire un atomic_int de manière thread-safe",
+    "Le flag 'ready' permet au parent de savoir quand tous les enfants ont fini",
+]
+id = "shm-lockfree-01"
+kc_ids = ["KC-C13"]
+key_concept = "atomic_fetch_add = incrément lock-free (instruction CPU lock xadd) ; pas de mutex nécessaire"
+lang = "c"
+prerequisites = ["shm-multiproc-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+
+typedef struct {
+    atomic_int counter;
+    atomic_int ready;
+} AtomicShared;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_atomic", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(AtomicShared));
+    AtomicShared *as = (AtomicShared *)mmap(NULL, sizeof(AtomicShared),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    atomic_store(&as->counter, 0);
+    atomic_store(&as->ready, 0);
+
+    for (int i = 0; i < 4; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++)
+                atomic_fetch_add(&as->counter, 1);
+            atomic_fetch_add(&as->ready, 1);
+            _exit(0);
+        }
+    }
+
+    while (atomic_load(&as->ready) < 4)
+        usleep(1000);
+
+    printf("Atomic counter: %d\n", atomic_load(&as->counter));
+
+    munmap(as, sizeof(AtomicShared));
+    shm_unlink("/kf_shm_atomic");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+
+typedef struct {
+    atomic_int counter;
+    atomic_int ready;
+} AtomicShared;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_atomic", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(AtomicShared));
+    AtomicShared *as = (AtomicShared *)mmap(NULL, sizeof(AtomicShared),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    atomic_store(&as->counter, 0);
+    atomic_store(&as->ready, 0);
+
+    for (int i = 0; i < 4; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++)
+                ____(____,  ____);
+            atomic_fetch_add(&as->ready, 1);
+            _exit(0);
+        }
+    }
+
+    while (atomic_load(&as->____) < 4)
+        usleep(1000);
+
+    printf("Atomic counter: %d\n", atomic_load(&as->counter));
+
+    munmap(as, sizeof(AtomicShared));
+    shm_unlink("/kf_shm_atomic");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+
+typedef struct { atomic_int counter; atomic_int ready; } AtomicShared;
+
+/* == EXEMPLE =======================================
+ * atomic_fetch_add avec 2 enfants, 500 chacun
+ * ================================================= */
+void example_atomic(void) {
+    AtomicShared s; atomic_store(&s.counter, 0); atomic_store(&s.ready, 0);
+    /* In real code this would be in shm. Simplified for example. */
+    atomic_fetch_add(&s.counter, 500);
+    atomic_fetch_add(&s.counter, 500);
+    printf("Atomic: %d\n", atomic_load(&s.counter));
+}
+/* Resultat: Atomic: 1000 */
+
+/* == VOTRE EXERCICE ================================
+ * 4 enfants, 1000 atomic_fetch_add chacun, en shm.
+ * ================================================= */
+int main(void) {
+    int fd = shm_open("/kf_shm_atomic", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, sizeof(AtomicShared));
+    AtomicShared *as = (AtomicShared *)mmap(NULL, sizeof(AtomicShared), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    atomic_store(&as->counter, 0); atomic_store(&as->ready, 0);
+    /* TODO: fork 4 children, each atomic_fetch_add 1000 times, parent spin-waits */
+    munmap(as, sizeof(AtomicShared)); shm_unlink("/kf_shm_atomic");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+
+typedef struct {
+    atomic_int counter;
+    atomic_int ready;
+} AtomicShared;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_atomic", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(AtomicShared));
+    AtomicShared *as = (AtomicShared *)mmap(NULL, sizeof(AtomicShared),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    atomic_store(&as->counter, 0);
+    atomic_store(&as->ready, 0);
+
+    for (int i = 0; i < 4; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++)
+                ____(____,  ____);
+            atomic_fetch_add(&as->ready, 1);
+            _exit(0);
+        }
+    }
+
+    while (atomic_load(&as->____) < 4)
+        usleep(1000);
+
+    printf("Atomic counter: %d\n", atomic_load(&as->counter));
+
+    munmap(as, sizeof(AtomicShared));
+    shm_unlink("/kf_shm_atomic");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+
+typedef struct {
+    atomic_int counter;
+    atomic_int ready;
+} AtomicShared;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_atomic", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(AtomicShared));
+    AtomicShared *as = (AtomicShared *)mmap(NULL, sizeof(AtomicShared),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    atomic_store(&as->counter, 0);
+    atomic_store(&as->ready, 0);
+
+    for (int i = 0; i < 4; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++)
+                ____(____,  ____);
+            atomic_fetch_add(&as->ready, 1);
+            _exit(0);
+        }
+    }
+
+    while (atomic_load(&as->____) < 4)
+        usleep(1000);
+
+    printf("Atomic counter: %d\n", atomic_load(&as->counter));
+
+    munmap(as, sizeof(AtomicShared));
+    shm_unlink("/kf_shm_atomic");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdatomic.h>
+
+int main(void) {
+    // AtomicShared{atomic_int counter, ready} en shm
+    // 4 enfants: atomic_fetch_add(&counter, 1) x1000
+    // Parent: spin-wait ready==4, affiche counter=4000
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Communication lock-free avec atomics"
+
+[validation]
+expected_output = """
+Atomic counter: 4000
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "atomic_store initialise les compteurs. Les opérations atomiques utilisent des instructions CPU spéciales (lock cmpxchg)."
+label = "atomic_int counter=0, ready=0 en shm"
+step_label = "init"
+
+[[visualizer.steps.arrows]]
+from = "as (AtomicShared*)"
+to = "AtomicShared"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "AtomicShared"
+value = "counter=0 ready=0"
+
+[[visualizer.steps.stack]]
+name = "as (AtomicShared*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = "atomic_fetch_add est une instruction CPU atomique — pas de mutex nécessaire. Chaque incrément est garanti atomique."
+label = "4 enfants: atomic_fetch_add(&counter, 1) x1000"
+step_label = "lock-free increments"
+
+[[visualizer.steps.arrows]]
+from = "as (AtomicShared*)"
+to = "AtomicShared"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (children)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "AtomicShared"
+value = "counter=4000 ready=4"
+
+[[visualizer.steps.stack]]
+name = "as (AtomicShared*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = "Le parent attend que ready==4 (tous les enfants finis), puis lit le compteur = 4000 exact."
+label = "Parent: spin-wait sur ready, lit counter=4000"
+step_label = "result"
+
+[[visualizer.steps.arrows]]
+from = "as (AtomicShared*)"
+to = "AtomicShared"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "AtomicShared"
+value = "counter=4000 ready=4"
+
+[[visualizer.steps.stack]]
+name = "as (AtomicShared*)"
+value = "0xSHM"

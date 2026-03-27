@@ -1,0 +1,368 @@
+common_mistake = "Utiliser p <= end au lieu de p < end : end pointe après le dernier élément"
+description = """
+NSY103 — Un tableau se décompose en pointeur vers son premier élément. On peut parcourir le tableau en incrémentant un pointeur au lieu d'utiliser un indice.
+
+Parcourez un tableau de 5 entiers avec un pointeur `p` qui avance à chaque itération, et affichez chaque élément."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Initialisez `p = arr` pour pointer vers le premier élément",
+    "La borne de fin est `end = arr + n` (un élément après le dernier)",
+    "Avancez le pointeur avec `p++` et lisez avec `*p`",
+]
+id = "ptr-deref-03"
+kc_ids = ["KC-C01"]
+key_concept = "p++ avance un pointeur de sizeof(*p) octets — parcours sans indice"
+lang = "c"
+prerequisites = ["ptr-deref-02"]
+solution_code = '''
+#include <stdio.h>
+
+int count_elements(int *begin, int *end) {
+    return (int)(end - begin);
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(count_elements(arr, arr)));
+    }
+    {
+        int arr[] = {42};
+        printf("%d\n", (int)(count_elements(arr, arr + 1)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        printf("%d\n", (int)(count_elements(arr, arr + 5)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4, 5, 6, 7};
+        printf("%d\n", (int)(count_elements(arr + 2, arr + 5)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+int count_elements(int *begin, int *end) {
+    return 0;
+}
+
+int main(void) {
+    int nums[] = {3, 7, 1, 9, 4};
+    print_array(nums, 5);
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Trouver le min d'un tableau via pointeur qui avance
+ * p++ deplace le pointeur de sizeof(int) octets.
+ * =========================================================== */
+int example_min(const int *arr, int n) {
+    const int *p = arr;
+    const int *end = arr + n;
+    int min = *p;
+    p++;
+    while (p < end) {
+        if (*p < min) min = *p;
+        p++;
+    }
+    return min;
+}
+void example_demo(void) {
+    int data[] = {8, 3, 5, 1, 9};
+    printf("Min : %d\n", example_min(data, 5));
+}
+/* Resultat: Min : 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Parcourir un tableau et afficher chaque element via pointeur
+ * Inspirez-vous de example_min ci-dessus.
+ * Utilisez p/end et p++ au lieu d'indices.
+ * =========================================================== */
+void print_array(const int *arr, int n) {
+    (void)arr; (void)n; /* TODO */
+}
+
+int main(void) {
+    int nums[] = {3, 7, 1, 9, 4};
+    print_array(nums, 5);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+void print_array(const int *arr, int n) {
+    const int *p = arr;
+    const int *end = arr + n;
+    while (p < end) {
+        printf("%d ", ____);
+        ____; // avancer le pointeur
+    }
+    printf("\n");
+}
+
+int main(void) {
+    int nums[] = {3, 7, 1, 9, 4};
+    print_array(nums, 5);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int count_elements(int *begin, int *end) {
+    return 0;
+}
+
+int main(void) {
+    int nums[] = {3, 7, 1, 9, 4};
+    print_array(nums, 5);
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+
+int count_elements(int *begin, int *end) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(count_elements(arr, arr)));
+    }
+    {
+        int arr[] = {42};
+        printf("%d\n", (int)(count_elements(arr, arr + 1)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        printf("%d\n", (int)(count_elements(arr, arr + 5)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4, 5, 6, 7};
+        printf("%d\n", (int)(count_elements(arr + 2, arr + 5)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int count_elements(int *begin, int *end) { return 0; }
+
+int main(void) {
+    {
+        int arr[] = {1, 2, 3};
+        printf("%d\n", (int)(count_elements(arr, arr)));
+    }
+    {
+        int arr[] = {42};
+        printf("%d\n", (int)(count_elements(arr, arr + 1)));
+    }
+    {
+        int arr[] = {10, 20, 30, 40, 50};
+        printf("%d\n", (int)(count_elements(arr, arr + 5)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4, 5, 6, 7};
+        printf("%d\n", (int)(count_elements(arr + 2, arr + 5)));
+    }
+    return 0;
+}
+''',
+]
+subject = "pointers"
+title = "Parcours de tableau par pointeur"
+
+[validation]
+mode = "test"
+test_code = """
+void test_count_empty(void) {
+    int arr[] = {1, 2, 3};
+    TEST_ASSERT_EQUAL_INT(0, count_elements(arr, arr));
+}
+
+void test_count_single(void) {
+    int arr[] = {42};
+    TEST_ASSERT_EQUAL_INT(1, count_elements(arr, arr + 1));
+}
+
+void test_count_multiple(void) {
+    int arr[] = {10, 20, 30, 40, 50};
+    TEST_ASSERT_EQUAL_INT(5, count_elements(arr, arr + 5));
+}
+
+void test_count_partial(void) {
+    int arr[] = {1, 2, 3, 4, 5, 6, 7};
+    TEST_ASSERT_EQUAL_INT(3, count_elements(arr + 2, arr + 5));
+}
+
+void test_count_two(void) {
+    int arr[] = {100, 200};
+    TEST_ASSERT_EQUAL_INT(2, count_elements(arr, arr + 2));
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_count_empty);
+    RUN_TEST(test_count_single);
+    RUN_TEST(test_count_multiple);
+    RUN_TEST(test_count_partial);
+    RUN_TEST(test_count_two);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "p commence à arr (=nums[0]). end = arr+5 pointe après le dernier élément. La condition p < end contrôle la boucle."
+heap = []
+label = "Début du parcours — p pointe vers nums[0]"
+step_label = "p = arr — début de parcours"
+
+[[visualizer.steps.arrows]]
+from = "p"
+label = "*p=3"
+to = "nums[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "nums, 5"
+function_name = "print_array"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "7"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→nums[0]"
+
+[[visualizer.steps.stack]]
+name = "end"
+value = "→nums[5]"
+
+[[visualizer.steps]]
+explanation = "Après deux p++, le pointeur avance de 2*sizeof(int) octets. *p lit maintenant nums[2]=1. p < end est toujours vrai."
+heap = []
+label = "Milieu du parcours — p pointe vers nums[2]"
+step_label = "p++ deux fois — *p = nums[2]"
+
+[[visualizer.steps.arrows]]
+from = "p"
+label = "*p=1"
+to = "nums[2]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "nums, 5"
+function_name = "print_array"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "7"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→nums[2]"
+
+[[visualizer.steps.stack]]
+name = "end"
+value = "→nums[5]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "p == end : la boucle s'arrête. Ne jamais déréférencer end car il pointe après le tableau — accès invalide."
+heap = []
+label = "Fin du parcours — p == end"
+step_label = "p == end — fin de boucle"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "nums, 5"
+function_name = "print_array"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "7"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "9"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→nums[5]"
+
+[[visualizer.steps.stack]]
+name = "end"
+value = "→nums[5]"

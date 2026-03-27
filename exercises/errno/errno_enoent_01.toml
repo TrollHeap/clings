@@ -1,0 +1,214 @@
+common_mistake = "Confondre ENOENT (fichier inexistant) avec ENOTDIR (composant du chemin n'est pas un répertoire)"
+description = """
+NSY103 — ENOENT (Error NO ENTry) indique qu'un chemin n'existe pas. C'est l'erreur la plus courante avec les appels système de fichiers.
+
+Testez plusieurs chemins avec access() et affichez le résultat pour chacun."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "access() retourne -1 en cas d'erreur, 0 si ok",
+    "strerror(errno) pour obtenir le message",
+    "/tmp existe toujours sur un système Linux",
+]
+id = "errno-enoent-01"
+kc_ids = ["KC-C15"]
+key_concept = "ENOENT=2 signifie que le chemin référencé n'existe pas dans le système de fichiers"
+lang = "c"
+prerequisites = ["errno-check-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+void check_path(const char *path) {
+    errno = 0;
+    int rc = access(path, F_OK);
+    if (rc == -1) {
+        printf("%s: %s (errno=%d)\n", path, strerror(errno), errno);
+    } else {
+        printf("%s: exists\n", path);
+    }
+}
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+void check_path(const char *path) {
+    errno = 0;
+    int rc = access(path, F_OK);
+    if (rc == ____) {
+        printf("%s: %s (errno=%d)\n", path, ____(errno), errno);
+    } else {
+        printf("%s: exists\n", path);
+    }
+}
+
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+/* == EXEMPLE: vérifier l'existence avec access() ========= */
+void example_check(const char *path) {
+    if (access(path, F_OK) == -1) {
+        printf("Missing: %s (%s)\n", path, strerror(errno));
+    } else {
+        printf("Found: %s\n", path);
+    }
+}
+
+/* == VOTRE EXERCICE ====================================== */
+void check_path(const char *path) {
+    errno = 0;
+    int rc = access(path, F_OK);
+    if (rc == -1) {
+        printf("%s: %s (errno=%d)\n", path, strerror(errno), errno);
+    } else {
+        printf("%s: exists\n", path);
+    }
+}
+
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+void check_path(const char *path) {
+    errno = 0;
+    int rc = access(path, F_OK);
+    if (rc == -1) {
+        printf("%s: %s (errno=%d)\n", path, strerror(errno), errno);
+    } else {
+        printf("%s: ____\n", path);
+    }
+}
+
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+void check_path(const char *path) {
+    errno = 0;
+    int rc = access(path, F_OK);
+    if (rc == ____) {
+        printf("%s: %s (errno=%d)\n", path, ____(errno), errno);
+    } else {
+        printf("%s: exists\n", path);
+    }
+}
+
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+// Implémentez check_path: access(path, F_OK), affiche exists ou erreur
+void check_path(const char *path) {
+    (void)path;
+}
+
+int main(void) {
+    check_path("/tmp");
+    check_path("/nonexistent_kf_path");
+    check_path("/also/does/not/exist");
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "ENOENT: fichier inexistant"
+
+[validation]
+expected_output = """
+/tmp: exists
+/nonexistent_kf_path: No such file or directory (errno=2)
+/also/does/not/exist: No such file or directory (errno=2)
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "/tmp existe, access retourne 0"
+heap = []
+label = 'access("/tmp", F_OK) → 0'
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = '"/tmp"'
+function_name = "check_path"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "rc"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le chemin n'existe pas, errno=ENOENT"
+heap = []
+label = 'access("/nonexistent...") → -1'
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = '"/nonexistent..."'
+function_name = "check_path"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "rc"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "2 (ENOENT)"

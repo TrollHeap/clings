@@ -1,0 +1,265 @@
+common_mistake = "Utiliser MAP_PRIVATE au lieu de MAP_SHARED → chaque processus a sa propre copie (copy-on-write)"
+description = """
+NSY103 — Après fork(), parent et enfant partagent le segment mmap(MAP_SHARED). Les écritures de l'un sont visibles par l'autre immédiatement. L'enfant écrit, le parent lit après wait().
+
+Créez un segment partagé. L'enfant y écrit la valeur 99. Le parent attend l'enfant puis lit et affiche la valeur."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "MAP_SHARED fait que les modifications sont visibles entre processus (pas MAP_PRIVATE)",
+    "L'enfant écrit *shared = 99 avant _exit()",
+    "Le parent fait wait() pour s'assurer que l'enfant a fini d'écrire",
+]
+id = "shm-readwrite-01"
+kc_ids = ["KC-C13"]
+key_concept = "MAP_SHARED + fork() = même page physique ; les écritures sont immédiatement visibles"
+lang = "c"
+prerequisites = ["shm-create-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = shm_open("/kf_shm_rw", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    int *shared = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    *shared = 0;
+    pid_t pid = fork();
+    if (pid == 0) {
+        *shared = 99;
+        _exit(0);
+    }
+    wait(NULL);
+    printf("Parent reads: %d\n", *shared);
+
+    munmap(shared, 4096);
+    shm_unlink("/kf_shm_rw");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = shm_open("/kf_shm_rw", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    int *shared = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+
+    *shared = 0;
+    pid_t pid = ____();
+    if (pid == 0) {
+        *shared = ____;
+        _exit(0);
+    }
+    wait(NULL);
+    printf("Parent reads: %d\n", *shared);
+
+    munmap(shared, 4096);
+    shm_unlink("/kf_shm_rw");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * Enfant ecrit un char, parent le lit
+ * ================================================= */
+void example_shm_char(void) {
+    int fd = shm_open("/kf_ex_char", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    char *p = (char *)mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    *p = 'X';
+    if (fork() == 0) { *p = 'Z'; _exit(0); }
+    wait(NULL);
+    printf("char: %c\n", *p);
+    munmap(p, 4096); shm_unlink("/kf_ex_char");
+}
+/* Resultat: char: Z */
+
+/* == VOTRE EXERCICE ================================
+ * Enfant ecrit 99, parent lit apres wait().
+ * ================================================= */
+int main(void) {
+    int fd = shm_open("/kf_shm_rw", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    int *shared = (int *)mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    *shared = 0;
+    /* TODO: fork, child writes 99, parent waits and reads */
+    munmap(shared, 4096); shm_unlink("/kf_shm_rw");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = shm_open("/kf_shm_rw", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    int *shared = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+
+    *shared = 0;
+    pid_t pid = ____();
+    if (pid == 0) {
+        *shared = ____;
+        _exit(0);
+    }
+    wait(NULL);
+    printf("Parent reads: %d\n", *shared);
+
+    munmap(shared, 4096);
+    shm_unlink("/kf_shm_rw");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = shm_open("/kf_shm_rw", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, 4096);
+    int *shared = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, ____, fd, 0);
+    close(fd);
+
+    *shared = 0;
+    pid_t pid = ____();
+    if (pid == 0) {
+        *shared = ____;
+        _exit(0);
+    }
+    wait(NULL);
+    printf("Parent reads: %d\n", *shared);
+
+    munmap(shared, 4096);
+    shm_unlink("/kf_shm_rw");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // Créez /kf_shm_rw, mmap MAP_SHARED
+    // fork: enfant écrit 99, parent wait + lit
+    // Affiche "Parent reads: 99"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Lecture/écriture en mémoire partagée"
+
+[validation]
+expected_output = """
+Parent reads: 99
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le segment est mappé avant fork() donc parent et enfant partagent la même page physique."
+label = "mmap MAP_SHARED — même page physique"
+step_label = "mmap avant fork"
+
+[[visualizer.steps.arrows]]
+from = "shared (int*)"
+to = "/kf_shm_rw"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xMMAP"
+name = "/kf_shm_rw"
+value = "*shared = 0"
+
+[[visualizer.steps.stack]]
+name = "shared (int*)"
+value = "0xMMAP"
+
+[[visualizer.steps]]
+explanation = "L'enfant écrit 99 dans le segment partagé. La modification est immédiatement visible."
+label = "Enfant: *shared = 99"
+step_label = "child writes"
+
+[[visualizer.steps.arrows]]
+from = "shared (int*)"
+to = "/kf_shm_rw"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (child)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xMMAP"
+name = "/kf_shm_rw"
+value = "*shared = 99"
+
+[[visualizer.steps.stack]]
+name = "shared (int*)"
+value = "0xMMAP"
+
+[[visualizer.steps]]
+explanation = "Après wait(), le parent voit la valeur 99 écrite par l'enfant — même page physique."
+label = "Parent: lit *shared = 99 après wait()"
+step_label = "parent reads"
+
+[[visualizer.steps.arrows]]
+from = "shared (int*)"
+to = "/kf_shm_rw"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xMMAP"
+name = "/kf_shm_rw"
+value = "*shared = 99"
+
+[[visualizer.steps.stack]]
+name = "shared (int*)"
+value = "0xMMAP"

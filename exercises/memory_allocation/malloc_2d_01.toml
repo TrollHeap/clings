@@ -1,0 +1,327 @@
+common_mistake = "Libérer le tableau de pointeurs avant les lignes — on perd les adresses des lignes (fuite mémoire)"
+description = """
+NSY103 — Une matrice 2D dynamique s'alloue en deux étapes : d'abord un tableau de pointeurs de lignes (`int **`), puis chaque ligne individuellement. La libération se fait dans l'ordre inverse : les lignes d'abord, puis le tableau de pointeurs.
+
+Allouez une matrice 3×4, remplissez-la, affichez-la et libérez-la proprement."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Premier malloc : `rows * sizeof(int *)` pour le tableau de pointeurs de lignes",
+    "Chaque ligne : `cols * sizeof(int)` pour les données",
+    "En cas d'échec partiel, libérer les lignes déjà allouées avant de retourner NULL",
+]
+id = "malloc-2d-01"
+kc_ids = ["KC-C02"]
+key_concept = "Une matrice 2D dynamique nécessite rows+1 allocations et autant de free — les lignes ne sont pas contiguës"
+lang = "c"
+prerequisites = ["realloc-grow-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int **alloc_matrix(int rows, int cols) {
+    int **mat = malloc(rows * sizeof(int *));
+    if (!mat) return NULL;
+    for (int i = 0; i < rows; i++) {
+        mat[i] = malloc(cols * sizeof(int));
+        if (!mat[i]) {
+            for (int j = 0; j < i; j++) free(mat[j]);
+            free(mat);
+            return NULL;
+        }
+    }
+    return mat;
+}
+
+void free_matrix(int **mat, int rows) {
+    for (int i = 0; i < rows; i++)
+        free(mat[i]);
+    free(mat);
+}
+
+int main(void) {
+    {
+        int **mat = alloc_matrix(3, 4);
+        printf("%d\n", (mat) != NULL ? 1 : 0);
+        free_matrix(mat, 3);
+    }
+    {
+        int **mat = alloc_matrix(3, 4);
+        printf("%d\n", (mat) != NULL ? 1 : 0);
+        printf("%d\n", (mat[0]) != NULL ? 1 : 0);
+        printf("%d\n", (mat[1]) != NULL ? 1 : 0);
+        printf("%d\n", (mat[2]) != NULL ? 1 : 0);
+        free_matrix(mat, 3);
+    }
+    {
+        int **mat = alloc_matrix(3, 4);
+        printf("%d\n", (mat) != NULL ? 1 : 0);
+        mat[0][0] = 5; mat[1][2] = 10; mat[2][3] = 15;
+        printf("%d\n", (int)(mat[0][0]));
+        printf("%d\n", (int)(mat[1][2]));
+        printf("%d\n", (int)(mat[2][3]));
+        free_matrix(mat, 3);
+    }
+    {
+        int **mat = alloc_matrix(2, 3);
+        printf("%d\n", (mat) != NULL ? 1 : 0);
+        for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 3; j++)
+        mat[i][j] = i * 3 + j;
+        printf("%d\n", (int)(mat[0][0]));
+        printf("%d\n", (int)(mat[0][2]));
+        printf("%d\n", (int)(mat[1][0]));
+        printf("%d\n", (int)(mat[1][2]));
+        free_matrix(mat, 2);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+int **alloc_matrix(int rows, int cols) {
+    /* TODO: malloc rows*sizeof(int*), then each row malloc cols*sizeof(int) */
+    /* Handle partial failure: free allocated rows before returning NULL */
+    return NULL;
+}
+
+void free_matrix(int **mat, int rows) {
+    /* TODO: free each row, then free the rows array */
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Matrice 2x3 de floats allouee dynamiquement
+ * rows+1 mallocs : 1 pour float**, rows pour float*
+ * =========================================================== */
+float **example_alloc(int r, int c) {
+    float **m = malloc(r * sizeof(float *));
+    for (int i = 0; i < r; i++) m[i] = malloc(c * sizeof(float));
+    return m;
+}
+void example_free(float **m, int r) {
+    for (int i = 0; i < r; i++) free(m[i]);
+    free(m);
+}
+void example_demo(void) {
+    float **m = example_alloc(2, 3);
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 3; j++)
+            m[i][j] = (float)(i * 3 + j);
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 3; j++) printf("%.0f ", m[i][j]);
+        printf("\n");
+    }
+    example_free(m, 2);
+}
+/* Resultat: 0 1 2 / 3 4 5 */
+
+/* == VOTRE EXERCICE =========================================
+ * Matrice 3x4 d'entiers avec gestion d'erreur partielle
+ * =========================================================== */
+int **alloc_matrix(int rows, int cols) { (void)rows; (void)cols; return NULL; }
+void free_matrix(int **mat, int rows) { (void)mat; (void)rows; }
+
+int main(void) {
+    /* TODO: allouer 3x4, remplir i*cols+j, afficher, liberer */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int **alloc_matrix(int rows, int cols) {
+    int **mat = malloc(rows * sizeof(int *));
+    if (!mat) return NULL;
+    for (int i = 0; i < rows; i++) {
+        mat[i] = malloc(cols * sizeof(int));
+        if (!mat[i]) {
+            for (int j = 0; j < i; j++) free(mat[j]);
+            free(mat);
+            return NULL;
+        }
+    }
+    return mat;
+}
+void free_matrix(int **mat, int rows) {
+    for (int i = 0; i < rows; i++) free(mat[i]);
+    free(mat);
+}
+
+int main(void) {
+    int rows = 3, cols = 4;
+    int **mat = alloc_matrix(rows, cols);
+    if (!mat) return 1;
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            mat[i][j] = i * cols + j;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++)
+            printf("%3d", mat[i][____]);
+        printf("\n");
+    }
+    printf("mat[2][3] = %d\n", mat[____][____]);
+    free_matrix(mat, rows);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int **alloc_matrix(int rows, int cols) {
+    int **mat = malloc(rows * sizeof(____));
+    if (!mat) return NULL;
+    for (int i = 0; i < rows; i++) {
+        mat[i] = malloc(cols * sizeof(____));
+        if (!mat[i]) {
+            for (int j = 0; j < i; j++) free(mat[j]);
+            free(mat);
+            return NULL;
+        }
+    }
+    return mat;
+}
+
+void free_matrix(int **mat, int rows) {
+    for (int i = 0; i < rows; i++)
+        free(____);
+    free(____);
+}
+
+int main(void) {
+    int rows = 3, cols = 4;
+    int **mat = alloc_matrix(rows, cols);
+    if (!mat) return 1;
+
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            mat[i][j] = i * cols + j;
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++)
+            printf("%3d", mat[i][j]);
+        printf("\n");
+    }
+
+    printf("mat[2][3] = %d\n", mat[____][____]);
+    free_matrix(mat, rows);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+// Implémentez alloc_matrix(rows, cols) et free_matrix(mat, rows)
+// Matrice 3x4, remplir avec i*cols+j, afficher en grille
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Matrice 2D dynamique"
+
+[validation]
+expected_output = """
+1
+1
+1
+1
+1
+1
+5
+10
+15
+1
+0
+2
+3
+5"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "4 allocations au total : 1 pour le tableau de pointeurs + 3 pour les lignes. mat[i][j] fait deux déréférencements. Les lignes ne sont pas forcément contiguës en mémoire."
+label = "Matrice 3x4 sur le heap"
+step_label = "int** — tableau de pointeurs vers lignes"
+
+[[visualizer.steps.arrows]]
+from = "mat"
+label = "int**"
+to = "heap_ptrs"
+
+[[visualizer.steps.arrows]]
+from = "heap_ptrs"
+label = "mat[0]"
+to = "ptr0"
+
+[[visualizer.steps.arrows]]
+from = "heap_ptrs"
+label = "mat[1]"
+to = "ptr1"
+
+[[visualizer.steps.arrows]]
+from = "heap_ptrs"
+label = "mat[2]"
+to = "ptr2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap_ptrs"
+value = "[ptr0, ptr1, ptr2]"
+
+[[visualizer.steps.heap]]
+address = "ptr0"
+value = "[0, 1, 2, 3]"
+
+[[visualizer.steps.heap]]
+address = "ptr1"
+value = "[4, 5, 6, 7]"
+
+[[visualizer.steps.heap]]
+address = "ptr2"
+value = "[8, 9, 10, 11]"
+
+[[visualizer.steps.stack]]
+name = "mat"
+value = "→heap_ptrs"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On free d'abord chaque ligne (mat[0], mat[1], mat[2]) puis le tableau de pointeurs (mat). L'ordre inverse évite d'accéder à de la mémoire déjà libérée."
+heap = []
+label = "Libération en ordre inverse"
+step_label = "Free lignes d'abord, puis le tableau"
+
+[[visualizer.steps.call_frames]]
+args = "mat, 3"
+function_name = "free_matrix"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "mat"
+value = "→(libéré)"

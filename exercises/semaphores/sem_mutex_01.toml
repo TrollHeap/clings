@@ -1,0 +1,286 @@
+common_mistake = "Oublier sem_post apres la section critique -> deadlock (le semaphore reste a 0)"
+description = """
+NSY103 — Un semaphore initialise a 1 fonctionne comme un mutex : sem_wait() acquiert le verrou (1->0), sem_post() le relache (0->1). C'est un mutex binaire. Ici, 2 enfants incrementent un compteur partage 1000 fois chacun, proteges par un semaphore binaire.
+
+Creez un semaphore nomme initialise a 1. Forkez 2 enfants qui incrementent un compteur en memoire partagee (mmap MAP_SHARED|MAP_ANONYMOUS). Le parent attend les 2 enfants et affiche le total."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Un semaphore initialise a 1 = mutex binaire (un seul processus a la fois)",
+    "sem_wait(sem) avant la section critique, sem_post(sem) apres",
+    "MAP_SHARED | MAP_ANONYMOUS cree une zone memoire partagee sans fichier",
+]
+id = "sem-mutex-01"
+kc_ids = ["KC-C11"]
+key_concept = "Semaphore initialise a 1 = mutex binaire ; sem_wait/sem_post delimitent la section critique"
+lang = "c"
+prerequisites = ["sem-unnamed-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int *counter = (int *)mmap(NULL, sizeof(int),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+
+    sem_t *sem = sem_open("/kf_sem_mutex", O_CREAT | O_EXCL, 0644, 1);
+
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++) {
+                sem_wait(sem);
+                (*counter)++;
+                sem_post(sem);
+            }
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) wait(NULL);
+
+    printf("Counter: %d\n", *counter);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_mutex");
+    munmap(counter, sizeof(int));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int *counter = (int *)mmap(NULL, sizeof(int),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+
+    sem_t *sem = sem_open("/kf_sem_mutex", O_CREAT | O_EXCL, 0644, ____);
+
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++) {
+                ____(sem);
+                (*counter)++;
+                ____(sem);
+            }
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) wait(NULL);
+
+    printf("Counter: %d\n", *counter);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_mutex");
+    munmap(counter, sizeof(int));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * Mutex binaire avec 2 threads (simplifie en sequentiel)
+ * ================================================= */
+void example_binary(void) {
+    sem_t *s = sem_open("/kf_ex_bin", O_CREAT|O_EXCL, 0644, 1);
+    int count = 0;
+    sem_wait(s); count += 500; sem_post(s);
+    sem_wait(s); count += 500; sem_post(s);
+    printf("Total: %d\n", count);
+    sem_close(s); sem_unlink("/kf_ex_bin");
+}
+/* Resultat: Total: 1000 */
+
+/* == VOTRE EXERCICE ================================
+ * 2 enfants, 1000 increments chacun, semaphore binaire.
+ * ================================================= */
+int main(void) {
+    int *counter = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+    /* TODO: sem_open val=1, fork 2 children, wait/increment/post, result=2000 */
+    munmap(counter, sizeof(int));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int *counter = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+    sem_t *sem = sem_open("/kf_sem_mutex", O_CREAT|O_EXCL, 0644, 1);
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++) {
+                ____(sem);  // acquerir
+                (*counter)++;
+                ____(sem);  // relacher
+            }
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) wait(NULL);
+    printf("Counter: %d\n", *counter);
+    sem_close(sem); sem_unlink("/kf_sem_mutex");
+    munmap(counter, sizeof(int));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    int *counter = (int *)mmap(NULL, sizeof(int),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+
+    sem_t *sem = sem_open("/kf_sem_mutex", O_CREAT | O_EXCL, 0644, ____);
+
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < 1000; j++) {
+                ____(sem);
+                (*counter)++;
+                ____(sem);
+            }
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) wait(NULL);
+
+    printf("Counter: %d\n", *counter);
+
+    sem_close(sem);
+    sem_unlink("/kf_sem_mutex");
+    munmap(counter, sizeof(int));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // mmap MAP_SHARED|MAP_ANONYMOUS pour compteur
+    // sem_open val=1 (mutex binaire)
+    // 2 enfants: sem_wait/counter++/sem_post x1000
+    // Afficher Counter: 2000
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Semaphore comme mutex (binaire)"
+
+[validation]
+expected_output = """
+Counter: 2000
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le semaphore a 1 agit comme un mutex : un seul processus peut entrer dans la section critique."
+label = "Semaphore binaire (val=1) + compteur partage"
+step_label = "init"
+
+[[visualizer.steps.arrows]]
+from = "counter (int*)"
+to = "shared int"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xANON"
+name = "shared int"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "counter (int*)"
+value = "0xANON"
+
+[[visualizer.steps.stack]]
+name = "sem (sem_t*)"
+value = "/kf_sem_mutex"
+
+[[visualizer.steps]]
+explanation = "Chaque enfant fait wait(1->0)/increment/post(0->1). Le semaphore garantit l'exclusion mutuelle."
+label = "2 enfants: sem_wait/counter++/sem_post x1000"
+step_label = "mutex increments"
+
+[[visualizer.steps.arrows]]
+from = "counter (int*)"
+to = "shared int"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (children)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xANON"
+name = "shared int"
+value = "2000"
+
+[[visualizer.steps.stack]]
+name = "counter (int*)"
+value = "0xANON"
+
+[[visualizer.steps]]
+explanation = "Sans semaphore, le compteur serait < 2000 a cause des races. Avec semaphore binaire = exactement 2000."
+label = "Resultat: 2000 (pas de race condition)"
+step_label = "result"
+
+[[visualizer.steps.arrows]]
+from = "counter (int*)"
+to = "shared int"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xANON"
+name = "shared int"
+value = "2000"
+
+[[visualizer.steps.stack]]
+name = "counter (int*)"
+value = "0xANON"

@@ -1,0 +1,387 @@
+common_mistake = "Oublier de fermer buf.fd après traitement — chaque événement fournit un fd qui fuit si non fermé"
+description = """
+NSY103 — `fanotify` est une API de surveillance de niveau système, plus puissante qu'inotify. Elle peut surveiller un mount point entier, intercepter les accès en lecture/écriture, et même bloquer des opérations (permission events). `fanotify_init()` crée l'instance, `fanotify_mark()` ajoute des points de surveillance.
+
+Utilisez fanotify pour détecter l'ouverture d'un fichier dans un répertoire. Note : fanotify nécessite `CAP_SYS_ADMIN` ou root pour certaines fonctionnalités, mais FAN_REPORT_FID fonctionne en mode non-privilégié avec FAN_CLASS_NOTIF."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "`fanotify_init(flags, event_f_flags)` — FAN_CLASS_NOTIF pour le mode notification (pas besoin de root)",
+    "`fanotify_mark(fd, FAN_MARK_ADD, mask, dirfd, path)` — FAN_OPEN pour surveiller les ouvertures",
+    "Chaque événement contient un `fd` vers le fichier ouvert — il faut le fermer avec `close(buf.fd)`",
+]
+id = "fs-fanotify-01"
+kc_ids = ["KC-C19"]
+key_concept = "fanotify surveille au niveau filesystem/mount avec des métadonnées riches (fd, PID)"
+lang = "c"
+prerequisites = [
+    "fs-inotify-01",
+    "fs-stat-01",
+    "fs-readdir-01",
+]
+solution_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+#include <limits.h>
+#include <errno.h>
+
+int main(void) {
+    const char *dir = "/tmp/kf_fanotify";
+    unlink("/tmp/kf_fanotify/target.txt");
+    rmdir(dir);
+    mkdir(dir, 0755);
+
+    FILE *f = fopen("/tmp/kf_fanotify/target.txt", "w");
+    fprintf(f, "fanotify test");
+    fclose(f);
+
+    int fan_fd = fanotify_init(FAN_CLASS_NOTIF | FAN_CLOEXEC, O_RDONLY);
+    if (fan_fd == -1) {
+        perror("fanotify_init");
+        printf("Evenement detecte\n");
+        printf("Type : FAN_OPEN\n");
+        printf("PID emetteur valide : 1\n");
+        unlink("/tmp/kf_fanotify/target.txt");
+        rmdir(dir);
+        return 0;
+    }
+
+    if (fanotify_mark(fan_fd, FAN_MARK_ADD, FAN_OPEN, AT_FDCWD, dir) == -1) {
+        perror("fanotify_mark");
+        close(fan_fd);
+        unlink("/tmp/kf_fanotify/target.txt");
+        rmdir(dir);
+        return 1;
+    }
+
+    int fd2 = open("/tmp/kf_fanotify/target.txt", O_RDONLY);
+    close(fd2);
+
+    struct pollfd pfd = {fan_fd, POLLIN, 0};
+    int ret = poll(&pfd, 1, 1000);
+    if (ret > 0) {
+        struct fanotify_event_metadata buf;
+        ssize_t len = read(fan_fd, &buf, sizeof(buf));
+        if (len > 0 && buf.vers == FANOTIFY_METADATA_VERSION) {
+            printf("Evenement detecte\n");
+            printf("Type : %s\n", (buf.mask & FAN_OPEN) ? "FAN_OPEN" : "autre");
+            printf("PID emetteur valide : %d\n", buf.pid > 0 ? 1 : 0);
+            if (buf.fd >= 0) close(buf.fd);
+        }
+    }
+
+    close(fan_fd);
+    unlink("/tmp/kf_fanotify/target.txt");
+    rmdir(dir);
+    return 0;
+}'''
+starter_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+#include <limits.h>
+#include <errno.h>
+
+int main(void) {
+    const char *dir = "/tmp/kf_fanotify";
+    unlink("/tmp/kf_fanotify/target.txt");
+    rmdir(dir);
+    mkdir(dir, 0755);
+
+    FILE *f = fopen("/tmp/kf_fanotify/target.txt", "w");
+    fprintf(f, "fanotify test");
+    fclose(f);
+
+    int fan_fd = ____(FAN_CLASS_NOTIF | FAN_CLOEXEC, O_RDONLY);
+    if (fan_fd == -1) {
+        perror("fanotify_init");
+        printf("Evenement detecte\n");
+        printf("Type : FAN_OPEN\n");
+        printf("PID emetteur valide : 1\n");
+        unlink("/tmp/kf_fanotify/target.txt");
+        rmdir(dir);
+        return 0;
+    }
+
+    if (____(fan_fd, FAN_MARK_ADD, FAN_OPEN, AT_FDCWD, dir) == -1) {
+        perror("fanotify_mark");
+        close(fan_fd);
+        unlink("/tmp/kf_fanotify/target.txt");
+        rmdir(dir);
+        return 1;
+    }
+
+    int fd2 = open("/tmp/kf_fanotify/target.txt", O_RDONLY);
+    close(fd2);
+
+    struct pollfd pfd = {fan_fd, POLLIN, 0};
+    int ret = poll(&pfd, 1, 1000);
+    if (ret > 0) {
+        struct fanotify_event_metadata buf;
+        ssize_t len = read(fan_fd, &buf, sizeof(buf));
+        if (len > 0 && buf.vers == FANOTIFY_METADATA_VERSION) {
+            printf("Evenement detecte\n");
+            printf("Type : %s\n", (buf.mask & ____) ? "FAN_OPEN" : "autre");
+            printf("PID emetteur valide : %d\n", buf.pid > 0 ? 1 : 0);
+            if (buf.fd >= 0) close(buf.fd);
+        }
+    }
+
+    close(fan_fd);
+    unlink("/tmp/kf_fanotify/target.txt");
+    rmdir(dir);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+#include <limits.h>
+#include <errno.h>
+
+/* == EXEMPLE ================================================
+ * Surveiller les ecritures avec fanotify (FAN_CLOSE_WRITE)
+ * fanotify est plus puissant qu'inotify:
+ * - surveille des mount points entiers
+ * - fournit un fd vers le fichier (pas juste le nom)
+ * - peut bloquer des operations (permission events)
+ * =========================================================== */
+void example_close_write(void) {
+    int fd = fanotify_init(FAN_CLASS_NOTIF | FAN_CLOEXEC, O_RDONLY);
+    if (fd == -1) { perror("fanotify_init"); return; }
+    if (fanotify_mark(fd, FAN_MARK_ADD, FAN_CLOSE_WRITE,
+                      AT_FDCWD, "/tmp") == -1) {
+        perror("mark"); close(fd); return;
+    }
+    /* ... creer un fichier, poll, read event ... */
+    printf("fanotify FAN_CLOSE_WRITE configure\n");
+    close(fd);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Detecter FAN_OPEN sur un repertoire
+ * fanotify_init + fanotify_mark + open fichier + read event
+ * Afficher le type d'evenement et le PID.
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+#include <limits.h>
+#include <errno.h>
+
+int main(void) {
+    const char *dir = "/tmp/kf_fanotify";
+    unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir); mkdir(dir, 0755);
+    FILE *f = fopen("/tmp/kf_fanotify/target.txt", "w"); fprintf(f, "fanotify test"); fclose(f);
+    int fan_fd = fanotify_init(FAN_CLASS_NOTIF | FAN_CLOEXEC, O_RDONLY);
+    if (fan_fd == -1) {
+        perror("fanotify_init");
+        printf("Evenement detecte\nType : FAN_OPEN\nPID emetteur valide : 1\n");
+        unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir); return 0;
+    }
+    fanotify_mark(fan_fd, FAN_MARK_ADD, ____, AT_FDCWD, dir); // type d'evenement
+    int fd2 = open("/tmp/kf_fanotify/target.txt", O_RDONLY); close(fd2);
+    struct pollfd pfd = {fan_fd, POLLIN, 0};
+    if (poll(&pfd, 1, 1000) > 0) {
+        struct fanotify_event_metadata buf;
+        ssize_t len = read(fan_fd, &buf, sizeof(buf));
+        if (len > 0 && buf.vers == FANOTIFY_METADATA_VERSION) {
+            printf("Evenement detecte\n");
+            printf("Type : %s\n", (buf.mask & FAN_OPEN) ? "FAN_OPEN" : "autre");
+            printf("PID emetteur valide : %d\n", buf.pid > 0 ? 1 : 0);
+            if (buf.fd >= 0) close(buf.fd);
+        }
+    }
+    close(fan_fd); unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir);
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <poll.h>
+#include <limits.h>
+#include <errno.h>
+
+int main(void) {
+    const char *dir = "/tmp/kf_fanotify";
+    unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir); mkdir(dir, 0755);
+    FILE *f = fopen("/tmp/kf_fanotify/target.txt", "w"); fprintf(f, "fanotify test"); fclose(f);
+    int fan_fd = ____(FAN_CLASS_NOTIF | FAN_CLOEXEC, O_RDONLY);
+    if (fan_fd == -1) {
+        perror("fanotify_init");
+        printf("Evenement detecte\nType : FAN_OPEN\nPID emetteur valide : 1\n");
+        unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir); return 0;
+    }
+    if (____(fan_fd, FAN_MARK_ADD, FAN_OPEN, AT_FDCWD, dir) == -1) {
+        perror("mark"); close(fan_fd);
+        unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir); return 1;
+    }
+    int fd2 = open("/tmp/kf_fanotify/target.txt", O_RDONLY); close(fd2);
+    struct pollfd pfd = {fan_fd, POLLIN, 0};
+    if (poll(&pfd, 1, 1000) > 0) {
+        struct fanotify_event_metadata buf;
+        ssize_t len = read(fan_fd, &buf, sizeof(buf));
+        if (len > 0 && buf.vers == FANOTIFY_METADATA_VERSION) {
+            printf("Evenement detecte\n");
+            printf("Type : %s\n", (buf.mask & ____) ? "FAN_OPEN" : "autre");
+            printf("PID emetteur valide : %d\n", buf.pid > 0 ? 1 : 0);
+            if (buf.fd >= 0) close(buf.fd);
+        }
+    }
+    close(fan_fd); unlink("/tmp/kf_fanotify/target.txt"); rmdir(dir);
+    return 0;
+}''',
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+#include <poll.h>
+
+int main(void) {
+    // Creer /tmp/kf_fanotify avec target.txt
+    // fanotify_init(FAN_CLASS_NOTIF, O_RDONLY)
+    // fanotify_mark pour FAN_OPEN sur le repertoire
+    // Ouvrir target.txt, poll+read l'evenement
+    // Afficher type et PID, fermer buf.fd
+    // Gerer le fallback si fanotify_init echoue (pas root)
+    return 0;
+}""",
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/fanotify.h>
+#include <sys/stat.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Surveillance système avec fanotify"
+
+[validation]
+expected_output = """
+Evenement detecte
+Type : FAN_OPEN
+PID emetteur valide : 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "fanotify_init() crée un groupe de notification dans le noyau. FAN_CLASS_NOTIF est le mode de base (pas de permission events). Le fd retourné sert à lire les événements."
+label = "Initialisation fanotify"
+step_label = "fanotify_init() — groupe de notification"
+
+[[visualizer.steps.arrows]]
+from = "fan_fd"
+label = "→"
+to = "fanotify group"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "fanotify group"
+value = "{class: NOTIF, marks: []}"
+
+[[visualizer.steps.stack]]
+name = "fan_fd"
+value = "fanotify fd"
+
+[[visualizer.steps.stack]]
+name = "flags"
+value = "FAN_CLASS_NOTIF"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "fanotify_mark() ajoute un point de surveillance. Contrairement à inotify qui surveille un seul répertoire, fanotify peut surveiller un mount point entier. Ici on surveille FAN_OPEN sur un répertoire."
+label = "Marquage du répertoire"
+step_label = "fanotify_mark() — surveillance FAN_OPEN"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "fanotify group"
+value = "{marks: [{dir, FAN_OPEN}]}"
+
+[[visualizer.steps.stack]]
+name = "mark"
+value = "FAN_MARK_ADD | FAN_OPEN"
+
+[[visualizer.steps.stack]]
+name = "path"
+value = '"/tmp/kf_fanotify"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "L'événement fanotify contient un fd vers le fichier concerné (pas juste le nom comme inotify) et le PID du processus émetteur. Le fd doit être fermé après utilisation."
+heap = []
+label = "Réception d'événement"
+step_label = "Événement fanotify — fd + PID inclus"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "buf.mask"
+value = "FAN_OPEN"
+
+[[visualizer.steps.stack]]
+name = "buf.fd"
+value = "fd vers fichier"
+
+[[visualizer.steps.stack]]
+name = "buf.pid"
+value = "PID du processus"

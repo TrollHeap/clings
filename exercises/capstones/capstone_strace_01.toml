@@ -1,0 +1,497 @@
+common_mistake = "Écrire dans trace_fd depuis le parent — trace_fd doit être initialisé uniquement dans l'enfant (pipefd[1])"
+description = """
+NSY103 — Capstone avancé combinant processus, signaux et descripteurs de fichiers. Implémentez un mini-strace qui simule le traçage d'appels système. Le programme fork un enfant qui exécute une séquence d'opérations (open, read, write, close), et le parent intercepte et journalise chaque opération en utilisant un système de hooks basé sur des macros.
+
+Pour la testabilité, les appels système sont wrappés par des fonctions qui loggent avant d'exécuter, simulant le comportement de ptrace.
+
+⚠ Cet exercice combine : fork(), pipe(), macros C, wrapping de syscalls, waitpid()."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "Les fonctions traced_* wrappent les vrais appels système et envoient le log via trace_fd (le pipe)",
+    "L'enfant écrit les traces dans pipefd[1], le parent lit depuis pipefd[0] — comme strace capture stderr",
+    'Le nom du syscall dans trace_log doit correspondre exactement : "open", "write", "read", "close"',
+]
+id = "capstone-strace-01"
+kc_ids = ["KC-CAP"]
+key_concept = "strace intercepte les appels système — ici simulé par wrapping des fonctions et communication parent-enfant via pipe"
+lang = "c"
+prerequisites = [
+    "pipe-01",
+    "process-state-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+static int trace_fd = -1;
+
+void trace_log(const char *syscall_name, const char *args, int ret) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "%s(%s) = %d\n",
+                       syscall_name, args, ret);
+    if (trace_fd >= 0)
+        write(trace_fd, buf, len);
+}
+
+int traced_open(const char *path, int flags, int mode) {
+    int ret = open(path, flags, mode);
+    char args[128];
+    snprintf(args, sizeof(args), "\"%s\", 0x%x, 0%o", path, flags, mode);
+    trace_log("open", args, ret);
+    return ret;
+}
+
+ssize_t traced_write(int fd, const void *buf, size_t count) {
+    ssize_t ret = write(fd, buf, count);
+    char args[128];
+    snprintf(args, sizeof(args), "%d, \"...\", %zu", fd, count);
+    trace_log("write", args, (int)ret);
+    return ret;
+}
+
+ssize_t traced_read(int fd, void *buf, size_t count) {
+    ssize_t ret = read(fd, buf, count);
+    char args[128];
+    snprintf(args, sizeof(args), "%d, buf, %zu", fd, count);
+    trace_log("read", args, (int)ret);
+    return ret;
+}
+
+int traced_close(int fd) {
+    int ret = close(fd);
+    char args[32];
+    snprintf(args, sizeof(args), "%d", fd);
+    trace_log("close", args, ret);
+    return ret;
+}
+
+void child_program(void) {
+    const char *testfile = "/tmp/kf_strace_test.txt";
+    int fd = traced_open(testfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *data = "Hello strace!";
+        traced_write(fd, data, strlen(data));
+        traced_close(fd);
+    }
+
+    fd = traced_open(testfile, O_RDONLY, 0);
+    if (fd >= 0) {
+        char buf[64];
+        ssize_t n = traced_read(fd, buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[child] lu: %s\n", buf);
+        }
+        traced_close(fd);
+    }
+    unlink(testfile);
+}
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[0]);
+        trace_fd = pipefd[1];
+        child_program();
+        close(trace_fd);
+        exit(0);
+    }
+
+    close(pipefd[1]);
+    int status;
+
+    printf("[strace] tracage demarre\n");
+
+    char buf[512];
+    ssize_t n;
+    while ((n = read(pipefd[0], buf, sizeof(buf) - 1)) > 0) {
+        buf[n] = '\0';
+        char *line = strtok(buf, "\n");
+        while (line) {
+            printf("[strace] %s\n", line);
+            line = strtok(NULL, "\n");
+        }
+    }
+
+    waitpid(pid, &status, 0);
+    close(pipefd[0]);
+    printf("[strace] processus termine, exit=%d\n", WEXITSTATUS(status));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+static int trace_fd = -1;
+
+void trace_log(const char *syscall_name, const char *args, int ret) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "%s(%s) = %d\n",
+                       syscall_name, args, ret);
+    if (trace_fd >= 0)
+        write(trace_fd, buf, len);
+}
+
+int traced_open(const char *path, int flags, int mode) {
+    int ret = open(path, flags, mode);
+    char args[128];
+    snprintf(args, sizeof(args), "\"%s\", 0x%x, 0%o", path, flags, mode);
+    trace_log("____", args, ret);
+    return ret;
+}
+
+ssize_t traced_write(int fd, const void *buf, size_t count) {
+    ssize_t ret = write(fd, buf, count);
+    char args[128];
+    snprintf(args, sizeof(args), "%d, \"...\", %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+
+ssize_t traced_read(int fd, void *buf, size_t count) {
+    ssize_t ret = read(fd, buf, count);
+    char args[128];
+    snprintf(args, sizeof(args), "%d, buf, %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+
+int traced_close(int fd) {
+    int ret = close(fd);
+    char args[32];
+    snprintf(args, sizeof(args), "%d", fd);
+    trace_log("____", args, ret);
+    return ret;
+}
+
+void child_program(void) {
+    const char *testfile = "/tmp/kf_strace_test.txt";
+    int fd = traced_open(testfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *data = "Hello strace!";
+        traced_write(fd, data, strlen(data));
+        traced_close(fd);
+    }
+
+    fd = traced_open(testfile, O_RDONLY, 0);
+    if (fd >= 0) {
+        char buf[64];
+        ssize_t n = traced_read(fd, buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[child] lu: %s\n", buf);
+        }
+        traced_close(fd);
+    }
+    unlink(testfile);
+}
+
+int main(void) {
+    int pipefd[2];
+    ____(pipefd);
+
+    pid_t pid = ____();
+    if (pid == 0) {
+        close(pipefd[____]);
+        trace_fd = pipefd[____];
+        child_program();
+        close(trace_fd);
+        exit(0);
+    }
+
+    close(pipefd[____]);
+    int status;
+
+    printf("[strace] tracage demarre\n");
+
+    char buf[512];
+    ssize_t n;
+    while ((n = read(pipefd[____], buf, sizeof(buf) - 1)) > 0) {
+        buf[n] = '\0';
+        char *line = strtok(buf, "\n");
+        while (line) {
+            printf("[strace] %s\n", line);
+            line = strtok(NULL, "\n");
+        }
+    }
+
+    waitpid(pid, &status, 0);
+    close(pipefd[0]);
+    printf("[strace] processus termine, exit=%d\n", WEXITSTATUS(status));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == EXEMPLE =======================================
+ * Logger d'appels de fonctions via wrapper
+ * Pattern: fonction wrapper qui log + appelle l'originale.
+ * ================================================= */
+static int log_fd_ex = -1;
+
+int logged_add(int a, int b) {
+    int ret = a + b;
+    char buf[64];
+    int len = snprintf(buf, sizeof(buf), "add(%d, %d) = %d\n", a, b, ret);
+    if (log_fd_ex >= 0) write(log_fd_ex, buf, len);
+    return ret;
+}
+
+void example_logger(void) {
+    int p[2]; pipe(p);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(p[0]); log_fd_ex = p[1];
+        logged_add(3, 4); logged_add(10, 20);
+        close(log_fd_ex); exit(0);
+    }
+    close(p[1]);
+    char buf[128]; ssize_t n;
+    while ((n = read(p[0], buf, sizeof(buf)-1)) > 0) { buf[n]='\0'; printf("%s", buf); }
+    wait(NULL); close(p[0]);
+}
+/* Resultat: add(3, 4) = 7 / add(10, 20) = 30 */
+
+int main(void) {
+    example_logger();
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+static int trace_fd = -1;
+
+void trace_log(const char *name, const char *args, int ret) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "%s(%s) = %d\n", name, args, ret);
+    if (trace_fd >= 0) write(trace_fd, buf, len);
+}
+
+int traced_open(const char *path, int flags, int mode) {
+    int ret = open(path, flags, mode);
+    char args[128]; snprintf(args, sizeof(args), "\"%s\", 0x%x, 0%o", path, flags, mode);
+    trace_log("____", args, ret);
+    return ret;
+}
+ssize_t traced_write(int fd, const void *buf, size_t count) {
+    ssize_t ret = write(fd, buf, count);
+    char args[128]; snprintf(args, sizeof(args), "%d, \"...\", %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+ssize_t traced_read(int fd, void *buf, size_t count) {
+    ssize_t ret = read(fd, buf, count);
+    char args[128]; snprintf(args, sizeof(args), "%d, buf, %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+int traced_close(int fd) {
+    int ret = close(fd);
+    char args[32]; snprintf(args, sizeof(args), "%d", fd);
+    trace_log("____", args, ret);
+    return ret;
+}
+
+void child_program(void) {
+    const char *f = "/tmp/kf_strace_test.txt";
+    int fd = traced_open(f, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd >= 0) { traced_write(fd, "Hello strace!", 13); traced_close(fd); }
+    fd = traced_open(f, O_RDONLY, 0);
+    if (fd >= 0) { char buf[64]; ssize_t n=traced_read(fd,buf,63); if(n>0){buf[n]='\0';printf("[child] lu: %s\n",buf);} traced_close(fd); }
+    unlink(f);
+}
+
+int main(void) {
+    int pipefd[2];
+    ____(pipefd);
+    pid_t pid = ____();
+    if (pid == 0) {
+        close(pipefd[____]);
+        trace_fd = pipefd[____];
+        child_program();
+        close(trace_fd);
+        exit(0);
+    }
+    close(pipefd[____]);
+    printf("[strace] tracage demarre\n");
+    char buf[512]; ssize_t n;
+    while ((n = read(pipefd[____], buf, sizeof(buf)-1)) > 0) {
+        buf[n]='\0'; char *line=strtok(buf,"\n");
+        while (line) { printf("[strace] %s\n", line); line=strtok(NULL,"\n"); }
+    }
+    int status; waitpid(pid, &status, 0); close(pipefd[0]);
+    printf("[strace] processus termine, exit=%d\n", WEXITSTATUS(status));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+static int trace_fd = -1;
+
+void trace_log(const char *name, const char *args, int ret) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "%s(%s) = %d\n", name, args, ret);
+    if (trace_fd >= 0) write(trace_fd, buf, len);
+}
+
+int traced_open(const char *path, int flags, int mode) {
+    int ret = open(path, flags, mode);
+    char args[128]; snprintf(args, sizeof(args), "\"%s\", 0x%x, 0%o", path, flags, mode);
+    trace_log("____", args, ret);
+    return ret;
+}
+ssize_t traced_write(int fd, const void *buf, size_t count) {
+    ssize_t ret = write(fd, buf, count);
+    char args[128]; snprintf(args, sizeof(args), "%d, \"...\", %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+ssize_t traced_read(int fd, void *buf, size_t count) {
+    ssize_t ret = read(fd, buf, count);
+    char args[128]; snprintf(args, sizeof(args), "%d, buf, %zu", fd, count);
+    trace_log("____", args, (int)ret);
+    return ret;
+}
+int traced_close(int fd) {
+    int ret = close(fd);
+    char args[32]; snprintf(args, sizeof(args), "%d", fd);
+    trace_log("____", args, ret);
+    return ret;
+}
+
+void child_program(void) {
+    const char *f = "/tmp/kf_strace_test.txt";
+    int fd = traced_open(f, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd >= 0) { traced_write(fd, "Hello strace!", 13); traced_close(fd); }
+    fd = traced_open(f, O_RDONLY, 0);
+    if (fd >= 0) { char buf[64]; ssize_t n=traced_read(fd,buf,63); if(n>0){buf[n]='\0';printf("[child] lu: %s\n",buf);} traced_close(fd); }
+    unlink(f);
+}
+
+int main(void) {
+    int pipefd[2];
+    ____(pipefd);
+    pid_t pid = ____();
+    if (pid == 0) {
+        close(pipefd[____]);
+        trace_fd = pipefd[____];
+        child_program();
+        close(trace_fd);
+        exit(0);
+    }
+    close(pipefd[____]);
+    printf("[strace] tracage demarre\n");
+    char buf[512]; ssize_t n;
+    while ((n = read(pipefd[____], buf, sizeof(buf)-1)) > 0) {
+        buf[n]='\0'; char *line=strtok(buf,"\n");
+        while (line) { printf("[strace] %s\n", line); line=strtok(NULL,"\n"); }
+    }
+    int status; waitpid(pid, &status, 0); close(pipefd[0]);
+    printf("[strace] processus termine, exit=%d\n", WEXITSTATUS(status));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+// Mini-strace: traceur d'appels systeme
+// trace_log: ecrit "syscall(args) = ret" dans trace_fd
+// traced_open/write/read/close: wrappers qui log + appellent le vrai syscall
+// child_program: sequence open/write/close + open/read/close sur un fichier
+// main: pipe, fork, enfant=traced program, parent=lit et affiche traces
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "capstones"
+title = "Mini-strace : traceur d'appels système"
+
+[validation]
+expected_output = 'REGEX:(?s)\[strace\] tracage demarre.*write\(\d+, .*, 13\) = 13.*close\(\d+\) = 0.*read\(\d+, .*, 63\) = 13.*close\(\d+\) = 0.*\[strace\] processus termine, exit=0'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "L'enfant exécute le programme avec des syscalls wrappés. Les logs sont envoyés au parent via un pipe."
+heap = []
+label = "Architecture du traceur"
+step_label = "fork+pipe"
+
+[[visualizer.steps.arrows]]
+from = "child (programme)"
+label = "traces via pipe"
+to = "parent (strace)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "parent (strace)"
+value = "lit pipefd[0]"
+
+[[visualizer.steps.stack]]
+name = "child (programme)"
+value = "écrit pipefd[1]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "traced_open appelle le vrai open(), puis envoie le log (nom, args, retour) via trace_fd."
+heap = []
+label = "Wrapping d'un appel système"
+step_label = "wrapper"
+
+[[visualizer.steps.call_frames]]
+args = "path, flags, mode"
+function_name = "traced_open"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "traced_open"
+value = "wrapper"
+
+[[visualizer.steps.stack]]
+name = "open()"
+value = "vrai syscall"
+
+[[visualizer.steps.stack]]
+name = "trace_log()"
+value = "log via pipe"

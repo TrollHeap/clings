@@ -1,0 +1,107 @@
+common_mistake = "Retourner `p` (l'adresse) au lieu de `*p` (la valeur) dans deref_int — ou confondre `p++` (modifie p) et `(*p)++` (modifie la valeur pointée)"
+description = """
+Implémentez trois fonctions de manipulation de pointeurs validées par des tests unitaires Unity.
+
+- `deref_int(int *p)` : retourne la valeur pointée par `p`
+- `sum_array_ptr(int *arr, int n)` : retourne la somme des n éléments en utilisant uniquement l'arithmétique de pointeurs (pas d'accès par index)
+- `swap_int(int *a, int *b)` : échange les valeurs aux adresses `a` et `b`
+
+Les tests compilent votre code et vérifient chaque fonction indépendamment."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Pour `deref_int` : l'opérateur `*` déréférence — `*p` lit la valeur à l'adresse contenue dans `p`.",
+    "Pour `sum_array_ptr` : utilisez `for (int *p = arr; p < arr + n; p++)` et accumulez `*p` — pas d'index `i`.",
+    "Pour `swap_int` : utilisez une variable temporaire `int tmp = *a; *a = *b; *b = tmp;`.",
+]
+id = "ptr-test-unity-01"
+kc_ids = ["KC-PTR"]
+key_concept = "Un pointeur est une adresse mémoire — `*p` déréférence (lit/écrit la valeur), `p+i` avance de i×sizeof(*p) octets, `&x` prend l'adresse de x"
+lang = "c"
+solution_code = """
+#include <stdio.h>
+
+int deref_int(int *p) {
+    return *p;
+}
+
+int sum_array_ptr(int *arr, int n) {
+    int sum = 0;
+    for (int *p = arr; p < arr + n; p++) {
+        sum += *p;
+    }
+    return sum;
+}
+
+void swap_int(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+"""
+starter_code = """
+#include <stdio.h>
+
+/* Retourne la valeur pointée par p. */
+int deref_int(int *p) {
+    /* TODO */
+    return 0;
+}
+
+/* Retourne la somme des n entiers pointés par arr
+ * en utilisant uniquement l'arithmétique de pointeurs (p++, pas arr[i]). */
+int sum_array_ptr(int *arr, int n) {
+    /* TODO */
+    return 0;
+}
+
+/* Échange les valeurs aux adresses a et b. */
+void swap_int(int *a, int *b) {
+    /* TODO */
+}
+"""
+subject = "pointers"
+title = "Opérations fondamentales sur les pointeurs — tests Unity"
+
+[validation]
+mode = "test"
+test_code = """
+void test_deref_int(void) {
+    int x = 42;
+    TEST_ASSERT_EQUAL_INT(42, deref_int(&x));
+    x = -7;
+    TEST_ASSERT_EQUAL_INT(-7, deref_int(&x));
+    int zero = 0;
+    TEST_ASSERT_EQUAL_INT(0, deref_int(&zero));
+}
+
+void test_sum_array_ptr(void) {
+    int arr1[] = {1, 2, 3, 4, 5};
+    TEST_ASSERT_EQUAL_INT(15, sum_array_ptr(arr1, 5));
+    int arr2[] = {0};
+    TEST_ASSERT_EQUAL_INT(0, sum_array_ptr(arr2, 1));
+    int arr3[] = {-3, 7};
+    TEST_ASSERT_EQUAL_INT(4, sum_array_ptr(arr3, 2));
+    int arr4[] = {10, -10};
+    TEST_ASSERT_EQUAL_INT(0, sum_array_ptr(arr4, 2));
+}
+
+void test_swap_int(void) {
+    int a = 10, b = 20;
+    swap_int(&a, &b);
+    TEST_ASSERT_EQUAL_INT(20, a);
+    TEST_ASSERT_EQUAL_INT(10, b);
+    int x = 0, y = 0;
+    swap_int(&x, &y);
+    TEST_ASSERT_EQUAL_INT(0, x);
+    TEST_ASSERT_EQUAL_INT(0, y);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_deref_int);
+    RUN_TEST(test_sum_array_ptr);
+    RUN_TEST(test_swap_int);
+    return UNITY_END();
+}
+"""

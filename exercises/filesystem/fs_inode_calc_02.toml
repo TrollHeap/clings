@@ -1,0 +1,254 @@
+common_mistake = "Utiliser la taille de fichier au lieu du nombre de blocs restants pour calculer les blocs d'indirection"
+description = """
+NSY103/UTC502 — Même structure que les annales UTC502 1ère session 2021-2022 (Ex.1).
+
+Paramètres :
+- Taille de bloc : 512 octets
+- Numéro de bloc (pointeur) : 4 octets
+- Fichier de 2 Mo (2 × 1024 × 1024 = 2 097 152 octets)
+
+Calculez :
+1. Nombre de blocs de données : file_size / block_size = 4096
+2. Entrées dans un bloc d'adresses : block_size / ptr_size = 128
+3. Blocs directs utilisés : 12 (tous remplis)
+4. Blocs restants après directs : 4096 - 12 = 4084
+5. Blocs d'indirection simple nécessaires : ceil(4084 / 128) = 32
+
+Réponse exacte de l'annale UTC502 2021-2022 : blocs=4096, entrées=128, indirects=32."""
+difficulty = 3
+exercise_type = "fill_blank"
+files = []
+hints = [
+    "data_blocks = FILE_SIZE / BLOCK_SIZE = 2097152 / 512 = 4096 ; entries_per_block = BLOCK_SIZE / PTR_SIZE = 512 / 4 = 128",
+    "Les 12 blocs directs couvrent les 12 premiers blocs ; remaining = data_blocks - DIRECT_BLOCKS = 4096 - 12 = 4084",
+    "Nombre de blocs I1 = ceil(remaining / entries_per_block) = ceil(4084 / 128) = 32 (formule entière : (remaining + entries_per_block - 1) / entries_per_block)",
+]
+id = "fs-inode-calc-02"
+kc_ids = ["KC-C5"]
+key_concept = "Avec blocs de 512 B et pointeurs 4 B : 128 entrées/bloc indirect ; un fichier 2 Mo nécessite 32 blocs d'indirection simple"
+lang = "c"
+prerequisites = [
+    "fs-inode-01",
+    "fs-inode-calc-01",
+]
+solution_code = '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int data_blocks       = FILE_SIZE / BLOCK_SIZE;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    int remaining         = data_blocks - DIRECT_BLOCKS;
+    /* ceil(remaining / entries_per_block) */
+    int i1_blocks         = (remaining + entries_per_block - 1) / entries_per_block;
+
+    printf("Blocs de données: %d\n", data_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs restants après directs: %d\n", remaining);
+    printf("Blocs d'indirection simple: %d\n", i1_blocks);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int data_blocks       = ____;
+    int entries_per_block = ____;
+    int remaining         = ____;
+    /* ceil(remaining / entries_per_block) */
+    int i1_blocks         = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs de données: %d\n", data_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs restants après directs: %d\n", remaining);
+    printf("Blocs d'indirection simple: %d\n", i1_blocks);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == RAPPEL =================================================
+ * Annale UTC502 1ère session 2021-2022, Exercice 1
+ *
+ * Avec BLOCK_SIZE=512, PTR_SIZE=4, FILE_SIZE=2Mo :
+ *   data_blocks       = 2097152 / 512  = 4096
+ *   entries_per_block = 512 / 4        = 128
+ *   remaining         = 4096 - 12      = 4084
+ *   i1_blocks         = ceil(4084/128) = 32
+ *
+ * Formule plafond entier : ceil(a/b) = (a + b - 1) / b
+ * =========================================================== */
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int data_blocks       = FILE_SIZE / BLOCK_SIZE;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    int remaining         = data_blocks - DIRECT_BLOCKS;
+    int i1_blocks         = (remaining + entries_per_block - 1) / entries_per_block;
+
+    printf("Blocs de données: %d\n", data_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs restants après directs: %d\n", remaining);
+    printf("Blocs d'indirection simple: %d\n", i1_blocks);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int data_blocks       = FILE_SIZE / BLOCK_SIZE;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    /* blocs non couverts par les 12 pointeurs directs */
+    int remaining         = data_blocks - ____;
+    int i1_blocks         = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs de données: %d\n", data_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs restants après directs: %d\n", remaining);
+    printf("Blocs d'indirection simple: %d\n", i1_blocks);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int data_blocks       = ____;
+    int entries_per_block = ____;
+    int remaining         = ____;
+    int i1_blocks         = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs de données: %d\n", data_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs restants après directs: %d\n", remaining);
+    printf("Blocs d'indirection simple: %d\n", i1_blocks);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+#define BLOCK_SIZE    512
+#define PTR_SIZE      4
+#define FILE_SIZE     (2 * 1024 * 1024)
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    // data_blocks       = FILE_SIZE / BLOCK_SIZE
+    // entries_per_block = BLOCK_SIZE / PTR_SIZE
+    // remaining         = data_blocks - DIRECT_BLOCKS
+    // i1_blocks         = ceil(remaining / entries_per_block)
+    //                   = (remaining + entries_per_block - 1) / entries_per_block
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Inode : indirection simple pour un fichier 2 Mo (blocs 512 B, ptr 4 B)"
+
+[validation]
+expected_output = """
+Blocs de données: 4096
+Entrées par bloc indirect: 128
+Blocs restants après directs: 4084
+Blocs d'indirection simple: 32
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Paramètres de l'annale UTC502 1ère session 2021-2022, exercice 1"
+label = "Étape 1 — Paramètres du problème (annale UTC502 2021-2022)"
+step_label = "Étape 1"
+
+[[visualizer.steps.stack]]
+name = "BLOCK_SIZE"
+value = "512 octets"
+
+[[visualizer.steps.stack]]
+name = "PTR_SIZE"
+value = "4 octets"
+
+[[visualizer.steps.stack]]
+name = "FILE_SIZE"
+value = "2 × 1024 × 1024 = 2 097 152 octets"
+
+[[visualizer.steps.stack]]
+name = "DIRECT_BLOCKS"
+value = "12"
+
+[[visualizer.steps]]
+explanation = "Avec PTR_SIZE=4 (uint32), un bloc de 512 o contient seulement 128 pointeurs"
+label = "Étape 2 — Nombre de blocs de données et entrées par bloc"
+step_label = "Étape 2"
+
+[[visualizer.steps.stack]]
+name = "data_blocks"
+value = "2097152 / 512 = 4096 blocs"
+
+[[visualizer.steps.stack]]
+name = "entries_per_block"
+value = "512 / 4 = 128 entrées/bloc"
+
+[[visualizer.steps]]
+explanation = "Les 12 blocs directs couvrent 12 × 512 = 6 Ko ; 4084 blocs restent à adresser via I1"
+label = "Étape 3 — Blocs restants après les 12 directs"
+step_label = "Étape 3"
+
+[[visualizer.steps.stack]]
+name = "data_blocks"
+value = "4096 blocs totaux"
+
+[[visualizer.steps.stack]]
+name = "DIRECT_BLOCKS"
+value = "12 blocs couverts directement"
+
+[[visualizer.steps.stack]]
+name = "remaining"
+value = "4096 - 12 = 4084 blocs restants"
+
+[[visualizer.steps]]
+explanation = "ceil(a/b) en entier : (a + b - 1) / b = (4084 + 127) / 128 = 32"
+label = "Étape 4 — Blocs d'indirection simple nécessaires"
+step_label = "Étape 4"
+
+[[visualizer.steps.stack]]
+name = "remaining"
+value = "4084 blocs à couvrir"
+
+[[visualizer.steps.stack]]
+name = "entries_per_block"
+value = "128 entrées par bloc I1"
+
+[[visualizer.steps.stack]]
+name = "i1_blocks"
+value = "ceil(4084 / 128) = 32 blocs I1"

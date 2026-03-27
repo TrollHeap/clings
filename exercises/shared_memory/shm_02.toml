@@ -1,0 +1,229 @@
+common_mistake = "Utiliser malloc pour une struct partagée → champs non initialisés peuvent causer des bugs intermittents"
+description = """
+NSY103 — calloc(n, size) alloue et initialise à zéro — utile pour les structures partagées car évite les valeurs garbage. Contrairement à malloc, calloc garantit counter=0, flag=0 à l'initialisation.
+
+Allouez une struct Shared avec calloc, vérifiez les valeurs nulles, puis modifiez counter=7 et flag=1.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "calloc(1, sizeof(Shared)) : alloue 1 élément de taille Shared, zéro-initialisé",
+    "shm->flag accède au champ flag via le pointeur",
+    "calloc = malloc + memset(0) — garantit que counter=0 et flag=0",
+]
+id = "shm-02"
+kc_ids = ["KC-C13"]
+key_concept = "calloc vs malloc : calloc zero-initialise → pas de garbage en mémoire partagée ; mmap(MAP_ANONYMOUS) est aussi zero-init"
+lang = "c"
+prerequisites = ["shm-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int counter;
+    int flag;
+} Shared;
+
+int main(void) {
+    Shared *shm = (Shared *)calloc(1, sizeof(Shared));
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    shm->counter = 7;
+    shm->flag = 1;
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    free(shm);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int counter; int flag; } Shared;
+
+int main(void) {
+    Shared *shm = (Shared *)____(1, sizeof(Shared));  // zero-init
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    shm->counter = 7;
+    shm->____ = 1;                                    // champ booléen
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    free(shm);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int counter; int flag; } Shared;
+
+/* == EXEMPLE ===============================================
+ * calloc zero-init : struct Stats avec reads et writes
+ * calloc garantit que tous les champs valent 0 au demarrage.
+ * ========================================================= */
+typedef struct { int reads; int writes; } Stats;
+
+void example_calloc_stats(void) {
+    Stats *st = (Stats *)calloc(1, sizeof(Stats));
+    printf("reads=%d writes=%d\n", st->reads, st->writes);
+    st->reads = 15;
+    st->writes = 3;
+    printf("reads=%d writes=%d\n", st->reads, st->writes);
+    free(st);
+}
+/* Resultat: reads=0 writes=0 puis reads=15 writes=3 */
+
+/* == VOTRE EXERCICE ========================================
+ * Memoire partagee : calloc zero-init + multiple champs
+ * Inspirez-vous de example_calloc_stats ci-dessus.
+ * Allouez Shared avec calloc, verifiez 0, modifiez counter=7 flag=1.
+ * ========================================================= */
+
+int main(void) {
+    Shared *shm = (Shared *)calloc(1, sizeof(Shared));
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    /* TODO: shm->counter = 7 */
+    /* TODO: shm->flag = 1 */
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    free(shm);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int counter; int flag; } Shared;
+
+int main(void) {
+    Shared *shm = (Shared *)____((1), sizeof(Shared));
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    shm->counter = 7;
+    shm->____ = 1;
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    ____(shm);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int counter; int flag; } Shared;
+
+int main(void) {
+    Shared *shm = (Shared *)____(1, sizeof(Shared));  // zero-init
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    shm->counter = 7;
+    shm->____ = 1;                                    // champ booléen
+    printf("counter=%d flag=%d\n", shm->counter, shm->flag);
+    free(shm);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { int counter; int flag; } Shared;
+
+int main(void) {
+    // Allouez Shared avec calloc (zero-init)
+    // Affichez counter et flag (doivent valoir 0)
+    // Modifiez counter=7 et flag=1
+    // Affichez à nouveau
+    // Libérez la mémoire
+    // Sortie attendue: "counter=0 flag=0\ncounter=7 flag=1\n"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Mémoire partagée : calloc zero-init + multiple champs"
+
+[mission]
+clientId = "nordcloud"
+clientName = "NordCloud"
+contactEmail = "arch@nordcloud.sys"
+failureEmail = """
+La zéro-initialisation n'est pas correcte. Utilise calloc (pas malloc) pour garantir counter=0 et flag=0 à l'initialisation.
+
+Arch @ NordCloud"""
+incidentEmail = """
+Architecte,
+
+Notre mémoire partagée doit être garantie zéro-initialisée au démarrage pour éviter les garbage values entre processus.
+
+Utilisez calloc(1, sizeof(Shared)) pour simuler mmap(MAP_ANONYMOUS). Vérifiez counter=0 flag=0, puis modifiez counter=7 flag=1.
+
+Arch @ NordCloud"""
+payout = 280
+prereqMissionIds = ["shm-01"]
+receivedTime = "09:20"
+subject = "Mémoire partagée zero-init — calloc pour struct Shared"
+successEmail = """
+Zéro-init confirmé. counter=0 flag=0 puis counter=7 flag=1 — calloc garantit l'absence de garbage en mémoire partagée.
+
+NordCloud Architecture"""
+syscallsInvolved = [
+    "shmget",
+    "shmat",
+    "shmdt",
+    "shmctl",
+    "mmap",
+]
+tier = 3
+
+[validation]
+expected_output = """
+counter=0 flag=0
+counter=7 flag=1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+label = "calloc(1, sizeof(Shared)) — zero-init"
+
+[[visualizer.steps.arrows]]
+from = "shm (Shared*)"
+to = "Shared"
+
+[[visualizer.steps.heap]]
+address = "0x1000"
+name = "Shared"
+value = "counter=0 flag=0"
+
+[[visualizer.steps.stack]]
+name = "shm (Shared*)"
+value = "0xHEAP"
+
+[[visualizer.steps]]
+label = "shm->counter=7 ; shm->flag=1"
+
+[[visualizer.steps.arrows]]
+from = "shm (Shared*)"
+to = "Shared"
+
+[[visualizer.steps.heap]]
+address = "0x1000"
+name = "Shared"
+value = "counter=7 flag=1"
+
+[[visualizer.steps.stack]]
+name = "shm (Shared*)"
+value = "0xHEAP"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "free(shm) — libération"
+
+[[visualizer.steps.stack]]
+name = "shm (Shared*)"
+value = "dangling"

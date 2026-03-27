@@ -1,0 +1,140 @@
+common_mistake = "Oublier de vérifier que malloc/realloc ne retourne pas NULL, ou réutiliser l'ancien pointeur après realloc (double-free / use-after-free si realloc déplace le bloc)."
+description = """
+Implémentez trois fonctions :
+- `int *alloc_ints(int n)` — alloue un tableau de `n` entiers initialisés à zéro et le retourne (NULL si n ≤ 0).
+- `int *grow_ints(int *arr, int old_n, int new_n)` — agrandit le tableau via `realloc` et initialise les nouvelles cases à zéro.
+- `void free_ints(int *arr)` — libère la mémoire."""
+difficulty = 2
+exercise_type = "complete"
+files = []
+hints = [
+    "Utilisez `malloc(n * sizeof(int))` puis `memset` pour initialiser à zéro, ou `calloc(n, sizeof(int))` directement.",
+    "Pour grow_ints : `realloc` peut déplacer le bloc — utilisez le pointeur retourné, pas l'ancien. Initialisez les cases `[old_n, new_n)` avec `memset`.",
+    "free_ints appelle simplement `free(arr)` — passer NULL à free est valide en C.",
+]
+id = "mem-test-01"
+kc_ids = [
+    "malloc",
+    "realloc",
+    "free",
+    "memset",
+]
+key_concept = "`malloc` alloue de la mémoire non initialisée ; `calloc` ou `memset` l'initialise à zéro. `realloc` peut déplacer le bloc : toujours utiliser le pointeur retourné."
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int *alloc_ints(int n) {
+    if (n <= 0) return NULL;
+    int *arr = malloc((size_t)n * sizeof(int));
+    if (arr) memset(arr, 0, (size_t)n * sizeof(int));
+    return arr;
+}
+
+int *grow_ints(int *arr, int old_n, int new_n) {
+    int *new_arr = realloc(arr, (size_t)new_n * sizeof(int));
+    if (!new_arr) return NULL;
+    if (new_n > old_n)
+        memset(new_arr + old_n, 0, (size_t)(new_n - old_n) * sizeof(int));
+    return new_arr;
+}
+
+void free_ints(int *arr) {
+    free(arr);
+}
+
+int main(void) {
+    {
+        int *arr = alloc_ints(5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        free_ints(arr);
+    }
+    {
+        int *arr = alloc_ints(4);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[3]));
+        free_ints(arr);
+    }
+    {
+        printf("%d\n", (alloc_ints(0)) == NULL ? 1 : 0);
+        printf("%d\n", (alloc_ints(-1)) == NULL ? 1 : 0);
+    }
+    {
+        int *arr = alloc_ints(3);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 10; arr[1] = 20; arr[2] = 30;
+        arr = grow_ints(arr, 3, 6);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        printf("%d\n", (int)(arr[0]));
+        printf("%d\n", (int)(arr[1]));
+        printf("%d\n", (int)(arr[2]));
+        free_ints(arr);
+    }
+    {
+        int *arr = alloc_ints(2);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        arr[0] = 1; arr[1] = 2;
+        arr = grow_ints(arr, 2, 5);
+        printf("%d\n", (arr) != NULL ? 1 : 0);
+        printf("%d\n", (int)(arr[2]));
+        printf("%d\n", (int)(arr[3]));
+        printf("%d\n", (int)(arr[4]));
+        free_ints(arr);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Alloue n entiers initialisés à 0. Retourne NULL si n <= 0. */
+int *alloc_ints(int n) {
+    /* TODO */
+    return NULL;
+}
+
+/* Agrandit arr de old_n à new_n éléments.
+ * Les nouvelles cases sont initialisées à 0. */
+int *grow_ints(int *arr, int old_n, int new_n) {
+    /* TODO */
+    return NULL;
+}
+
+/* Libère la mémoire allouée par alloc_ints / grow_ints. */
+void free_ints(int *arr) {
+    /* TODO */
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+subject = "memory_allocation"
+title = "malloc / realloc / free — tableau dynamique"
+
+[validation]
+expected_output = """
+1
+1
+0
+0
+1
+1
+1
+1
+10
+20
+30
+1
+1
+0
+0
+0"""
+mode = "output"

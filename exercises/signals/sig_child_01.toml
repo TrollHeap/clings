@@ -1,0 +1,277 @@
+common_mistake = "Un seul waitpid par handler — si 2 enfants meurent simultanément, un seul SIGCHLD est délivré"
+description = """
+NSY103 — Quand un processus enfant se termine, le noyau envoie SIGCHLD au parent. Installer un handler SIGCHLD permet de récolter les enfants sans bloquer sur waitpid(). Avec WNOHANG, waitpid retourne immédiatement si aucun enfant n'est terminé.
+
+Créez 3 enfants et récoltez-les via un handler SIGCHLD."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "WNOHANG fait que waitpid retourne 0 immédiatement si aucun enfant n'est terminé",
+    "La boucle while(waitpid(..., WNOHANG) > 0) récolte tous les enfants terminés",
+    "SA_RESTART relance automatiquement les appels système interrompus par le signal",
+]
+id = "sig-child-01"
+kc_ids = ["KC-C08"]
+key_concept = "SIGCHLD + waitpid(WNOHANG) dans une boucle récolte tous les zombies sans bloquer"
+lang = "c"
+prerequisites = ["sig-alarm-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+volatile sig_atomic_t child_done = 0;
+
+void sigchld_handler(int sig) {
+    (void)sig;
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        child_done++;
+    }
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigchld_handler;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGCHLD, &sa, NULL);
+    printf("SIGCHLD handler installed\n");
+
+    /* Creer 3 enfants */
+    for (int i = 0; i < 3; i++) {
+        pid_t p = fork();
+        if (p == 0) {
+            _exit(i);
+        }
+    }
+
+    /* Attendre que tous soient recoltes */
+    while (child_done < 3) {
+        usleep(1000);
+    }
+
+    printf("Children reaped: %d\n", child_done);
+    printf("No zombies left\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+volatile sig_atomic_t child_done = 0;
+
+void sigchld_handler(int sig) {
+    (void)sig;
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, ____)) > 0) {
+        child_done++;
+    }
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    ____(SIGCHLD, &sa, NULL);
+    printf("SIGCHLD handler installed\n");
+
+    /* Creer 3 enfants */
+    for (int i = 0; i < 3; i++) {
+        pid_t p = fork();
+        if (p == 0) {
+            _exit(i);
+        }
+    }
+
+    /* Attendre que tous soient recoltes */
+    while (child_done < 3) {
+        usleep(1000);
+    }
+
+    printf("Children reaped: %d\n", child_done);
+    printf("No zombies left\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * SIGCHLD simple avec un seul enfant
+ * ================================================= */
+volatile sig_atomic_t ex_done = 0;
+void ex_handler(int s) { (void)s; wait(NULL); ex_done = 1; }
+void example_sigchld(void) {
+    struct sigaction sa = {.sa_handler = ex_handler, .sa_flags = SA_RESTART};
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGCHLD, &sa, NULL);
+    if (fork() == 0) _exit(0);
+    while (!ex_done) usleep(1000);
+    printf("example: child reaped\n");
+}
+
+/* == VOTRE EXERCICE ================================
+ * 3 enfants, récolte via SIGCHLD + boucle WNOHANG
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+volatile sig_atomic_t child_done = 0;
+void sigchld_handler(int sig) {
+    (void)sig;
+    int status; pid_t pid;
+    while ((pid = waitpid(-1, &status, ____)) > 0) child_done++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sa.sa_flags = ____;
+    sigemptyset(&sa.sa_mask);
+    ____(SIGCHLD, &sa, NULL);
+    printf("SIGCHLD handler installed\n");
+    for (int i = 0; i < 3; i++) { pid_t p = fork(); if (p == 0) _exit(i); }
+    while (child_done < 3) usleep(1000);
+    printf("Children reaped: %d\n", child_done);
+    printf("No zombies left\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+volatile sig_atomic_t child_done = 0;
+void sigchld_handler(int sig) {
+    (void)sig;
+    int status; pid_t pid;
+    while ((pid = waitpid(-1, &status, ____)) > 0) child_done++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    ____(SIGCHLD, &sa, NULL);
+    printf("SIGCHLD handler installed\n");
+    for (int i = 0; i < 3; i++) { pid_t p = fork(); if (p == 0) _exit(i); }
+    while (child_done < 3) usleep(1000);
+    printf("Children reaped: %d\n", child_done);
+    printf("No zombies left\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+// handler SIGCHLD: boucle waitpid(-1, WNOHANG)
+// main: sigaction, fork 3 enfants _exit(i)
+// attendre child_done >= 3
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "SIGCHLD et waitpid"
+
+[validation]
+expected_output = """
+SIGCHLD handler installed
+Children reaped: 3
+No zombies left
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque enfant termine immédiatement — le noyau envoie SIGCHLD au parent"
+heap = []
+label = "3 enfants créés, _exit() immédiat"
+step_label = "fork x3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "enfant 0"
+value = "_exit(0)"
+
+[[visualizer.steps.stack]]
+name = "enfant 1"
+value = "_exit(1)"
+
+[[visualizer.steps.stack]]
+name = "enfant 2"
+value = "_exit(2)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Un seul SIGCHLD peut signaler plusieurs enfants — la boucle waitpid les récolte tous"
+heap = []
+label = "SIGCHLD déclenche le handler"
+step_label = "SIGCHLD"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "SIGCHLD"
+function_name = "sigchld_handler"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "waitpid(-1, WNOHANG)"
+value = "récolte tous les terminés"
+
+[[visualizer.steps.stack]]
+name = "child_done"
+value = "0 → 3"

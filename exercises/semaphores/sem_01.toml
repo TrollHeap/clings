@@ -1,0 +1,253 @@
+common_mistake = "Oublier sem_destroy : les sémaphores non nommés doivent être détruits pour libérer les ressources"
+description = """
+NSY103 — Un sémaphore est un compteur entier ≥ 0. sem_wait() décrémente (bloque si 0), sem_post() incrémente. sem_init(s, pshared, valeur) initialise avec une valeur initiale.
+
+Créez un sémaphore de valeur 3, effectuez un wait (−1) puis un post (+1), affichez la valeur à chaque étape.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "sem_init(&s, 0, 3) — 0=non partagé entre processus, valeur initiale=3",
+    "sem_wait(&s) décrémente le compteur (−1)",
+    "sem_post(&s) incrémente le compteur (+1)",
+]
+id = "sem-01"
+kc_ids = ["KC-C11"]
+key_concept = "sem_wait bloque si compteur=0 ; sem_post réveille un thread en attente"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+int main(void) {
+    sem_t s;
+    sem_init(&s, 0, 3);
+    int val;
+    sem_getvalue(&s, &val);
+    printf("Initial: %d\n", val);
+    sem_wait(&s);
+    sem_getvalue(&s, &val);
+    printf("After wait: %d\n", val);
+    sem_post(&s);
+    sem_getvalue(&s, &val);
+    printf("After post: %d\n", val);
+    sem_destroy(&s);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t s;
+    sem_init(&s, 0, ____);
+    int val;
+    sem_getvalue(&s, &val);
+    printf("Initial: %d\n", val);
+    ____(&s);
+    sem_getvalue(&s, &val);
+    printf("After wait: %d\n", val);
+    ____(&s);
+    sem_getvalue(&s, &val);
+    printf("After post: %d\n", val);
+    sem_destroy(&s);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+/* == EXEMPLE ===============================================
+ * Semaphore : init a 5, deux waits, un post
+ * sem_wait decremente, sem_post incremente.
+ * ========================================================= */
+void example_sem_ops(void) {
+    sem_t demo;
+    sem_init(&demo, 0, 5);
+    int v;
+    sem_getvalue(&demo, &v);
+    printf("demo init: %d\n", v);
+    sem_wait(&demo);
+    sem_wait(&demo);
+    sem_getvalue(&demo, &v);
+    printf("after 2 waits: %d\n", v);
+    sem_post(&demo);
+    sem_getvalue(&demo, &v);
+    printf("after 1 post: %d\n", v);
+    sem_destroy(&demo);
+}
+/* Resultat: demo init: 5, after 2 waits: 3, after 1 post: 4 */
+
+/* == VOTRE EXERCICE ========================================
+ * Semaphore non nomme : init, wait, post, getvalue
+ * Inspirez-vous de example_sem_ops ci-dessus.
+ * Init a 3, un wait (-1), un post (+1).
+ * ========================================================= */
+
+int main(void) {
+    sem_t s;
+    /* TODO: sem_init(&s, 0, 3) */
+    int val;
+    sem_getvalue(&s, &val);
+    printf("Initial: %d\n", val);
+    /* TODO: sem_wait */
+    sem_getvalue(&s, &val);
+    printf("After wait: %d\n", val);
+    /* TODO: sem_post */
+    sem_getvalue(&s, &val);
+    printf("After post: %d\n", val);
+    sem_destroy(&s);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t s;
+    sem_init(&s, 0, 3);
+    int val;
+    sem_getvalue(&s, &val);
+    printf("Initial: %d\n", val);
+    sem_wait(&s);
+    sem_getvalue(&s, &val);
+    printf("After wait: %d\n", val);
+    ____(&s);  // incrémenter le compteur
+    sem_getvalue(&s, &val);
+    printf("After post: %d\n", val);
+    sem_destroy(&s);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t s;
+    sem_init(&s, 0, ____);
+    int val;
+    sem_getvalue(&s, &val);
+    printf("Initial: %d\n", val);
+    ____(&s);
+    sem_getvalue(&s, &val);
+    printf("After wait: %d\n", val);
+    ____(&s);
+    sem_getvalue(&s, &val);
+    printf("After post: %d\n", val);
+    sem_destroy(&s);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t s;
+    // Initialisez s à 3, affichez la valeur
+    // Effectuez un wait (−1), affichez
+    // Effectuez un post (+1), affichez
+    // Sortie attendue: "Initial: 3", "After wait: 2", "After post: 3"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Sémaphore non nommé : init, wait, post, getvalue"
+
+[mission]
+clientId = "hobbylab"
+clientName = "HobbyLab"
+contactEmail = "dave@hobbylab.sys"
+failureEmail = """
+La valeur du sémaphore n'est pas correcte. Vérifie sem_init avec la bonne valeur initiale et que sem_post incrémente bien.
+
+Dave"""
+incidentEmail = """
+Salut,
+
+J'ai besoin de comprendre les sémaphores POSIX non nommés. Montre-moi sem_init, sem_wait et sem_post avec une valeur initiale qui contrôle combien de threads peuvent entrer simultanément.
+
+Dave @ HobbyLab"""
+payout = 100
+prereqMissionIds = []
+receivedTime = "08:25"
+subject = "Sémaphore POSIX — contrôle accès section critique"
+successEmail = """
+Super, je comprends maintenant le cycle init/wait/post/destroy. La valeur initiale contrôle le nombre de passages simultanés.
+
+Dave"""
+syscallsInvolved = [
+    "sem_init",
+    "sem_wait",
+    "sem_post",
+    "sem_getvalue",
+    "sem_destroy",
+]
+tier = 1
+
+[validation]
+expected_output = """
+Initial: 3
+After wait: 2
+After post: 3
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_init initialise le sémaphore avec pshared=0 (intra-processus) et valeur=3. Cela signifie que 3 sem_wait() peuvent réussir sans blocage avant d'épuiser le compteur."
+heap = []
+label = "sem_init(&s, 0, 3) — compteur = 3"
+step_label = "sem_init(&s, 0, 3) — compteur = 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s (sem_t)"
+value = "count=3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_wait décrémente le compteur de 1 : 3→2. Si le compteur était 0, le thread serait bloqué jusqu'à un sem_post d'un autre thread ou d'un signal."
+heap = []
+label = "sem_wait(&s) — compteur − 1 = 2"
+step_label = "sem_wait(&s) — compteur − 1 = 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s (sem_t)"
+value = "count=2"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_post incrémente le compteur : 2→3. Si un thread était bloqué en sem_wait, il serait réveillé ici. sem_post peut être appelé depuis n'importe quel thread — contrairement à un mutex."
+heap = []
+label = "sem_post(&s) — compteur + 1 = 3"
+step_label = "sem_post(&s) — compteur + 1 = 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s (sem_t)"
+value = "count=3"

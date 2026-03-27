@@ -1,0 +1,253 @@
+common_mistake = "Faire plus de sem_post que de sem_wait -> la valeur depasse N (fuite de ressources logique)"
+description = """
+NSY103 — Un semaphore compteur (valeur > 1) modelise un pool de N ressources identiques. Chaque sem_wait() acquiert une ressource, chaque sem_post() la relache. Quand toutes les ressources sont prises (valeur=0), les processus suivants bloquent.
+
+Creez un semaphore compteur initialise a 2 (pool de 2 slots). 4 enfants sequentiels tentent d'acquerir un slot : les 2 premiers reussissent (valeur decremente), puis ils relachent. Affichez la valeur a chaque etape."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Valeur initiale 2 = pool de 2 ressources disponibles",
+    "sem_wait decremente : 2->1->0. Un 3e wait bloquerait",
+    "sem_post incremente : 0->1->2, les ressources sont rendues",
+]
+id = "sem-count-01"
+kc_ids = ["KC-C11"]
+key_concept = "Semaphore compteur (val > 1) = pool de N ressources ; sem_wait acquiert, sem_post relache"
+lang = "c"
+prerequisites = ["sem-unnamed-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *pool = sem_open("/kf_sem_pool", O_CREAT | O_EXCL, 0644, 2);
+    int val;
+
+    sem_getvalue(pool, &val);
+    printf("Pool: %d\n", val);
+
+    sem_wait(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 1: %d\n", val);
+
+    sem_wait(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 2: %d\n", val);
+
+    sem_post(pool);
+    sem_post(pool);
+    sem_getvalue(pool, &val);
+    printf("Release all: %d\n", val);
+
+    sem_close(pool);
+    sem_unlink("/kf_sem_pool");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *pool = sem_open("/kf_sem_pool", O_CREAT | O_EXCL, 0644, ____);
+    int val;
+
+    sem_getvalue(pool, &val);
+    printf("Pool: %d\n", val);
+
+    ____(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 1: %d\n", val);
+
+    ____(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 2: %d\n", val);
+
+    sem_post(pool);
+    sem_post(pool);
+    sem_getvalue(pool, &val);
+    printf("Release all: %d\n", val);
+
+    sem_close(pool);
+    sem_unlink("/kf_sem_pool");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+/* == EXEMPLE =======================================
+ * Pool de 1 ressource (mutex)
+ * ================================================= */
+void example_pool(void) {
+    sem_t *p = sem_open("/kf_ex_pool", O_CREAT|O_EXCL, 0644, 1);
+    int v;
+    sem_getvalue(p, &v); printf("Pool: %d\n", v);
+    sem_wait(p);
+    sem_getvalue(p, &v); printf("Acquired: %d\n", v);
+    sem_post(p);
+    sem_getvalue(p, &v); printf("Released: %d\n", v);
+    sem_close(p); sem_unlink("/kf_ex_pool");
+}
+/* Resultat: Pool: 1  Acquired: 0  Released: 1 */
+
+/* == VOTRE EXERCICE ================================
+ * Pool de 2 ressources. 2 acquisitions puis 2 releases.
+ * ================================================= */
+int main(void) {
+    /* TODO: sem_open val=2, 2 waits, 2 posts, getvalue a chaque etape */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *pool = sem_open("/kf_sem_pool", O_CREAT|O_EXCL, 0644, 2);
+    int val;
+    sem_getvalue(pool, &val); printf("Pool: %d\n", val);
+    ____(pool);  // acquerir 1
+    sem_getvalue(pool, &val); printf("Acquire 1: %d\n", val);
+    ____(pool);  // acquerir 2
+    sem_getvalue(pool, &val); printf("Acquire 2: %d\n", val);
+    sem_post(pool); sem_post(pool);
+    sem_getvalue(pool, &val); printf("Release all: %d\n", val);
+    sem_close(pool); sem_unlink("/kf_sem_pool");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    sem_t *pool = sem_open("/kf_sem_pool", O_CREAT | O_EXCL, 0644, ____);
+    int val;
+
+    sem_getvalue(pool, &val);
+    printf("Pool: %d\n", val);
+
+    ____(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 1: %d\n", val);
+
+    ____(pool);
+    sem_getvalue(pool, &val);
+    printf("Acquire 2: %d\n", val);
+
+    sem_post(pool);
+    sem_post(pool);
+    sem_getvalue(pool, &val);
+    printf("Release all: %d\n", val);
+
+    sem_close(pool);
+    sem_unlink("/kf_sem_pool");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+
+int main(void) {
+    // sem_open val=2 (pool de 2)
+    // 2x sem_wait (acquire), afficher valeur
+    // 2x sem_post (release), afficher valeur
+    // sem_close, sem_unlink
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Semaphore compteur (pool de ressources)"
+
+[validation]
+expected_output = """
+Pool: 2
+Acquire 1: 1
+Acquire 2: 0
+Release all: 2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Un semaphore compteur modelise N ressources identiques. Ici N=2."
+label = "Pool de 2 ressources (val=2)"
+step_label = "pool init"
+
+[[visualizer.steps.arrows]]
+from = "pool (sem_t*)"
+to = "semaphore"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore"
+value = "val=2"
+
+[[visualizer.steps.stack]]
+name = "pool (sem_t*)"
+value = "/kf_sem_pool"
+
+[[visualizer.steps]]
+explanation = "Deux sem_wait consomment les 2 slots. Un troisieme wait bloquerait jusqu'a un sem_post."
+label = "2 acquisitions: 2 -> 1 -> 0"
+step_label = "acquired"
+
+[[visualizer.steps.arrows]]
+from = "pool (sem_t*)"
+to = "semaphore"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore"
+value = "val=0"
+
+[[visualizer.steps.stack]]
+name = "pool (sem_t*)"
+value = "/kf_sem_pool"
+
+[[visualizer.steps]]
+explanation = "Deux sem_post restituent les ressources. Le pool est de nouveau complet."
+label = "2 releases: 0 -> 1 -> 2"
+step_label = "released"
+
+[[visualizer.steps.arrows]]
+from = "pool (sem_t*)"
+to = "semaphore"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSEM"
+name = "semaphore"
+value = "val=2"
+
+[[visualizer.steps.stack]]
+name = "pool (sem_t*)"
+value = "/kf_sem_pool"

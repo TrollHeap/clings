@@ -1,0 +1,358 @@
+common_mistake = "Appeler aio_return avant que aio_error ne retourne 0 — comportement indéfini"
+description = """
+NSY103 — Les E/S asynchrones POSIX (aio_read, aio_write) permettent de lancer une opération d'E/S sans bloquer le thread appelant. On soumet une requête via struct aiocb et on vérifie sa complétion avec aio_error/aio_return.
+
+Simulez des opérations asynchrones en écrivant puis relisant un fichier temporaire avec les API AIO."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "struct aiocb contient aio_fildes (fd), aio_buf (buffer), aio_nbytes (taille), aio_offset",
+    "aio_error retourne EINPROGRESS tant que l'opération est en cours, 0 si terminée",
+    "aio_return récupère le résultat (nombre d'octets) — ne l'appeler qu'après complétion",
+]
+id = "file-aio-01"
+kc_ids = ["KC-C06"]
+key_concept = "AIO POSIX : soumettre (aio_write/aio_read), vérifier (aio_error), récupérer (aio_return)"
+lang = "c"
+prerequisites = ["file-scatter-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void) {
+    char path[] = "/tmp/kf_aio_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path);
+
+    /* Ecriture asynchrone */
+    char wbuf[] = "Async I/O works!";
+    struct aiocb wcb;
+    memset(&wcb, 0, sizeof(wcb));
+    wcb.aio_fildes = fd;
+    wcb.aio_buf    = wbuf;
+    wcb.aio_nbytes = strlen(wbuf);
+    wcb.aio_offset = 0;
+
+    if (aio_write(&wcb) == -1) {
+        perror("aio_write");
+        close(fd);
+        return 1;
+    }
+
+    /* Attendre la completion */
+    while (aio_error(&wcb) == EINPROGRESS)
+        ; /* busy wait (simplifié) */
+
+    ssize_t nw = aio_return(&wcb);
+    printf("Async write: %zd bytes\n", nw);
+
+    /* Lecture asynchrone */
+    char rbuf[64] = {0};
+    struct aiocb rcb;
+    memset(&rcb, 0, sizeof(rcb));
+    rcb.aio_fildes = fd;
+    rcb.aio_buf    = rbuf;
+    rcb.aio_nbytes = sizeof(rbuf) - 1;
+    rcb.aio_offset = 0;
+
+    if (aio_read(&rcb) == -1) {
+        perror("aio_read");
+        close(fd);
+        return 1;
+    }
+
+    while (aio_error(&rcb) == EINPROGRESS)
+        ;
+
+    ssize_t nr = aio_return(&rcb);
+    printf("Async read: %zd bytes\n", nr);
+    printf("Content: %s\n", rbuf);
+
+    close(fd);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void) {
+    char path[] = "/tmp/kf_aio_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd == -1) { perror("mkstemp"); return 1; }
+    unlink(path);
+
+    /* Ecriture asynchrone */
+    char wbuf[] = "Async I/O works!";
+    struct aiocb wcb;
+    memset(&wcb, 0, sizeof(wcb));
+    wcb.aio_fildes = ____;
+    wcb.aio_buf    = wbuf;
+    wcb.aio_nbytes = strlen(wbuf);
+    wcb.aio_offset = 0;
+
+    if (aio_write(&wcb) == -1) {
+        perror("aio_write");
+        close(fd);
+        return 1;
+    }
+
+    /* Attendre la completion */
+    while (aio_error(&wcb) == ____)
+        ; /* busy wait (simplifié) */
+
+    ssize_t nw = aio_return(&____);
+    printf("Async write: %zd bytes\n", nw);
+
+    /* Lecture asynchrone */
+    char rbuf[64] = {0};
+    struct aiocb rcb;
+    memset(&rcb, 0, sizeof(rcb));
+    rcb.aio_fildes = fd;
+    rcb.aio_buf    = rbuf;
+    rcb.aio_nbytes = sizeof(rbuf) - 1;
+    rcb.aio_offset = 0;
+
+    if (____(____) == -1) {
+        perror("aio_read");
+        close(fd);
+        return 1;
+    }
+
+    while (aio_error(&rcb) == EINPROGRESS)
+        ;
+
+    ssize_t nr = aio_return(&rcb);
+    printf("Async read: %zd bytes\n", nr);
+    printf("Content: %s\n", rbuf);
+
+    close(fd);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+/* == EXEMPLE =======================================
+ * AIO write basique avec attente par suspension
+ * aio_suspend bloque jusqu'à complétion
+ * ================================================= */
+void example_aio(void) {
+    char p[] = "/tmp/kf_ex_aio_XXXXXX";
+    int fd = mkstemp(p); if (fd == -1) return; unlink(p);
+    char buf[] = "test";
+    struct aiocb cb;
+    memset(&cb, 0, sizeof(cb));
+    cb.aio_fildes = fd; cb.aio_buf = buf;
+    cb.aio_nbytes = 4; cb.aio_offset = 0;
+    aio_write(&cb);
+    const struct aiocb *list[] = {&cb};
+    aio_suspend(list, 1, NULL); /* bloque */
+    printf("example: wrote %zd\n", aio_return(&cb));
+    close(fd);
+}
+/* Resultat: example: wrote 4 */
+
+/* == VOTRE EXERCICE ================================
+ * Write async + read async avec polling aio_error
+ * Inspirez-vous de example_aio.
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void) {
+    char path[] = "/tmp/kf_aio_XXXXXX";
+    int fd = mkstemp(path); if (fd == -1) return 1; unlink(path);
+    char wbuf[] = "Async I/O works!";
+    struct aiocb wcb;
+    memset(&wcb, 0, sizeof(wcb));
+    wcb.aio_fildes = fd; wcb.aio_buf = wbuf;
+    wcb.aio_nbytes = strlen(wbuf); wcb.aio_offset = 0;
+    aio_write(&wcb);
+    while (aio_error(&wcb) == EINPROGRESS) ;
+    printf("Async write: %zd bytes\n", aio_return(&wcb));
+    char rbuf[64] = {0};
+    struct aiocb rcb;
+    memset(&rcb, 0, sizeof(rcb));
+    rcb.aio_fildes = fd; rcb.aio_buf = rbuf;
+    rcb.aio_nbytes = sizeof(rbuf)-1; rcb.aio_offset = 0;
+    ____(____); // soumettre la lecture async
+    while (aio_error(&rcb) == EINPROGRESS) ;
+    printf("Async read: %zd bytes\n", aio_return(&rcb));
+    printf("Content: %s\n", rbuf);
+    close(fd);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void) {
+    char path[] = "/tmp/kf_aio_XXXXXX";
+    int fd = mkstemp(path); if (fd == -1) return 1; unlink(path);
+
+    char wbuf[] = "Async I/O works!";
+    struct aiocb wcb;
+    memset(&wcb, 0, sizeof(wcb));
+    wcb.aio_fildes = ____;
+    wcb.aio_buf    = wbuf;
+    wcb.aio_nbytes = strlen(wbuf);
+    wcb.aio_offset = 0;
+
+    if (aio_write(&wcb) == -1) { perror("aio_write"); close(fd); return 1; }
+    while (aio_error(&wcb) == ____) ;
+    ssize_t nw = aio_return(&____);
+    printf("Async write: %zd bytes\n", nw);
+
+    char rbuf[64] = {0};
+    struct aiocb rcb;
+    memset(&rcb, 0, sizeof(rcb));
+    rcb.aio_fildes = fd;
+    rcb.aio_buf    = rbuf;
+    rcb.aio_nbytes = sizeof(rbuf) - 1;
+    rcb.aio_offset = 0;
+
+    if (____(____) == -1) { perror("aio_read"); close(fd); return 1; }
+    while (aio_error(&rcb) == EINPROGRESS) ;
+    ssize_t nr = aio_return(&rcb);
+    printf("Async read: %zd bytes\n", nr);
+    printf("Content: %s\n", rbuf);
+
+    close(fd);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <aio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void) {
+    // mkstemp + unlink pour fichier temporaire
+    // struct aiocb pour write: aio_fildes, aio_buf, aio_nbytes, aio_offset
+    // aio_write, poll aio_error, aio_return
+    // struct aiocb pour read: même pattern
+    // aio_read, poll, aio_return
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <aio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "file_io"
+title = "E/S asynchrones POSIX"
+
+[validation]
+expected_output = """
+Async write: 16 bytes
+Async read: 16 bytes
+Content: Async I/O works!
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "aio_write soumet l'écriture au noyau et retourne immédiatement"
+heap = []
+label = "Soumission aio_write"
+step_label = "Submit write"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "wcb.aio_fildes"
+value = "fd"
+
+[[visualizer.steps.stack]]
+name = "wcb.aio_buf"
+value = '"Async I/O works!"'
+
+[[visualizer.steps.stack]]
+name = "wcb.aio_nbytes"
+value = "16"
+
+[[visualizer.steps.stack]]
+name = "wcb.aio_offset"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "aio_error retourne EINPROGRESS puis 0 quand c'est fini"
+heap = []
+label = "Polling aio_error → complétion"
+step_label = "Write complete"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "aio_error(&wcb)"
+value = "EINPROGRESS → 0"
+
+[[visualizer.steps.stack]]
+name = "nw"
+value = "16"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Même pattern : soumettre, poll, récupérer le résultat"
+heap = []
+label = "aio_read + complétion lecture"
+step_label = "Read complete"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "rbuf"
+value = '"Async I/O works!"'
+
+[[visualizer.steps.stack]]
+name = "nr"
+value = "16"

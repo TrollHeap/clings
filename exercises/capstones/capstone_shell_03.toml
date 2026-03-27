@@ -1,0 +1,798 @@
+common_mistake = "Oublier WUNTRACED dans waitpid — sans ce flag, waitpid ignore les processus stoppés et bloque indéfiniment"
+description = """
+NSY103 — Capstone avancé combinant processus, signaux et job control. Implémentez un mini job controller qui gère une table de jobs, peut suspendre un processus (SIGTSTP), le reprendre en foreground (SIGCONT) ou en background, et afficher l'état des jobs.
+
+Pour la testabilité, les jobs sont simulés avec fork() et les signaux sont envoyés programmatiquement.
+
+⚠ Cet exercice combine : fork(), kill(), waitpid(WNOHANG|WUNTRACED), SIGTSTP, SIGCONT, gestion de groupe de processus."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "SIGTSTP suspend un processus (comme Ctrl-Z), SIGCONT le reprend",
+    "waitpid avec WUNTRACED permet de détecter quand un enfant est stoppé via WIFSTOPPED(status)",
+    "fg = SIGCONT + waitpid en premier plan, bg = SIGCONT sans attendre",
+]
+id = "capstone-shell-03"
+kc_ids = ["KC-CAP"]
+key_concept = "Job control = table de jobs + SIGTSTP/SIGCONT + waitpid(WUNTRACED) pour détecter les processus stoppés"
+lang = "c"
+prerequisites = ["capstone-shell-02"]
+solution_code = '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+
+typedef struct {
+    pid_t pid;
+    JobState state;
+    char name[32];
+} Job;
+
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+    }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) {
+    if (njobs >= MAX_JOBS) return -1;
+    jobs[njobs].pid = pid;
+    jobs[njobs].state = JOB_RUNNING;
+    strncpy(jobs[njobs].name, name, 31);
+    jobs[njobs].name[31] = '\0';
+    return njobs++;
+}
+
+void print_jobs(void) {
+    for (int i = 0; i < njobs; i++) {
+        printf("[%d] %-8s %s\n", i+1, state_str(jobs[i].state),
+               jobs[i].name);
+    }
+}
+
+void job_fg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("fg: reprendre '%s'\n", jobs[idx].name);
+        kill(jobs[idx].pid, SIGCONT);
+        jobs[idx].state = JOB_RUNNING;
+    }
+    int status;
+    waitpid(jobs[idx].pid, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) {
+        jobs[idx].state = JOB_STOPPED;
+        printf("[%d] Stopped %s\n", idx+1, jobs[idx].name);
+    } else {
+        jobs[idx].state = JOB_DONE;
+        printf("[%d] Done %s\n", idx+1, jobs[idx].name);
+    }
+}
+
+void job_bg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("bg: reprendre '%s' en arriere-plan\n", jobs[idx].name);
+        kill(jobs[idx].pid, SIGCONT);
+        jobs[idx].state = JOB_RUNNING;
+    }
+}
+
+int main(void) {
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        pause();
+        pause();
+        exit(0);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        pause();
+        exit(0);
+    }
+
+    usleep(50000);
+    add_job(pid1, "worker1");
+    add_job(pid2, "worker2");
+
+    printf("--- jobs ---\n");
+    print_jobs();
+
+    printf("--- stop worker1 ---\n");
+    kill(pid1, SIGTSTP);
+    usleep(50000);
+    int status;
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    print_jobs();
+
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT);
+    jobs[0].state = JOB_RUNNING;
+    usleep(50000);
+    kill(pid1, SIGTSTP);
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+
+    printf("--- bg worker1 ---\n");
+    job_bg(0);
+    usleep(50000);
+
+    kill(pid1, SIGTERM);
+    kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0);
+    jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0);
+    jobs[1].state = JOB_DONE;
+
+    printf("--- final ---\n");
+    print_jobs();
+    return 0;
+}'''
+starter_code = '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+
+typedef struct {
+    pid_t pid;
+    JobState state;
+    char name[32];
+} Job;
+
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+    }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) {
+    if (njobs >= MAX_JOBS) return -1;
+    jobs[njobs].pid = pid;
+    jobs[njobs].state = ____;
+    strncpy(jobs[njobs].name, name, 31);
+    jobs[njobs].name[31] = '\0';
+    return njobs++;
+}
+
+void print_jobs(void) {
+    for (int i = 0; i < njobs; i++) {
+        printf("[%d] %-8s %s\n", i+1, state_str(jobs[i].state),
+               jobs[i].name);
+    }
+}
+
+void job_fg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("fg: reprendre '%s'\n", jobs[idx].name);
+        kill(jobs[idx].pid, ____);
+        jobs[idx].state = JOB_RUNNING;
+    }
+    int status;
+    waitpid(jobs[idx].pid, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) {
+        jobs[idx].state = ____;
+        printf("[%d] Stopped %s\n", idx+1, jobs[idx].name);
+    } else {
+        jobs[idx].state = ____;
+        printf("[%d] Done %s\n", idx+1, jobs[idx].name);
+    }
+}
+
+void job_bg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("bg: reprendre '%s' en arriere-plan\n", jobs[idx].name);
+        kill(jobs[idx].pid, ____);
+        jobs[idx].state = ____;
+    }
+}
+
+int main(void) {
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        pause();
+        pause();
+        exit(0);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        pause();
+        exit(0);
+    }
+
+    usleep(50000);
+    add_job(pid1, "worker1");
+    add_job(pid2, "worker2");
+
+    printf("--- jobs ---\n");
+    print_jobs();
+
+    printf("--- stop worker1 ---\n");
+    kill(pid1, SIGTSTP);
+    usleep(50000);
+    int status;
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    print_jobs();
+
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT);
+    jobs[0].state = JOB_RUNNING;
+    usleep(50000);
+    kill(pid1, SIGTSTP);
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+
+    printf("--- bg worker1 ---\n");
+    job_bg(0);
+    usleep(50000);
+
+    kill(pid1, SIGTERM);
+    kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0);
+    jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0);
+    jobs[1].state = JOB_DONE;
+
+    printf("--- final ---\n");
+    print_jobs();
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Gestion simple de signal: suspendre/reprendre
+ * Pattern: kill(pid, SIGSTOP) + kill(pid, SIGCONT)
+ * waitpid avec WUNTRACED pour detecter l'arret.
+ * ================================================= */
+void example_stop_continue(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        while (1) pause();
+        exit(0);
+    }
+    usleep(50000);
+    printf("Stopping child %d\n", child);
+    kill(child, SIGSTOP);
+    int st;
+    waitpid(child, &st, WUNTRACED);
+    if (WIFSTOPPED(st)) printf("Child stopped\n");
+    printf("Continuing child\n");
+    kill(child, SIGCONT);
+    usleep(50000);
+    kill(child, SIGTERM);
+    waitpid(child, &st, 0);
+    printf("Child done\n");
+}
+/* Resultat: Stopping child N / Child stopped / Continuing child / Child done */
+
+/* == VOTRE EXERCICE ================================
+ * Job controller complet avec fg/bg
+ * Table de jobs, SIGTSTP/SIGCONT, etats Running/Stopped/Done
+ * ================================================= */
+
+#define MAX_JOBS 4
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+typedef struct { pid_t pid; JobState state; char name[32]; } Job;
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+int main(void) {
+    example_stop_continue();
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+typedef struct { pid_t pid; JobState state; char name[32]; } Job;
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) { case JOB_RUNNING: return "Running"; case JOB_STOPPED: return "Stopped"; case JOB_DONE: return "Done"; }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) {
+    if (njobs >= MAX_JOBS) return -1;
+    jobs[njobs].pid = pid;
+    jobs[njobs].state = JOB_RUNNING;
+    strncpy(jobs[njobs].name, name, 31);
+    return njobs++;
+}
+
+void print_jobs(void) {
+    for (int i = 0; i < njobs; i++)
+        printf("[%d] %-8s %s\n", i+1, state_str(jobs[i].state), jobs[i].name);
+}
+
+void job_bg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("bg: reprendre '%s' en arriere-plan\n", jobs[idx].name);
+        kill(jobs[idx].pid, ____);
+        jobs[idx].state = ____;
+    }
+}
+
+int main(void) {
+    pid_t pid1 = ____();
+    if (pid1 == 0) { pause(); pause(); exit(0); }
+    pid_t pid2 = ____();
+    if (pid2 == 0) { pause(); exit(0); }
+    usleep(50000);
+    add_job(pid1, "worker1"); add_job(pid2, "worker2");
+    printf("--- jobs ---\n"); print_jobs();
+    printf("--- stop worker1 ---\n");
+    kill(pid1, ____);
+    usleep(50000);
+    int status; waitpid(pid1, &status, ____);
+    if (WIFSTOPPED(status)) jobs[0].state = ____;
+    print_jobs();
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT); jobs[0].state = JOB_RUNNING; usleep(50000);
+    kill(pid1, SIGTSTP); waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+    printf("--- bg worker1 ---\n"); job_bg(0); usleep(50000);
+    kill(pid1, SIGTERM); kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0); jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0); jobs[1].state = JOB_DONE;
+    printf("--- final ---\n"); print_jobs();
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+
+typedef struct {
+    pid_t pid;
+    JobState state;
+    char name[32];
+} Job;
+
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+    }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) {
+    if (njobs >= MAX_JOBS) return -1;
+    jobs[njobs].pid = pid;
+    jobs[njobs].state = ____;
+    strncpy(jobs[njobs].name, name, 31);
+    jobs[njobs].name[31] = '\0';
+    return njobs++;
+}
+
+void print_jobs(void) {
+    for (int i = 0; i < njobs; i++) {
+        printf("[%d] %-8s %s\n", i+1, state_str(jobs[i].state),
+               jobs[i].name);
+    }
+}
+
+void job_fg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("fg: reprendre '%s'\n", jobs[idx].name);
+        kill(jobs[idx].pid, ____);
+        jobs[idx].state = JOB_RUNNING;
+    }
+    int status;
+    waitpid(jobs[idx].pid, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) {
+        jobs[idx].state = ____;
+        printf("[%d] Stopped %s\n", idx+1, jobs[idx].name);
+    } else {
+        jobs[idx].state = ____;
+        printf("[%d] Done %s\n", idx+1, jobs[idx].name);
+    }
+}
+
+void job_bg(int idx) {
+    if (idx < 0 || idx >= njobs) return;
+    if (jobs[idx].state == JOB_STOPPED) {
+        printf("bg: reprendre '%s' en arriere-plan\n", jobs[idx].name);
+        kill(jobs[idx].pid, ____);
+        jobs[idx].state = ____;
+    }
+}
+
+int main(void) {
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        pause();
+        pause();
+        exit(0);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        pause();
+        exit(0);
+    }
+
+    usleep(50000);
+    add_job(pid1, "worker1");
+    add_job(pid2, "worker2");
+
+    printf("--- jobs ---\n");
+    print_jobs();
+
+    printf("--- stop worker1 ---\n");
+    kill(pid1, SIGTSTP);
+    usleep(50000);
+    int status;
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    print_jobs();
+
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT);
+    jobs[0].state = JOB_RUNNING;
+    usleep(50000);
+    kill(pid1, SIGTSTP);
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+
+    printf("--- bg worker1 ---\n");
+    job_bg(0);
+    usleep(50000);
+
+    kill(pid1, SIGTERM);
+    kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0);
+    jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0);
+    jobs[1].state = JOB_DONE;
+
+    printf("--- final ---\n");
+    print_jobs();
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+
+typedef struct {
+    pid_t pid;
+    JobState state;
+    char name[32];
+} Job;
+
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+    }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) {
+    /* TODO */
+    return 0;
+}
+
+void print_jobs(void) {
+    /* TODO */
+}
+
+void job_fg(int idx) {
+    /* TODO */
+}
+
+void job_bg(int idx) {
+    /* TODO */
+}
+
+int main(void) {
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        pause();
+        pause();
+        exit(0);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        pause();
+        exit(0);
+    }
+
+    usleep(50000);
+    add_job(pid1, "worker1");
+    add_job(pid2, "worker2");
+
+    printf("--- jobs ---\n");
+    print_jobs();
+
+    printf("--- stop worker1 ---\n");
+    kill(pid1, SIGTSTP);
+    usleep(50000);
+    int status;
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    print_jobs();
+
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT);
+    jobs[0].state = JOB_RUNNING;
+    usleep(50000);
+    kill(pid1, SIGTSTP);
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+
+    printf("--- bg worker1 ---\n");
+    job_bg(0);
+    usleep(50000);
+
+    kill(pid1, SIGTERM);
+    kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0);
+    jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0);
+    jobs[1].state = JOB_DONE;
+
+    printf("--- final ---\n");
+    print_jobs();
+    return 0;
+}
+''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define MAX_JOBS 4
+
+typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } JobState;
+
+typedef struct {
+    pid_t pid;
+    JobState state;
+    char name[32];
+} Job;
+
+Job jobs[MAX_JOBS];
+int njobs = 0;
+
+const char *state_str(JobState s) {
+    switch (s) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+    }
+    return "?";
+}
+
+int add_job(pid_t pid, const char *name) { return 0; }
+
+void print_jobs(void) { }
+
+void job_fg(int idx) { }
+
+void job_bg(int idx) { }
+
+int main(void) {
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        pause();
+        pause();
+        exit(0);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        pause();
+        exit(0);
+    }
+
+    usleep(50000);
+    add_job(pid1, "worker1");
+    add_job(pid2, "worker2");
+
+    printf("--- jobs ---\n");
+    print_jobs();
+
+    printf("--- stop worker1 ---\n");
+    kill(pid1, SIGTSTP);
+    usleep(50000);
+    int status;
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    print_jobs();
+
+    printf("--- fg worker1 ---\n");
+    kill(pid1, SIGCONT);
+    jobs[0].state = JOB_RUNNING;
+    usleep(50000);
+    kill(pid1, SIGTSTP);
+    waitpid(pid1, &status, WUNTRACED);
+    if (WIFSTOPPED(status)) jobs[0].state = JOB_STOPPED;
+    printf("[1] Stopped worker1\n");
+
+    printf("--- bg worker1 ---\n");
+    job_bg(0);
+    usleep(50000);
+
+    kill(pid1, SIGTERM);
+    kill(pid2, SIGTERM);
+    waitpid(pid1, &status, 0);
+    jobs[0].state = JOB_DONE;
+    waitpid(pid2, &status, 0);
+    jobs[1].state = JOB_DONE;
+
+    printf("--- final ---\n");
+    print_jobs();
+    return 0;
+}
+''',
+]
+subject = "capstones"
+title = "Shell avec fg/bg/Ctrl-Z"
+
+[validation]
+expected_output = """
+--- jobs ---
+[1] Running  worker1
+[2] Running  worker2
+--- stop worker1 ---
+[1] Stopped  worker1
+[2] Running  worker2
+--- fg worker1 ---
+[1] Stopped worker1
+--- bg worker1 ---
+bg: reprendre 'worker1' en arriere-plan
+--- final ---
+[1] Done     worker1
+[2] Done     worker2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Deux processus enfants créés et enregistrés comme jobs Running."
+heap = []
+label = "Table de jobs initiale"
+step_label = "init jobs"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "jobs[0]"
+value = "{worker1, Running}"
+
+[[visualizer.steps.stack]]
+name = "jobs[1]"
+value = "{worker2, Running}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "kill(pid1, SIGTSTP) suspend le processus. waitpid avec WUNTRACED détecte l'arrêt."
+heap = []
+label = "SIGTSTP -> worker1 stoppé"
+step_label = "stop"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "jobs[0]"
+value = "{worker1, Stopped}"
+
+[[visualizer.steps.stack]]
+name = "signal"
+value = "SIGTSTP (20)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "kill(pid, SIGCONT) reprend l'exécution du processus suspendu."
+heap = []
+label = "SIGCONT -> worker1 reprend"
+step_label = "continue"
+
+[[visualizer.steps.call_frames]]
+args = "0"
+function_name = "job_bg"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "jobs[0]"
+value = "{worker1, Running}"
+
+[[visualizer.steps.stack]]
+name = "signal"
+value = "SIGCONT (18)"

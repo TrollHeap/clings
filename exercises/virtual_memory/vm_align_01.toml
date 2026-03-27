@@ -1,0 +1,210 @@
+common_mistake = "Utiliser modulo au lieu de masque de bits — le masque est O(1) et plus efficace"
+description = """
+NSY103 — Les adresses mémoire doivent souvent être alignées sur des frontières de page pour mmap/mprotect. L'alignement se fait par masquage de bits: addr & ~(page_size - 1) arrondit vers le bas.
+
+Implémentez des fonctions d'alignement et vérifiez sur des adresses arbitraires."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "~(page - 1) crée un masque qui met à zéro les bits de poids faible",
+    "Pour page=4096 (0x1000), le masque est 0xFFFFF000",
+    "align_up ajoute page-1 avant le masquage pour arrondir vers le haut",
+]
+id = "vm-align-01"
+kc_ids = ["KC-C18"]
+key_concept = "Alignement par masque de bits: addr & ~(page-1) pour arrondir aux frontières de page"
+lang = "c"
+prerequisites = ["vm-page-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+uintptr_t align_down(uintptr_t addr, uintptr_t page) {
+    return addr & ~(page - 1);
+}
+uintptr_t align_up(uintptr_t addr, uintptr_t page) {
+    return (addr + page - 1) & ~(page - 1);
+}
+int main(void) {
+    uintptr_t ps = (uintptr_t)getpagesize();
+    printf("Page size: %lu\n", (unsigned long)ps);
+    uintptr_t addr = 0x12345;
+    printf("Original:   0x%lx\n", (unsigned long)addr);
+    printf("Align down: 0x%lx\n", (unsigned long)align_down(addr, ps));
+    printf("Align up:   0x%lx\n", (unsigned long)align_up(addr, ps));
+    printf("Down aligned: %s\n", align_down(addr, ps) % ps == 0 ? "yes" : "no");
+    printf("Up aligned: %s\n", align_up(addr, ps) % ps == 0 ? "yes" : "no");
+    printf("Already aligned: %s\n", align_down(ps * 3, ps) == ps * 3 ? "yes" : "no");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+uintptr_t align_down(uintptr_t addr, uintptr_t page) {
+    return addr & ____(page - 1);
+}
+
+uintptr_t align_up(uintptr_t addr, uintptr_t page) {
+    return (addr + page - 1) & ~(page - ____);
+}
+
+int main(void) {
+    uintptr_t ps = (uintptr_t)getpagesize();
+    printf("Page size: %lu\n", (unsigned long)ps);
+    uintptr_t addr = 0x12345;
+    printf("Original:   0x%lx\n", (unsigned long)addr);
+    printf("Align down: 0x%lx\n", (unsigned long)align_down(addr, ps));
+    printf("Align up:   0x%lx\n", (unsigned long)align_up(addr, ps));
+    printf("Down aligned: %s\n", align_down(addr, ps) % ps == 0 ? "yes" : "no");
+    printf("Up aligned: %s\n", align_up(addr, ps) % ps == 0 ? "yes" : "no");
+    printf("Already aligned: %s\n", align_down(ps * 3, ps) == ps * 3 ? "yes" : "no");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+/* == EXEMPLE: masque binaire ========================== */
+void example_mask(void) {
+    uintptr_t page = 4096; /* 0x1000 */
+    uintptr_t mask = ~(page - 1); /* 0xFFFFF...F000 */
+    printf("page-1 = 0x%lx\n", (unsigned long)(page-1));
+    printf("mask   = 0x%lx\n", (unsigned long)mask);
+}
+
+uintptr_t align_down(uintptr_t addr, uintptr_t page) { return addr & ~(page-1); }
+uintptr_t align_up(uintptr_t addr, uintptr_t page) { return (addr+page-1) & ~(page-1); }
+int main(void) {
+    uintptr_t ps = (uintptr_t)getpagesize();
+    printf("Page size: %lu\n", (unsigned long)ps);
+    uintptr_t addr = 0x12345;
+    printf("Original:   0x%lx\n", (unsigned long)addr);
+    printf("Align down: 0x%lx\n", (unsigned long)align_down(addr, ps));
+    printf("Align up:   0x%lx\n", (unsigned long)align_up(addr, ps));
+    printf("Down aligned: %s\n", align_down(addr,ps)%ps==0?"yes":"no");
+    printf("Up aligned: %s\n", align_up(addr,ps)%ps==0?"yes":"no");
+    printf("Already aligned: %s\n", align_down(ps*3,ps)==ps*3?"yes":"no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+uintptr_t align_down(uintptr_t addr, uintptr_t page) { return addr & ____(page-1); }
+uintptr_t align_up(uintptr_t addr, uintptr_t page) { return (addr+____-1) & ~(page-____); }
+int main(void) {
+    uintptr_t ps = (uintptr_t)getpagesize();
+    printf("Page size: %lu\n", (unsigned long)ps);
+    uintptr_t addr = 0x12345;
+    printf("Original:   0x%lx\n", (unsigned long)addr);
+    printf("Align down: 0x%lx\n", (unsigned long)align_down(addr, ps));
+    printf("Align up:   0x%lx\n", (unsigned long)align_up(addr, ps));
+    printf("Down aligned: %s\n", align_down(addr,ps)%ps==0?"yes":"no");
+    printf("Up aligned: %s\n", align_up(addr,ps)%ps==0?"yes":"no");
+    printf("Already aligned: %s\n", align_down(ps*3,ps)==ps*3?"yes":"no");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+uintptr_t align_down(uintptr_t addr, uintptr_t page) {
+    return addr & ____(page - 1);
+}
+uintptr_t align_up(uintptr_t addr, uintptr_t page) {
+    return (addr + page - 1) & ~(page - ____);
+}
+int main(void) {
+    uintptr_t ps = (uintptr_t)getpagesize();
+    printf("Page size: %lu\n", (unsigned long)ps);
+    uintptr_t addr = 0x12345;
+    printf("Original:   0x%lx\n", (unsigned long)addr);
+    printf("Align down: 0x%lx\n", (unsigned long)align_down(addr, ps));
+    printf("Align up:   0x%lx\n", (unsigned long)align_up(addr, ps));
+    printf("Down aligned: %s\n", align_down(addr,ps)%ps==0?"yes":"no");
+    printf("Up aligned: %s\n", align_up(addr,ps)%ps==0?"yes":"no");
+    printf("Already aligned: %s\n", align_down(ps*3,ps)==ps*3?"yes":"no");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+// Implémentez align_down et align_up avec masques de bits
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Alignement d'adresses sur pages"
+
+[validation]
+expected_output = """
+Page size: 4096
+Original:   0x12345
+Align down: 0x12000
+Align up:   0x13000
+Down aligned: yes
+Up aligned: yes
+Already aligned: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les 12 bits bas sont masqués"
+heap = []
+label = "Alignement vers le bas"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "0x12345, 4096"
+function_name = "align_down"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "addr"
+value = "0x12345"
+
+[[visualizer.steps.stack]]
+name = "mask"
+value = "~(0xFFF) = 0xFFFFF000"
+
+[[visualizer.steps.stack]]
+name = "result"
+value = "0x12000"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Ajout puis masquage → page suivante"
+heap = []
+label = "Alignement vers le haut"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "0x12345, 4096"
+function_name = "align_up"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "addr+page-1"
+value = "0x12345 + 0xFFF = 0x13344"
+
+[[visualizer.steps.stack]]
+name = "result"
+value = "0x13000"

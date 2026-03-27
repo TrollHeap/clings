@@ -1,0 +1,363 @@
+common_mistake = "Confondre head et tail → push sur head au lieu de tail inverse l'ordre FIFO"
+description = """
+NSY103 — Un ring buffer (tampon circulaire) en mémoire partagée permet une communication FIFO entre producteur et consommateur. Les indices head et tail avancent modulo la capacité. Le producteur écrit à tail, le consommateur lit à head.
+
+Implémentez un ring buffer de 4 slots. L'enfant (producteur) envoie 3 messages, le parent (consommateur) les lit séquentiellement après wait()."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "rb_push écrit dans slots[tail] puis avance tail modulo CAP",
+    "rb_pop lit depuis slots[head] puis avance head modulo CAP",
+    """Le modulo (% CAP) fait que les indices "tournent" — c'est le principe circulaire""",
+]
+id = "shm-ringbuf-01"
+kc_ids = ["KC-C13"]
+key_concept = "Ring buffer : indices head/tail modulo capacité ; FIFO sans allocation dynamique"
+lang = "c"
+prerequisites = ["shm-mutex-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char slots[CAP][MSG_LEN];
+    int head;
+    int tail;
+    int count;
+} RingBuf;
+
+void rb_push(RingBuf *rb, const char *msg) {
+    strncpy(rb->slots[rb->tail], msg, MSG_LEN - 1);
+    rb->tail = (rb->tail + 1) % CAP;
+    rb->count++;
+}
+
+const char *rb_pop(RingBuf *rb) {
+    const char *msg = rb->slots[rb->head];
+    rb->head = (rb->head + 1) % CAP;
+    rb->count--;
+    return msg;
+}
+
+int main(void) {
+    int fd = shm_open("/kf_shm_ring", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(RingBuf));
+    RingBuf *rb = (RingBuf *)mmap(NULL, sizeof(RingBuf),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(rb, 0, sizeof(RingBuf));
+
+    if (fork() == 0) {
+        rb_push(rb, "msg-A");
+        rb_push(rb, "msg-B");
+        rb_push(rb, "msg-C");
+        _exit(0);
+    }
+    wait(NULL);
+
+    while (rb->count > 0)
+        printf("Pop: %s\n", rb_pop(rb));
+
+    munmap(rb, sizeof(RingBuf));
+    shm_unlink("/kf_shm_ring");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char slots[CAP][MSG_LEN];
+    int head;
+    int tail;
+    int count;
+} RingBuf;
+
+void rb_push(RingBuf *rb, const char *msg) {
+    strncpy(rb->slots[rb->____], msg, MSG_LEN - 1);
+    rb->tail = (rb->tail + 1) % ____;
+    rb->count++;
+}
+
+const char *rb_pop(RingBuf *rb) {
+    const char *msg = rb->slots[rb->____];
+    rb->head = (rb->head + 1) % CAP;
+    rb->count--;
+    return msg;
+}
+
+int main(void) {
+    int fd = shm_open("/kf_shm_ring", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(RingBuf));
+    RingBuf *rb = (RingBuf *)mmap(NULL, sizeof(RingBuf),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(rb, 0, sizeof(RingBuf));
+
+    if (fork() == 0) {
+        rb_push(rb, "msg-A");
+        rb_push(rb, "msg-B");
+        rb_push(rb, "msg-C");
+        _exit(0);
+    }
+    wait(NULL);
+
+    while (rb->count > 0)
+        printf("Pop: %s\n", rb_pop(rb));
+
+    munmap(rb, sizeof(RingBuf));
+    shm_unlink("/kf_shm_ring");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+typedef struct { char slots[CAP][MSG_LEN]; int head; int tail; int count; } RingBuf;
+
+/* == EXEMPLE =======================================
+ * Ring buffer d'entiers (capacite 3)
+ * ================================================= */
+#define ECAP 3
+typedef struct { int data[ECAP]; int h,t,c; } IntRing;
+void ex_push(IntRing *r, int v) { r->data[r->t] = v; r->t = (r->t+1)%ECAP; r->c++; }
+int ex_pop(IntRing *r) { int v = r->data[r->h]; r->h = (r->h+1)%ECAP; r->c--; return v; }
+void example_ring(void) {
+    IntRing r = {0};
+    ex_push(&r, 10); ex_push(&r, 20);
+    printf("%d %d\n", ex_pop(&r), ex_pop(&r));
+}
+/* Resultat: 10 20 */
+
+/* == VOTRE EXERCICE ================================
+ * Ring buffer de strings en shared memory.
+ * ================================================= */
+void rb_push(RingBuf *rb, const char *msg) { /* TODO */ }
+const char *rb_pop(RingBuf *rb) { /* TODO */ return ""; }
+int main(void) {
+    int fd = shm_open("/kf_shm_ring", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, sizeof(RingBuf));
+    RingBuf *rb = (RingBuf *)mmap(NULL, sizeof(RingBuf), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd); memset(rb, 0, sizeof(RingBuf));
+    if (fork() == 0) { rb_push(rb, "msg-A"); rb_push(rb, "msg-B"); rb_push(rb, "msg-C"); _exit(0); }
+    wait(NULL);
+    while (rb->count > 0) printf("Pop: %s\n", rb_pop(rb));
+    munmap(rb, sizeof(RingBuf)); shm_unlink("/kf_shm_ring");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char slots[CAP][MSG_LEN];
+    int head;
+    int tail;
+    int count;
+} RingBuf;
+
+void rb_push(RingBuf *rb, const char *msg) {
+    strncpy(rb->slots[rb->____], msg, MSG_LEN - 1);
+    rb->tail = (rb->tail + 1) % ____;
+    rb->count++;
+}
+
+const char *rb_pop(RingBuf *rb) {
+    const char *msg = rb->slots[rb->____];
+    rb->head = (rb->head + 1) % CAP;
+    rb->count--;
+    return msg;
+}
+
+int main(void) {
+    int fd = shm_open("/kf_shm_ring", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(RingBuf));
+    RingBuf *rb = (RingBuf *)mmap(NULL, sizeof(RingBuf),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(rb, 0, sizeof(RingBuf));
+
+    if (fork() == 0) {
+        rb_push(rb, "msg-A");
+        rb_push(rb, "msg-B");
+        rb_push(rb, "msg-C");
+        _exit(0);
+    }
+    wait(NULL);
+
+    while (rb->count > 0)
+        printf("Pop: %s\n", rb_pop(rb));
+
+    munmap(rb, sizeof(RingBuf));
+    shm_unlink("/kf_shm_ring");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+typedef struct {
+    char slots[CAP][MSG_LEN];
+    int head;
+    int tail;
+    int count;
+} RingBuf;
+
+void rb_push(RingBuf *rb, const char *msg) {
+    strncpy(rb->slots[rb->____], msg, MSG_LEN - 1);
+    rb->tail = (rb->tail + 1) % ____;
+    rb->count++;
+}
+
+const char *rb_pop(RingBuf *rb) {
+    const char *msg = rb->slots[rb->____];
+    rb->head = (rb->head + 1) % CAP;
+    rb->count--;
+    return msg;
+}
+
+int main(void) {
+    int fd = shm_open("/kf_shm_ring", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(RingBuf));
+    RingBuf *rb = (RingBuf *)mmap(NULL, sizeof(RingBuf),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    memset(rb, 0, sizeof(RingBuf));
+
+    if (fork() == 0) {
+        rb_push(rb, "msg-A");
+        rb_push(rb, "msg-B");
+        rb_push(rb, "msg-C");
+        _exit(0);
+    }
+    wait(NULL);
+
+    while (rb->count > 0)
+        printf("Pop: %s\n", rb_pop(rb));
+
+    munmap(rb, sizeof(RingBuf));
+    shm_unlink("/kf_shm_ring");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define CAP 4
+#define MSG_LEN 32
+
+int main(void) {
+    // Ring buffer en shm: struct avec slots[CAP][MSG_LEN], head, tail, count
+    // Enfant push 3 messages, parent pop et affiche
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Ring buffer en shared memory"
+
+[validation]
+expected_output = """
+Pop: msg-A
+Pop: msg-B
+Pop: msg-C
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+label = "Ring buffer initialisé (head=0, tail=0)"
+
+[[visualizer.steps.nodes]]
+id = "rb"
+label = """
+RingBuf
+[_, _, _, _]
+head=0 tail=0"""
+
+[[visualizer.steps]]
+edges = []
+label = "3 push: msg-A, msg-B, msg-C"
+
+[[visualizer.steps.nodes]]
+id = "rb"
+label = """
+RingBuf
+[A, B, C, _]
+head=0 tail=3"""
+
+[[visualizer.steps]]
+label = "3 pop: head avance 0→1→2→3"
+
+[[visualizer.steps.edges]]
+label = "rb_pop x3"
+source = "rb"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "rb"
+label = """
+RingBuf
+[A, B, C, _]
+head=3 tail=3"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = """
+msg-A
+msg-B
+msg-C"""

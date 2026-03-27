@@ -1,0 +1,277 @@
+common_mistake = "Oublier de fermer fd[1] dans l'enfant → read ne recevra jamais EOF et bloquera"
+description = """
+NSY103 — Un pipe permet la communication unidirectionnelle entre un processus parent et son enfant après fork(). Le parent écrit dans fd[1], l'enfant lit depuis fd[0]. Chaque processus ferme l'extrémité qu'il n'utilise pas.
+
+Créez un pipe, forkez, le parent envoie 'Bonjour fils' dans fd[1], l'enfant lit depuis fd[0] et affiche le message."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "fork() crée un processus enfant qui hérite des descripteurs du pipe",
+    "L'enfant ferme fd[1] (écriture) car il ne fait que lire",
+    "Le parent ferme fd[0] (lecture) car il ne fait qu'écrire, puis wait() attend la fin de l'enfant",
+]
+id = "pipe-basic-01"
+kc_ids = ["KC-C10"]
+key_concept = "Après fork(), parent et enfant partagent les fd du pipe ; chacun ferme l'extrémité inutilisée"
+lang = "c"
+prerequisites = ["pipe-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[1]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[0]);
+        const char *msg = "Bonjour fils";
+        write(fd[1], msg, strlen(msg));
+        close(fd[1]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    pipe(fd);
+    pid_t pid = ____();
+    if (pid == 0) {
+        close(fd[____]);
+        char buf[64];
+        ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[____]);
+        const char *msg = "Bonjour fils";
+        write(fd[____], msg, strlen(msg));
+        close(fd[1]);
+        wait(NULL);
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * Envoyer un entier du parent a l'enfant via pipe
+ * Le parent ecrit dans fd[1], l'enfant lit depuis fd[0].
+ * ================================================= */
+void example_pipe_fork(void) {
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[1]);
+        int val;
+        read(fd[0], &val, sizeof(val));
+        printf("Enfant got: %d\n", val);
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[0]);
+        int val = 99;
+        write(fd[1], &val, sizeof(val));
+        close(fd[1]);
+        wait(NULL);
+    }
+}
+/* Resultat: Enfant got: 99 */
+
+/* == VOTRE EXERCICE ================================
+ * Envoyer une chaine du parent a l'enfant via pipe
+ * Inspirez-vous de example_pipe_fork ci-dessus.
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[1]);
+        char buf[64];
+        /* TODO: read from fd[0], null-terminate, printf */
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[0]);
+        const char *msg = "Bonjour fils";
+        /* TODO: write msg to fd[1] */
+        close(fd[1]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    pipe(fd);
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(fd[1]);
+        char buf[64];
+        ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[____]);  // fermer quel fd ?
+        const char *msg = "Bonjour fils";
+        write(fd[1], msg, strlen(msg));
+        close(fd[1]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    pipe(fd);
+    pid_t pid = ____();
+    if (pid == 0) {
+        close(fd[____]);
+        char buf[64];
+        ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Enfant recu: %s\n", buf);
+        close(fd[0]);
+        _exit(0);
+    } else {
+        close(fd[____]);
+        const char *msg = "Bonjour fils";
+        write(fd[____], msg, strlen(msg));
+        close(fd[1]);
+        wait(NULL);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    int fd[2];
+    // Créez un pipe, forkez
+    // Enfant: ferme fd[1], lit depuis fd[0], affiche "Enfant recu: Bonjour fils"
+    // Parent: ferme fd[0], écrit "Bonjour fils" dans fd[1], ferme fd[1], wait()
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "pipe() et communication parent-enfant"
+
+[validation]
+expected_output = """
+Enfant recu: Bonjour fils
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "fork() duplique le processus : l'enfant hérite de tous les descripteurs de fichier ouverts, y compris fd[0] et fd[1] du pipe. Chaque processus doit ensuite fermer l'extrémité qu'il n'utilise pas pour éviter des blocages sur EOF."
+label = "pipe(fd) + fork() — deux processus partagent le pipe"
+step_label = "Étape 1 — fork() : parent et enfant partagent les fd du pipe"
+
+[[visualizer.steps.edges]]
+label = "kernel pipe buffer"
+source = "parent"
+target = "child"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+Parent
+fd[1] (write)"""
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = """
+Enfant
+fd[0] (read)"""
+
+[[visualizer.steps]]
+explanation = "write(fd[1]) copie les données dans le buffer circulaire kernel du pipe. Le parent ferme fd[0] (lecture) avant d'écrire car il n'en a pas besoin — et surtout, si l'extrémité lecture restait ouverte dans le parent après close(fd[1]), l'enfant ne verrait jamais EOF (le kernel compterait encore un lecteur)."
+label = "Parent: write(fd[1], 'Bonjour fils')"
+step_label = "Étape 2 — Parent: write(fd[1], 'Bonjour fils') dans le buffer kernel"
+
+[[visualizer.steps.edges]]
+label = "12 bytes"
+source = "msg"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "msg"
+label = '"Bonjour fils"'
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "kernel buffer"
+
+[[visualizer.steps]]
+explanation = "read(fd[0]) retourne le nombre d'octets lus — pas nécessairement strlen(msg), car les pipes ne garantissent pas la préservation des frontières de messages pour les tailles > PIPE_BUF. Ici le message est court (12 octets) donc une seule lecture suffit. L'enfant appelle _exit(0) (et non exit()) pour éviter de flusher les buffers stdio deux fois."
+label = "Enfant: read(fd[0]) → affiche le message"
+step_label = "Étape 3 — Enfant: read(fd[0]) → affiche le message reçu"
+
+[[visualizer.steps.edges]]
+label = "n bytes"
+source = "buf"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "kernel buffer"
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "buf[] enfant"

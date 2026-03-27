@@ -1,0 +1,207 @@
+common_mistake = "Croire que SIGKILL peut être capturé — c'est impossible par design"
+description = """
+NSY103 — Les signaux sont des entiers définis dans signal.h. Chaque signal a un comportement par défaut : TERM (tuer), IGN (ignorer), CORE (core dump), STOP (suspendre).
+
+Affichez les numéros et catégories des signaux POSIX fondamentaux.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "#include <signal.h> donne accès aux constantes SIGTERM, SIGKILL, SIGINT, etc.",
+    "SIGTERM=15, SIGKILL=9, SIGINT=2, SIGSEGV=11, SIGCHLD=17 (Linux)",
+    "Organiser en tableau struct { int num; char *name; char *action; }",
+]
+id = "signal-constants-01"
+kc_ids = ["KC-C08"]
+key_concept = "SIGKILL(9) et SIGSTOP(19) ne peuvent pas être bloqués ni ignorés"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+
+typedef struct { int num; const char *name; const char *action; } SigInfo;
+
+/* Test mode: test harness handles validation */
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <signal.h>
+
+typedef struct { int num; const char *name; const char *action; } SigInfo;
+
+/* Test mode: no main() needed */
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <signal.h>
+
+/* Test mode: signal constants are pre-defined */
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* SIGHUP=1, SIGINT=2, SIGKILL=9, SIGTERM=15 */
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* Signals have numeric values defined in signal.h */
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* Understand signal constants */
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+int main(void) {
+    {
+        printf("%d\n", (int)(SIGHUP));
+    }
+    {
+        printf("%d\n", (int)(SIGINT));
+    }
+    {
+        printf("%d\n", (int)(SIGKILL));
+    }
+    {
+        printf("%d\n", (int)(SIGTERM));
+    }
+    return 0;
+}
+''',
+]
+subject = "signals"
+title = "Constantes et catégories de signaux"
+
+[validation]
+expected_output = """
+1
+2
+9
+15"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Tableau de SigInfo initialisé"
+
+[[visualizer.steps.stack]]
+name = "signals[0]"
+value = '{1, "SIGHUP", "TERM"}'
+
+[[visualizer.steps.stack]]
+name = "signals[1]"
+value = '{2, "SIGINT", "TERM"}'
+
+[[visualizer.steps.stack]]
+name = "signals[6]"
+value = '{9, "SIGKILL", "TERM (unkillable)"}'
+
+[[visualizer.steps.stack]]
+name = "signals[7]"
+value = '{19, "SIGSTOP", "STOP (unstoppable)"}'
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Boucle printf sur 9 signaux"
+
+[[visualizer.steps.stack]]
+name = "i"
+value = "0..8"
+
+[[visualizer.steps.stack]]
+name = "format"
+value = '"%-4d %-10s %s"'

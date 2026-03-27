@@ -56,11 +56,11 @@ fn make_app_state() -> AppState {
 fn snapshot_watch_view_initial() {
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
-    let state = make_app_state();
+    let mut state = make_app_state();
 
     terminal
         .draw(|f| {
-            ui_watch::view(f, &state);
+            ui_watch::view(f, &mut state);
         })
         .unwrap();
 
@@ -85,7 +85,7 @@ fn snapshot_watch_view_with_compile_error() {
 
     terminal
         .draw(|f| {
-            ui_watch::view(f, &state);
+            ui_watch::view(f, &mut state);
         })
         .unwrap();
 
@@ -111,7 +111,7 @@ fn snapshot_watch_view_success() {
 
     terminal
         .draw(|f| {
-            ui_watch::view(f, &state);
+            ui_watch::view(f, &mut state);
         })
         .unwrap();
 
@@ -128,7 +128,7 @@ fn snapshot_watch_view_help_overlay() {
 
     terminal
         .draw(|f| {
-            ui_watch::view(f, &state);
+            ui_watch::view(f, &mut state);
         })
         .unwrap();
 
@@ -145,7 +145,7 @@ fn snapshot_watch_view_solution_overlay() {
 
     terminal
         .draw(|f| {
-            ui_watch::view(f, &state);
+            ui_watch::view(f, &mut state);
         })
         .unwrap();
 

@@ -1,0 +1,316 @@
+common_mistake = "Oublier que quand remaining[i] < quantum, on avance de remaining[i] unités (pas de quantum) et remaining[i] devient 0"
+description = """
+NSY103/UTC502 — Round-Robin avec quantum Q=2, 4 processus arrivant à t=0.
+
+Processus : P1(burst=12), P2(burst=8), P3(burst=4), P4(burst=10)
+Ordre initial : P1→P2→P3→P4 (tête de liste)
+
+Simulez le Round-Robin (Q=2) et calculez le temps de réponse (= temps de terminaison) de chaque processus.
+
+Gantt : P1(0-2) P2(2-4) P3(4-6) P4(6-8) P1(8-10) P2(10-12) P3(12-14) P4(14-16) P1(16-18) P2(18-20) P4(20-22) P1(22-24) P2(24-26) P4(26-28) P1(28-30) P4(30-32) P1(32-34)
+
+Résultats :
+  P3 finit à t=14 (burst=4, 2 tours)
+  P2 finit à t=26 (burst=8, 4 tours)
+  P4 finit à t=32 (burst=10, 5 tours)
+  P1 finit à t=34 (burst=12, 6 tours)
+  Temps de réponse moyen : (34+26+14+32)/4 = 26.50"""
+difficulty = 3
+exercise_type = "complete"
+files = []
+hints = [
+    "Utilisez un tableau remaining[] initialisé avec burst[], decrementé à chaque tour : `run = (remaining[i] < quantum) ? remaining[i] : quantum`",
+    "Quand remaining[i] atteint 0, le processus est terminé : enregistrez `response[i] = time` et incrémentez `done`",
+    "Bouclez tant que `done < N` — la boucle interne for parcourt tous les processus à chaque tour de RR",
+]
+id = "sched-rr-gantt-01"
+kc_ids = ["KC-C6"]
+key_concept = "En RR avec Q=2 sur 4 processus, la durée totale = sum(bursts) = 34 ; P3 (burst=4) finit en premier à t=14, P1 (burst=12) finit en dernier à t=34"
+lang = "c"
+prerequisites = [
+    "sched-fifo-01",
+    "sched-rr-01",
+]
+solution_code = '''
+#include <stdio.h>
+#define N 4
+
+void simulate_rr_gantt(int burst[], int n, int quantum, int response[]) {
+    int remaining[N];
+    int time = 0, done = 0;
+    for (int i = 0; i < n; i++) {
+        remaining[i] = burst[i];
+        response[i] = -1;
+    }
+    while (done < n) {
+        for (int i = 0; i < n; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    response[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+}
+
+int main(void) {
+    int burst[]    = {12, 8, 4, 10};
+    int remaining[N];
+    int response[N];
+    int quantum    = 2;
+    int time       = 0;
+    int done       = 0;
+
+    for (int i = 0; i < N; i++) {
+        remaining[i] = burst[i];
+        response[i]  = -1;
+    }
+
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    response[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, response[i]);
+
+    float avg = (float)(response[0] + response[1] + response[2] + response[3]) / N;
+    printf("Average response time: %.2f\n", avg);
+    return 0;
+}
+'''
+starter_code = """
+#define N 4
+
+void simulate_rr_gantt(int burst[], int n, int quantum, int response[]) {
+    int remaining[N];
+    /* TODO: Initialisez remaining[] avec burst[], response[]=-1 */
+    /* TODO: Boucle while (done < n) avec Round-Robin Q=2 */
+    /* TODO: run = min(remaining[i], quantum) */
+    /* TODO: Enregistrez response[i] = time quand remaining[i] == 0 */
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 4
+
+/* Round-Robin Q=2 avec 4 processus arrivant a t=0.
+ * Algorithme :
+ *   Repeter tant que done < N :
+ *     Pour chaque processus i :
+ *       Si remaining[i] > 0 :
+ *         run = min(remaining[i], quantum)  /* le processus ne peut depasser son quantum */
+ *         time += run
+ *         remaining[i] -= run
+ *         Si remaining[i] == 0 : response[i] = time, done++
+ */
+int main(void) {
+    int burst[]    = {12, 8, 4, 10};
+    int remaining[N];
+    int response[N];
+    int quantum    = 2;
+    int time       = 0;
+    int done       = 0;
+
+    for (int i = 0; i < N; i++) {
+        remaining[i] = burst[i];
+        response[i]  = -1;
+    }
+
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    response[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, response[i]);
+
+    float avg = (float)(response[0] + response[1] + response[2] + response[3]) / N;
+    printf("Average response time: %.2f\n", avg);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 4
+
+int main(void) {
+    int burst[]    = {12, 8, 4, 10};
+    int remaining[N];
+    int response[N];
+    int quantum    = 2;
+    int time       = 0;
+    int done       = 0;
+
+    for (int i = 0; i < N; i++) {
+        remaining[i] = ____; /* initialiser avec burst[i] */
+        response[i]  = -1;
+    }
+
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                /* run = min(remaining[i], quantum) — ternaire */
+                int run = (remaining[i] < quantum) ? ____ : ____;
+                time += ____;
+                remaining[i] -= ____;
+                if (remaining[i] == 0) {
+                    response[i] = ____; /* temps de fin */
+                    done++;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, response[i]);
+
+    float avg = (float)(response[0] + response[1] + response[2] + response[3]) / N;
+    printf("Average response time: %.2f\n", avg);
+    return 0;
+}''',
+    """
+#define N 4
+
+void simulate_rr_gantt(int burst[], int n, int quantum, int response[]) {
+    int remaining[N];
+    /* TODO: Initialisez remaining[] avec burst[], response[]=-1 */
+    /* TODO: Boucle while (done < n) avec Round-Robin Q=2 */
+    /* TODO: run = min(remaining[i], quantum) */
+    /* TODO: Enregistrez response[i] = time quand remaining[i] == 0 */
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 4
+
+void simulate_rr_gantt(int burst[], int n, int quantum, int response[]) {
+    /* TODO */
+}
+
+int main(void) {
+    int burst[]    = {12, 8, 4, 10};
+    int remaining[N];
+    int response[N];
+    int quantum    = 2;
+    int time       = 0;
+    int done       = 0;
+
+    for (int i = 0; i < N; i++) {
+        remaining[i] = burst[i];
+        response[i]  = -1;
+    }
+
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    response[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, response[i]);
+
+    float avg = (float)(response[0] + response[1] + response[2] + response[3]) / N;
+    printf("Average response time: %.2f\n", avg);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 4
+
+void simulate_rr_gantt(int burst[], int n, int quantum, int response[]) { }
+
+int main(void) {
+    int burst[]    = {12, 8, 4, 10};
+    int remaining[N];
+    int response[N];
+    int quantum    = 2;
+    int time       = 0;
+    int done       = 0;
+
+    for (int i = 0; i < N; i++) {
+        remaining[i] = burst[i];
+        response[i]  = -1;
+    }
+
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    response[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N; i++)
+        printf("Response time P%d: %d\n", i + 1, response[i]);
+
+    float avg = (float)(response[0] + response[1] + response[2] + response[3]) / N;
+    printf("Average response time: %.2f\n", avg);
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "Round-Robin Q=2 : temps de réponse (4 processus)"
+
+[validation]
+expected_output = """
+Response time P1: 34
+Response time P2: 26
+Response time P3: 14
+Response time P4: 32
+Average response time: 26.50"""
+mode = "output"
+
+[visualizer]
+steps = []
+type = "dataflow"

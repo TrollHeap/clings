@@ -1,0 +1,272 @@
+common_mistake = "Utiliser un timeout relatif au lieu d'absolu — struct timespec doit être un point dans le temps, pas une durée"
+description = """
+NSY103 — mq_timedreceive() fonctionne comme mq_receive() mais avec un timeout absolu (struct timespec). Si aucun message n'arrive avant le deadline, l'appel échoue avec errno=ETIMEDOUT. On construit le deadline en ajoutant un délai à clock_gettime(CLOCK_REALTIME).
+
+Tentez de recevoir avec un timeout de 0 secondes sur une file vide (→ ETIMEDOUT), puis envoyez un message et recevez avec succès."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "clock_gettime(CLOCK_REALTIME, &ts) donne l'heure actuelle comme deadline",
+    "mq_timedreceive avec ts = maintenant → timeout immédiat si file vide",
+    "ETIMEDOUT est l'errno retourné quand le timeout expire",
+]
+id = "mq-timeout-01"
+kc_ids = ["KC-C12"]
+key_concept = "mq_timedreceive utilise un timeout absolu (CLOCK_REALTIME) ; retourne ETIMEDOUT si expiré"
+lang = "c"
+prerequisites = ["mq-notify-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_timeout", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    char buf[128];
+    ssize_t n = mq_timedreceive(mq, buf, sizeof(buf), NULL, &ts);
+    if (n == -1 && errno == ETIMEDOUT)
+        printf("Timeout: no message\n");
+
+    mq_send(mq, "timed msg", 9, 0);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5;
+    n = mq_timedreceive(mq, buf, sizeof(buf), NULL, &ts);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_timeout");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_timeout", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct timespec ts;
+    clock_gettime(____,  &ts);
+
+    char buf[128];
+    ssize_t n = ____(mq, buf, sizeof(buf), NULL, &ts);
+    if (n == -1 && errno == ____)
+        printf("Timeout: no message\n");
+
+    mq_send(mq, "timed msg", 9, 0);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5;
+    n = mq_timedreceive(mq, buf, sizeof(buf), NULL, &ts);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_timeout");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+/* == EXEMPLE =======================================
+ * mq_timedsend avec timeout
+ * ================================================= */
+void example_timed(void) {
+    struct mq_attr a = { .mq_maxmsg = 1, .mq_msgsize = 64 };
+    mqd_t q = mq_open("/kf_ex_timed", O_CREAT|O_RDWR, 0644, &a);
+    mq_send(q, "fill", 4, 0);
+    struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+    int r = mq_timedsend(q, "full", 4, 0, &ts);
+    if (r == -1 && errno == ETIMEDOUT)
+        printf("Send timed out (queue full)\n");
+    char buf[64]; mq_receive(q, buf, sizeof(buf), NULL);
+    mq_close(q); mq_unlink("/kf_ex_timed");
+}
+/* Resultat: Send timed out (queue full) */
+
+/* == VOTRE EXERCICE ================================
+ * mq_timedreceive: timeout sur file vide, puis succes.
+ * ================================================= */
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_timeout", O_CREAT|O_RDWR, 0644, &attr);
+    /* TODO: timedreceive with now → ETIMEDOUT, send, timedreceive → success */
+    mq_close(mq); mq_unlink("/kf_mq_timeout");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_timeout", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct timespec ts;
+    clock_gettime(____,  &ts);
+
+    char buf[128];
+    ssize_t n = ____(mq, buf, sizeof(buf), NULL, &ts);
+    if (n == -1 && errno == ____)
+        printf("Timeout: no message\n");
+
+    mq_send(mq, "timed msg", 9, 0);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5;
+    n = mq_timedreceive(mq, buf, sizeof(buf), NULL, &ts);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_timeout");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_timeout", O_CREAT | O_RDWR, 0644, &attr);
+
+    struct timespec ts;
+    clock_gettime(____,  &ts);
+
+    char buf[128];
+    ssize_t n = ____(mq, buf, sizeof(buf), NULL, &ts);
+    if (n == -1 && errno == ____)
+        printf("Timeout: no message\n");
+
+    mq_send(mq, "timed msg", 9, 0);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5;
+    n = mq_timedreceive(mq, buf, sizeof(buf), NULL, &ts);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_timeout");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <errno.h>
+
+int main(void) {
+    // Créez /kf_mq_timeout
+    // timedreceive avec deadline=now sur file vide → ETIMEDOUT
+    // send "timed msg", timedreceive avec deadline+5s → succès
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "mq_timedreceive avec timeout"
+
+[validation]
+expected_output = """
+Timeout: no message
+Received: timed msg
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "mq_timedreceive() avec un deadline égal au temps présent expire immédiatement si la file est vide. Le noyau compare l'heure courante (CLOCK_REALTIME) à l'heure absolue fournie dans struct timespec. Si le deadline est dépassé, l'appel retourne -1 avec errno=ETIMEDOUT sans bloquer."
+label = "mq_timedreceive avec deadline = maintenant"
+step_label = "Étape 1 — mq_timedreceive() expire immédiatement (file vide)"
+
+[[visualizer.steps.edges]]
+label = "ETIMEDOUT"
+source = "mq"
+target = "ts"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = """
+/kf_mq_timeout
+(vide)"""
+
+[[visualizer.steps.nodes]]
+id = "ts"
+label = "deadline = now"
+
+[[visualizer.steps]]
+explanation = "mq_send() dépose le message dans la file du noyau de façon synchrone. Le message sera disponible instantanément pour le prochain mq_timedreceive(). Contrairement à mq_notify (asynchrone), mq_send/mq_receive fonctionnent en mode synchrone bloquant par défaut."
+label = "mq_send 'timed msg'"
+step_label = "Étape 2 — mq_send() dépose le message dans la file"
+
+[[visualizer.steps.edges]]
+label = "mq_send"
+source = "msg"
+target = "mq"
+
+[[visualizer.steps.nodes]]
+id = "msg"
+label = '"timed msg"'
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_timeout"
+
+[[visualizer.steps]]
+explanation = "mq_timedreceive() avec un deadline +5 secondes dans le futur réussit immédiatement si un message est disponible dans la file — le timeout n'est jamais atteint. Le noyau retourne le message sans attendre, la struct timespec n'est consultée que si la file est vide au moment de l'appel."
+label = "mq_timedreceive avec deadline +5s → succès"
+step_label = "Étape 3 — mq_timedreceive() succès immédiat (message présent)"
+
+[[visualizer.steps.edges]]
+label = "immediate success"
+source = "mq"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_timeout"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = '"timed msg"'

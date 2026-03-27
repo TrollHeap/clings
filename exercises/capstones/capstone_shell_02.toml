@@ -1,0 +1,459 @@
+common_mistake = "Confondre O_TRUNC (écrase le fichier) et O_APPEND (ajoute à la fin) pour > vs >>"
+description = """
+NSY103 — Capstone combinant processus, pipes, descripteurs de fichiers et redirections. Implémentez un parser de commande shell qui détecte les opérateurs de redirection (<, >, >>), ouvre les fichiers correspondants avec open(), redirige les fd avec dup2(), puis exécute la commande simulée.
+
+Pour la testabilité, on utilise des fichiers simulés via fmemopen et on affiche les actions de redirection.
+
+⚠ Cet exercice combine : open(), dup2(), fork(), close(), parsing de ligne de commande."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Le parser doit détecter <, > et >> comme tokens séparés et stocker le fichier suivant",
+    "O_RDONLY pour la redirection d'entrée, O_WRONLY|O_CREAT|O_TRUNC pour > et O_APPEND pour >>",
+    "Après dup2(fd, STDIN_FILENO), fermez l'ancien fd pour éviter les fuites de descripteurs",
+]
+id = "capstone-shell-02"
+kc_ids = ["KC-CAP"]
+key_concept = "Les redirections shell utilisent open() + dup2() : < = O_RDONLY, > = O_TRUNC, >> = O_APPEND"
+lang = "c"
+prerequisites = ["capstone-shell-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+typedef struct {
+    char *cmd;
+    char *infile;
+    char *outfile;
+    int append;
+} Command;
+
+Command parse_redirections(char *line) {
+    Command c = {NULL, NULL, NULL, 0};
+    char *token = strtok(line, " ");
+    char cmd_buf[256] = "";
+    while (token) {
+        if (strcmp(token, "<") == 0) {
+            token = strtok(NULL, " ");
+            c.infile = token;
+        } else if (strcmp(token, ">>") == 0) {
+            token = strtok(NULL, " ");
+            c.outfile = token;
+            c.append = 1;
+        } else if (strcmp(token, ">") == 0) {
+            token = strtok(NULL, " ");
+            c.outfile = token;
+        } else {
+            if (strlen(cmd_buf) > 0) strcat(cmd_buf, " ");
+            strcat(cmd_buf, token);
+        }
+        token = strtok(NULL, " ");
+    }
+    c.cmd = strdup(cmd_buf);
+    return c;
+}
+
+void execute_with_redirections(Command *c) {
+    printf("CMD: %s\n", c->cmd);
+    if (c->infile)
+        printf("REDIR: stdin < %s\n", c->infile);
+    if (c->outfile) {
+        if (c->append)
+            printf("REDIR: stdout >> %s\n", c->outfile);
+        else
+            printf("REDIR: stdout > %s\n", c->outfile);
+    }
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (c->infile) {
+            int fd = open(c->infile, O_RDONLY);
+            if (fd >= 0) {
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+            }
+        }
+        if (c->outfile) {
+            int flags = O_WRONLY | O_CREAT;
+            flags |= c->append ? O_APPEND : O_TRUNC;
+            int fd = open(c->outfile, flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+            }
+        }
+        printf("[exec: %s]\n", c->cmd);
+        exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    printf("EXIT: %d\n", WEXITSTATUS(status));
+}
+
+int main(void) {
+    char line1[] = "cat < input.txt";
+    char line2[] = "echo hello > output.txt";
+    char line3[] = "logger msg >> log.txt";
+
+    Command c1 = parse_redirections(line1);
+    Command c2 = parse_redirections(line2);
+    Command c3 = parse_redirections(line3);
+
+    execute_with_redirections(&c1);
+    execute_with_redirections(&c2);
+    execute_with_redirections(&c3);
+
+    free(c1.cmd); free(c2.cmd); free(c3.cmd);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+typedef struct {
+    char *cmd;
+    char *infile;
+    char *outfile;
+    int append;
+} Command;
+
+Command parse_redirections(char *line) {
+    Command c = {NULL, NULL, NULL, 0};
+    char *token = strtok(line, " ");
+    char cmd_buf[256] = "";
+    while (token) {
+        if (strcmp(token, "<") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else if (strcmp(token, ">>") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+            c.____ = 1;
+        } else if (strcmp(token, ">") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else {
+            if (strlen(cmd_buf) > 0) strcat(cmd_buf, " ");
+            strcat(cmd_buf, token);
+        }
+        token = strtok(NULL, " ");
+    }
+    c.cmd = strdup(cmd_buf);
+    return c;
+}
+
+void execute_with_redirections(Command *c) {
+    printf("CMD: %s\n", c->cmd);
+    if (c->infile)
+        printf("REDIR: stdin < %s\n", c->infile);
+    if (c->outfile) {
+        if (c->append)
+            printf("REDIR: stdout >> %s\n", c->outfile);
+        else
+            printf("REDIR: stdout > %s\n", c->outfile);
+    }
+
+    pid_t pid = ____();
+    if (pid == 0) {
+        if (c->infile) {
+            int fd = open(c->infile, ____);
+            if (fd >= 0) {
+                dup2(fd, STDIN_FILENO);
+                ____(____);
+            }
+        }
+        if (c->outfile) {
+            int flags = O_WRONLY | O_CREAT;
+            flags |= c->append ? ____ : ____;
+            int fd = open(c->outfile, flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDOUT_FILENO);
+                ____(____);
+            }
+        }
+        printf("[exec: %s]\n", c->cmd);
+        exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    printf("EXIT: %d\n", WEXITSTATUS(status));
+}
+
+int main(void) {
+    char line1[] = "cat < input.txt";
+    char line2[] = "echo hello > output.txt";
+    char line3[] = "logger msg >> log.txt";
+
+    Command c1 = parse_redirections(line1);
+    Command c2 = parse_redirections(line2);
+    Command c3 = parse_redirections(line3);
+
+    execute_with_redirections(&c1);
+    execute_with_redirections(&c2);
+    execute_with_redirections(&c3);
+
+    free(c1.cmd); free(c2.cmd); free(c3.cmd);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == EXEMPLE =======================================
+ * Parser simple de flags de commande
+ * Meme pattern: tokeniser une ligne et dispatcher
+ * selon les tokens speciaux detectes.
+ * ================================================= */
+typedef struct { char *prog; int verbose; char *output; } Opts;
+
+Opts parse_opts(char *line) {
+    Opts o = {NULL, 0, NULL};
+    char *t = strtok(line, " ");
+    char buf[128] = "";
+    while (t) {
+        if (strcmp(t, "-v") == 0) { o.verbose = 1; }
+        else if (strcmp(t, "-o") == 0) { t = strtok(NULL, " "); o.output = t; }
+        else { if (strlen(buf) > 0) strcat(buf, " "); strcat(buf, t); }
+        t = strtok(NULL, " ");
+    }
+    o.prog = strdup(buf);
+    return o;
+}
+
+void example_opts(void) {
+    char line[] = "gcc -v -o main.out file.c";
+    Opts o = parse_opts(line);
+    printf("Prog: %s, Verbose: %d, Output: %s\n", o.prog, o.verbose, o.output);
+    free(o.prog);
+}
+/* Resultat: Prog: gcc file.c, Verbose: 1, Output: main.out */
+
+int main(void) {
+    example_opts();
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+typedef struct { char *cmd; char *infile; char *outfile; int append; } Command;
+
+Command parse_redirections(char *line) {
+    Command c = {NULL, NULL, NULL, 0};
+    char *token = strtok(line, " ");
+    char cmd_buf[256] = "";
+    while (token) {
+        if (strcmp(token, "<") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else if (strcmp(token, ">>") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+            c.____ = 1;
+        } else if (strcmp(token, ">") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else {
+            if (strlen(cmd_buf) > 0) strcat(cmd_buf, " ");
+            strcat(cmd_buf, token);
+        }
+        token = strtok(NULL, " ");
+    }
+    c.cmd = strdup(cmd_buf);
+    return c;
+}
+
+void execute_with_redirections(Command *c) {
+    printf("CMD: %s\n", c->cmd);
+    if (c->infile) printf("REDIR: stdin < %s\n", c->infile);
+    if (c->outfile) {
+        if (c->append) printf("REDIR: stdout >> %s\n", c->outfile);
+        else printf("REDIR: stdout > %s\n", c->outfile);
+    }
+    pid_t pid = ____();
+    if (pid == 0) {
+        if (c->infile) { int fd = open(c->infile, ____); if (fd>=0) { dup2(fd,STDIN_FILENO); ____(fd); } }
+        if (c->outfile) { int flags = O_WRONLY|O_CREAT|(c->append ? ____ : ____); int fd = open(c->outfile, flags, 0644); if (fd>=0) { dup2(fd,STDOUT_FILENO); ____(fd); } }
+        printf("[exec: %s]\n", c->cmd);
+        exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    printf("EXIT: %d\n", WEXITSTATUS(status));
+}
+
+int main(void) {
+    char l1[] = "cat < input.txt";
+    char l2[] = "echo hello > output.txt";
+    char l3[] = "logger msg >> log.txt";
+    Command c1 = parse_redirections(l1);
+    Command c2 = parse_redirections(l2);
+    Command c3 = parse_redirections(l3);
+    execute_with_redirections(&c1);
+    execute_with_redirections(&c2);
+    execute_with_redirections(&c3);
+    free(c1.cmd); free(c2.cmd); free(c3.cmd);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+typedef struct { char *cmd; char *infile; char *outfile; int append; } Command;
+
+Command parse_redirections(char *line) {
+    Command c = {NULL, NULL, NULL, 0};
+    char *token = strtok(line, " ");
+    char cmd_buf[256] = "";
+    while (token) {
+        if (strcmp(token, "<") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else if (strcmp(token, ">>") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+            c.____ = 1;
+        } else if (strcmp(token, ">") == 0) {
+            token = strtok(NULL, " ");
+            c.____ = token;
+        } else {
+            if (strlen(cmd_buf) > 0) strcat(cmd_buf, " ");
+            strcat(cmd_buf, token);
+        }
+        token = strtok(NULL, " ");
+    }
+    c.cmd = strdup(cmd_buf);
+    return c;
+}
+
+void execute_with_redirections(Command *c) {
+    printf("CMD: %s\n", c->cmd);
+    if (c->infile) printf("REDIR: stdin < %s\n", c->infile);
+    if (c->outfile) {
+        if (c->append) printf("REDIR: stdout >> %s\n", c->outfile);
+        else printf("REDIR: stdout > %s\n", c->outfile);
+    }
+    pid_t pid = ____();
+    if (pid == 0) {
+        if (c->infile) { int fd = open(c->infile, ____); if (fd>=0) { dup2(fd,STDIN_FILENO); ____(fd); } }
+        if (c->outfile) { int flags = O_WRONLY|O_CREAT|(c->append ? ____ : ____); int fd = open(c->outfile, flags, 0644); if (fd>=0) { dup2(fd,STDOUT_FILENO); ____(fd); } }
+        printf("[exec: %s]\n", c->cmd);
+        exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    printf("EXIT: %d\n", WEXITSTATUS(status));
+}
+
+int main(void) {
+    char l1[] = "cat < input.txt";
+    char l2[] = "echo hello > output.txt";
+    char l3[] = "logger msg >> log.txt";
+    Command c1 = parse_redirections(l1);
+    Command c2 = parse_redirections(l2);
+    Command c3 = parse_redirections(l3);
+    execute_with_redirections(&c1);
+    execute_with_redirections(&c2);
+    execute_with_redirections(&c3);
+    free(c1.cmd); free(c2.cmd); free(c3.cmd);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+// Parser de redirections: detecter <, >, >> dans la ligne de commande
+// Stocker infile/outfile/append dans une struct Command
+// fork + open + dup2 pour appliquer les redirections
+// Tester avec 3 commandes: cat < in, echo > out, logger >> log
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "capstones"
+title = "Shell avec redirections < > >>"
+
+[validation]
+expected_output = 'REGEX:(?s)CMD: cat\nREDIR: stdin < input\.txt\n.*EXIT: 0\nCMD: echo hello\nREDIR: stdout > output\.txt\nEXIT: 0\nCMD: logger msg\nREDIR: stdout >> log\.txt\nEXIT: 0'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le token '<' indique une redirection d'entrée. Le token suivant est le fichier source."
+heap = []
+label = 'Parsing de "cat < input.txt"'
+step_label = "parse <"
+
+[[visualizer.steps.call_frames]]
+args = "line"
+function_name = "parse_redirections"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "c.cmd"
+value = '"cat"'
+
+[[visualizer.steps.stack]]
+name = "c.infile"
+value = '"input.txt"'
+
+[[visualizer.steps.stack]]
+name = "c.outfile"
+value = "NULL"
+
+[[visualizer.steps]]
+explanation = "open() retourne un fd, dup2() redirige stdin vers ce fd, puis on ferme l'original."
+heap = []
+label = "dup2 pour redirection d'entrée"
+step_label = "dup2 stdin"
+
+[[visualizer.steps.arrows]]
+from = "STDIN_FILENO"
+label = "dup2"
+to = "fd"
+
+[[visualizer.steps.call_frames]]
+args = "c"
+function_name = "execute_with_redirections"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "3 (open input.txt)"
+
+[[visualizer.steps.stack]]
+name = "STDIN_FILENO"
+value = "-> fd 3"

@@ -1,0 +1,279 @@
+common_mistake = "Écrire n &= n + 1 au lieu de n &= n - 1 → boucle infinie"
+description = """
+NSY103 — Le popcount (population count) compte le nombre de bits à 1 dans un entier. L'algorithme naïf parcourt chaque bit. L'astuce de Brian Kernighan (n &= n-1) éteint le bit le plus bas en une itération — O(nombre de bits à 1) au lieu de O(32).
+
+Implémentez popcount naïf et optimisé, puis comparez."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Naïf: n & 1 teste le bit de poids faible, n >>= 1 décale au suivant",
+    "Kernighan: n & (n-1) efface le bit le plus bas à 1",
+    "0xA5 = 10100101b → 4 bits à 1",
+]
+id = "bit-count-01"
+kc_ids = ["KC-C04"]
+key_concept = "n & (n-1) éteint le bit le plus bas à 1 — trick de Kernighan pour un popcount en O(k) au lieu de O(N)"
+lang = "c"
+prerequisites = ["bit-toggle-01"]
+solution_code = '''
+#include <stdio.h>
+
+int popcount_naive(unsigned int n) {
+    int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+
+int popcount_kernighan(unsigned int n) {
+    int count = 0;
+    while (n) {
+        n &= n - 1;
+        count++;
+    }
+    return count;
+}
+
+int main(void) {
+    unsigned int vals[] = {0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000};
+    int nvals = 5;
+    for (int i = 0; i < nvals; i++) {
+        int naive = popcount_naive(vals[i]);
+        int kern = popcount_kernighan(vals[i]);
+        printf("0x%08X: naive=%d kern=%d\n", vals[i], naive, kern);
+    }
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+int popcount_naive(unsigned int n) {
+    int count = 0;
+    while (n) {
+        count += n & 0;
+        n >>= 1;
+    }
+    return count;
+}
+
+int popcount_kernighan(unsigned int n) {
+    int count = 0;
+    while (n) {
+        n &= 0;
+        count++;
+    }
+    return count;
+}
+
+int main(void) {
+    unsigned int vals[] = {0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000};
+    int nvals = 5;
+    for (int i = 0; i < nvals; i++) {
+        int naive = popcount_naive(vals[i]);
+        int kern = popcount_kernighan(vals[i]);
+        printf("0x%08X: naive=%d kern=%d\n", vals[i], naive, kern);
+    }
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * n & (n-1) magic: éteint le bit le plus bas
+ * 1100 & 1011 = 1000 (bit 2 éteint)
+ * =========================================================== */
+void example_trick(void) {
+    unsigned int n = 0x0C; /* 1100b */
+    printf("0x%02X & 0x%02X = 0x%02X\n", n, n-1, n & (n-1)); /* 0x08 */
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Implémenter popcount naïf et Kernighan
+ * =========================================================== */
+
+int popcount_naive(unsigned int n) {
+    int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+
+int popcount_kernighan(unsigned int n) {
+    int count = 0;
+    while (n) {
+        n &= n - 1;
+        count++;
+    }
+    return count;
+}
+
+int main(void) {
+    unsigned int vals[] = {0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000};
+    int nvals = 5;
+    for (int i = 0; i < nvals; i++) {
+        int naive = popcount_naive(vals[i]);
+        int kern = popcount_kernighan(vals[i]);
+        printf("0x%08X: naive=%d kern=%d\n", vals[i], naive, kern);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int popcount_naive(unsigned int n) {
+    int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+
+int popcount_kernighan(unsigned int n) {
+    int count = 0;
+    while (n) {
+        n &= ____;
+        count++;
+    }
+    return count;
+}
+
+int main(void) {
+    unsigned int vals[] = {0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000};
+    int nvals = 5;
+    for (int i = 0; i < nvals; i++) {
+        int naive = popcount_naive(vals[i]);
+        int kern = popcount_kernighan(vals[i]);
+        printf("0x%08X: naive=%d kern=%d\n", vals[i], naive, kern);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int popcount_naive(unsigned int n) {
+    int count = 0;
+    while (n) {
+        count += n & ____;
+        n >>= 1;
+    }
+    return count;
+}
+
+int popcount_kernighan(unsigned int n) {
+    int count = 0;
+    while (n) {
+        n &= ____;
+        count++;
+    }
+    return count;
+}
+
+int main(void) {
+    unsigned int vals[] = {0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000};
+    int nvals = 5;
+    for (int i = 0; i < nvals; i++) {
+        int naive = popcount_naive(vals[i]);
+        int kern = popcount_kernighan(vals[i]);
+        printf("0x%08X: naive=%d kern=%d\n", vals[i], naive, kern);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+// popcount_naive: while(n) count += n&1, n>>=1
+// popcount_kernighan: while(n) n &= n-1, count++
+// Tester sur: 0x00, 0xFF, 0xA5, 0xDEADBEEF, 0x80000000
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "bitwise_ops"
+title = "Comptage de bits (popcount optimisé)"
+
+[validation]
+expected_output = """
+0x00000000: naive=0 kern=0
+0x000000FF: naive=8 kern=8
+0x000000A5: naive=4 kern=4
+0xDEADBEEF: naive=24 kern=24
+0x80000000: naive=1 kern=1"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Parcourt tous les bits — O(32) pour un 32-bit"
+heap = []
+label = "Naïf: parcours bit par bit"
+step_label = "1. Naïf"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5"
+function_name = "popcount_naive"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n=0xA5"
+value = "10100101b"
+
+[[visualizer.steps.stack]]
+name = "itération 1"
+value = "n&1=1, n>>=1 → 01010010"
+
+[[visualizer.steps.stack]]
+name = "itération 2"
+value = "n&1=0, n>>=1 → 00101001"
+
+[[visualizer.steps.stack]]
+name = "..."
+value = "8 itérations au total"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Seulement 4 itérations pour 4 bits — O(popcount)"
+heap = []
+label = "Kernighan: n &= n-1 éteint le bit le plus bas"
+step_label = "2. Kernighan"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5"
+function_name = "popcount_kernighan"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n=0xA5"
+value = "10100101b"
+
+[[visualizer.steps.stack]]
+name = "n&(n-1)"
+value = "10100100b (bit 0 éteint)"
+
+[[visualizer.steps.stack]]
+name = "n&(n-1)"
+value = "10100000b (bit 2 éteint)"
+
+[[visualizer.steps.stack]]
+name = "n&(n-1)"
+value = "10000000b (bit 5 éteint)"
+
+[[visualizer.steps.stack]]
+name = "n&(n-1)"
+value = "00000000b → 4 itérations"

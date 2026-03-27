@@ -1,0 +1,314 @@
+common_mistake = "Pour trier char*[], le comparateur reçoit char** (adresse de l'élément), pas char*"
+description = """
+NSY103 — `void *` est un pointeur générique qui peut pointer vers n'importe quel type. Il ne peut pas être déréférencé directement — il faut le caster. La fonction standard `qsort` utilise ce mécanisme pour trier n'importe quel type.
+
+Implémentez des fonctions de comparaison pour trier des entiers et des chaînes avec `qsort`."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Pour cmp_int : caster `const void *` en `const int *` puis déréférencer",
+    "Pour cmp_str : qsort passe l'adresse de chaque élément — un élément est `char *`, donc le paramètre est `char **`",
+    "Pattern safe pour comparer des entiers sans overflow : `(a > b) - (a < b)`",
+]
+id = "ptr-generic-01"
+kc_ids = ["KC-C01"]
+key_concept = "void* est le polymorphisme du C — cast explicite obligatoire pour déréférencer"
+lang = "c"
+prerequisites = ["ptr-ptr-03"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int cmp_int(const void *a, const void *b) {
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+    return (ia > ib) - (ia < ib);
+}
+
+int cmp_str(const void *a, const void *b) {
+    const char *sa = *(const char **)a;
+    const char *sb = *(const char **)b;
+    return strcmp(sa, sb);
+}
+
+int main(void) {
+    int nums[] = {42, 7, 99, 3, 15};
+    qsort(nums, 5, sizeof(int), cmp_int);
+    printf("Entiers : ");
+    for (int i = 0; i < 5; i++) printf("%d ", nums[i]);
+    printf("\n");
+    char *mots[] = {"delta", "alpha", "charlie", "bravo"};
+    qsort(mots, 4, sizeof(char *), cmp_str);
+    printf("Mots : ");
+    for (int i = 0; i < 4; i++) printf("%s ", mots[i]);
+    printf("\n");
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int cmp_int(const void *a, const void *b) {
+    return 0;
+}
+
+int cmp_str(const void *a, const void *b) {
+    return 0;
+}
+
+int main(void) {
+    // TODO: trier nums[] et mots[] avec qsort
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * qsort sur un tableau de double
+ * Le comparateur recoit des void* qu'il caste en double*.
+ * =========================================================== */
+int example_cmp_double(const void *a, const void *b) {
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    return (da > db) - (da < db);
+}
+void example_demo(void) {
+    double vals[] = {3.14, 1.41, 2.72};
+    qsort(vals, 3, sizeof(double), example_cmp_double);
+    for (int i = 0; i < 3; i++) printf("%.2f ", vals[i]);
+    printf("\n");
+}
+/* Resultat: 1.41 2.72 3.14 */
+
+/* == VOTRE EXERCICE =========================================
+ * qsort sur int[] et char*[]
+ * Implementez cmp_int et cmp_str.
+ * Attention: pour char*[], void* est en fait char**.
+ * =========================================================== */
+int cmp_int(const void *a, const void *b) {
+    (void)a; (void)b;
+    return 0; /* TODO */
+}
+int cmp_str(const void *a, const void *b) {
+    (void)a; (void)b;
+    return 0; /* TODO */
+}
+
+int main(void) {
+    int nums[] = {42, 7, 99, 3, 15};
+    qsort(nums, 5, sizeof(int), cmp_int);
+    printf("Entiers : ");
+    for (int i = 0; i < 5; i++) printf("%d ", nums[i]);
+    printf("\n");
+    char *mots[] = {"delta", "alpha", "charlie", "bravo"};
+    qsort(mots, 4, sizeof(char *), cmp_str);
+    printf("Mots : ");
+    for (int i = 0; i < 4; i++) printf("%s ", mots[i]);
+    printf("\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int cmp_int(const void *a, const void *b) {
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+    return ____; // pattern safe sans overflow
+}
+
+int cmp_str(const void *a, const void *b) {
+    const char *sa = *(const char **)a;
+    const char *sb = ____;
+    return strcmp(sa, sb);
+}
+
+int main(void) {
+    int nums[] = {42, 7, 99, 3, 15};
+    qsort(nums, 5, sizeof(int), cmp_int);
+    printf("Entiers : ");
+    for (int i = 0; i < 5; i++) printf("%d ", nums[i]);
+    printf("\n");
+    char *mots[] = {"delta", "alpha", "charlie", "bravo"};
+    qsort(mots, 4, sizeof(char *), ____);
+    printf("Mots : ");
+    for (int i = 0; i < 4; i++) printf("%s ", mots[i]);
+    printf("\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int cmp_int(const void *a, const void *b) {
+    int ia = *(const ____ *)a;
+    int ib = *(const ____ *)b;
+    return ____;
+}
+
+int cmp_str(const void *a, const void *b) {
+    const char *sa = *(const char *____)a;
+    const char *sb = *(const char *____)b;
+    return strcmp(____, ____);
+}
+
+int main(void) {
+    int nums[] = {42, 7, 99, 3, 15};
+    int n = 5;
+    qsort(nums, n, sizeof(____), ____);
+    printf("Entiers : ");
+    for (int i = 0; i < n; i++) printf("%d ", nums[i]);
+    printf("\n");
+
+    char *mots[] = {"delta", "alpha", "charlie", "bravo"};
+    int m = 4;
+    qsort(mots, m, sizeof(____), ____);
+    printf("Mots : ");
+    for (int i = 0; i < m; i++) printf("%s ", mots[i]);
+    printf("\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Implémentez cmp_int et cmp_str pour qsort
+// cmp_int : cast void* → int*, comparez
+// cmp_str : cast void* → char**, déréférencez, strcmp
+int cmp_int(const void *a, const void *b) { return 0; }
+int cmp_str(const void *a, const void *b) { return 0; }
+
+int main(void) {
+    // TODO: trier nums[] et mots[] avec qsort
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "void* et cast générique (qsort)"
+
+[validation]
+expected_output = """
+Entiers : 3 7 15 42 99
+Mots : alpha bravo charlie delta"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "qsort passe des void* vers chaque paire d'éléments. cmp_int caste en int* et déréférence pour comparer. qsort ne connaît pas le type — seule la taille (sizeof(int)) et le comparateur importent."
+heap = []
+label = "qsort sur nums[] — cast void* → int*"
+step_label = "cmp_int — cast void* vers int*"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "nums, 5, 4, cmp_int"
+function_name = "qsort"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "void *a, void *b"
+function_name = "cmp_int"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "7"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "99"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "15"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque mots[i] est un char*. qsort passe &mots[i] qui est char**. Donc on caste void* en char** puis déréférence pour obtenir le char*. Double indirection."
+heap = []
+label = "qsort sur mots[] — cast void* → char**"
+step_label = "cmp_str — void* → char** → char*"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "mots, 4, 8, cmp_str"
+function_name = "qsort"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "void *a, void *b"
+function_name = "cmp_str"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "mots[0]"
+value = '→"delta"'
+
+[[visualizer.steps.stack]]
+name = "mots[1]"
+value = '→"alpha"'
+
+[[visualizer.steps.stack]]
+name = "mots[2]"
+value = '→"charlie"'
+
+[[visualizer.steps.stack]]
+name = "mots[3]"
+value = '→"bravo"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "qsort trie en place — les mêmes tableaux contiennent maintenant les éléments ordonnés. Le mécanisme void* + comparateur permet un tri générique sans templates ni génériques."
+heap = []
+label = "Résultats triés"
+step_label = "Résultats triés en place"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[]"
+value = "3 7 15 42 99"
+
+[[visualizer.steps.stack]]
+name = "mots[]"
+value = "alpha bravo charlie delta"

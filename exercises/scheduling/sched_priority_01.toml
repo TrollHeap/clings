@@ -1,0 +1,381 @@
+common_mistake = "Initialiser order[i]=priority[i] au lieu de order[i]=i — order[] doit contenir des indices de processus, pas des valeurs de priorité"
+description = """
+NSY103 — L'ordonnancement par priorité exécute les processus dans l'ordre de priorité (1=plus haute). Avec P1(burst=3, pri=2), P2(burst=6, pri=1), P3(burst=3, pri=3) :
+
+Ordre d'exécution : P2(pri=1) → P1(pri=2) → P3(pri=3)
+
+Utilisez un tableau d'indices order[] trié par priorité croissante."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Initialisez order[] = {0, 1, 2} — les indices des processus, pas les priorités",
+    "Triez order[] par priority[order[j]] : comparez les priorités via l'indirection",
+    "wait[order[0]]=0 ; wait[order[i]] = wait[order[i-1]] + burst[order[i-1]] — naviguez via order[]",
+]
+id = "sched-priority-01"
+kc_ids = ["KC-C6"]
+key_concept = "Trier des indices order[] par priorité permet d'accéder aux données dans l'ordre d'exécution sans les déplacer"
+lang = "c"
+prerequisites = ["sched-sjf-01"]
+solution_code = '''
+#include <stdio.h>
+#define N 3
+
+void simulate_priority(int burst[], int priority[], int n, int wait[], int turnaround[]) {
+    int order[N];
+    for (int i = 0; i < n; i++) order[i] = i;
+    for (int i = 0; i < n - 1; i++)
+        for (int j = 0; j < n - 1 - i; j++)
+            if (priority[order[j]] > priority[order[j+1]]) {
+                int tmp = order[j]; order[j] = order[j+1]; order[j+1] = tmp;
+            }
+    wait[order[0]] = 0;
+    for (int i = 1; i < n; i++)
+        wait[order[i]] = wait[order[i-1]] + burst[order[i-1]];
+    for (int i = 0; i < n; i++)
+        turnaround[i] = wait[i] + burst[i];
+}
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int priority[] = {1};
+        int wait[1], ta[1];
+        simulate_priority(burst, priority, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {2, 3};
+        int priority[] = {2, 1};
+        int wait[2], ta[2];
+        simulate_priority(burst, priority, 2, wait, ta);
+        /* P2 (prio=1) executes first */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {3, 6, 3};
+        int priority[] = {2, 1, 3};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        /* Order: P2 (prio=1), P1 (prio=2), P3 (prio=3) */
+        /* wait: P1=6, P2=0, P3=9 */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {2, 2, 2};
+        int priority[] = {1, 1, 1};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#define N 3
+
+void simulate_priority(int burst[], int priority[], int n, int wait[], int turnaround[]) {
+    int order[N];
+    /* TODO: Initialisez order[i] = i */
+    /* TODO: Tri à bulles : comparez priority[order[j]] > priority[order[j+1]] */
+    /* TODO: wait[order[0]]=0, wait[order[i]]=wait[order[i-1]]+burst[order[i-1]] */
+    /* TODO: turnaround[i]=wait[i]+burst[i] */
+}
+
+int main(void) {
+    int burst[]    = {3, 6, 3};
+    int priority[] = {2, 1, 3};
+    int order[N];
+    // 1. order[i] = i  (indices des processus)
+    // 2. Tri a bulles : comparer priority[order[j]] vs priority[order[j+1]]
+    // 3. wait[order[0]] = 0
+    //    wait[order[i]] = wait[order[i-1]] + burst[order[i-1]]
+    // 4. turnaround[i] = wait[i] + burst[i]
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* == EXEMPLE =======================================
+ * Priority avec P1(burst=2,pri=3), P2(burst=4,pri=1), P3(burst=1,pri=2)
+ * order initial = {0,1,2}
+ * apres tri par priorite : order = {1, 2, 0} (P2,P3,P1)
+ * wait[order[0]]=wait[1]=0
+ * wait[order[1]]=wait[2]=0+4=4
+ * wait[order[2]]=wait[0]=4+1=5
+ * avg_wait=(0+4+5)/3=3.00
+ * ================================================= */
+void example_priority(void) {
+    int b[] = {2, 4, 1};
+    int p[] = {3, 1, 2};
+    int o[] = {0, 1, 2};
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2-i; j++)
+            if (p[o[j]] > p[o[j+1]]) { int t=o[j]; o[j]=o[j+1]; o[j+1]=t; }
+    int w[3];
+    w[o[0]] = 0;
+    for (int i = 1; i < 3; i++) w[o[i]] = w[o[i-1]] + b[o[i-1]];
+    printf("Avg wait: %.2f\n", (w[0]+w[1]+w[2])/3.0f);
+}
+
+/* == VOTRE EXERCICE ================================
+ * burst={3,6,3}, priority={2,1,3}
+ * ================================================= */
+int main(void) {
+    int burst[]    = {3, 6, 3};
+    int priority[] = {2, 1, 3};
+    int order[N];
+    /* TODO: order[i] = i */
+    /* TODO: tri order par priority[order[j]] croissant */
+    /* TODO: wait[order[0]]=0, boucle wait via order */
+    /* TODO: turnaround et sommes */
+    printf("Average waiting time: %.2f\n", 0.0f);
+    printf("Average turnaround time: %.2f\n", 0.0f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+int main(void) {
+    int burst[]    = {3, 6, 3};
+    int priority[] = {2, 1, 3};
+    int order[N];
+
+    for (int i = 0; i < N; i++) order[i] = i;
+
+    for (int i = 0; i < N - 1; i++)
+        for (int j = 0; j < N - 1 - i; j++)
+            if (priority[order[j]] > priority[order[j+1]]) {
+                int tmp = order[j]; order[j] = order[j+1]; order[j+1] = tmp;
+            }
+
+    int wait[N], turnaround[N];
+    wait[order[0]] = 0;
+    for (int i = 1; i < N; i++)
+        wait[order[i]] = wait[order[____]] + burst[order[____]]; // i ou i-1?
+
+    float total_wait = 0, total_ta = 0;
+    for (int i = 0; i < N; i++) {
+        turnaround[i] = wait[i] + burst[i];
+        total_wait += wait[i];
+        total_ta += turnaround[i];
+    }
+
+    printf("Average waiting time: %.2f\n", total_wait / N);
+    printf("Average turnaround time: %.2f\n", total_ta / N);
+    return 0;
+}''',
+    """
+#define N 3
+
+void simulate_priority(int burst[], int priority[], int n, int wait[], int turnaround[]) {
+    int order[N];
+    /* TODO: Initialisez order[i] = i */
+    /* TODO: Tri à bulles : comparez priority[order[j]] > priority[order[j+1]] */
+    /* TODO: wait[order[0]]=0, wait[order[i]]=wait[order[i-1]]+burst[order[i-1]] */
+    /* TODO: turnaround[i]=wait[i]+burst[i] */
+}
+
+int main(void) {
+    int burst[]    = {3, 6, 3};
+    int priority[] = {2, 1, 3};
+    int order[N];
+    // 1. order[i] = i  (indices des processus)
+    // 2. Tri a bulles : comparer priority[order[j]] vs priority[order[j+1]]
+    // 3. wait[order[0]] = 0
+    //    wait[order[i]] = wait[order[i-1]] + burst[order[i-1]]
+    // 4. turnaround[i] = wait[i] + burst[i]
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 3
+
+void simulate_priority(int burst[], int priority[], int n, int wait[], int turnaround[]) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int priority[] = {1};
+        int wait[1], ta[1];
+        simulate_priority(burst, priority, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {2, 3};
+        int priority[] = {2, 1};
+        int wait[2], ta[2];
+        simulate_priority(burst, priority, 2, wait, ta);
+        /* P2 (prio=1) executes first */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {3, 6, 3};
+        int priority[] = {2, 1, 3};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        /* Order: P2 (prio=1), P1 (prio=2), P3 (prio=3) */
+        /* wait: P1=6, P2=0, P3=9 */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {2, 2, 2};
+        int priority[] = {1, 1, 1};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 3
+
+void simulate_priority(int burst[], int priority[], int n, int wait[], int turnaround[]) { }
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int priority[] = {1};
+        int wait[1], ta[1];
+        simulate_priority(burst, priority, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {2, 3};
+        int priority[] = {2, 1};
+        int wait[2], ta[2];
+        simulate_priority(burst, priority, 2, wait, ta);
+        /* P2 (prio=1) executes first */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {3, 6, 3};
+        int priority[] = {2, 1, 3};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        /* Order: P2 (prio=1), P1 (prio=2), P3 (prio=3) */
+        /* wait: P1=6, P2=0, P3=9 */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {2, 2, 2};
+        int priority[] = {1, 1, 1};
+        int wait[3], ta[3];
+        simulate_priority(burst, priority, 3, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "Ordonnancement par priorité (non-préemptif)"
+
+[validation]
+expected_output = """
+0
+4
+3
+0
+6
+0
+9
+0
+2
+4"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "L'ordonnancement par priorité trie un tableau d'indices order[] selon la valeur de priorité (1 = plus haute). On ne déplace pas les données dans burst[], on déplace leurs indices : order[]={1,0,2} signifie exécuter P2 puis P1 puis P3. Cette indirection est un pattern fondamental en C pour trier sans copier les structures."
+label = "Tri par priorité : order[] = {1, 0, 2} (P2 en premier)"
+step_label = "Étape 1 — Tri d'indices order[] par priorité croissante"
+
+[[visualizer.steps.edges]]
+label = "t=6"
+source = "p2"
+target = "p1"
+
+[[visualizer.steps.edges]]
+label = "t=9"
+source = "p1"
+target = "p3"
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = """
+P2
+pri=1
+burst=6"""
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = """
+P1
+pri=2
+burst=3"""
+
+[[visualizer.steps.nodes]]
+id = "p3"
+label = """
+P3
+pri=3
+burst=3"""
+
+[[visualizer.steps]]
+explanation = "Le calcul des temps d'attente navigue via order[] : wait[order[i]] = wait[order[i-1]] + burst[order[i-1]]. P3 de priorité basse (pri=3) subit la famine si des processus haute priorité arrivent continuellement — c'est le risque principal de l'ordonnancement par priorité pur sans vieillissement (aging)."
+label = "Calcul via order[] : wait[order[i]]"
+step_label = "Étape 2 — wait[] calculé via indirection order[] : risque de famine pour P3"
+
+[[visualizer.steps.edges]]
+label = "+burst[P2]=6"
+source = "w2"
+target = "w1"
+
+[[visualizer.steps.edges]]
+label = "+burst[P1]=3"
+source = "w1"
+target = "w3"
+
+[[visualizer.steps.nodes]]
+id = "w2"
+label = "wait[P2]=0"
+
+[[visualizer.steps.nodes]]
+id = "w1"
+label = "wait[P1]=6"
+
+[[visualizer.steps.nodes]]
+id = "w3"
+label = "wait[P3]=9"

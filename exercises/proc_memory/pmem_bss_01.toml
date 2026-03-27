@@ -1,0 +1,188 @@
+common_mistake = "Croire que les variables locales non initialisées sont à zéro — c'est seulement BSS"
+description = """
+NSY103 — Le segment BSS (Block Started by Symbol) contient les variables globales et statiques non initialisées. Le noyau les met à zéro au chargement du programme. Les variables statiques locales persistent entre les appels.
+
+Démontrez que les variables BSS sont initialisées à zéro et que les variables statiques persistent."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Les variables globales non initialisées vont dans BSS et sont mises à 0",
+    "Le mot-clé 'static' dans une fonction rend la variable persistante entre appels",
+    "BSS n'occupe pas d'espace dans le fichier ELF — juste une taille à allouer",
+]
+id = "pmem-bss-01"
+kc_ids = ["KC-C17"]
+key_concept = "BSS = globales non-init (zéro garanti), static = persistance entre appels"
+lang = "c"
+prerequisites = ["pmem-layout-01"]
+solution_code = '''
+#include <stdio.h>
+int g_uninit;
+int g_array[4];
+int counter(void) {
+    static int count = 0;
+    return ++count;
+}
+int main(void) {
+    printf("g_uninit: %d\n", g_uninit);
+    printf("g_array: %d %d %d %d\n", g_array[0], g_array[1], g_array[2], g_array[3]);
+    printf("All BSS zero: %s\n",
+        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? "yes" : "no");
+    printf("call1: %d\n", counter());
+    printf("call2: %d\n", counter());
+    printf("call3: %d\n", counter());
+    printf("Static persists: yes\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+int g_uninit;
+int g_array[4];
+
+int counter(void) {
+    ____ int count = 0;
+    return ++count;
+}
+
+int main(void) {
+    printf("g_uninit: %d\n", g_uninit);
+    printf("g_array: %d %d %d %d\n", g_array[0], g_array[1], g_array[2], g_array[3]);
+    printf("All BSS zero: %s\n",
+        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? "yes" : "no");
+    printf("call1: %d\n", counter());
+    printf("call2: %d\n", counter());
+    printf("call3: %d\n", ____);
+    printf("Static persists: yes\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE: différence data vs bss ================== */
+int g_data = 42;  /* segment data (initialisé) */
+int g_bss_ex;     /* segment bss (non-initialisé → 0) */
+void example_segments(void) {
+    printf("data: %d, bss: %d\n", g_data, g_bss_ex);
+}
+
+int g_uninit;
+int g_array[4];
+int counter(void) { static int count = 0; return ++count; }
+int main(void) {
+    printf("g_uninit: %d\n", g_uninit);
+    printf("g_array: %d %d %d %d\n", g_array[0], g_array[1], g_array[2], g_array[3]);
+    printf("All BSS zero: %s\n",
+        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? "yes" : "no");
+    printf("call1: %d\n", counter());
+    printf("call2: %d\n", counter());
+    printf("call3: %d\n", counter());
+    printf("Static persists: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+int g_uninit;
+int g_array[4];
+int counter(void) { ____ int count = 0; return ++count; }
+int main(void) {
+    printf("g_uninit: %d\n", g_uninit);
+    printf("g_array: %d %d %d %d\n", g_array[0], g_array[1], g_array[2], g_array[3]);
+    printf("All BSS zero: %s\n",
+        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? "yes" : "no");
+    printf("call1: %d\n", counter());
+    printf("call2: %d\n", ____);
+    printf("call3: %d\n", ____);
+    printf("Static persists: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+int g_uninit;
+int g_array[4];
+int counter(void) {
+    ____ int count = 0;
+    return ++count;
+}
+int main(void) {
+    printf("g_uninit: %d\n", g_uninit);
+    printf("g_array: %d %d %d %d\n", g_array[0], g_array[1], g_array[2], g_array[3]);
+    printf("All BSS zero: %s\n",
+        (g_uninit == 0 && g_array[0] == 0 && g_array[3] == 0) ? "yes" : "no");
+    printf("call1: %d\n", counter());
+    printf("call2: %d\n", counter());
+    printf("call3: %d\n", ____);
+    printf("Static persists: yes\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int g_uninit;
+int g_array[4];
+
+// Montrez que BSS est à zéro et que static persiste
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Segment BSS et initialisation implicite"
+
+[validation]
+expected_output = """
+g_uninit: 0
+g_array: 0 0 0 0
+All BSS zero: yes
+call1: 1
+call2: 2
+call3: 3
+Static persists: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le noyau met BSS à zéro au chargement"
+heap = []
+label = "BSS initialisé à zéro"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "g_uninit"
+value = "0 (BSS)"
+
+[[visualizer.steps.stack]]
+name = "g_array"
+value = "{0,0,0,0} (BSS)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "static local: même adresse, valeur persistante"
+heap = []
+label = "static count persiste"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "counter"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "count (static)"
+value = "1 → 2 → 3"

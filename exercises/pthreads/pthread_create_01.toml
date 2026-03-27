@@ -1,0 +1,306 @@
+common_mistake = "Oublier pthread_join → le main peut se terminer avant le thread"
+description = """
+NSY103 — pthread_create() lance un thread d'exécution. pthread_join() attend sa terminaison et récupère sa valeur de retour. Le thread exécute une fonction de signature void *(*)(void *).
+
+Créez un thread qui affiche un message, puis attendez-le dans le main."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "pthread_create prend 4 arguments : &tid, attributs (NULL), fonction, argument (NULL)",
+    "La fonction thread doit avoir la signature void *(*)(void *)",
+    "pthread_join(tid, NULL) bloque jusqu'à la fin du thread",
+]
+id = "pthread-create-01"
+kc_ids = ["KC-C09"]
+key_concept = "pthread_create lance un thread, pthread_join attend sa fin — le join garantit l'ordre d'exécution"
+lang = "c"
+prerequisites = ["pthread-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+void *thread_func(void *arg) {
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <pthread.h>
+
+void *thread_func(void *arg) {
+    /* TODO: cast arg if needed and do something */
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Fonction thread simple qui retourne NULL
+ * ========================================================= */
+void *example_func(void *arg) {
+    (void)arg;
+    return NULL;
+}
+/* Resultat: fonction qui retourne NULL */
+
+/* == VOTRE EXERCICE ========================================
+ * Implémentez thread_func(void *arg)
+ * Retournez NULL
+ * ========================================================= */
+
+void *thread_func(void *arg) {
+    /* TODO: return NULL */
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+''',
+    '''
+#include <pthread.h>
+
+void *thread_func(void *arg) {
+    /* TODO: do something with arg or ignore it */
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+''',
+    '''
+#include <pthread.h>
+
+void *thread_func(void *arg) {
+    (void)arg;
+    /* TODO: implement thread function body */
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+''',
+    '''
+#include <pthread.h>
+
+/* thread_func qui accepte void *arg et retourne NULL */
+
+void *thread_func(void *arg) {
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+''',
+    '''
+#include <pthread.h>
+
+void *thread_func(void *arg) {
+    (void)arg;
+    return NULL;
+}
+
+int main(void) {
+    {
+        void *result = thread_func(NULL);
+        printf("%d\n", (result) == NULL ? 1 : 0);
+    }
+    {
+        pthread_t tid;
+        int rc = pthread_create(&tid, NULL, thread_func, NULL);
+        printf("%d\n", (int)(rc));
+        int join_rc = pthread_join(tid, NULL);
+        printf("%d\n", (int)(join_rc));
+    }
+    {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_func, NULL) == 0) {
+        int result = pthread_join(tid, NULL);
+        printf("%d\n", (int)(result));
+        }
+    }
+    return 0;
+}
+''',
+]
+subject = "pthreads"
+title = "pthread_create et pthread_join"
+
+[validation]
+expected_output = """
+1
+0
+0
+0"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "pthread_create lance thread_func dans un thread séparé"
+heap = []
+label = "pthread_create — lancement du thread"
+step_label = "1. Création"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "tid"
+value = "pthread_t (thread ID)"
+
+[[visualizer.steps.stack]]
+name = "main()"
+value = "en cours"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le thread exécute sa fonction et affiche le message"
+heap = []
+label = "thread_func exécute printf"
+step_label = "2. Exécution"
+
+[[visualizer.steps.call_frames]]
+args = "void *arg"
+function_name = "thread_func"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "tid"
+value = "pthread_t"
+
+[[visualizer.steps.stack]]
+name = "thread_func"
+value = 'printf("Hello...")'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "pthread_join bloque jusqu'à la fin du thread, puis main continue"
+heap = []
+label = "pthread_join — main attend le thread"
+step_label = "3. Join"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "tid"
+value = "terminé"
+
+[[visualizer.steps.stack]]
+name = "main()"
+value = "reprend"

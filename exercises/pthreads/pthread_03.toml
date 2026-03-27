@@ -1,0 +1,490 @@
+common_mistake = "Oublier pthread_rwlock_unlock() après wrlock → deadlock si le même thread tente un rdlock (rwlock non récursif par défaut)"
+description = """
+NSY103 — pthread_rwlock_t permet des lectures concurrentes et une écriture exclusive. PTHREAD_RWLOCK_INITIALIZER initialise statiquement. pthread_rwlock_rdlock() acquiert en lecture (partageable), pthread_rwlock_wrlock() en écriture (exclusive).
+
+Simulez une lecture puis une écriture sur une donnée partagée avec un rwlock.
+
+Note : le code exécuté est intentionnellement mono-thread (pas de pthread_create) pour garantir une sortie déterministe. Le visualiseur thread_timeline illustre un vrai scénario concurrent reader/writer — c'est le contexte réel dans lequel pthread_rwlock_t est utile."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "PTHREAD_RWLOCK_INITIALIZER initialise statiquement sans pthread_rwlock_init()",
+    "pthread_rwlock_rdlock() : plusieurs readers simultanés autorisés",
+    "pthread_rwlock_wrlock() : exclusif — bloque si un reader ou writer actif",
+    "pthread_rwlock_unlock() déverrouille dans les deux cas (rdlock et wrlock)",
+]
+id = "pthread-03"
+kc_ids = ["KC-C09"]
+key_concept = "rdlock = lectures concurrentes (N readers) ; wrlock = écriture exclusive (1 writer, 0 readers)"
+lang = "c"
+prerequisites = ["pthread-02"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Read locked\n");
+    printf("data = %d\n", data);
+    pthread_rwlock_unlock(&rwlock);
+    printf("Read unlocked\n");
+    pthread_rwlock_wrlock(&rwlock);
+    printf("Write locked\n");
+    data = 100;
+    printf("data = %d\n", data);
+    pthread_rwlock_unlock(&rwlock);
+    printf("Write unlocked\n");
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Read locked\n");
+    printf("data = %d\n", data);
+    ____(&rwlock);            // déverrouiller
+    printf("Read unlocked\n");
+    ____(&rwlock);            // verrouiller en écriture
+    printf("Write locked\n");
+    data = 100;
+    printf("data = %d\n", data);
+    ____(&rwlock);            // déverrouiller
+    printf("Write unlocked\n");
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * RW Lock : lire et mettre a jour une config
+ * rdlock = lectures concurrentes, wrlock = ecriture exclusive.
+ * ========================================================= */
+int config_port = 8080;
+pthread_rwlock_t cfg_lock = PTHREAD_RWLOCK_INITIALIZER;
+
+void example_read_config(void) {
+    pthread_rwlock_rdlock(&cfg_lock);
+    printf("Config port = %d\n", config_port);
+    pthread_rwlock_unlock(&cfg_lock);
+}
+
+void example_update_config(int new_port) {
+    pthread_rwlock_wrlock(&cfg_lock);
+    config_port = new_port;
+    printf("Config updated to %d\n", config_port);
+    pthread_rwlock_unlock(&cfg_lock);
+}
+/* Resultat: Config port = 8080 puis Config updated to 9090 */
+
+/* == VOTRE EXERCICE ========================================
+ * Read-Write Lock : rdlock, wrlock, unlock
+ * Inspirez-vous de example_read_config/example_update_config.
+ * Lisez data=42 sous rdlock, modifiez data=100 sous wrlock.
+ * ========================================================= */
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    /* TODO: rdlock, print Read locked, print data, unlock, print Read unlocked */
+    /* TODO: wrlock, print Write locked, set data=100, print data, unlock, print Write unlocked */
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Read locked\n");
+    printf("data = %d\n", data);
+    pthread_rwlock_unlock(&rwlock);
+    printf("Read unlocked\n");
+    ____(&rwlock);            // verrouiller en écriture
+    printf("Write locked\n");
+    data = 100;
+    printf("data = %d\n", data);
+    pthread_rwlock_unlock(&rwlock);
+    printf("Write unlocked\n");
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    pthread_rwlock_rdlock(&rwlock);
+    printf("Read locked\n");
+    printf("data = %d\n", data);
+    ____(&rwlock);            // déverrouiller
+    printf("Read unlocked\n");
+    ____(&rwlock);            // verrouiller en écriture
+    printf("Write locked\n");
+    data = 100;
+    printf("data = %d\n", data);
+    ____(&rwlock);            // déverrouiller
+    printf("Write unlocked\n");
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int data = 42;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int main(void) {
+    // Acquérez en lecture, affichez data=42, déverrouillez
+    // Acquérez en écriture, modifiez data=100, affichez, déverrouillez
+    // Sortie attendue: "Read locked\ndata = 42\nRead unlocked\nWrite locked\ndata = 100\nWrite unlocked\n"
+    pthread_rwlock_destroy(&rwlock);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Read-Write Lock : rdlock, wrlock, unlock"
+
+[mission]
+clientId = "nordcloud"
+clientName = "NordCloud"
+contactEmail = "arch@nordcloud.sys"
+failureEmail = """
+Le lock n'est pas correctement configuré. Vérifie pthread_rwlock_rdlock() pour les lecteurs et pthread_rwlock_wrlock() pour le writer.
+
+Arch @ NordCloud"""
+incidentEmail = """
+Architecte,
+
+Notre cache metadata est consulté par N lecteurs en parallèle mais écrasé par un seul writer. Un mutex bloque tous les lecteurs inutilement.
+
+Implémente pthread_rwlock : rdlock pour les lecteurs, wrlock pour le writer exclusif.
+
+Arch @ NordCloud"""
+payout = 280
+prereqMissionIds = ["pthread-02"]
+receivedTime = "10:00"
+subject = "Cache distribué — Read-Write Lock concurrent"
+successEmail = """
+Impeccable. Le RW lock permet la lecture concurrente tout en garantissant l'exclusivité en écriture.
+
+NordCloud Architecture"""
+syscallsInvolved = [
+    "pthread_rwlock_init",
+    "pthread_rwlock_rdlock",
+    "pthread_rwlock_wrlock",
+    "pthread_rwlock_unlock",
+]
+tier = 3
+
+[validation]
+expected_output = """
+Read locked
+data = 42
+Read unlocked
+Write locked
+data = 100
+Write unlocked
+"""
+mode = "output"
+
+[visualizer]
+type = "thread_timeline"
+
+[[visualizer.steps]]
+explanation = "PTHREAD_RWLOCK_INITIALIZER initialise statiquement le rwlock sans pthread_rwlock_init(). Le verrou est libre : N readers peuvent l'acquérir simultanément (rdlock partagé), mais un writer exige l'exclusivité totale — aucun reader ni writer concurrent."
+label = "PTHREAD_RWLOCK_INITIALIZER — rwlock libre"
+step_label = "Init rwlock"
+
+[[visualizer.steps.events]]
+label = "spawn reader"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "spawn writer"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.locks]]
+name = "rwlock"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "reader"
+label = "reader"
+state = "ready"
+
+[[visualizer.steps.threads]]
+id = "writer"
+label = "writer"
+state = "ready"
+
+[[visualizer.steps]]
+explanation = "pthread_rwlock_rdlock acquiert le verrou en lecture partagée. Plusieurs readers peuvent détenir simultanément un rdlock — c'est la propriété fondamentale qui distingue rwlock d'un mutex. Le writer tente pthread_rwlock_wrlock mais est bloqué : un writer exige l'exclusivité totale (zéro reader actif)."
+label = "pthread_rwlock_rdlock — lecture acquise (non exclusive)"
+step_label = "reader → rdlock"
+
+[[visualizer.steps.events]]
+label = "spawn reader"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "spawn writer"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "rdlock acquired"
+thread = "reader"
+type = "read"
+
+[[visualizer.steps.events]]
+label = "wrlock blocked"
+thread = "writer"
+type = "lock"
+
+[[visualizer.steps.locks]]
+holder = "reader (READ)"
+name = "rwlock"
+waiters = ["writer"]
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "reader"
+label = "reader"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "writer"
+label = "writer"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "Le reader lit data=42 en toute sécurité sous rdlock. Le writer reste bloqué — il ne peut pas écrire tant qu'un reader détient le verrou. Cette asymétrie est le cœur du rwlock : N lectures concurrentes sont autorisées, 1 écriture exclusive est sérialisée."
+label = "reader lit data=42 — writer toujours bloqué"
+step_label = "reader → read data"
+
+[[visualizer.steps.events]]
+label = "spawn reader"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "spawn writer"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "rdlock acquired"
+thread = "reader"
+type = "read"
+
+[[visualizer.steps.events]]
+label = "read data"
+thread = "reader"
+type = "read"
+value = "42"
+
+[[visualizer.steps.events]]
+label = "wrlock blocked"
+thread = "writer"
+type = "lock"
+
+[[visualizer.steps.locks]]
+holder = "reader (READ)"
+name = "rwlock"
+waiters = ["writer"]
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "reader"
+label = "reader"
+state = "running"
+
+[[visualizer.steps.threads]]
+id = "writer"
+label = "writer"
+state = "blocked"
+
+[[visualizer.steps]]
+explanation = "pthread_rwlock_unlock libère le rdlock — la même fonction sert pour rdlock et wrlock. Le reader passe à dead (thread terminé). Le kernel réveille le writer qui était en attente : il obtient maintenant le wrlock exclusif car le compteur de readers actifs est tombé à 0."
+label = "pthread_rwlock_unlock (reader) — writer peut acquérir"
+step_label = "reader → unlock"
+
+[[visualizer.steps.events]]
+label = "spawn reader"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "spawn writer"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "rdlock acquired"
+thread = "reader"
+type = "read"
+
+[[visualizer.steps.events]]
+label = "read data"
+thread = "reader"
+type = "read"
+value = "42"
+
+[[visualizer.steps.events]]
+label = "rdunlock"
+thread = "reader"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "thread exit"
+thread = "reader"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "wrlock acquired"
+thread = "writer"
+type = "lock"
+
+[[visualizer.steps.locks]]
+holder = "writer (WRITE)"
+name = "rwlock"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "reader"
+label = "reader"
+state = "dead"
+
+[[visualizer.steps.threads]]
+id = "writer"
+label = "writer"
+state = "running"
+
+[[visualizer.steps]]
+explanation = "Le writer détient le wrlock exclusif : aucun reader ne peut acquérir rdlock pendant cette phase. data est modifié de 42 à 100 de façon atomique du point de vue des autres threads. Après pthread_rwlock_unlock, le rwlock revient à l'état libre — prêt pour de nouvelles acquisitions rd ou wr."
+label = "writer modifie data=100 — exclusif, aucun lecteur possible"
+step_label = "writer → write data=100"
+
+[[visualizer.steps.events]]
+label = "spawn reader"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "spawn writer"
+thread = "main"
+type = "spawn"
+
+[[visualizer.steps.events]]
+label = "rdlock acquired"
+thread = "reader"
+type = "read"
+
+[[visualizer.steps.events]]
+label = "read data"
+thread = "reader"
+type = "read"
+value = "42"
+
+[[visualizer.steps.events]]
+label = "rdunlock"
+thread = "reader"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "thread exit"
+thread = "reader"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "wrlock acquired"
+thread = "writer"
+type = "lock"
+
+[[visualizer.steps.events]]
+label = "data = 100"
+thread = "writer"
+type = "write"
+value = "100"
+
+[[visualizer.steps.events]]
+label = "wrunlock"
+thread = "writer"
+type = "unlock"
+
+[[visualizer.steps.events]]
+label = "thread exit"
+thread = "writer"
+type = "dead"
+
+[[visualizer.steps.events]]
+label = "pthread_join(writer)"
+thread = "main"
+type = "join"
+
+[[visualizer.steps.locks]]
+name = "rwlock"
+waiters = []
+
+[[visualizer.steps.threads]]
+id = "main"
+label = "main()"
+state = "blocked"
+
+[[visualizer.steps.threads]]
+id = "reader"
+label = "reader"
+state = "dead"
+
+[[visualizer.steps.threads]]
+id = "writer"
+label = "writer"
+state = "running"

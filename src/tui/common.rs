@@ -4,8 +4,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
-    Block, BorderType, Clear, List, ListItem, ListState, Paragraph, Scrollbar,
-    ScrollbarOrientation, ScrollbarState, Wrap,
+    Block, BorderType, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
+    ScrollbarState, Wrap,
 };
 use ratatui::Frame;
 use ratatui_macros::{line, span, vertical};
@@ -443,6 +443,93 @@ pub fn run_result_height(result: &RunResult, expected: Option<&str>) -> u16 {
     }
 }
 
+/// Structure représentant le résumé parsé d'un test Unity.
+#[derive(Debug)]
+struct UnityTestSummary {
+    total_tests: usize,
+    failures: usize,
+    #[allow(dead_code)]
+    ignored: usize,
+    failed_tests: Vec<(String, Option<String>)>, // (test_name, optional error message)
+}
+
+/// Analyse le stdout d'un test Unity et extrait les résultats.
+/// Format attendu : "file:line:test_name:PASS" ou "file:line:test_name:FAIL" suivi optionnellement d'une ligne d'erreur.
+fn parse_unity_output(stdout: &str) -> Option<UnityTestSummary> {
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    if lines.is_empty() {
+        return None;
+    }
+
+    let mut failed_tests: Vec<(String, Option<String>)> = Vec::new();
+    let mut i = 0;
+
+    // Parser chaque ligne de test
+    while i < lines.len() {
+        let line = lines[i];
+        // Format : "file.c:123:test_name:PASS" ou "file.c:123:test_name:FAIL"
+        if let Some(colon_pos) = line.rfind(':') {
+            let status = &line[colon_pos + 1..];
+            if status == "PASS" || status == "FAIL" {
+                // Extraire le nom du test (avant le dernier ':')
+                if let Some(prev_colon) = line[..colon_pos].rfind(':') {
+                    let test_name = line[prev_colon + 1..colon_pos].to_string();
+                    if status == "FAIL" {
+                        // Chercher la ligne d'erreur optionnelle (ligne suivante)
+                        let error_msg = if i + 1 < lines.len() && !lines[i + 1].contains(':') {
+                            i += 1;
+                            Some(lines[i].trim().to_string())
+                        } else {
+                            None
+                        };
+                        failed_tests.push((test_name, error_msg));
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // Chercher la ligne récapitulative "N Tests M Failures X Ignored"
+    for line in lines.iter().rev() {
+        if line.contains("Tests") && line.contains("Failures") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let mut total = 0;
+            let mut failures = 0;
+            let mut ignored = 0;
+
+            for (idx, &part) in parts.iter().enumerate() {
+                if part == "Tests" && idx > 0 {
+                    if let Ok(n) = parts[idx - 1].parse() {
+                        total = n;
+                    }
+                }
+                if part == "Failures" && idx > 0 {
+                    if let Ok(n) = parts[idx - 1].parse() {
+                        failures = n;
+                    }
+                }
+                if part == "Ignored" && idx > 0 {
+                    if let Ok(n) = parts[idx - 1].parse() {
+                        ignored = n;
+                    }
+                }
+            }
+
+            if total > 0 {
+                return Some(UnityTestSummary {
+                    total_tests: total,
+                    failures,
+                    ignored,
+                    failed_tests,
+                });
+            }
+        }
+    }
+
+    None
+}
+
 /// Rendu du panneau résultat de compilation/exécution.
 pub fn render_run_result(
     f: &mut Frame,
@@ -486,6 +573,45 @@ pub fn render_run_result(
         }
     } else if result.timeout {
         lines.push(Line::from("Dépassement de 10s — boucle infinie ?"));
+    } else if matches!(exercise.validation.mode, ValidationMode::Test) {
+        // Mode test Unity — parser et afficher les résultats
+        if let Some(summary) = parse_unity_output(&result.stdout) {
+            // Header du résumé
+            let pass_count = summary.total_tests.saturating_sub(summary.failures);
+            let summary_line = format!(
+                "{} Tests — {} PASS ✓ — {} FAIL ✗",
+                summary.total_tests, pass_count, summary.failures
+            );
+            lines.push(Line::from(span!(C_ACCENT; "{}", summary_line)));
+            lines.push(Line::raw(""));
+
+            // Lister les tests échoués
+            if !summary.failed_tests.is_empty() {
+                for (test_name, error_msg) in &summary.failed_tests {
+                    lines.push(Line::from(vec![Span::styled(
+                        format!("✗ {}", test_name),
+                        Style::default().fg(C_DANGER),
+                    )]));
+                    if let Some(err) = error_msg {
+                        lines.push(Line::from(span!(C_TEXT_DIM; "  {}", err)));
+                    }
+                }
+                lines.push(Line::raw(""));
+            }
+
+            // Résumé final Unity (brut)
+            for line in result.stdout.lines().rev() {
+                if line.contains("Tests") && line.contains("Failures") {
+                    lines.push(Line::from(span!(C_TEXT_DIM; "{}", line)));
+                    break;
+                }
+            }
+        } else {
+            // Afficher le stdout brut si parsing échoue
+            for line in result.stdout.lines() {
+                lines.push(Line::from(span!(C_DANGER; "{}", line)));
+            }
+        }
     } else if let Some(expected) = &exercise.validation.expected_output {
         const MAX: usize = 5;
         let exp_lines: Vec<&str> = expected.trim().lines().collect();
@@ -642,7 +768,7 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 /// Overlay de recherche fuzzy (touche `/` depuis watch).
-pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
     let popup = centered_popup(area, 15, 10);
     f.render_widget(Clear, popup);
 
@@ -714,9 +840,11 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         format!(" {count} résultats ")
     };
 
-    let mut list_state = ListState::default();
     if !state.overlay.search_results.is_empty() {
-        list_state.select(Some(state.overlay.search_selected));
+        state
+            .overlay
+            .search_list_state
+            .select(Some(state.overlay.search_selected));
     }
 
     f.render_stateful_widget(
@@ -730,7 +858,7 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
             )
             .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
         results_area,
-        &mut list_state,
+        &mut state.overlay.search_list_state,
     );
 
     // Hint bar
@@ -764,7 +892,7 @@ pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::mode
 }
 
 /// Overlay liste d'exercices — navigation j/k, Tab/Shift-Tab chapitres, Enter pour jump.
-pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
     use crate::tui::app::ListDisplayItem;
 
     let popup = centered_popup(area, 10, 8);
@@ -828,8 +956,10 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     let done = state.completed.iter().filter(|&&c| c).count();
     let list_title = format!(" Exercices [{}/{}] ", done, total);
 
-    let mut list_state = ListState::default();
-    list_state.select(Some(state.overlay.list_selected));
+    state
+        .overlay
+        .list_list_state
+        .select(Some(state.overlay.list_selected));
 
     f.render_stateful_widget(
         List::new(items)
@@ -842,7 +972,7 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
             )
             .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
         list_area,
-        &mut list_state,
+        &mut state.overlay.list_list_state,
     );
 
     // Hint bar

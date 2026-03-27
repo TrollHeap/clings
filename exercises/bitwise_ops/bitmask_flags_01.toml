@@ -1,0 +1,321 @@
+common_mistake = "Utiliser == au lieu de != 0 pour vérifier : `if (flags & EXEC)` fonctionne, mais `if ((flags & EXEC) == 1)` est faux si EXEC != 1"
+description = """
+NSY103 — Les bitmasks permettent de stocker plusieurs flags booléens dans un seul entier. Chaque flag occupe un bit.
+
+Implémentez un système de permissions UNIX-style : READ=4, WRITE=2, EXEC=1. Fonctions : `set_flag`, `clear_flag`, `has_flag`."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "set_flag: `return flags | bit;` — OR active le bit",
+    "clear_flag: `return flags & ~bit;` — AND avec NOT efface le bit",
+    "has_flag: `return (flags & bit) != 0;` — éviter `== 1` qui échouerait si bit > 1",
+]
+id = "bitmask-flags-01"
+kc_ids = ["KC-C04"]
+key_concept = "set: flags|=bit, clear: flags&=~bit, check: (flags&bit)!=0"
+lang = "c"
+prerequisites = ["bitwise-ops-01"]
+solution_code = '''
+#include <stdio.h>
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+int set_flag(int flags, int bit) {
+    return flags | bit;
+}
+int clear_flag(int flags, int bit) {
+    return flags & ~bit;
+}
+int has_flag(int flags, int bit) {
+    return (flags & bit) != 0;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) {
+    return 0;
+}
+
+int clear_flag(int flags, int bit) {
+    return 0;
+}
+
+int has_flag(int flags, int bit) {
+    return 0;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) {
+    return flags | bit;
+}
+
+int clear_flag(int flags, int bit) {
+    return flags & ~bit;
+}
+
+int has_flag(int flags, int bit) {
+    return (flags & bit) != 0;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) {
+    return flags | bit;
+}
+
+int clear_flag(int flags, int bit) {
+    return ____;
+}
+
+int has_flag(int flags, int bit) {
+    return ____;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) {
+    return ____;
+}
+
+int clear_flag(int flags, int bit) {
+    return ____;
+}
+
+int has_flag(int flags, int bit) {
+    return ____;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) { return 0; }
+int clear_flag(int flags, int bit) { return 0; }
+int has_flag(int flags, int bit) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+#define READ  4
+#define WRITE 2
+#define EXEC  1
+
+int set_flag(int flags, int bit) { return 0; }
+int clear_flag(int flags, int bit) { return 0; }
+int has_flag(int flags, int bit) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_flag(0, READ | WRITE)));
+        printf("%d\n", (int)(set_flag(6, EXEC)));
+        printf("%d\n", (int)(set_flag(5, READ)));
+        printf("%d\n", (int)(set_flag(7, EXEC)));
+    }
+    {
+        printf("%d\n", (int)(clear_flag(7, WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE)));
+        printf("%d\n", (int)(clear_flag(7, READ | WRITE | EXEC)));
+        printf("%d\n", (int)(clear_flag(6, WRITE)));
+    }
+    {
+        printf("%d\n", (int)(has_flag(7, READ)));
+        printf("%d\n", (int)(has_flag(7, WRITE)));
+        printf("%d\n", (int)(has_flag(7, EXEC)));
+        printf("%d\n", (int)(has_flag(1, WRITE)));
+    }
+    return 0;
+}
+''',
+]
+subject = "bitwise_ops"
+title = "Bitmask — flags de permissions"
+
+[validation]
+expected_output = """
+6
+7
+5
+7
+5
+1
+0
+4
+1
+1
+1
+0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "set_flag(READ|WRITE) : perms=6 (110b)"
+
+[[visualizer.steps.stack]]
+name = "perms"
+value = "0b110 (rw-)"
+
+[[visualizer.steps.stack]]
+name = "READ=4"
+value = "0b100"
+
+[[visualizer.steps.stack]]
+name = "WRITE=2"
+value = "0b010"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "clear_flag(WRITE) : perms=5 (101b)"
+
+[[visualizer.steps.stack]]
+name = "perms"
+value = "0b101 (r-x)"
+
+[[visualizer.steps.stack]]
+name = "~WRITE"
+value = "0b...101"

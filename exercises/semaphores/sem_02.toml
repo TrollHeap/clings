@@ -1,0 +1,250 @@
+common_mistake = "Initialiser à 0 au lieu de 1 → sem_wait bloque immédiatement (sémaphore déjà acquis)"
+description = """
+NSY103 — Un sémaphore initialisé à 1 se comporte comme un mutex : sem_wait() acquiert (décrémente à 0), sem_post() libère (remet à 1). Contrairement à un mutex, un sémaphore binaire peut être posté par un thread différent.
+
+Protégez une section critique avec un sémaphore binaire et vérifiez sa valeur avant/après.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Un sémaphore binaire s'initialise à 1 (libre) ou 0 (acquis)",
+    "sem_wait() décrémente : 1→0 = acquis ; bloque si déjà 0",
+    "sem_post() incrémente : 0→1 = libéré",
+]
+id = "sem-02"
+kc_ids = ["KC-C11"]
+key_concept = "Sémaphore binaire (init=1) : sem_wait=lock, sem_post=unlock ; peut être posté par n'importe quel thread"
+lang = "c"
+prerequisites = ["sem-01"]
+solution_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t mutex;
+    sem_init(&mutex, 0, 1);
+    int val;
+    sem_getvalue(&mutex, &val);
+    printf("Before lock: %d\n", val);
+    sem_wait(&mutex);
+    printf("In critical section\n");
+    sem_post(&mutex);
+    sem_getvalue(&mutex, &val);
+    printf("After unlock: %d\n", val);
+    sem_destroy(&mutex);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t mutex;
+    sem_init(&mutex, 0, ____);  // valeur initiale = 1 (binaire)
+    int val;
+    sem_getvalue(&mutex, &val);
+    printf("Before lock: %d\n", val);
+    sem_wait(&mutex);           // acquérir (0)
+    printf("In critical section\n");
+    sem_post(&mutex);           // libérer (____)
+    sem_getvalue(&mutex, &val);
+    printf("After unlock: %d\n", val);
+    sem_destroy(&mutex);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+/* == EXEMPLE ===============================================
+ * Semaphore binaire : controler l'acces a un compteur
+ * Init=1 signifie 'libre', sem_wait acquiert, sem_post libere.
+ * ========================================================= */
+int resource_count = 0;
+
+void example_binary_sem(void) {
+    sem_t gate;
+    sem_init(&gate, 0, 1);
+    int v;
+    sem_getvalue(&gate, &v);
+    printf("gate before: %d\n", v);
+    sem_wait(&gate);
+    resource_count++;
+    printf("resource_count = %d\n", resource_count);
+    sem_post(&gate);
+    sem_getvalue(&gate, &v);
+    printf("gate after: %d\n", v);
+    sem_destroy(&gate);
+}
+/* Resultat: gate before: 1, resource_count = 1, gate after: 1 */
+
+/* == VOTRE EXERCICE ========================================
+ * Semaphore binaire : mutex par semaphore
+ * Inspirez-vous de example_binary_sem ci-dessus.
+ * Init a 1, wait pour acquerir, post pour liberer.
+ * ========================================================= */
+
+int main(void) {
+    sem_t mutex;
+    /* TODO: sem_init(&mutex, 0, 1) */
+    int val;
+    sem_getvalue(&mutex, &val);
+    printf("Before lock: %d\n", val);
+    /* TODO: sem_wait to acquire */
+    printf("In critical section\n");
+    /* TODO: sem_post to release */
+    sem_getvalue(&mutex, &val);
+    printf("After unlock: %d\n", val);
+    sem_destroy(&mutex);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t mutex;
+    sem_init(&mutex, 0, 1);
+    int val;
+    sem_getvalue(&mutex, &val);
+    printf("Before lock: %d\n", val);
+    sem_wait(&mutex);
+    printf("In critical section\n");
+    ____(&mutex);  // libérer le sémaphore
+    sem_getvalue(&mutex, &val);
+    printf("After unlock: %d\n", val);
+    sem_destroy(&mutex);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t mutex;
+    sem_init(&mutex, 0, ____);  // valeur initiale = 1 (binaire)
+    int val;
+    sem_getvalue(&mutex, &val);
+    printf("Before lock: %d\n", val);
+    sem_wait(&mutex);
+    printf("In critical section\n");
+    sem_post(&mutex);
+    sem_getvalue(&mutex, &val);
+    printf("After unlock: %d\n", val);
+    sem_destroy(&mutex);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    sem_t mutex;
+    // Initialisez comme sémaphore binaire (1=libre)
+    // Acquérez, entrez en section critique, libérez
+    // Sortie: "Before lock: 1\nIn critical section\nAfter unlock: 1\n"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <semaphore.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "semaphores"
+title = "Sémaphore binaire : mutex par sémaphore"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+L'exclusion mutuelle n'est pas correcte. Un sémaphore binaire s'initialise à 1 (pas 0).
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+Deux équipements tentent d'accéder simultanément à notre bus de données. Nous avons besoin d'un sémaphore binaire (init=1) comme mutex.
+
+Démontre : équipement 1 prend le sem, accède, le relâche ; équipement 2 fait de même séquentiellement.
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = ["sem-01"]
+receivedTime = "10:00"
+subject = "Sémaphore binaire mutex — exclusion mutuelle équipements"
+successEmail = """
+Accès exclusif garanti. Le sémaphore binaire protège correctement notre bus de données.
+
+SensorGrid Ops"""
+syscallsInvolved = [
+    "sem_init",
+    "sem_wait",
+    "sem_post",
+    "sem_destroy",
+]
+tier = 2
+
+[validation]
+expected_output = """
+Before lock: 1
+In critical section
+After unlock: 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_init avec valeur=1 crée un sémaphore binaire. count=1 signifie 'libre' — un thread peut entrer en section critique immédiatement. count=0 signifie 'acquis'."
+heap = []
+label = "sem_init(&mutex, 0, 1) — sémaphore binaire libre"
+step_label = "sem_init(&mutex, 0, 1) — sémaphore binaire libre"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "mutex (sem_t)"
+value = "count=1 (libre)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_wait décrémente : 1→0. Le sémaphore est maintenant 'acquis' — tout autre thread appelant sem_wait() serait bloqué jusqu'à un sem_post(). Section critique protégée."
+heap = []
+label = "sem_wait(&mutex) — acquisition (1→0)"
+step_label = "sem_wait(&mutex) — acquisition (1→0)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "mutex (sem_t)"
+value = "count=0 (acquis)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sem_post incrémente : 0→1. Le sémaphore repasse à 'libre'. Un thread en attente sur sem_wait() sera réveillé. Contrairement à pthread_mutex_unlock, sem_post peut être appelé par n'importe quel thread."
+heap = []
+label = "sem_post(&mutex) — libération (0→1)"
+step_label = "sem_post(&mutex) — libération (0→1)"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "mutex (sem_t)"
+value = "count=1 (libre)"

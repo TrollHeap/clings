@@ -1,0 +1,264 @@
+common_mistake = "Oublier sigemptyset(&sa.sa_mask) — le masque contiendrait des valeurs aléatoires"
+description = """
+NSY103 — sigaction() est l'interface moderne et portable pour les handlers de signaux. Contrairement à signal(), elle garantit que le handler n'est pas réinitialisé après chaque délivrance (pas de race condition). Elle permet aussi de contrôler le masque pendant le handler et les flags.
+
+Utilisez sigaction pour installer un handler qui compte les signaux recus."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "struct sigaction { sa_handler, sa_mask, sa_flags } — sa_mask bloque des signaux pendant le handler",
+    "sigemptyset(&sa.sa_mask) pour ne bloquer aucun signal supplémentaire",
+    "SIG_DFL restaure le comportement par défaut, SIG_IGN ignore le signal",
+]
+id = "sig-action-01"
+kc_ids = ["KC-C08"]
+key_concept = "sigaction est portable et fiable — le handler n'est jamais réinitialisé automatiquement"
+lang = "c"
+prerequisites = ["sig-handler-02"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t count = 0;
+
+void handler(int sig) {
+    (void)sig;
+    count++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+        perror("sigaction");
+        return 1;
+    }
+    printf("sigaction installed\n");
+
+    /* Envoyer 3 fois */
+    for (int i = 0; i < 3; i++)
+        raise(SIGUSR1);
+
+    printf("Signals received: %d\n", count);
+
+    /* Restaurer le comportement par defaut */
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGUSR1, &sa, NULL);
+    printf("Default restored\n");
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t count = 0;
+
+void handler(int sig) {
+    (void)sig;
+    count++;
+}
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sigemptyset(&sa.______);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+        perror("sigaction");
+        return 1;
+    }
+    printf("sigaction installed\n");
+
+    /* Envoyer 3 fois */
+    for (int i = 0; i < 3; i++)
+        ____(SIGUSR1);
+
+    printf("Signals received: %d\n", count);
+
+    /* Restaurer le comportement par defaut */
+    sa.sa_handler = ____;
+    sigaction(SIGUSR1, &sa, NULL);
+    printf("Default restored\n");
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * sigaction basique pour SIGINT
+ * ================================================= */
+void example_sa_handler(int sig) {
+    printf("example: caught %d\n", sig);
+}
+void example_sigaction(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = example_sa_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    raise(SIGINT);
+    printf("example: still running\n");
+}
+/* Resultat: example: caught 2, example: still running */
+
+/* == VOTRE EXERCICE ================================
+ * Compteur de SIGUSR1 avec sigaction
+ * 3x raise, puis SIG_DFL
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t count = 0;
+void handler(int sig) { (void)sig; count++; }
+
+int main(void) {
+    struct sigaction sa;
+    ____((&sa, 0, sizeof(sa)));
+    sa.sa_handler = ____;
+    ____(&sa.sa_mask);
+    sa.sa_flags = 0;
+    ____(SIGUSR1, &sa, NULL);
+    printf("sigaction installed\n");
+    for (int i = 0; i < 3; i++) ____(SIGUSR1);
+    printf("Signals received: %d\n", count);
+    sa.sa_handler = ____;
+    sigaction(SIGUSR1, &sa, NULL);
+    printf("Default restored\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+volatile sig_atomic_t count = 0;
+void handler(int sig) { (void)sig; count++; }
+
+int main(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = ____;
+    sigemptyset(&sa.______);
+    sa.sa_flags = 0;
+    if (sigaction(SIGUSR1, &sa, NULL) == -1) { perror("sigaction"); return 1; }
+    printf("sigaction installed\n");
+    for (int i = 0; i < 3; i++) ____(SIGUSR1);
+    printf("Signals received: %d\n", count);
+    sa.sa_handler = ____;
+    sigaction(SIGUSR1, &sa, NULL);
+    printf("Default restored\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+
+// handler incrémente count
+// main: struct sigaction, sa_handler, sa_mask, sa_flags
+// sigaction(SIGUSR1, &sa, NULL)
+// 3x raise, restaurer SIG_DFL
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "sigaction vs signal"
+
+[validation]
+expected_output = """
+sigaction installed
+Signals received: 3
+Default restored
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "sigaction installe le handler de façon portable — pas de reset automatique"
+heap = []
+label = "sigaction configure le handler"
+step_label = "sigaction"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sa.sa_handler"
+value = "handler()"
+
+[[visualizer.steps.stack]]
+name = "sa.sa_mask"
+value = "{} (vide)"
+
+[[visualizer.steps.stack]]
+name = "sa.sa_flags"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Contrairement à signal(), le handler reste installé après chaque appel"
+heap = []
+label = "3x raise(SIGUSR1)"
+step_label = "raise x3"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "SIGUSR1"
+function_name = "handler"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "count"
+value = "0 → 1 → 2 → 3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Après restauration, SIGUSR1 terminerait le processus"
+heap = []
+label = "SIG_DFL restaure le défaut"
+step_label = "Restauration"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sa.sa_handler"
+value = "SIG_DFL (terminate)"

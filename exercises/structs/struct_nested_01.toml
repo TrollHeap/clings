@@ -1,0 +1,289 @@
+common_mistake = "Confondre `p->adresse->rue` (si adresse était un pointeur) avec `p->adresse.rue` (adresse inline)"
+description = """
+NSY103 — Une struct peut contenir d'autres structs comme champs. L'accès se fait en chaînant l'opérateur point : `a.adresse.ville`. Avec un pointeur, on combine `->` et `.` : `p->adresse.ville`.
+
+Définissez `Adresse` et `Personne` (avec une `Adresse` imbriquée), puis affichez les informations."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Le champ adresse a le type `Adresse` : `Adresse adresse;`",
+    "Via pointeur : `p->adresse.rue` — `->` pour le pointeur, `.` pour le champ imbriqué",
+    "L'initialisation imbriquée utilise des accolades imbriquées : `.adresse = { .rue = ... }`",
+]
+id = "struct-nested-01"
+kc_ids = ["KC-C03"]
+key_concept = "Une struct imbriquée est stockée inline — accès par chaînage de . et ->"
+lang = "c"
+prerequisites = ["struct-init-02"]
+solution_code = '''
+#include <stdio.h>
+
+typedef struct {
+    char rue[50];
+    char ville[30];
+    int code_postal;
+} Adresse;
+
+typedef struct {
+    char nom[30];
+    int age;
+    Adresse adresse;
+} Personne;
+
+void print_personne(const Personne *p) {
+    printf("Nom : %s\n", p->nom);
+    printf("Age : %d\n", p->age);
+    printf("Rue : %s\n", p->adresse.rue);
+    printf("Ville : %s (%d)\n", p->adresse.ville, p->adresse.code_postal);
+}
+
+int main(void) {
+    Personne alice = {
+        .nom = "Alice Dupont",
+        .age = 28,
+        .adresse = {
+            .rue = "12 rue de la Paix",
+            .ville = "Paris",
+            .code_postal = 75001
+        }
+    };
+    print_personne(&alice);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+typedef struct {
+    char rue[50];
+    char ville[30];
+    int code_postal;
+} Adresse;
+
+typedef struct {
+    char nom[30];
+    int age;
+    ____ adresse;
+} Personne;
+
+void print_personne(const Personne *p) {
+    printf("Nom : %s\n", p->____);
+    printf("Age : %d\n", p->____);
+    printf("Rue : %s\n", p->____.____); 
+    printf("Ville : %s (%d)\n", p->adresse.____, p->adresse.____);
+}
+
+int main(void) {
+    Personne alice = {
+        .nom = "Alice Dupont",
+        .age = 28,
+        .adresse = {
+            .rue = "12 rue de la Paix",
+            .ville = "Paris",
+            .code_postal = 75001
+        }
+    };
+    print_personne(&alice);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Struct imbriquee : Date dans Evenement
+ * L'acces se fait par chainons : evt.date.jour
+ * =========================================================== */
+typedef struct { int jour, mois, annee; } Date;
+typedef struct { char titre[40]; Date date; } Evenement;
+
+void example_demo(void) {
+    Evenement evt = {
+        .titre = "Conference",
+        .date = {.jour = 15, .mois = 3, .annee = 2024}
+    };
+    printf("%s : %02d/%02d/%d\n",
+           evt.titre, evt.date.jour, evt.date.mois, evt.date.annee);
+}
+/* Resultat: Conference : 15/03/2024 */
+
+/* == VOTRE EXERCICE =========================================
+ * Struct Personne avec Adresse imbriquee
+ * Definissez les structs, initialisez et affichez.
+ * =========================================================== */
+typedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;
+typedef struct { char nom[30]; int age; Adresse adresse; } Personne;
+
+void print_personne(const Personne *p) {
+    (void)p; /* TODO */
+}
+
+int main(void) {
+    Personne alice = {
+        .nom = "Alice Dupont", .age = 28,
+        .adresse = {.rue = "12 rue de la Paix", .ville = "Paris", .code_postal = 75001}
+    };
+    print_personne(&alice);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;
+typedef struct { char nom[30]; int age; Adresse adresse; } Personne;
+
+void print_personne(const Personne *p) {
+    printf("Nom : %s\n", p->nom);
+    printf("Age : %d\n", p->age);
+    printf("Rue : %s\n", p->adresse.____);
+    printf("Ville : %s (%d)\n", p->adresse.____, p->adresse.____);
+}
+
+int main(void) {
+    Personne alice = {
+        .nom = "Alice Dupont", .age = 28,
+        .adresse = {.rue = "12 rue de la Paix", .ville = "Paris", .code_postal = 75001}
+    };
+    print_personne(&alice);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef struct {
+    char rue[50];
+    char ville[30];
+    int code_postal;
+} Adresse;
+
+typedef struct {
+    char nom[30];
+    int age;
+    ____ adresse;
+} Personne;
+
+void print_personne(const Personne *p) {
+    printf("Nom : %s\n", p->____);
+    printf("Age : %d\n", p->____);
+    printf("Rue : %s\n", p->____.____); 
+    printf("Ville : %s (%d)\n", p->adresse.____, p->adresse.____);
+}
+
+int main(void) {
+    Personne alice = {
+        .nom = "Alice Dupont",
+        .age = 28,
+        .adresse = {
+            .rue = "12 rue de la Paix",
+            .ville = "Paris",
+            .code_postal = 75001
+        }
+    };
+    print_personne(&alice);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+// Définissez Adresse {rue, ville, code_postal}
+// Définissez Personne {nom, age, adresse}
+// Implémentez print_personne
+typedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;
+typedef struct { char nom[30]; int age; Adresse adresse; } Personne;
+
+void print_personne(const Personne *p) {
+    (void)p; // TODO
+}
+
+int main(void) {
+    // TODO: initialisez alice et affichez
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+typedef struct { char rue[50]; char ville[30]; int code_postal; } Adresse;
+typedef struct { char nom[30]; int age; Adresse adresse; } Personne;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Struct imbriquée"
+
+[validation]
+expected_output = """
+Nom : Alice Dupont
+Age : 28
+Rue : 12 rue de la Paix
+Ville : Paris (75001)
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "alice est une Personne qui contient une Adresse inline (pas un pointeur). Tous les champs sont contigus en mémoire — la taille totale est sizeof(Personne) qui inclut sizeof(Adresse)."
+heap = []
+label = "Personne alice sur la pile"
+step_label = "Struct imbriquée — tout sur la pile"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "alice.nom"
+value = '"Alice Dupont"'
+
+[[visualizer.steps.stack]]
+name = "alice.age"
+value = "28"
+
+[[visualizer.steps.stack]]
+name = "alice.adresse.rue"
+value = '"12 rue de la Paix"'
+
+[[visualizer.steps.stack]]
+name = "alice.adresse.ville"
+value = '"Paris"'
+
+[[visualizer.steps.stack]]
+name = "alice.adresse.code_postal"
+value = "75001"
+
+[[visualizer.steps]]
+explanation = "p->adresse.rue : p-> accède à la struct Personne, .adresse descend dans le champ Adresse, .rue accède au champ char[]. Pas d'allocation supplémentaire — tout est imbriqué."
+heap = []
+label = "Accès via pointeur p->adresse.rue"
+step_label = "p->adresse.rue — chaînage d'accès"
+
+[[visualizer.steps.arrows]]
+from = "p"
+label = "→"
+to = "alice.nom"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "&alice"
+function_name = "print_personne"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→alice"
+
+[[visualizer.steps.stack]]
+name = "p->nom"
+value = '"Alice Dupont"'
+
+[[visualizer.steps.stack]]
+name = "p->adresse.rue"
+value = '"12 rue de la Paix"'

@@ -1,8 +1,8 @@
-//! Exercise loader — discovers and parses JSON exercise files.
+//! Exercise loader — discovers and parses TOML exercise files.
 //!
 //! Resolution order: `CLINGS_EXERCISES` env var → embedded binary data.
-//! Each exercise is a JSON file under `exercises/<subject>/`.
-//! Also loads `annales_map.json` for past exam mappings.
+//! Each exercise is a TOML file under `exercises/<subject>/`.
+//! Also loads `annales_map.json` (JSON) for past exam mappings.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -14,12 +14,14 @@ use crate::models::Exercise;
 /// Exercises embedded at compile time from the `exercises/` directory.
 #[derive(rust_embed::RustEmbed)]
 #[folder = "exercises/"]
+#[include = "**/*.toml"]
+#[include = "annales_map.json"]
 struct EmbeddedExercises;
 
 /// Ensemble d'exercices : liste complète + index par sujet (indices dans le Vec).
 pub type ExerciseSet = (Vec<Exercise>, HashMap<String, Vec<usize>>);
 
-/// Recursively load all exercise JSON files from a directory.
+/// Recursively load all exercise TOML files from a directory.
 fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
     let mut exercises = Vec::new();
     let entries = match std::fs::read_dir(dir) {
@@ -43,12 +45,9 @@ fn load_exercises_from_dir(dir: &Path) -> Vec<Exercise> {
         let path = entry.path();
         if path.is_dir() {
             exercises.extend(load_exercises_from_dir(&path));
-        } else if path.extension().is_some_and(|e| e == "json")
-            && path.file_name() != Some(std::ffi::OsStr::new("kc_error_map.json"))
-            && path.file_name() != Some(std::ffi::OsStr::new("annales_map.json"))
-        {
+        } else if path.extension().is_some_and(|e| e == "toml") {
             if let Ok(content) = std::fs::read_to_string(&path) {
-                match serde_json::from_str::<Exercise>(&content) {
+                match toml::from_str::<Exercise>(&content) {
                     Ok(exercise) => exercises.push(exercise),
                     Err(e) => eprintln!(
                         "Avertissement : échec d'analyse de {} : {}",
@@ -131,21 +130,14 @@ pub fn load_all_exercises() -> Result<ExerciseSet> {
     let mut exercises = Vec::new();
     for path in EmbeddedExercises::iter() {
         let p = path.as_ref();
-        if !p.ends_with(".json") {
-            continue;
-        }
-        let filename = std::path::Path::new(p)
-            .file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("");
-        if filename == "annales_map.json" || filename == "kc_error_map.json" {
+        if !p.ends_with(".toml") {
             continue;
         }
         let file = EmbeddedExercises::get(p)
             .ok_or_else(|| KfError::Config(format!("embedded file missing: {p}")))?;
         let text = std::str::from_utf8(file.data.as_ref())
             .map_err(|e| KfError::Config(format!("UTF-8 invalide {p}: {e}")))?;
-        match serde_json::from_str::<Exercise>(text) {
+        match toml::from_str::<Exercise>(text) {
             Ok(ex) => exercises.push(ex),
             Err(e) => eprintln!("Avertissement : {p} ignoré ({e})"),
         }

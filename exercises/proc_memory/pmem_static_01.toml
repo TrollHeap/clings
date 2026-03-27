@@ -1,0 +1,179 @@
+common_mistake = "Confondre static local (persistance) et static global (visibilité)"
+description = """
+NSY103 — Le mot-clé static a deux usages: (1) dans une fonction, la variable persiste entre appels; (2) au niveau fichier, la variable est invisible depuis les autres unités de compilation. sizeof permet de vérifier les tailles.
+
+Démontrez la persistance des variables statiques et les différences de stockage."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "static dans une fonction: la variable garde sa valeur entre les appels",
+    "sizeof retourne la taille en octets d'un type ou d'une variable",
+    "static au niveau fichier: visible uniquement dans cette unité de compilation",
+]
+id = "pmem-static-01"
+kc_ids = ["KC-C17"]
+key_concept = "static = persistance locale + portée fichier, stocké dans data/bss"
+lang = "c"
+prerequisites = ["pmem-bss-01"]
+solution_code = '''
+#include <stdio.h>
+static int file_scope = 100;
+int accumulate(int val) {
+    static int total = 0;
+    total += val;
+    return total;
+}
+int main(void) {
+    printf("file_scope: %d\n", file_scope);
+    printf("sizeof(file_scope): %zu\n", sizeof(file_scope));
+    printf("acc(10): %d\n", accumulate(10));
+    printf("acc(20): %d\n", accumulate(20));
+    printf("acc(30): %d\n", accumulate(30));
+    printf("Total: 60\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+static int file_scope = 100;
+
+int accumulate(int val) {
+    ____ int total = 0;
+    total += val;
+    return total;
+}
+
+int main(void) {
+    printf("file_scope: %d\n", file_scope);
+    printf("sizeof(file_scope): %zu\n", ____(file_scope));
+    printf("acc(10): %d\n", accumulate(10));
+    printf("acc(20): %d\n", accumulate(20));
+    printf("acc(30): %d\n", accumulate(30));
+    printf("Total: 60\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE: compteur static ========================= */
+void example_counter(void) {
+    static int n = 0;
+    printf("call %d\n", ++n);
+}
+
+static int file_scope = 100;
+int accumulate(int val) {
+    static int total = 0;
+    total += val;
+    return total;
+}
+int main(void) {
+    printf("file_scope: %d\n", file_scope);
+    printf("sizeof(file_scope): %zu\n", sizeof(file_scope));
+    printf("acc(10): %d\n", accumulate(10));
+    printf("acc(20): %d\n", accumulate(20));
+    printf("acc(30): %d\n", accumulate(30));
+    printf("Total: 60\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+static int file_scope = 100;
+int accumulate(int val) {
+    static int total = 0;
+    total += val;
+    return total;
+}
+int main(void) {
+    printf("file_scope: %d\n", file_scope);
+    printf("sizeof(file_scope): %zu\n", sizeof(file_scope));
+    printf("acc(10): %d\n", accumulate(10));
+    printf("acc(20): %d\n", ____(20));
+    printf("acc(30): %d\n", accumulate(30));
+    printf("Total: 60\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+static int file_scope = 100;
+int accumulate(int val) {
+    ____ int total = 0;
+    total += val;
+    return total;
+}
+int main(void) {
+    printf("file_scope: %d\n", file_scope);
+    printf("sizeof(file_scope): %zu\n", ____(file_scope));
+    printf("acc(10): %d\n", accumulate(10));
+    printf("acc(20): %d\n", accumulate(20));
+    printf("acc(30): %d\n", accumulate(30));
+    printf("Total: 60\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+// Démontrez static local (persistance) et sizeof
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Variables statiques et portée (static/extern)"
+
+[validation]
+expected_output = """
+file_scope: 100
+sizeof(file_scope): 4
+acc(10): 10
+acc(20): 30
+acc(30): 60
+Total: 60
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "file_scope dans data (init), total dans bss (init à 0)"
+heap = []
+label = "Variables statiques"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "file_scope"
+value = "100 (data)"
+
+[[visualizer.steps.stack]]
+name = "total (static)"
+value = "0 (bss)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "total persiste: 0+10=10, 10+20=30, 30+30=60"
+heap = []
+label = "Accumulation"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "val"
+function_name = "accumulate"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "total"
+value = "10 → 30 → 60"

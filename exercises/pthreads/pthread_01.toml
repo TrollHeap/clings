@@ -1,0 +1,207 @@
+common_mistake = "Créer un thread DETACHED puis appeler pthread_join → comportement indéfini"
+description = """
+NSY103 — Un thread peut être créé en mode JOINABLE (le parent attend sa fin avec pthread_join) ou DETACHED (libère ses ressources seul). pthread_attr_t configure ces options avant création.
+
+Initialisez des attributs, lisez le detachstate par défaut, puis changez-le en DETACHED."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "La constante pour mode joinable est PTHREAD_CREATE_JOINABLE",
+    "Pour passer en mode détaché : PTHREAD_CREATE_DETACHED",
+    "pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) modifie l'attribut",
+]
+id = "pthread-01"
+kc_ids = ["KC-C09"]
+key_concept = "JOINABLE = parent attend avec pthread_join ; DETACHED = thread libère lui-même sa pile"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+int main(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int state;
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("Default: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("After set: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_destroy(&attr);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int state;
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("Default: %s\n", state == ____ ? "JOINABLE" : "DETACHED");
+    pthread_attr_setdetachstate(&attr, ____);
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("After set: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_destroy(&attr);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Attribut de thread : stack size
+ * pthread_attr_t permet aussi de configurer la taille de pile.
+ * ========================================================= */
+void example_show_stacksize(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    size_t stacksz;
+    pthread_attr_getstacksize(&attr, &stacksz);
+    printf("Default stack: %zu bytes\n", stacksz);
+    pthread_attr_setstacksize(&attr, 2 * 1024 * 1024);
+    pthread_attr_getstacksize(&attr, &stacksz);
+    printf("Custom stack: %zu bytes\n", stacksz);
+    pthread_attr_destroy(&attr);
+}
+/* Resultat: affiche la stack par defaut puis 2097152 */
+
+/* == VOTRE EXERCICE ========================================
+ * Attributs de thread : JOINABLE vs DETACHED
+ * Inspirez-vous de example_show_stacksize ci-dessus.
+ * Utilisez pthread_attr_getdetachstate / setdetachstate.
+ * ========================================================= */
+
+int main(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int state;
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("Default: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    /* TODO: pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) */
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("After set: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_destroy(&attr);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int state;
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("Default: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("After set: %s\n", state == ____ ? "JOINABLE" : "DETACHED"); // constante JOINABLE
+    pthread_attr_destroy(&attr);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int state;
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("Default: %s\n", state == ____ ? "JOINABLE" : "DETACHED");
+    pthread_attr_setdetachstate(&attr, ____);
+    pthread_attr_getdetachstate(&attr, &state);
+    printf("After set: %s\n", state == PTHREAD_CREATE_JOINABLE ? "JOINABLE" : "DETACHED");
+    pthread_attr_destroy(&attr);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    pthread_attr_t attr;
+    // Initialisez attr, lisez le detachstate par défaut (doit être JOINABLE)
+    // Puis mettez-le en DETACHED et vérifiez
+    // Afficher: "Default: JOINABLE" puis "After set: DETACHED"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Attributs de thread : JOINABLE vs DETACHED"
+
+[mission]
+clientId = "hobbylab"
+clientName = "HobbyLab"
+contactEmail = "dave@hobbylab.sys"
+failureEmail = """
+Hmm, la sortie n'est pas ce que j'attendais. Vérifie que pthread_join() est bien appelé après pthread_create().
+
+Dave"""
+incidentEmail = """
+Salut,
+
+On a un daemon qui spawn des threads mais parfois le process se termine avant qu'ils finissent. Peux-tu me montrer la différence entre JOINABLE et DETACHED ? Je veux voir pthread_join() en action.
+
+Merci,
+Dave @ HobbyLab"""
+payout = 100
+prereqMissionIds = []
+receivedTime = "08:15"
+subject = "Diagnostic thread lifecycle — JOINABLE vs DETACHED"
+successEmail = """
+Parfait ! C'est exactement ça. Le join() garantit que le thread termine avant le main. Je comprends maintenant pourquoi mes threads étaient abandonnés.
+
+Bon boulot — Dave"""
+syscallsInvolved = [
+    "pthread_create",
+    "pthread_join",
+    "pthread_detach",
+]
+tier = 1
+
+[validation]
+expected_output = """
+Default: JOINABLE
+After set: DETACHED
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "pthread_attr_init — attributs par défaut"
+
+[[visualizer.steps.stack]]
+name = "attr"
+value = "pthread_attr_t"
+
+[[visualizer.steps.stack]]
+name = "state"
+value = "JOINABLE (0)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "setdetachstate → DETACHED"
+
+[[visualizer.steps.stack]]
+name = "attr"
+value = "pthread_attr_t"
+
+[[visualizer.steps.stack]]
+name = "state"
+value = "DETACHED (1)"

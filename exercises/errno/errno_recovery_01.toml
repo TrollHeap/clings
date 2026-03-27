@@ -1,0 +1,295 @@
+common_mistake = "Ne pas sauvegarder errno — le 2e open() écrase errno du 1er appel"
+description = """
+NSY103 — Face à une erreur, plusieurs stratégies existent : retry (EINTR, EAGAIN), fallback (chemin alternatif), fail-fast (erreur fatale). Le choix dépend du code errno.
+
+Implémentez une fonction qui tente d'ouvrir un fichier avec fallback sur un chemin alternatif."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "strerror() pour convertir errno en chaîne",
+    "Sauvegarder errno avant un autre appel système qui pourrait le modifier",
+    "Retourner -1 pour signaler l'échec total",
+]
+id = "errno-recovery-01"
+kc_ids = ["KC-C15"]
+key_concept = "Sauvegarder errno avant un autre appel système, pattern primary/fallback"
+lang = "c"
+prerequisites = ["errno-wrapper-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+int open_with_fallback(const char *primary, const char *fallback) {
+    int fd = open(primary, O_RDONLY);
+    if (fd >= 0) return fd;
+    int saved = errno;
+    printf("Primary failed: %s\n", strerror(saved));
+    fd = open(fallback, O_RDONLY);
+    if (fd >= 0) {
+        printf("Fallback succeeded\n");
+        return fd;
+    }
+    printf("Fallback failed: %s\n", strerror(errno));
+    return -1;
+}
+int main(void) {
+    int fd = open("/tmp/kf_fallback.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) { write(fd, "fallback data", 13); close(fd); }
+    int result = open_with_fallback("/kf_no_such_primary", "/tmp/kf_fallback.txt");
+    if (result >= 0) {
+        char buf[32];
+        ssize_t n = read(result, buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Read: %s\n", buf);
+        close(result);
+    }
+    result = open_with_fallback("/kf_no_primary", "/kf_no_fallback");
+    if (result == -1) {
+        printf("Both failed\n");
+    }
+    unlink("/tmp/kf_fallback.txt");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int open_with_fallback(const char *primary, const char *fallback) {
+    int fd = open(primary, O_RDONLY);
+    if (fd >= 0) return fd;
+    int saved = errno;
+    printf("Primary failed: %s\n", ____(saved));
+    fd = open(fallback, O_RDONLY);
+    if (fd >= 0) {
+        printf("Fallback succeeded\n");
+        return fd;
+    }
+    printf("Fallback failed: %s\n", ____(errno));
+    return ____;
+}
+
+int main(void) {
+    // Create fallback file
+    int fd = open("/tmp/kf_fallback.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) { write(fd, "fallback data", 13); close(fd); }
+
+    int result = open_with_fallback("/kf_no_such_primary", "/tmp/kf_fallback.txt");
+    if (result >= 0) {
+        char buf[32];
+        ssize_t n = read(result, buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        printf("Read: %s\n", buf);
+        close(result);
+    }
+
+    result = open_with_fallback("/kf_no_primary", "/kf_no_fallback");
+    if (result == -1) {
+        printf("Both failed\n");
+    }
+
+    unlink("/tmp/kf_fallback.txt");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* == EXEMPLE: retry puis abandon ======================== */
+int example_retry_open(const char *path, int retries) {
+    for (int i = 0; i < retries; i++) {
+        int fd = open(path, O_RDONLY);
+        if (fd >= 0) return fd;
+        if (errno != EINTR) return -1;
+    }
+    return -1;
+}
+
+/* == VOTRE EXERCICE: fallback =========================== */
+int open_with_fallback(const char *primary, const char *fallback) {
+    int fd = open(primary, O_RDONLY);
+    if (fd >= 0) return fd;
+    int saved = errno;
+    printf("Primary failed: %s\n", strerror(saved));
+    fd = open(fallback, O_RDONLY);
+    if (fd >= 0) { printf("Fallback succeeded\n"); return fd; }
+    printf("Fallback failed: %s\n", strerror(errno));
+    return -1;
+}
+
+int main(void) {
+    int fd = open("/tmp/kf_fallback.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) { write(fd, "fallback data", 13); close(fd); }
+    int result = open_with_fallback("/kf_no_such_primary", "/tmp/kf_fallback.txt");
+    if (result >= 0) {
+        char buf[32]; ssize_t n = read(result, buf, sizeof(buf)-1); buf[n]='\0';
+        printf("Read: %s\n", buf); close(result);
+    }
+    result = open_with_fallback("/kf_no_primary", "/kf_no_fallback");
+    if (result == -1) printf("Both failed\n");
+    unlink("/tmp/kf_fallback.txt");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int open_with_fallback(const char *primary, const char *fallback) {
+    int fd = open(primary, O_RDONLY);
+    if (fd >= 0) return fd;
+    int saved = errno;
+    printf("Primary failed: %s\n", strerror(saved));
+    fd = open(fallback, O_RDONLY);
+    if (fd >= 0) { printf("Fallback succeeded\n"); return fd; }
+    printf("Fallback failed: %s\n", ____(errno));
+    return ____;
+}
+
+int main(void) {
+    int fd = open("/tmp/kf_fallback.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) { write(fd, "fallback data", 13); close(fd); }
+    int result = open_with_fallback("/kf_no_such_primary", "/tmp/kf_fallback.txt");
+    if (result >= 0) {
+        char buf[32]; ssize_t n = read(result, buf, sizeof(buf)-1); buf[n]='\0';
+        printf("Read: %s\n", buf); close(result);
+    }
+    result = open_with_fallback("/kf_no_primary", "/kf_no_fallback");
+    if (result == -1) printf("Both failed\n");
+    unlink("/tmp/kf_fallback.txt");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int open_with_fallback(const char *primary, const char *fallback) {
+    int fd = open(primary, O_RDONLY);
+    if (fd >= 0) return fd;
+    int saved = errno;
+    printf("Primary failed: %s\n", ____(saved));
+    fd = open(fallback, O_RDONLY);
+    if (fd >= 0) { printf("Fallback succeeded\n"); return fd; }
+    printf("Fallback failed: %s\n", ____(errno));
+    return ____;
+}
+
+int main(void) {
+    int fd = open("/tmp/kf_fallback.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) { write(fd, "fallback data", 13); close(fd); }
+    int result = open_with_fallback("/kf_no_such_primary", "/tmp/kf_fallback.txt");
+    if (result >= 0) {
+        char buf[32]; ssize_t n = read(result, buf, sizeof(buf)-1); buf[n]='\0';
+        printf("Read: %s\n", buf); close(result);
+    }
+    result = open_with_fallback("/kf_no_primary", "/kf_no_fallback");
+    if (result == -1) printf("Both failed\n");
+    unlink("/tmp/kf_fallback.txt");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+// Implémentez open_with_fallback: try primary, if fail try fallback
+// Affichez messages d'erreur, retournez -1 si les deux échouent
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "Stratégies de récupération d'erreur"
+
+[validation]
+expected_output = """
+Primary failed: No such file or directory
+Fallback succeeded
+Read: fallback data
+Primary failed: No such file or directory
+Fallback failed: No such file or directory
+Both failed
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On sauvegarde errno avant le 2e appel"
+heap = []
+label = "Primary échoue → try fallback"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "primary, fallback"
+function_name = "open_with_fallback"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "saved"
+value = "2 (ENOENT)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le chemin alternatif fonctionne"
+heap = []
+label = "Fallback réussit"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "primary, fallback"
+function_name = "open_with_fallback"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = ">= 0"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Aucun chemin ne fonctionne, on retourne -1"
+heap = []
+label = "Les deux échouent → -1"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "primary, fallback"
+function_name = "open_with_fallback"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "return"
+value = "-1"

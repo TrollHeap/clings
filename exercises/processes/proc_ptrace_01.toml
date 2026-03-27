@@ -1,0 +1,345 @@
+common_mistake = "Oublier le toggle entrée/sortie — PTRACE_SYSCALL s'arrête deux fois par appel système"
+description = """
+NSY103 — ptrace() permet à un processus de contrôler l'exécution d'un autre : inspecter registres, mémoire, intercepter les appels système. C'est le mécanisme derrière strace et gdb.
+
+Utilisez ptrace pour tracer les appels système d'un processus enfant qui fait write()."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "PTRACE_TRACEME dans l'enfant + SIGSTOP pour donner le contrôle au parent",
+    "PTRACE_SYSCALL continue jusqu'au prochain syscall (entrée ou sortie)",
+    "orig_rax contient le numéro du syscall sur x86_64",
+]
+id = "proc-ptrace-01"
+kc_ids = ["KC-C07"]
+key_concept = "ptrace permet d'intercepter chaque syscall — PTRACE_SYSCALL s'arrête à l'entrée ET à la sortie"
+lang = "c"
+prerequisites = ["proc-rlimit-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        /* Enfant: se déclare tracé */
+        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+        raise(SIGSTOP); /* s'arrête pour que le parent prenne le controle */
+        /* Faire quelques appels système */
+        write(STDOUT_FILENO, "Hello\n", 6);
+        write(STDOUT_FILENO, "World\n", 6);
+        _exit(0);
+    }
+
+    /* Parent: tracer les syscalls */
+    int status;
+    int syscall_count = 0;
+    int in_syscall = 0;
+
+    waitpid(child, &status, 0); /* attendre SIGSTOP initial */
+
+    /* Commencer le tracing */
+    ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+
+    while (1) {
+        waitpid(child, &status, 0);
+        if (WIFEXITED(status)) {
+            printf("Child exited with %d\n", WEXITSTATUS(status));
+            break;
+        }
+        if (WIFSTOPPED(status)) {
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, child, NULL, &regs);
+            if (in_syscall) {
+                /* Retour du syscall */
+                in_syscall = 0;
+            } else {
+                /* Entrée du syscall */
+                long syscall_nr = regs.orig_rax;
+                if (syscall_nr == SYS_write)
+                    syscall_count++;
+                in_syscall = 1;
+            }
+            ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+        }
+    }
+
+    printf("write() calls traced: %d\n", syscall_count);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        /* Enfant: se déclare tracé */
+        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+        raise(SIGSTOP); /* s'arrête pour que le parent prenne le controle */
+        /* Faire quelques appels système */
+        write(STDOUT_FILENO, "Hello\n", 6);
+        write(STDOUT_FILENO, "World\n", 6);
+        _exit(0);
+    }
+
+    /* Parent: tracer les syscalls */
+    int status;
+    int syscall_count = 0;
+    int in_syscall = 0;
+
+    waitpid(child, &status, 0); /* attendre SIGSTOP initial */
+
+    /* Commencer le tracing */
+    ptrace(____SYSCALL, child, NULL, NULL);
+
+    while (1) {
+        waitpid(child, &status, 0);
+        if (WIFEXITED(status)) {
+            printf("Child exited with %d\n", ____(status));
+            break;
+        }
+        if (WIFSTOPPED(status)) {
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, child, NULL, &____);
+            if (in_syscall) {
+                /* Retour du syscall */
+                in_syscall = 0;
+            } else {
+                /* Entrée du syscall */
+                long syscall_nr = regs.orig_rax;
+                if (syscall_nr == SYS_write)
+                    syscall_count++;
+                in_syscall = 1;
+            }
+            ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+        }
+    }
+
+    printf("write() calls traced: %d\n", syscall_count);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+/* == EXEMPLE =======================================
+ * Compter les syscalls totaux d'un enfant
+ * ================================================= */
+void example_ptrace(void) {
+    pid_t p = fork();
+    if (p == 0) {
+        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+        raise(SIGSTOP);
+        write(1, "x", 1);
+        _exit(0);
+    }
+    int st, count = 0;
+    waitpid(p, &st, 0);
+    ptrace(PTRACE_SYSCALL, p, NULL, NULL);
+    while (1) {
+        waitpid(p, &st, 0);
+        if (WIFEXITED(st)) break;
+        count++;
+        ptrace(PTRACE_SYSCALL, p, NULL, NULL);
+    }
+    printf("example: %d syscall stops\n", count);
+}
+
+/* == VOTRE EXERCICE ================================
+ * Tracer spécifiquement les write() avec orig_rax
+ * Compter uniquement les entrées (pas les sorties)
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    pid_t child = ____();
+    if (child == 0) {
+        ____(PTRACE_TRACEME, 0, NULL, NULL);
+        ____(SIGSTOP);
+        write(STDOUT_FILENO, "Hello\n", 6);
+        write(STDOUT_FILENO, "World\n", 6);
+        _exit(0);
+    }
+    int status, syscall_count = 0, in_syscall = 0;
+    waitpid(child, &status, 0);
+    ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+    while (1) {
+        waitpid(child, &status, 0);
+        if (WIFEXITED(status)) { printf("Child exited with %d\n", ____(status)); break; }
+        if (WIFSTOPPED(status)) {
+            struct user_regs_struct regs;
+            ____(PTRACE_GETREGS, child, NULL, &regs);
+            if (in_syscall) { in_syscall = 0; }
+            else { if (regs.orig_rax == SYS_write) syscall_count++; in_syscall = 1; }
+            ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+        }
+    }
+    printf("write() calls traced: %d\n", syscall_count);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+        raise(SIGSTOP);
+        write(STDOUT_FILENO, "Hello\n", 6);
+        write(STDOUT_FILENO, "World\n", 6);
+        _exit(0);
+    }
+    int status, syscall_count = 0, in_syscall = 0;
+    waitpid(child, &status, 0);
+    ptrace(____SYSCALL, child, NULL, NULL);
+    while (1) {
+        waitpid(child, &status, 0);
+        if (WIFEXITED(status)) { printf("Child exited with %d\n", ____(status)); break; }
+        if (WIFSTOPPED(status)) {
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, child, NULL, &____);
+            if (in_syscall) { in_syscall = 0; }
+            else { if (regs.orig_rax == SYS_write) syscall_count++; in_syscall = 1; }
+            ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+        }
+    }
+    printf("write() calls traced: %d\n", syscall_count);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    // fork: enfant PTRACE_TRACEME + raise(SIGSTOP) + 2x write + _exit
+    // parent: waitpid SIGSTOP, boucle PTRACE_SYSCALL
+    // PTRACE_GETREGS, vérifier orig_rax == SYS_write
+    // Toggle in_syscall pour ne compter que les entrées
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/ptrace.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Mini-strace avec ptrace"
+
+[validation]
+expected_output = 'REGEX:Hello\nWorld\nChild exited with 0\nwrite\(\) calls traced: 2'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "L'enfant se déclare tracé et s'arrête pour synchronisation"
+heap = []
+label = "PTRACE_TRACEME + SIGSTOP"
+step_label = "Setup ptrace"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "child"
+value = "STOPPED (tracé)"
+
+[[visualizer.steps.stack]]
+name = "parent"
+value = "waitpid → prêt"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque arrêt alterne entre entrée et sortie de syscall"
+heap = []
+label = "PTRACE_SYSCALL intercepte write()"
+step_label = "Trace write"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (tracer)"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "regs.orig_rax"
+value = "SYS_write (1)"
+
+[[visualizer.steps.stack]]
+name = "in_syscall"
+value = "0 → 1 (entrée)"
+
+[[visualizer.steps.stack]]
+name = "syscall_count"
+value = "1"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "2 appels write() détectés par le traceur"
+heap = []
+label = "Enfant termine, bilan"
+step_label = "Résultat"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "WIFEXITED"
+value = "true, code=0"
+
+[[visualizer.steps.stack]]
+name = "syscall_count"
+value = "2"

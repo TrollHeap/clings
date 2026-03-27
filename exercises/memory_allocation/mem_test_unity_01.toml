@@ -1,0 +1,125 @@
+common_mistake = "Oublier de vérifier si malloc retourne NULL avant d'accéder au tableau — ou ne pas initialiser les éléments alloués (malloc ne zero-initialise pas, contrairement à calloc)"
+description = """
+Implémentez trois fonctions d'allocation et manipulation de tableaux dynamiques validées par des tests unitaires Unity.
+
+- `make_array(int n, int val)` : alloue un tableau de `n` entiers initialisés à `val`, retourne le pointeur (NULL si n <= 0)
+- `array_sum(int *arr, int n)` : retourne la somme des n éléments
+- `double_elements(int *arr, int n)` : double chaque élément du tableau en place
+
+La mémoire allouée par `make_array` doit être libérée par l'appelant avec `free()`."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Pour `make_array` : `malloc(n * sizeof(int))` alloue la mémoire — vérifiez le retour NULL et initialisez avec une boucle.",
+    "Pour `array_sum` : une boucle classique avec accumulateur suffit — pas besoin d'arithmétique de pointeurs ici.",
+    "Pour `double_elements` : `arr[i] *= 2` ou `*p *= 2` avec un pointeur — modifiez en place, pas de copie.",
+]
+id = "mem-test-unity-01"
+kc_ids = ["KC-MEM"]
+key_concept = "malloc(n * sizeof(T)) alloue n×sizeof(T) octets sur le tas et retourne un pointeur — toujours vérifier NULL et libérer avec free() après usage"
+lang = "c"
+solution_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+int *make_array(int n, int val) {
+    if (n <= 0) return NULL;
+    int *arr = malloc((size_t)n * sizeof(int));
+    if (!arr) return NULL;
+    for (int i = 0; i < n; i++) arr[i] = val;
+    return arr;
+}
+
+int array_sum(int *arr, int n) {
+    int sum = 0;
+    for (int i = 0; i < n; i++) sum += arr[i];
+    return sum;
+}
+
+void double_elements(int *arr, int n) {
+    for (int i = 0; i < n; i++) arr[i] *= 2;
+}
+"""
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+/* Alloue un tableau de n entiers tous initialisés à val.
+ * Retourne NULL si n <= 0. L'appelant doit libérer avec free(). */
+int *make_array(int n, int val) {
+    /* TODO */
+    return NULL;
+}
+
+/* Retourne la somme des n éléments pointés par arr. */
+int array_sum(int *arr, int n) {
+    /* TODO */
+    return 0;
+}
+
+/* Double chaque élément du tableau en place : arr[i] *= 2. */
+void double_elements(int *arr, int n) {
+    /* TODO */
+}
+"""
+subject = "memory_allocation"
+title = "Allocation dynamique — tests Unity"
+
+[validation]
+mode = "test"
+test_code = """
+void test_make_array_basic(void) {
+    int *arr = make_array(3, 7);
+    TEST_ASSERT_NOT_NULL(arr);
+    TEST_ASSERT_EQUAL_INT(7, arr[0]);
+    TEST_ASSERT_EQUAL_INT(7, arr[1]);
+    TEST_ASSERT_EQUAL_INT(7, arr[2]);
+    free(arr);
+}
+
+void test_make_array_zero(void) {
+    int *arr = make_array(0, 42);
+    TEST_ASSERT_NULL(arr);
+}
+
+void test_make_array_negative(void) {
+    int *arr = make_array(-1, 5);
+    TEST_ASSERT_NULL(arr);
+}
+
+void test_array_sum(void) {
+    int arr1[] = {1, 2, 3, 4, 5};
+    TEST_ASSERT_EQUAL_INT(15, array_sum(arr1, 5));
+    int arr2[] = {-3, 3};
+    TEST_ASSERT_EQUAL_INT(0, array_sum(arr2, 2));
+    int arr3[] = {42};
+    TEST_ASSERT_EQUAL_INT(42, array_sum(arr3, 1));
+}
+
+void test_double_elements(void) {
+    int arr[] = {1, 2, 3};
+    double_elements(arr, 3);
+    TEST_ASSERT_EQUAL_INT(2, arr[0]);
+    TEST_ASSERT_EQUAL_INT(4, arr[1]);
+    TEST_ASSERT_EQUAL_INT(6, arr[2]);
+}
+
+void test_double_elements_negative(void) {
+    int arr[] = {-5, 0, 5};
+    double_elements(arr, 3);
+    TEST_ASSERT_EQUAL_INT(-10, arr[0]);
+    TEST_ASSERT_EQUAL_INT(0, arr[1]);
+    TEST_ASSERT_EQUAL_INT(10, arr[2]);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_make_array_basic);
+    RUN_TEST(test_make_array_zero);
+    RUN_TEST(test_make_array_negative);
+    RUN_TEST(test_array_sum);
+    RUN_TEST(test_double_elements);
+    RUN_TEST(test_double_elements_negative);
+    return UNITY_END();
+}
+"""

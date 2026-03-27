@@ -1,0 +1,258 @@
+common_mistake = "Oublier de vérifier errno après sched_setscheduler — l'appel peut échouer silencieusement sans traitement de l'erreur"
+description = """
+NSY103 — Linux supporte l'ordonnancement temps-réel via `sched_setscheduler()`. La politique `SCHED_FIFO` donne au thread la priorité absolue (de 1 à 99) : un thread FIFO de priorité 50 préempte tout thread `SCHED_OTHER`. En pratique, cela requiert `CAP_SYS_NICE` ou root.
+
+Utilisez `sched_setscheduler()` avec `SCHED_FIFO` prio=50. Si `EPERM`, affichez le message d'erreur. Affichez la politique effective obtenue avec `sched_getscheduler()`."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "`sched_setscheduler(0, SCHED_FIFO, &param)` : 0 = PID du processus courant",
+    "`SCHED_FIFO` nécessite `CAP_SYS_NICE` ; sans ça, errno=EPERM et ret==-1",
+    "`sched_getscheduler(0)` retourne la politique réelle — SCHED_OTHER si le changement a échoué",
+]
+id = "sched-rt-01"
+kc_ids = ["KC-C10"]
+key_concept = "SCHED_FIFO prio 1-99 > toute tâche SCHED_OTHER ; requiert CAP_SYS_NICE ou root"
+lang = "c"
+prerequisites = ["sched-fifo-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    struct sched_param param = { .sched_priority = 50 };
+    int ret = sched_setscheduler(0, SCHED_FIFO, &param);
+    if (ret == -1) {
+        printf("sched_setscheduler: %s\n", strerror(errno));
+    }
+    int policy = sched_getscheduler(0);
+    if (policy == SCHED_FIFO)
+        printf("Policy: SCHED_FIFO prio=%d\n", param.sched_priority);
+    else if (policy == SCHED_OTHER)
+        printf("Policy: SCHED_OTHER (prio=%d ignored)\n", param.sched_priority);
+    else
+        printf("Policy: %d\n", policy);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    struct sched_param param = { .sched_priority = ____ };
+    int ret = sched_setscheduler(____, ____, &param);
+    if (ret == ____) {
+        printf("sched_setscheduler: %s\n", strerror(errno));
+    }
+    int policy = sched_getscheduler(____);
+    if (policy == SCHED_FIFO)
+        printf("Policy: SCHED_FIFO prio=%d\n", param.sched_priority);
+    else if (policy == SCHED_OTHER)
+        printf("Policy: SCHED_OTHER (prio=%d ignored)\n", param.sched_priority);
+    else
+        printf("Policy: %d\n", policy);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Lire la politique courante sans la changer
+ * sched_getscheduler(0) retourne SCHED_OTHER=0 par defaut
+ * ================================================= */
+void example_get_policy(void) {
+    int p = sched_getscheduler(0);
+    if (p == SCHED_OTHER)
+        printf("Current policy: SCHED_OTHER\n");
+}
+
+/* == VOTRE EXERCICE ================================
+ * Tentez de passer en SCHED_FIFO prio=50
+ * Gerez le cas EPERM (non-root)
+ * Lisez et affichez la politique effective
+ * ================================================= */
+int main(void) {
+    struct sched_param param = { .sched_priority = 50 };
+    /* TODO: sched_setscheduler(0, SCHED_FIFO, &param) */
+    /* TODO: verifier ret==-1 et afficher strerror(errno) */
+    /* TODO: sched_getscheduler(0) et afficher la politique */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    struct sched_param param = { .sched_priority = 50 };
+    int ret = sched_setscheduler(0, SCHED_FIFO, &param);
+    if (ret == -1) {
+        printf("sched_setscheduler: %s\n", strerror(errno));
+    }
+    int policy = sched_getscheduler(0);
+    if (policy == SCHED_FIFO)
+        printf("Policy: SCHED_FIFO prio=%d\n", param.sched_priority);
+    else if (policy == ____) // quelle constante pour la politique par defaut?
+        printf("Policy: SCHED_OTHER (prio=%d ignored)\n", param.sched_priority);
+    else
+        printf("Policy: %d\n", policy);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    struct sched_param param = { .sched_priority = ____ };
+    int ret = sched_setscheduler(____, ____, &param);
+    if (ret == ____) {
+        printf("sched_setscheduler: %s\n", strerror(errno));
+    }
+    int policy = sched_getscheduler(____);
+    if (policy == SCHED_FIFO)
+        printf("Policy: SCHED_FIFO prio=%d\n", param.sched_priority);
+    else if (policy == SCHED_OTHER)
+        printf("Policy: SCHED_OTHER (prio=%d ignored)\n", param.sched_priority);
+    else
+        printf("Policy: %d\n", policy);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    // 1. struct sched_param param = { .sched_priority = 50 };
+    // 2. sched_setscheduler(0, SCHED_FIFO, &param) -> ret
+    // 3. si ret==-1 : printf("sched_setscheduler: %s\n", strerror(errno))
+    // 4. sched_getscheduler(0) -> policy
+    // 5. afficher SCHED_FIFO ou SCHED_OTHER selon policy
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sched.h>
+#include <errno.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "scheduling"
+title = "Ordonnancement temps réel : SCHED_FIFO et priorités"
+
+[validation]
+expected_output = 'REGEX:^(sched_setscheduler: Operation not permitted\nPolicy: SCHED_OTHER \(prio=50 ignored\)|Policy: SCHED_FIFO prio=50)$'
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "sched_setscheduler() est un appel système qui demande au noyau de changer la politique d'ordonnancement du processus (PID=0 = processus courant). Le noyau vérifie immédiatement si le processus possède la capacité CAP_SYS_NICE ou s'exécute en root avant d'appliquer SCHED_FIFO."
+label = "Appel sched_setscheduler : param → syscall → kernel"
+step_label = "Étape 1 — sched_setscheduler : appel système vers le noyau"
+
+[[visualizer.steps.edges]]
+label = "&param"
+source = "param"
+target = "syscall"
+
+[[visualizer.steps.edges]]
+label = "syscall"
+source = "syscall"
+target = "kernel"
+
+[[visualizer.steps.nodes]]
+id = "param"
+label = """
+sched_param
+prio=50"""
+
+[[visualizer.steps.nodes]]
+id = "syscall"
+label = """
+sched_setscheduler(0,
+SCHED_FIFO, &param)"""
+
+[[visualizer.steps.nodes]]
+id = "kernel"
+label = """
+kernel
+CAP check"""
+
+[[visualizer.steps]]
+explanation = "Sans CAP_SYS_NICE, le noyau refuse le changement et retourne -1 avec errno=EPERM. Il faut toujours vérifier la valeur de retour de sched_setscheduler : un échec silencieux laisserait le processus croire qu'il est temps-réel alors qu'il reste en SCHED_OTHER, ce qui peut causer des violations de deadline."
+label = "Vérification errno : EPERM si non-root"
+step_label = "Étape 2 — errno EPERM : CAP_SYS_NICE ou root requis"
+
+[[visualizer.steps.edges]]
+label = "non-root"
+source = "ret"
+target = "eperm"
+
+[[visualizer.steps.edges]]
+label = "root/CAP_SYS_NICE"
+source = "ret"
+target = "ok"
+
+[[visualizer.steps.nodes]]
+id = "ret"
+label = "ret == -1"
+
+[[visualizer.steps.nodes]]
+id = "eperm"
+label = """
+errno == EPERM
+(Operation not permitted)"""
+
+[[visualizer.steps.nodes]]
+id = "ok"
+label = """
+ret == 0
+(succès si root)"""
+
+[[visualizer.steps]]
+explanation = "sched_getscheduler() lit la politique d'ordonnancement effective du processus. Après un échec EPERM, le processus reste en SCHED_OTHER (politique par défaut, time-sharing). SCHED_FIFO prio=50 signifie que le processus ne serait jamais préempté par un thread de priorité inférieure, même s'il boucle indéfiniment."
+label = "sched_getscheduler : politique effective retournée"
+step_label = "Étape 3 — sched_getscheduler : lecture de la politique effective"
+
+[[visualizer.steps.edges]]
+label = "root"
+source = "get"
+target = "fifo"
+
+[[visualizer.steps.edges]]
+label = "non-root"
+source = "get"
+target = "other"
+
+[[visualizer.steps.nodes]]
+id = "get"
+label = "sched_getscheduler(0)"
+
+[[visualizer.steps.nodes]]
+id = "fifo"
+label = """
+SCHED_FIFO
+(si root réussi)"""
+
+[[visualizer.steps.nodes]]
+id = "other"
+label = """
+SCHED_OTHER
+(si EPERM)"""

@@ -1,0 +1,223 @@
+common_mistake = """Utiliser un pointeur vers littéral (char *t = "...") au lieu d'un tableau (char t[] = "...") — mkdtemp modifie en place"""
+description = """
+NSY103 — `mkdtemp()` crée un répertoire temporaire unique à partir d'un template se terminant par "XXXXXX". Le template est modifié en place avec le nom généré. C'est la méthode sûre pour éviter les race conditions (contrairement à tmpnam).
+
+Créez un répertoire temporaire avec `mkdtemp()`, vérifiez qu'il existe avec `stat()`, puis nettoyez."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "`mkdtemp(template)` modifie le template en place et retourne un pointeur vers celui-ci",
+    'Le template DOIT se terminer par exactement 6 X : "XXXXXX"',
+    "`rmdir()` supprime un répertoire vide — le type est vérifié via `S_ISDIR(sb.st_mode)`",
+]
+id = "fs-tmpdir-01"
+kc_ids = ["KC-C19"]
+key_concept = "mkdtemp() crée un répertoire temporaire unique atomiquement"
+lang = "c"
+prerequisites = [
+    "fs-stat-01",
+    "fs-readdir-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(void) {
+    char template[] = "/tmp/kf_XXXXXX";
+    char *dir = mkdtemp(template);
+    if (!dir) {
+        perror("mkdtemp");
+        return 1;
+    }
+    printf("Repertoire cree\n");
+
+    struct stat sb;
+    if (stat(dir, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+        printf("Est un repertoire : 1\n");
+    }
+    printf("Longueur nom : %d\n", (int)strlen(dir) > 0 ? 1 : 0);
+
+    rmdir(dir);
+    printf("Repertoire supprime\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(void) {
+    char template[] = "/tmp/kf_XXXXXX";
+    char *dir = ____(template);
+    if (!dir) {
+        perror("mkdtemp");
+        return 1;
+    }
+    printf("Repertoire cree\n");
+
+    struct stat sb;
+    if (stat(dir, &sb) == 0 && S_ISDIR(sb.____)) {
+        printf("Est un repertoire : 1\n");
+    }
+    printf("Longueur nom : %d\n", (int)strlen(dir) > 0 ? 1 : 0);
+
+    ____(dir);
+    printf("Repertoire supprime\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+/* == EXEMPLE ================================================
+ * Creer un fichier temporaire avec mkstemp()
+ * mkstemp() fonctionne comme mkdtemp() mais pour les fichiers.
+ * Le template est modifie en place.
+ * =========================================================== */
+void example_mkstemp(void) {
+    char template[] = "/tmp/kf_ex_XXXXXX";
+    int fd = mkstemp(template);
+    if (fd == -1) { perror("mkstemp"); return; }
+    printf("Fichier cree : %s\n", template);
+    close(fd);
+    unlink(template);
+}
+/* Resultat: Fichier cree : /tmp/kf_ex_AbCdEf (nom aleatoire) */
+
+/* == VOTRE EXERCICE =========================================
+ * Creer un REPERTOIRE temporaire avec mkdtemp()
+ * Verifier qu'il existe avec stat/S_ISDIR
+ * Nettoyer avec rmdir()
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(void) {
+    char template[] = "/tmp/kf_XXXXXX";
+    char *dir = mkdtemp(____); // passer le template
+    if (!dir) { perror("mkdtemp"); return 1; }
+    printf("Repertoire cree\n");
+    struct stat sb;
+    if (stat(dir, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+        printf("Est un repertoire : 1\n");
+    }
+    printf("Longueur nom : %d\n", (int)strlen(dir) > 0 ? 1 : 0);
+    ____(dir); // supprimer le repertoire
+    printf("Repertoire supprime\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(void) {
+    char template[] = "/tmp/kf_XXXXXX";
+    char *dir = ____(template);
+    if (!dir) { perror("mkdtemp"); return 1; }
+    printf("Repertoire cree\n");
+    struct stat sb;
+    if (stat(dir, &sb) == 0 && S_ISDIR(sb.____)) {
+        printf("Est un repertoire : 1\n");
+    }
+    printf("Longueur nom : %d\n", (int)strlen(dir) > 0 ? 1 : 0);
+    ____(dir);
+    printf("Repertoire supprime\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(void) {
+    // Creer un template char[] avec XXXXXX
+    // Appeler mkdtemp(), verifier avec stat/S_ISDIR
+    // Nettoyer avec rmdir()
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Répertoire temporaire avec mkdtemp"
+
+[validation]
+expected_output = """
+Repertoire cree
+Est un repertoire : 1
+Longueur nom : 1
+Repertoire supprime
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le template est un tableau char[] (pas un pointeur vers littéral) car mkdtemp() modifie la chaîne en place. Les 6 X seront remplacés par des caractères aléatoires."
+heap = []
+label = "Template avant mkdtemp"
+step_label = "Template avec XXXXXX"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "template"
+value = '"/tmp/kf_XXXXXX"'
+
+[[visualizer.steps]]
+explanation = "mkdtemp() remplace XXXXXX par des caractères uniques, crée le répertoire avec permissions 0700, et retourne un pointeur vers le template modifié. Le répertoire est créé atomiquement — pas de race condition."
+heap = []
+label = "Après mkdtemp()"
+step_label = "mkdtemp() crée le répertoire atomiquement"
+
+[[visualizer.steps.arrows]]
+from = "dir"
+label = "=="
+to = "template"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "template"
+value = '"/tmp/kf_AbCdEf"'
+
+[[visualizer.steps.stack]]
+name = "dir"
+value = "→template"

@@ -1,0 +1,328 @@
+common_mistake = "Oublier le masque après le décalage → bits parasites des octets supérieurs"
+description = """
+NSY103 — Un masque bitwise isole des bits spécifiques. AND avec le masque extrait les bits, OR les active, XOR les inverse. Extraire les octets d'un entier 32-bit est une opération fondamentale.
+
+Extrayez les 4 octets d'un entier 32 bits en utilisant des masques et des décalages."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "0xFF masque les 8 bits de poids faible (un octet)",
+    "Décaler puis masquer: (val >> N) & 0xFF extrait l'octet à la position N",
+    "0x0F masque les 4 bits de poids faible (un nibble)",
+]
+id = "bit-mask-apply-01"
+kc_ids = ["KC-C04"]
+key_concept = "(val >> N) & mask extrait un champ de bits — pattern fondamental pour parser des protocoles et registres"
+lang = "c"
+prerequisites = ["bit-shift-01"]
+solution_code = '''
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) {
+    return (val >> (n * 8)) & 0xFF;
+}
+
+unsigned int get_nibble_lo(unsigned int val) {
+    return val & 0x0F;
+}
+
+unsigned int get_nibble_hi(unsigned int val) {
+    return (val >> 4) & 0x0F;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) {
+    return 0;
+}
+
+unsigned int get_nibble_lo(unsigned int val) {
+    return 0;
+}
+
+unsigned int get_nibble_hi(unsigned int val) {
+    return 0;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Masquage: extraire des champs de bits
+ * =========================================================== */
+void example_mask(void) {
+    unsigned int x = 0xABCD;
+    printf("lo byte = 0x%02X\n", x & 0xFF);       /* 0xCD */
+    printf("hi byte = 0x%02X\n", (x >> 8) & 0xFF); /* 0xAB */
+}
+
+unsigned int get_byte(unsigned int val, int n) {
+    return (val >> (n * 8)) & 0xFF;
+}
+
+unsigned int get_nibble_lo(unsigned int val) {
+    return val & 0x0F;
+}
+
+unsigned int get_nibble_hi(unsigned int val) {
+    return (val >> 4) & 0x0F;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) {
+    return (val >> ____) & 0xFF;
+}
+
+unsigned int get_nibble_lo(unsigned int val) {
+    return val & 0x0F;
+}
+
+unsigned int get_nibble_hi(unsigned int val) {
+    return (val >> 4) & 0x0F;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) {
+    return (val >> (n * 8)) & ____;
+}
+
+unsigned int get_nibble_lo(unsigned int val) {
+    return val & ____;
+}
+
+unsigned int get_nibble_hi(unsigned int val) {
+    return (val >> ____) & 0x0F;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) { return 0; }
+unsigned int get_nibble_lo(unsigned int val) { return 0; }
+unsigned int get_nibble_hi(unsigned int val) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned int get_byte(unsigned int val, int n) { return 0; }
+unsigned int get_nibble_lo(unsigned int val) { return 0; }
+unsigned int get_nibble_hi(unsigned int val) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 0)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 1)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 2)));
+        printf("%d\n", (int)(get_byte(0xDEADBEEF, 3)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_lo(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_lo(0x12345670)));
+        printf("%d\n", (int)(get_nibble_lo(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_lo(0x00000000)));
+    }
+    {
+        printf("%d\n", (int)(get_nibble_hi(0xDEADBEEF)));
+        printf("%d\n", (int)(get_nibble_hi(0x12345670)));
+        printf("%d\n", (int)(get_nibble_hi(0xFFFFFFAB)));
+        printf("%d\n", (int)(get_nibble_hi(0x00000000)));
+    }
+    return 0;
+}
+''',
+]
+subject = "bitwise_ops"
+title = "Application de masque (extraction de bits)"
+
+[validation]
+expected_output = """
+239
+190
+173
+222
+15
+0
+11
+0
+14
+7
+10
+0
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Shift + mask isole chaque octet: DE|AD|BE|EF"
+heap = []
+label = "Extraction d'octets par masquage"
+step_label = "1. Octets"
+
+[[visualizer.steps.call_frames]]
+args = "0xDEADBEEF, 0"
+function_name = "get_byte"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "0xDEADBEEF"
+
+[[visualizer.steps.stack]]
+name = "byte0 (& 0xFF)"
+value = "0xEF"
+
+[[visualizer.steps.stack]]
+name = "byte1 (>>8 & 0xFF)"
+value = "0xBE"
+
+[[visualizer.steps.stack]]
+name = "byte2 (>>16 & 0xFF)"
+value = "0xAD"
+
+[[visualizer.steps.stack]]
+name = "byte3 (>>24 & 0xFF)"
+value = "0xDE"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "0x0F masque 4 bits — un nibble est un demi-octet"
+heap = []
+label = "Extraction de nibbles (4 bits)"
+step_label = "2. Nibbles"
+
+[[visualizer.steps.call_frames]]
+args = "0xDEADBEEF"
+function_name = "get_nibble_lo"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "lo nibble (& 0x0F)"
+value = "0xF"
+
+[[visualizer.steps.stack]]
+name = "hi nibble (>>4 & 0x0F)"
+value = "0xE"

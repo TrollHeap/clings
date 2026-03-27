@@ -1,0 +1,310 @@
+common_mistake = "Oublier & devant les variables (sauf char*) — comportement indéfini"
+description = """
+NSY103 — sscanf(str, fmt, &var1, &var2, ...) parse une chaîne selon un format. C'est l'inverse de sprintf.
+
+Parsez une ligne de log format : '2026-03-02 14:30:05 [INFO] pid=42 cpu=87'"""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    'Pour une date : sscanf(s, "%d-%d-%d", &year, &month, &day);',
+    "Pour skip un mot : utiliser %*s (ignore le champ sans stocker)",
+    "Vérifier le retour de sscanf == nombre d'items attendus",
+]
+id = "sscanf-parse-01"
+kc_ids = ["KC-C05"]
+key_concept = "sscanf retourne le nombre d'items parsés avec succès"
+lang = "c"
+prerequisites = ["snprintf-builder-01"]
+solution_code = '''
+#include <stdio.h>
+
+int parse_log(const char *log, int *year, int *month, int *day,
+              int *hour, int *min, int *sec, int *pid, int *cpu) {
+    return sscanf(log, "%d-%d-%d %d:%d:%d %*s pid=%d cpu=%d",
+                  year, month, day, hour, min, sec, pid, cpu);
+}
+
+int main(void) {
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(year));
+        printf("%d\n", (int)(month));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(day));
+        printf("%d\n", (int)(hour));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(min));
+        printf("%d\n", (int)(sec));
+        printf("%d\n", (int)(n));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(pid));
+        printf("%d\n", (int)(cpu));
+        printf("%d\n", (int)(n));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+int parse_log(const char *log, int *year, int *month, int *day,
+              int *hour, int *min, int *sec, int *pid, int *cpu) {
+    return sscanf(log, ____,
+                  ____, ____, ____, ____, ____, ____, ____, ____);
+}
+
+int main(void) {
+    char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+    // Parser: year, month, day, hour, min, sec, pid, cpu
+    // Utiliser %*s pour ignorer [INFO]
+    // Afficher Date, Heure, PID, CPU avec %
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Parser une adresse IP:port avec sscanf
+ * sscanf retourne le nombre de champs parses avec succes
+ * =========================================================== */
+void example_parse_ip(void) {
+    char *addr = "192.168.1.42:8080";
+    int a, b, c, d, port;
+    int n = sscanf(addr, "%d.%d.%d.%d:%d", &a, &b, &c, &d, &port);
+    if (n == 5) {
+        printf("IP: %d.%d.%d.%d\n", a, b, c, d);
+        printf("Port: %d\n", port);
+    } else {
+        printf("Parse error: got %d fields\n", n);
+    }
+}
+/* Resultat: IP: 192.168.1.42 / Port: 8080 */
+
+/* == VOTRE EXERCICE =========================================
+ * Parser une ligne de log avec sscanf
+ * Inspirez-vous de example_parse_ip ci-dessus.
+ * Utilisez %*s pour ignorer un mot ([INFO]) sans le stocker.
+ * =========================================================== */
+
+int main(void) {
+    char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+    int year, month, day, hour, min, sec, pid, cpu;
+    int n = 0; /* TODO: sscanf(log, "%d-%d-%d %d:%d:%d %*s pid=%d cpu=%d", &year, ...) */
+    if (n == 8) {
+        printf("Date: %04d/%02d/%02d\n", year, month, day);
+        printf("Heure: %02d:%02d:%02d\n", hour, min, sec);
+        printf("PID: %d\n", pid);
+        printf("CPU: %d%%\n", cpu);
+    } else {
+        printf("Parse error: got %d fields\n", n);
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+    int year, month, day, hour, min, sec, pid, cpu;
+    int n = sscanf(log, "%d-%d-%d %d:%d:%d %*s pid=%d cpu=%d",
+                   &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+    if (n == 8) {
+        printf("Date: %04d/%02d/%02d\n", year, month, day);
+        printf("Heure: %02d:%02d:%02d\n", hour, min, sec);
+        printf("PID: %d\n", ____);
+        printf("CPU: ____\n", ____); // afficher le % littéral
+    } else {
+        printf("Parse error: got %d fields\n", n);
+    }
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int parse_log(const char *log, int *year, int *month, int *day,
+              int *hour, int *min, int *sec, int *pid, int *cpu) {
+    return sscanf(log, ____,
+                  ____, ____, ____, ____, ____, ____, ____, ____);
+}
+
+int main(void) {
+    char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+    // Parser: year, month, day, hour, min, sec, pid, cpu
+    // Utiliser %*s pour ignorer [INFO]
+    // Afficher Date, Heure, PID, CPU avec %
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+
+int parse_log(const char *log, int *year, int *month, int *day,
+              int *hour, int *min, int *sec, int *pid, int *cpu) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(year));
+        printf("%d\n", (int)(month));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(day));
+        printf("%d\n", (int)(hour));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(min));
+        printf("%d\n", (int)(sec));
+        printf("%d\n", (int)(n));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(pid));
+        printf("%d\n", (int)(cpu));
+        printf("%d\n", (int)(n));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int parse_log(const char *log, int *year, int *month, int *day,
+              int *hour, int *min, int *sec, int *pid, int *cpu) { return 0; }
+
+int main(void) {
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(year));
+        printf("%d\n", (int)(month));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(n));
+        printf("%d\n", (int)(day));
+        printf("%d\n", (int)(hour));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(min));
+        printf("%d\n", (int)(sec));
+        printf("%d\n", (int)(n));
+    }
+    {
+        char *log = "2026-03-02 14:30:05 [INFO] pid=42 cpu=87";
+        int year, month, day, hour, min, sec, pid, cpu;
+        int n = parse_log(log, &year, &month, &day, &hour, &min, &sec, &pid, &cpu);
+        printf("%d\n", (int)(pid));
+        printf("%d\n", (int)(cpu));
+        printf("%d\n", (int)(n));
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Parser une chaîne structurée avec sscanf"
+
+[validation]
+expected_output = """
+8
+2026
+3
+8
+2
+14
+30
+5
+8
+42
+87
+8"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Chaîne log à parser"
+
+[[visualizer.steps.stack]]
+name = "log"
+value = '"2026-03-02 14:30:05 [INFO] pid=42 cpu=87"'
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "sscanf extrait 8 champs"
+
+[[visualizer.steps.stack]]
+name = "year"
+value = "2026"
+
+[[visualizer.steps.stack]]
+name = "month"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "day"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "hour"
+value = "14"
+
+[[visualizer.steps.stack]]
+name = "min"
+value = "30"
+
+[[visualizer.steps.stack]]
+name = "sec"
+value = "5"
+
+[[visualizer.steps.stack]]
+name = "pid"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "cpu"
+value = "87"

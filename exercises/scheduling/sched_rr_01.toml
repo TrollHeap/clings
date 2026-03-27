@@ -1,0 +1,390 @@
+common_mistake = "Utiliser burst[i] au lieu de remaining[i] dans la condition — remaining diminue à chaque tour, burst reste fixe"
+description = """
+NSY103 — Round-Robin alloue à chaque processus prêt un quantum de temps fixe en tournant en boucle. Avec quantum=2 et P1(4), P2(2), P3(6) :
+
+t=0-2: P1(restant=2) → t=2-4: P2 termine(0) → t=4-6: P3(restant=4) → t=6-8: P1 termine(0) → t=8-10: P3(restant=2) → t=10-12: P3 termine(0)
+
+Calculez les temps de rotation et d'attente moyens."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "run = min(remaining[i], QUANTUM) — le processus s'exécute au plus QUANTUM unités",
+    "Quand remaining[i] atteint 0, enregistrez completion[i] = time et incrémentez done",
+    "wait = turnaround - burst ; turnaround = completion — temps de rotation depuis t=0",
+]
+id = "sched-rr-01"
+kc_ids = ["KC-C6"]
+key_concept = "RR : chaque processus tourne avec run=min(remaining,QUANTUM) ; completion quand remaining==0"
+lang = "c"
+prerequisites = ["sched-fifo-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+void simulate_rr(int burst[], int n, int quantum, int completion[]) {
+    int remaining[N];
+    memcpy(remaining, burst, sizeof(int) * n);
+    int time = 0, done = 0;
+    while (done < n) {
+        for (int i = 0; i < n; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < quantum) ? remaining[i] : quantum;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    completion[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+}
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int completion[1];
+        simulate_rr(burst, 1, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+    }
+    {
+        int burst[] = {2, 2};
+        int completion[2];
+        simulate_rr(burst, 2, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    {
+        int burst[] = {4, 2, 6};
+        int completion[3];
+        simulate_rr(burst, 3, 2, completion);
+        /* t=0-2: P1(rest=2) t=2-4: P2 done t=4-6: P3(rest=4) */
+        /* t=6-8: P1 done t=8-10: P3(rest=2) t=10-12: P3 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+        printf("%d\n", (int)(completion[2]));
+    }
+    {
+        int burst[] = {2, 1};
+        int completion[2];
+        simulate_rr(burst, 2, 1, completion);
+        /* t=0-1: P1(rest=1) t=1-2: P2 done t=2-3: P1 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+void simulate_rr(int burst[], int n, int quantum, int completion[]) {
+    int remaining[N];
+    /* TODO: Copiez burst[] dans remaining[] */
+    /* TODO: Boucle while (done < n) avec for i et Round-Robin */
+    /* TODO: run = min(remaining[i], quantum) */
+    /* TODO: Enregistrez completion[i] quand remaining[i] == 0 */
+}
+
+int main(void) {
+    int burst[] = {4, 2, 6};
+    int remaining[N];
+    int completion[N];
+    memcpy(remaining, burst, sizeof(burst));
+    // Boucle while (done < N) :
+    //   for chaque processus i : si remaining[i]>0
+    //     run = min(remaining[i], QUANTUM)
+    //     time += run ; remaining[i] -= run
+    //     si remaining[i]==0 : completion[i]=time, done++
+    // wait = completion[i] - burst[i]
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+/* == EXEMPLE =======================================
+ * RR avec 2 processus P1(3), P2(2), quantum=2
+ * t=0-2: P1(rest=1) | t=2-4: P2 termine(rest=0) | t=4-5: P1 termine(rest=0)
+ * completion: P2=4, P1=5
+ * wait: P2=4-2=2, P1=5-3=2  avg=2.00
+ * ta:   P2=4, P1=5           avg=4.50
+ * ================================================= */
+void example_rr2(void) {
+    int b[] = {3, 2};
+    int rem[] = {3, 2};
+    int comp[2];
+    int t = 0, done = 0;
+    while (done < 2) {
+        for (int i = 0; i < 2; i++) {
+            if (rem[i] > 0) {
+                int run = rem[i] < 2 ? rem[i] : 2;
+                t += run; rem[i] -= run;
+                if (rem[i] == 0) { comp[i] = t; done++; }
+            }
+        }
+    }
+    printf("P1 completion=%d P2 completion=%d\n", comp[0], comp[1]);
+}
+
+/* == VOTRE EXERCICE ================================
+ * P1(4), P2(2), P3(6), quantum=2
+ * ================================================= */
+int main(void) {
+    int burst[] = {4, 2, 6};
+    int remaining[N];
+    int completion[N];
+    memcpy(remaining, burst, sizeof(burst));
+    /* TODO: boucle RR while (done < N) */
+    /* TODO: calcul wait et turnaround */
+    printf("Average waiting time: %.2f\n", 0.0f);
+    printf("Average turnaround time: %.2f\n", 0.0f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+int main(void) {
+    int burst[] = {4, 2, 6};
+    int remaining[N];
+    int completion[N];
+    memcpy(remaining, burst, sizeof(burst));
+
+    int time = 0, done = 0;
+    while (done < N) {
+        for (int i = 0; i < N; i++) {
+            if (remaining[i] > 0) {
+                int run = (remaining[i] < QUANTUM) ? remaining[i] : QUANTUM;
+                time += run;
+                remaining[i] -= run;
+                if (remaining[i] == 0) {
+                    completion[i] = time;
+                    done++;
+                }
+            }
+        }
+    }
+
+    float total_wait = 0, total_ta = 0;
+    for (int i = 0; i < N; i++) {
+        int ta = completion[i];
+        int wait = ta - ____; // burst ou remaining?
+        total_wait += wait;
+        total_ta += ta;
+    }
+
+    printf("Average waiting time: %.2f\n", total_wait / N);
+    printf("Average turnaround time: %.2f\n", total_ta / N);
+    return 0;
+}''',
+    """
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+void simulate_rr(int burst[], int n, int quantum, int completion[]) {
+    int remaining[N];
+    /* TODO: Copiez burst[] dans remaining[] */
+    /* TODO: Boucle while (done < n) avec for i et Round-Robin */
+    /* TODO: run = min(remaining[i], quantum) */
+    /* TODO: Enregistrez completion[i] quand remaining[i] == 0 */
+}
+
+int main(void) {
+    int burst[] = {4, 2, 6};
+    int remaining[N];
+    int completion[N];
+    memcpy(remaining, burst, sizeof(burst));
+    // Boucle while (done < N) :
+    //   for chaque processus i : si remaining[i]>0
+    //     run = min(remaining[i], QUANTUM)
+    //     time += run ; remaining[i] -= run
+    //     si remaining[i]==0 : completion[i]=time, done++
+    // wait = completion[i] - burst[i]
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+void simulate_rr(int burst[], int n, int quantum, int completion[]) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int completion[1];
+        simulate_rr(burst, 1, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+    }
+    {
+        int burst[] = {2, 2};
+        int completion[2];
+        simulate_rr(burst, 2, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    {
+        int burst[] = {4, 2, 6};
+        int completion[3];
+        simulate_rr(burst, 3, 2, completion);
+        /* t=0-2: P1(rest=2) t=2-4: P2 done t=4-6: P3(rest=4) */
+        /* t=6-8: P1 done t=8-10: P3(rest=2) t=10-12: P3 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+        printf("%d\n", (int)(completion[2]));
+    }
+    {
+        int burst[] = {2, 1};
+        int completion[2];
+        simulate_rr(burst, 2, 1, completion);
+        /* t=0-1: P1(rest=1) t=1-2: P2 done t=2-3: P1 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define N 3
+#define QUANTUM 2
+
+void simulate_rr(int burst[], int n, int quantum, int completion[]) { }
+
+int main(void) {
+    {
+        int burst[] = {4};
+        int completion[1];
+        simulate_rr(burst, 1, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+    }
+    {
+        int burst[] = {2, 2};
+        int completion[2];
+        simulate_rr(burst, 2, 2, completion);
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    {
+        int burst[] = {4, 2, 6};
+        int completion[3];
+        simulate_rr(burst, 3, 2, completion);
+        /* t=0-2: P1(rest=2) t=2-4: P2 done t=4-6: P3(rest=4) */
+        /* t=6-8: P1 done t=8-10: P3(rest=2) t=10-12: P3 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+        printf("%d\n", (int)(completion[2]));
+    }
+    {
+        int burst[] = {2, 1};
+        int completion[2];
+        simulate_rr(burst, 2, 1, completion);
+        /* t=0-1: P1(rest=1) t=1-2: P2 done t=2-3: P1 done */
+        printf("%d\n", (int)(completion[0]));
+        printf("%d\n", (int)(completion[1]));
+    }
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "Round-Robin avec quantum=2"
+
+[validation]
+expected_output = """
+4
+2
+4
+8
+4
+12
+3
+2"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Round-Robin préempte chaque processus après QUANTUM=2 unités et passe au suivant. P2 ayant burst=2 termine exactement en un tour. Cette rotation équitable évite la famine et garantit un temps de réponse borné pour les processus interactifs (NSY103 Ch.10 : équité de l'ordonnanceur)."
+label = "Tour 1 : chaque processus reçoit jusqu'à QUANTUM=2"
+step_label = "Étape 1 — Tour 1 : préemption au quantum, P2 termine"
+
+[[visualizer.steps.edges]]
+label = "t=2"
+source = "p1a"
+target = "p2a"
+
+[[visualizer.steps.edges]]
+label = "t=4"
+source = "p2a"
+target = "p3a"
+
+[[visualizer.steps.nodes]]
+id = "p1a"
+label = """
+P1
+0→2
+rest=2"""
+
+[[visualizer.steps.nodes]]
+id = "p2a"
+label = """
+P2
+2→4
+rest=0 ✓"""
+
+[[visualizer.steps.nodes]]
+id = "p3a"
+label = """
+P3
+4→6
+rest=4"""
+
+[[visualizer.steps]]
+explanation = "Au tour 2, seuls P1 (rest=2) et P3 (rest=4) restent. P1 termine en un quantum supplémentaire (t=8) ; P3 nécessite deux quantums (t=10→t=12). Le wait se calcule comme turnaround − burst : P1 attend 4u, P3 attend 6u. RR favorise les processus courts sans les bloquer indéfiniment."
+label = "Tour 2 : P1 et P3 terminent"
+step_label = "Étape 2 — Tour 2 : P1 finit en 1 quantum, P3 en 2 quantums"
+
+[[visualizer.steps.edges]]
+label = "t=8"
+source = "p1b"
+target = "p3b"
+
+[[visualizer.steps.nodes]]
+id = "p1b"
+label = """
+P1
+6→8
+rest=0 ✓"""
+
+[[visualizer.steps.nodes]]
+id = "p3b"
+label = """
+P3
+8→12
+rest=0 ✓"""

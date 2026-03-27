@@ -1,0 +1,351 @@
+common_mistake = "Confondre SLEEPING (attente E/S) et STOPPED (suspendu par SIGSTOP)"
+description = """
+NSY103 — Un processus Linux traverse plusieurs états : RUNNING, SLEEPING, STOPPED, ZOMBIE. Ces transitions suivent des règles précises.
+
+Implémentez une machine d'état de processus simplifiée avec une enum et une fonction de transition.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "enum ProcState { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD };",
+    "typedef struct { int pid; enum ProcState state; int exit_code; } Proc;",
+    "Transition sur signal SIGSTOP → STOPPED, SIGCONT → RUNNING",
+]
+id = "process-state-01"
+kc_ids = ["KC-C07"]
+key_concept = "Zombie = process terminé dont le parent n'a pas encore fait wait()"
+lang = "c"
+prerequisites = ["wait-macros-01"]
+solution_code = '''
+#include <stdio.h>
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+const char *state_name(ProcState s) {
+    switch (s) {
+        case RUNNING:  return "RUNNING";
+        case SLEEPING: return "SLEEPING";
+        case STOPPED:  return "STOPPED";
+        case ZOMBIE:   return "ZOMBIE";
+        case DEAD:     return "DEAD";
+        default:       return "UNKNOWN";
+    }
+}
+Proc make_proc(int pid) { return (Proc){pid, RUNNING, 0}; }
+void sleep_proc(Proc *p)  { if (p->state == RUNNING) p->state = SLEEPING; }
+void wake_proc(Proc *p)   { if (p->state == SLEEPING) p->state = RUNNING; }
+void stop_proc(Proc *p)   { if (p->state == RUNNING || p->state == SLEEPING) p->state = STOPPED; }
+void cont_proc(Proc *p)   { if (p->state == STOPPED) p->state = RUNNING; }
+void exit_proc(Proc *p, int code) { p->state = ZOMBIE; p->exit_code = code; }
+void reap_proc(Proc *p)   { if (p->state == ZOMBIE) p->state = DEAD; }
+void print_proc(const Proc *p) { printf("PID %d: %s\n", p->pid, state_name(p->state)); }
+int main(void) {
+    Proc p = make_proc(42);
+    print_proc(&p);
+    sleep_proc(&p); print_proc(&p);
+    wake_proc(&p);  print_proc(&p);
+    stop_proc(&p);  print_proc(&p);
+    cont_proc(&p);  print_proc(&p);
+    exit_proc(&p, 0); print_proc(&p);
+    reap_proc(&p);  print_proc(&p);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+
+const char *state_name(ProcState s) {
+    switch (s) {
+        case RUNNING:  return "RUNNING";
+        case SLEEPING: return "SLEEPING";
+        case STOPPED:  return "STOPPED";
+        case ZOMBIE:   return "ZOMBIE";
+        case DEAD:     return "DEAD";
+        default:       return "UNKNOWN";
+    }
+}
+
+Proc make_proc(int pid) { return (Proc){pid, RUNNING, 0}; }
+void sleep_proc(Proc *p)  { if (p->state == ____) p->state = SLEEPING; }
+void wake_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void stop_proc(Proc *p)   { if (p->state == RUNNING || p->state == SLEEPING) p->state = ____; }
+void cont_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void exit_proc(Proc *p, int code) { p->state = ____; p->exit_code = code; }
+void reap_proc(Proc *p)   { if (p->state == ____) p->state = DEAD; }
+void print_proc(const Proc *p) { printf("PID %d: %s\n", p->pid, state_name(p->state)); }
+
+int main(void) {
+    Proc p = make_proc(42);
+    print_proc(&p);
+    sleep_proc(&p); print_proc(&p);
+    wake_proc(&p);  print_proc(&p);
+    stop_proc(&p);  print_proc(&p);
+    cont_proc(&p);  print_proc(&p);
+    exit_proc(&p, 0); print_proc(&p);
+    reap_proc(&p);  print_proc(&p);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+
+const char *state_name(ProcState s) {
+    switch (s) {
+        case RUNNING:  return "RUNNING";
+        case SLEEPING: return "SLEEPING";
+        case STOPPED:  return "STOPPED";
+        case ZOMBIE:   return "ZOMBIE";
+        case DEAD:     return "DEAD";
+        default:       return "UNKNOWN";
+    }
+}
+
+/* == EXEMPLE =======================================
+ * Machine d'etat TCP simplifiee
+ * Meme pattern : enum + struct + fonctions de transition
+ * avec gardes sur l'etat courant.
+ * ================================================= */
+typedef enum { CLOSED, LISTEN, ESTABLISHED, CLOSE_WAIT } TcpState;
+
+const char *example_tcp_name(TcpState s) {
+    switch (s) {
+        case CLOSED:      return "CLOSED";
+        case LISTEN:      return "LISTEN";
+        case ESTABLISHED: return "ESTABLISHED";
+        case CLOSE_WAIT:  return "CLOSE_WAIT";
+        default:          return "UNKNOWN";
+    }
+}
+
+typedef struct { int sockfd; TcpState state; } TcpConn;
+
+TcpConn example_make_conn(int fd) { return (TcpConn){fd, CLOSED}; }
+void example_listen(TcpConn *c) { if (c->state == CLOSED) c->state = LISTEN; }
+void example_accept(TcpConn *c) { if (c->state == LISTEN) c->state = ESTABLISHED; }
+void example_peer_close(TcpConn *c) { if (c->state == ESTABLISHED) c->state = CLOSE_WAIT; }
+void example_close(TcpConn *c) { if (c->state == CLOSE_WAIT) c->state = CLOSED; }
+void example_print(const TcpConn *c) { printf("TCP fd%d: %s\n", c->sockfd, example_tcp_name(c->state)); }
+/* Resultat: CLOSED -> LISTEN -> ESTABLISHED -> CLOSE_WAIT -> CLOSED */
+
+/* == VOTRE EXERCICE ================================
+ * Machine d'etat des processus Linux
+ * Inspirez-vous de example_make_conn ci-dessus.
+ * Implementez les transitions entre etats processus.
+ * ================================================= */
+Proc make_proc(int pid) { return (Proc){pid, RUNNING, 0}; }
+void sleep_proc(Proc *p)  { (void)p; /* TODO */ }
+void wake_proc(Proc *p)   { (void)p; /* TODO */ }
+void stop_proc(Proc *p)   { (void)p; /* TODO */ }
+void cont_proc(Proc *p)   { (void)p; /* TODO */ }
+void exit_proc(Proc *p, int code) { (void)p; (void)code; /* TODO */ }
+void reap_proc(Proc *p)   { (void)p; /* TODO */ }
+void print_proc(const Proc *p) { printf("PID %d: %s\n", p->pid, state_name(p->state)); }
+
+int main(void) {
+    Proc p = make_proc(42);
+    print_proc(&p);
+    sleep_proc(&p); print_proc(&p);
+    wake_proc(&p);  print_proc(&p);
+    stop_proc(&p);  print_proc(&p);
+    cont_proc(&p);  print_proc(&p);
+    exit_proc(&p, 0); print_proc(&p);
+    reap_proc(&p);  print_proc(&p);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+
+const char *state_name(ProcState s) {
+    switch (s) {
+        case RUNNING:  return "RUNNING";
+        case SLEEPING: return "SLEEPING";
+        case STOPPED:  return "STOPPED";
+        case ZOMBIE:   return "ZOMBIE";
+        case DEAD:     return "DEAD";
+        default:       return "UNKNOWN";
+    }
+}
+
+Proc make_proc(int pid) { return (Proc){pid, RUNNING, 0}; }
+void sleep_proc(Proc *p)  { if (p->state == ____) p->state = SLEEPING; }
+void wake_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void stop_proc(Proc *p)   { if (p->state == RUNNING || p->state == SLEEPING) p->state = ____; }
+void cont_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void exit_proc(Proc *p, int code) { p->state = ____; p->exit_code = code; }
+void reap_proc(Proc *p)   { if (p->state == ____) p->state = DEAD; }
+void print_proc(const Proc *p) { printf("PID %d: %s\n", p->pid, state_name(p->state)); }
+
+int main(void) {
+    Proc p = make_proc(42);
+    print_proc(&p);
+    sleep_proc(&p); print_proc(&p);
+    wake_proc(&p);  print_proc(&p);
+    stop_proc(&p);  print_proc(&p);
+    cont_proc(&p);  print_proc(&p);
+    exit_proc(&p, 0); print_proc(&p);
+    reap_proc(&p);  print_proc(&p);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+
+const char *state_name(ProcState s) {
+    switch (s) {
+        case RUNNING:  return "RUNNING";
+        case SLEEPING: return "SLEEPING";
+        case STOPPED:  return "STOPPED";
+        case ZOMBIE:   return "ZOMBIE";
+        case DEAD:     return "DEAD";
+        default:       return "UNKNOWN";
+    }
+}
+
+Proc make_proc(int pid) { return (Proc){pid, RUNNING, 0}; }
+void sleep_proc(Proc *p)  { if (p->state == ____) p->state = SLEEPING; }
+void wake_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void stop_proc(Proc *p)   { if (p->state == RUNNING || p->state == SLEEPING) p->state = ____; }
+void cont_proc(Proc *p)   { if (p->state == ____) p->state = RUNNING; }
+void exit_proc(Proc *p, int code) { p->state = ____; p->exit_code = code; }
+void reap_proc(Proc *p)   { if (p->state == ____) p->state = DEAD; }
+void print_proc(const Proc *p) { printf("PID %d: %s\n", p->pid, state_name(p->state)); }
+
+int main(void) {
+    Proc p = make_proc(42);
+    print_proc(&p);
+    sleep_proc(&p); print_proc(&p);
+    wake_proc(&p);  print_proc(&p);
+    stop_proc(&p);  print_proc(&p);
+    cont_proc(&p);  print_proc(&p);
+    exit_proc(&p, 0); print_proc(&p);
+    reap_proc(&p);  print_proc(&p);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+typedef enum { RUNNING, SLEEPING, STOPPED, ZOMBIE, DEAD } ProcState;
+typedef struct { int pid; ProcState state; int exit_code; } Proc;
+
+// Implémenter state_name(), make_proc(), sleep_proc(), wake_proc(),
+// stop_proc(), cont_proc(), exit_proc(), reap_proc(), print_proc()
+
+int main(void) {
+    Proc p = make_proc(42);
+    // Appeler les transitions dans l'ordre
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Machine d'état des processus"
+
+[validation]
+expected_output = """
+PID 42: RUNNING
+PID 42: SLEEPING
+PID 42: RUNNING
+PID 42: STOPPED
+PID 42: RUNNING
+PID 42: ZOMBIE
+PID 42: DEAD
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "make_proc(42) → RUNNING"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "42"
+function_name = "make_proc"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "p.pid"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "p.state"
+value = "RUNNING"
+
+[[visualizer.steps.stack]]
+name = "p.exit_code"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "sleep_proc → SLEEPING"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "&p"
+function_name = "sleep_proc"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "p.state"
+value = "SLEEPING (attente E/S)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "exit_proc → ZOMBIE"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "&p, 0"
+function_name = "exit_proc"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "p.state"
+value = "ZOMBIE (non reap)"
+
+[[visualizer.steps.stack]]
+name = "p.exit_code"
+value = "0"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "reap_proc → DEAD"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "&p"
+function_name = "reap_proc"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "p.state"
+value = "DEAD (parent a fait wait)"

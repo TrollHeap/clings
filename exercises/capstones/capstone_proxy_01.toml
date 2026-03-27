@@ -1,0 +1,541 @@
+common_mistake = "Confondre les indices [0] et [1] des pipes — chaque participant doit lire depuis [0] et écrire dans [1] du pipe approprié"
+description = """
+NSY103 — Capstone avancé combinant sockets (simulés par pipes), pthreads et communication bidirectionnelle. Implémentez un reverse-proxy simplifié : le proxy reçoit des requêtes d'un client, les transmet à un backend, reçoit la réponse du backend, et la renvoie au client.
+
+Pour la testabilité, toute la communication se fait via des pipes. Un thread simule le client, un thread simule le backend, et le proxy fait le relais dans le thread principal.
+
+⚠ Cet exercice combine : pipe() x4, pthread_create(), read()/write() bidirectionnel, gestion de multiples fd."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "4 pipes = 4 canaux unidirectionnels : client->proxy, proxy->client, proxy->backend, backend->proxy",
+    "Chaque pipe a [0]=lecture et [1]=écriture — le proxy lit depuis [0] et écrit dans [1] des pipes appropriés",
+    "Le message QUIT sert de sentinelle pour arrêter proprement le proxy et le backend",
+]
+id = "capstone-proxy-01"
+kc_ids = ["KC-CAP"]
+key_concept = "Un reverse-proxy relaie le trafic bidirectionnellement : 4 pipes = 2 canaux full-duplex (client<->proxy, proxy<->backend)"
+lang = "c"
+prerequisites = [
+    "capstone-chat-01",
+    "pipe-01",
+]
+solution_code = '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+typedef struct {
+    int client_to_proxy[2];
+    int proxy_to_client[2];
+    int proxy_to_backend[2];
+    int backend_to_proxy[2];
+} ProxyPipes;
+
+void *client_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    const char *requests[] = {"GET /index", "GET /about", "QUIT"};
+    char response[128];
+
+    for (int i = 0; i < 3; i++) {
+        printf("[client] envoye: %s\n", requests[i]);
+        write(p->client_to_proxy[1], requests[i], strlen(requests[i]));
+
+        if (strcmp(requests[i], "QUIT") != 0) {
+            ssize_t n = read(p->proxy_to_client[0], response, sizeof(response) - 1);
+            if (n > 0) {
+                response[n] = '\0';
+                printf("[client] recu: %s\n", response);
+            }
+        }
+        usleep(10000);
+    }
+    return NULL;
+}
+
+void *backend_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    char request[128];
+
+    while (1) {
+        ssize_t n = read(p->proxy_to_backend[0], request, sizeof(request) - 1);
+        if (n <= 0) break;
+        request[n] = '\0';
+        if (strcmp(request, "QUIT") == 0) {
+            printf("[backend] arret\n");
+            break;
+        }
+
+        printf("[backend] requete: %s\n", request);
+        char response[128];
+        snprintf(response, sizeof(response), "200 OK: %s", request);
+        write(p->backend_to_proxy[1], response, strlen(response));
+    }
+    return NULL;
+}
+
+void proxy_relay(ProxyPipes *p) {
+    char buf[128];
+    while (1) {
+        ssize_t n = read(p->client_to_proxy[0], buf, sizeof(buf) - 1);
+        if (n <= 0) break;
+        buf[n] = '\0';
+        printf("[proxy] relais client->backend: %s\n", buf);
+
+        write(p->proxy_to_backend[1], buf, n);
+
+        if (strcmp(buf, "QUIT") == 0) {
+            printf("[proxy] arret\n");
+            break;
+        }
+
+        n = read(p->backend_to_proxy[0], buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[proxy] relais backend->client: %s\n", buf);
+            write(p->proxy_to_client[1], buf, n);
+        }
+    }
+}
+
+int main(void) {
+    ProxyPipes p;
+    pipe(p.client_to_proxy);
+    pipe(p.proxy_to_client);
+    pipe(p.proxy_to_backend);
+    pipe(p.backend_to_proxy);
+
+    pthread_t cli_t, back_t;
+    pthread_create(&cli_t, NULL, client_thread, &p);
+    pthread_create(&back_t, NULL, backend_thread, &p);
+
+    proxy_relay(&p);
+
+    pthread_join(cli_t, NULL);
+    close(p.proxy_to_backend[1]);
+    pthread_join(back_t, NULL);
+
+    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);
+    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);
+    close(p.proxy_to_backend[0]);
+    close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);
+    printf("[main] proxy termine\n");
+    return 0;
+}'''
+starter_code = '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+typedef struct {
+    int client_to_proxy[2];
+    int proxy_to_client[2];
+    int proxy_to_backend[2];
+    int backend_to_proxy[2];
+} ProxyPipes;
+
+void *client_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    const char *requests[] = {"GET /index", "GET /about", "QUIT"};
+    char response[128];
+
+    for (int i = 0; i < 3; i++) {
+        write(p->client_to_proxy[____], requests[i], strlen(requests[i]));
+        printf("[client] envoye: %s\n", requests[i]);
+
+        if (strcmp(requests[i], "QUIT") != 0) {
+            ssize_t n = read(p->proxy_to_client[____], response, sizeof(response) - 1);
+            if (n > 0) {
+                response[n] = '\0';
+                printf("[client] recu: %s\n", response);
+            }
+        }
+        usleep(10000);
+    }
+    return NULL;
+}
+
+void *backend_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    char request[128];
+
+    while (1) {
+        ssize_t n = read(p->proxy_to_backend[____], request, sizeof(request) - 1);
+        if (n <= 0) break;
+        request[n] = '\0';
+        if (strcmp(request, "QUIT") == 0) {
+            printf("[backend] arret\n");
+            break;
+        }
+
+        printf("[backend] requete: %s\n", request);
+        char response[128];
+        snprintf(response, sizeof(response), "200 OK: %s", request);
+        write(p->backend_to_proxy[____], response, strlen(response));
+    }
+    return NULL;
+}
+
+void proxy_relay(ProxyPipes *p) {
+    char buf[128];
+    while (1) {
+        ssize_t n = ____(p->client_to_proxy[0], buf, sizeof(buf) - 1);
+        if (n <= 0) break;
+        buf[n] = '\0';
+        printf("[proxy] relais client->backend: %s\n", buf);
+
+        ____(p->proxy_to_backend[1], buf, n);
+
+        if (strcmp(buf, "QUIT") == 0) {
+            printf("[proxy] arret\n");
+            break;
+        }
+
+        n = ____(p->backend_to_proxy[0], buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[proxy] relais backend->client: %s\n", buf);
+            ____(p->proxy_to_client[1], buf, n);
+        }
+    }
+}
+
+int main(void) {
+    ProxyPipes p;
+    pipe(p.client_to_proxy);
+    pipe(p.proxy_to_client);
+    pipe(p.proxy_to_backend);
+    pipe(p.backend_to_proxy);
+
+    pthread_t cli_t, back_t;
+    pthread_create(&cli_t, NULL, ____, &p);
+    pthread_create(&back_t, NULL, ____, &p);
+
+    proxy_relay(&p);
+
+    pthread_join(cli_t, NULL);
+    close(p.proxy_to_backend[1]);
+    pthread_join(back_t, NULL);
+
+    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);
+    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);
+    close(p.proxy_to_backend[0]);
+    close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);
+    printf("[main] proxy termine\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+/* == EXEMPLE =======================================
+ * Relais simple: un ecrivain -> relais -> lecteur
+ * Pattern: 2 pipes, le relais lit d'un et ecrit dans l'autre.
+ * ================================================= */
+void example_relay(void) {
+    int p1[2], p2[2];
+    pipe(p1); pipe(p2);
+    write(p1[1], "data", 4);
+    char buf[32];
+    ssize_t n = read(p1[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    write(p2[1], buf, n);
+    n = read(p2[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("Relayed: %s\n", buf);
+    close(p1[0]); close(p1[1]); close(p2[0]); close(p2[1]);
+}
+/* Resultat: Relayed: data */
+
+/* == VOTRE EXERCICE ================================
+ * Mini reverse-proxy TCP via 4 pipes
+ * client -> proxy -> backend -> proxy -> client
+ * Thread client, thread backend, proxy dans main
+ * Message QUIT pour arreter
+ * ================================================= */
+
+typedef struct {
+    int client_to_proxy[2];
+    int proxy_to_client[2];
+    int proxy_to_backend[2];
+    int backend_to_proxy[2];
+} ProxyPipes;
+
+int main(void) {
+    example_relay();
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+typedef struct {
+    int client_to_proxy[2];
+    int proxy_to_client[2];
+    int proxy_to_backend[2];
+    int backend_to_proxy[2];
+} ProxyPipes;
+
+void *client_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    const char *requests[] = {"GET /index", "GET /about", "QUIT"};
+    char response[128];
+    for (int i = 0; i < 3; i++) {
+        write(p->client_to_proxy[____], requests[i], strlen(requests[i]));
+        printf("[client] envoye: %s\n", requests[i]);
+        if (strcmp(requests[i], "QUIT") != 0) {
+            ssize_t n = read(p->proxy_to_client[____], response, sizeof(response)-1);
+            if (n > 0) { response[n]='\0'; printf("[client] recu: %s\n", response); }
+        }
+        usleep(10000);
+    }
+    return NULL;
+}
+
+void *backend_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    char request[128];
+    while (1) {
+        ssize_t n = read(p->proxy_to_backend[____], request, sizeof(request)-1);
+        if (n <= 0) break; request[n]='\0';
+        if (strcmp(request, "QUIT") == 0) { printf("[backend] arret\n"); break; }
+        printf("[backend] requete: %s\n", request);
+        char response[128]; snprintf(response, sizeof(response), "200 OK: %s", request);
+        write(p->backend_to_proxy[____], response, strlen(response));
+    }
+    return NULL;
+}
+
+void proxy_relay(ProxyPipes *p) {
+    char buf[128];
+    while (1) {
+        ssize_t n = ____(p->client_to_proxy[0], buf, sizeof(buf)-1);
+        if (n <= 0) break; buf[n]='\0';
+        printf("[proxy] relais client->backend: %s\n", buf);
+        ____(p->proxy_to_backend[1], buf, n);
+        if (strcmp(buf, "QUIT") == 0) { printf("[proxy] arret\n"); break; }
+        n = ____(p->backend_to_proxy[0], buf, sizeof(buf)-1);
+        if (n > 0) { buf[n]='\0'; printf("[proxy] relais backend->client: %s\n", buf); ____(p->proxy_to_client[1], buf, n); }
+    }
+}
+
+int main(void) {
+    ProxyPipes p;
+    pipe(p.client_to_proxy); pipe(p.proxy_to_client);
+    pipe(p.proxy_to_backend); pipe(p.backend_to_proxy);
+    pthread_t cli_t, back_t;
+    pthread_create(&cli_t, NULL, ____, &p);
+    pthread_create(&back_t, NULL, ____, &p);
+    proxy_relay(&p);
+    pthread_join(cli_t, NULL); close(p.proxy_to_backend[1]); pthread_join(back_t, NULL);
+    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);
+    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);
+    close(p.proxy_to_backend[0]); close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);
+    printf("[main] proxy termine\n");
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+typedef struct {
+    int client_to_proxy[2];
+    int proxy_to_client[2];
+    int proxy_to_backend[2];
+    int backend_to_proxy[2];
+} ProxyPipes;
+
+void *client_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    const char *requests[] = {"GET /index", "GET /about", "QUIT"};
+    char response[128];
+    for (int i = 0; i < 3; i++) {
+        write(p->client_to_proxy[____], requests[i], strlen(requests[i]));
+        printf("[client] envoye: %s\n", requests[i]);
+        if (strcmp(requests[i], "QUIT") != 0) {
+            ssize_t n = read(p->proxy_to_client[____], response, sizeof(response)-1);
+            if (n > 0) { response[n]='\0'; printf("[client] recu: %s\n", response); }
+        }
+        usleep(10000);
+    }
+    return NULL;
+}
+
+void *backend_thread(void *arg) {
+    ProxyPipes *p = (ProxyPipes *)arg;
+    char request[128];
+    while (1) {
+        ssize_t n = read(p->proxy_to_backend[____], request, sizeof(request)-1);
+        if (n <= 0) break; request[n]='\0';
+        if (strcmp(request, "QUIT") == 0) { printf("[backend] arret\n"); break; }
+        printf("[backend] requete: %s\n", request);
+        char response[128]; snprintf(response, sizeof(response), "200 OK: %s", request);
+        write(p->backend_to_proxy[____], response, strlen(response));
+    }
+    return NULL;
+}
+
+void proxy_relay(ProxyPipes *p) {
+    char buf[128];
+    while (1) {
+        ssize_t n = ____(p->client_to_proxy[0], buf, sizeof(buf)-1);
+        if (n <= 0) break; buf[n]='\0';
+        printf("[proxy] relais client->backend: %s\n", buf);
+        ____(p->proxy_to_backend[1], buf, n);
+        if (strcmp(buf, "QUIT") == 0) { printf("[proxy] arret\n"); break; }
+        n = ____(p->backend_to_proxy[0], buf, sizeof(buf)-1);
+        if (n > 0) { buf[n]='\0'; printf("[proxy] relais backend->client: %s\n", buf); ____(p->proxy_to_client[1], buf, n); }
+    }
+}
+
+int main(void) {
+    ProxyPipes p;
+    pipe(p.client_to_proxy); pipe(p.proxy_to_client);
+    pipe(p.proxy_to_backend); pipe(p.backend_to_proxy);
+    pthread_t cli_t, back_t;
+    pthread_create(&cli_t, NULL, ____, &p);
+    pthread_create(&back_t, NULL, ____, &p);
+    proxy_relay(&p);
+    pthread_join(cli_t, NULL); close(p.proxy_to_backend[1]); pthread_join(back_t, NULL);
+    close(p.client_to_proxy[0]); close(p.client_to_proxy[1]);
+    close(p.proxy_to_client[0]); close(p.proxy_to_client[1]);
+    close(p.proxy_to_backend[0]); close(p.backend_to_proxy[0]); close(p.backend_to_proxy[1]);
+    printf("[main] proxy termine\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+// Mini reverse-proxy TCP
+// 4 pipes: client->proxy, proxy->client, proxy->backend, backend->proxy
+// Thread client: envoie requetes, lit reponses
+// Thread backend: lit requetes, repond "200 OK: ..."
+// Proxy relay: lit client, ecrit backend, lit reponse, ecrit client
+// QUIT pour arreter proprement
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "capstones"
+title = "Mini reverse-proxy TCP"
+
+[validation]
+expected_output = """
+[client] envoye: GET /index
+[proxy] relais client->backend: GET /index
+[backend] requete: GET /index
+[proxy] relais backend->client: 200 OK: GET /index
+[client] recu: 200 OK: GET /index
+[client] envoye: GET /about
+[proxy] relais client->backend: GET /about
+[backend] requete: GET /about
+[proxy] relais backend->client: 200 OK: GET /about
+[client] recu: 200 OK: GET /about
+[client] envoye: QUIT
+[proxy] relais client->backend: QUIT
+[proxy] arret
+[backend] arret
+[main] proxy termine
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le proxy est un relais bidirectionnel : il lit du client, écrit au backend, lit la réponse, écrit au client."
+heap = []
+label = "Architecture du proxy avec 4 pipes"
+step_label = "architecture"
+
+[[visualizer.steps.arrows]]
+from = "client_to_proxy"
+label = "requête"
+to = "proxy_relay"
+
+[[visualizer.steps.arrows]]
+from = "proxy_to_backend"
+label = "requête"
+to = "backend_thread"
+
+[[visualizer.steps.arrows]]
+from = "backend_to_proxy"
+label = "réponse"
+to = "proxy_relay"
+
+[[visualizer.steps.arrows]]
+from = "proxy_to_client"
+label = "réponse"
+to = "client_thread"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "client_to_proxy"
+value = "pipe [0,1]"
+
+[[visualizer.steps.stack]]
+name = "proxy_to_client"
+value = "pipe [0,1]"
+
+[[visualizer.steps.stack]]
+name = "proxy_to_backend"
+value = "pipe [0,1]"
+
+[[visualizer.steps.stack]]
+name = "backend_to_proxy"
+value = "pipe [0,1]"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le proxy read() depuis client_to_proxy[0] et write() dans proxy_to_backend[1]."
+heap = []
+label = "Relais d'une requête"
+step_label = "forward"
+
+[[visualizer.steps.call_frames]]
+args = "p"
+function_name = "proxy_relay"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"GET /index"'
+
+[[visualizer.steps.stack]]
+name = "direction"
+value = "client -> proxy -> backend"

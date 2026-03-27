@@ -1,0 +1,345 @@
+common_mistake = "Vérifier la troncature : si snprintf >= size, le buffer est insuffisant"
+description = """
+NSY103 — snprintf(buf, size, fmt, ...) écrit au maximum size-1 octets et garantit le null-terminator. Préférer snprintf à sprintf pour éviter les dépassements de tampon.
+
+Constituez un message d'erreur formaté : '[ERR-404] Not found: /proc/42/status (pid=42)'"""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "char buf[128]; int written = snprintf(buf, sizeof(buf), fmt, ...);",
+    "if (written >= (int)sizeof(buf)) { /* troncature */ }",
+    "Construire progressivement : snprintf(buf + offset, remaining, ...)",
+]
+id = "snprintf-builder-01"
+kc_ids = ["KC-C05"]
+key_concept = "snprintf retourne le nombre de chars VOULUS (pas écrits) — si ≥ size, la chaîne a été tronquée"
+lang = "c"
+prerequisites = ["printf-formats-01"]
+solution_code = '''
+#include <string.h>
+#include <stdio.h>
+
+int build_error_msg(char *buf, size_t sz) {
+    int code = 404;
+    char *path = "/proc/42/status";
+    int pid = 42;
+    return snprintf(buf, sz, "[ERR-%d] Not found: %s (pid=%d)", code, path, pid);
+}
+
+int build_small_error(char *buf, size_t sz) {
+    int pid = 42;
+    return snprintf(buf, sz, "pid=%d cmd=%s", pid, "very_long_name_here");
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+int build_error_msg(char *buf, size_t sz) {
+    int code = 404;
+    char *path = "/proc/42/status";
+    int pid = 42;
+    return snprintf(buf, sz, "[ERR-%d] Not found: %s (pid=%d)", code, path, pid);
+}
+
+int build_small_error(char *buf, size_t sz) {
+    int pid = 42;
+    return snprintf(buf, sz, "pid=%d cmd=%s", pid, "very_long_name_here");
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Construire une ligne de log avec snprintf
+ * snprintf(buf, size, fmt, ...) retourne les chars VOULUS
+ * Si retour >= size, la chaine a ete tronquee
+ * =========================================================== */
+int example_log_line(char *buf, size_t sz) {
+    int level = 3;
+    char *module = "network";
+    int line = 157;
+    return snprintf(buf, sz,
+                    "[WARN-%d] %s:%d connection timeout", level, module, line);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Construire un message d'erreur avec snprintf
+ * Inspirez-vous de example_log_line ci-dessus.
+ * Detecter la troncature quand le buffer est trop petit.
+ * =========================================================== */
+
+int build_error_msg(char *buf, size_t sz) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int build_small_error(char *buf, size_t sz) {
+    /* TODO: implementation */
+    return 0;
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+int build_error_msg(char *buf, size_t sz) {
+    int code = ____;
+    char *path = ____;
+    int pid = ____;
+    return snprintf(buf, sz, "[ERR-%d] Not found: %s (pid=%d)", code, path, pid);
+}
+
+int build_small_error(char *buf, size_t sz) {
+    int pid = 42;
+    return snprintf(buf, sz, "pid=%d cmd=%s", pid, ____);
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int build_error_msg(char *buf, size_t sz) {
+    int code = 404;
+    char *path = "/proc/42/status";
+    int pid = 42;
+    return snprintf(buf, sz, "____, ____, ____", ____, ____, ____);
+}
+
+int build_small_error(char *buf, size_t sz) {
+    int pid = 42;
+    return snprintf(buf, sz, "____, ____", ____, ____);
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int build_error_msg(char *buf, size_t sz) {
+    (void)buf; (void)sz;
+    return 0;
+}
+
+int build_small_error(char *buf, size_t sz) {
+    (void)buf; (void)sz;
+    return 0;
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+int build_error_msg(char *buf, size_t sz) {
+}
+
+int build_small_error(char *buf, size_t sz) {
+}
+
+int main(void) {
+    {
+        char buf[128];
+        build_error_msg(buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    {
+        char buf[128];
+        int ret = build_error_msg(buf, sizeof(buf));
+        printf("%d\n", (int)(ret));
+    }
+    {
+        char buf[20];
+        int ret = build_small_error(buf, sizeof(buf));
+        printf("%d\n", (ret >= (int)sizeof(buf)) ? 1 : 0);
+    }
+    {
+        char buf[20];
+        build_small_error(buf, sizeof(buf));
+        printf("%d\n", (int)(strlen(buf)));
+    }
+    return 0;
+}
+''',
+]
+subject = "string_formatting"
+title = "Construction sécurisée de chaîne avec snprintf"
+
+[validation]
+expected_output = """
+[ERR-404] Not found: /proc/42/status (pid=42)
+45
+1
+19
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "Buffer déclaré"
+
+[[visualizer.steps.stack]]
+name = "buf[128]"
+value = "(vide)"
+
+[[visualizer.steps.stack]]
+name = "code"
+value = "404"
+
+[[visualizer.steps.stack]]
+name = "path"
+value = '"/proc/42/status"'
+
+[[visualizer.steps.stack]]
+name = "pid"
+value = "42"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "snprintf remplit buf"
+
+[[visualizer.steps.stack]]
+name = "buf"
+value = '"[ERR-404] Not found..."'
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "44 (< 128)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "small[20] tronqué"
+
+[[visualizer.steps.stack]]
+name = "small[20]"
+value = '"pid=42 cmd=very_lon"'
+
+[[visualizer.steps.stack]]
+name = "ret"
+value = "25 (>= 20)"

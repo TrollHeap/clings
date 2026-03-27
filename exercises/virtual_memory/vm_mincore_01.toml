@@ -1,0 +1,251 @@
+common_mistake = "Oublier que mincore nécessite un buffer d'au moins ceil(len/page_size) octets"
+description = """
+NSY103 — mincore() indique quelles pages d'un mapping sont actuellement en RAM (résidentes). Un octet par page: bit 0 = 1 si résident. C'est utile pour le profilage et l'optimisation I/O.
+
+Utilisez mincore pour vérifier la résidence des pages après écriture."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "mincore(addr, len, vec) remplit vec avec 1 octet par page",
+    "Le bit 0 de chaque octet indique si la page est en RAM",
+    "Les pages touchées (écrites) sont résidentes, les autres peuvent ne pas l'être",
+]
+id = "vm-mincore-01"
+kc_ids = ["KC-C18"]
+key_concept = "mincore révèle quelles pages sont résidentes en RAM — diagnostic de performance"
+lang = "c"
+prerequisites = ["vm-mmap-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t size = (size_t)ps * 4;
+    char *m = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (m == MAP_FAILED) { perror("mmap"); return 1; }
+    size_t npages = size / (size_t)ps;
+    unsigned char vec[4];
+    memset(m, 'A', (size_t)ps);
+    memset(m + 2 * ps, 'C', (size_t)ps);
+    int rc = mincore(m, size, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (size_t i = 0; i < npages; i++) {
+        printf("Page %zu: %s\n", i, (vec[i] & 1) ? "resident" : "not resident");
+        if (vec[i] & 1) resident++;
+    }
+    printf("Resident pages: %d/%zu\n", resident, npages);
+    printf("At least 2 resident: %s\n", resident >= 2 ? "yes" : "no");
+    munmap(m, size);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t size = (size_t)ps * 4;
+    char *m = (char *)mmap(NULL, size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (m == MAP_FAILED) { perror("mmap"); return 1; }
+    size_t npages = size / (size_t)ps;
+    unsigned char vec[4];
+    memset(m, 'A', (size_t)ps);
+    memset(m + 2 * ps, 'C', (size_t)ps);
+    int rc = ____(m, size, ____);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (size_t i = 0; i < npages; i++) {
+        printf("Page %zu: %s\n", i, (vec[i] & 1) ? "resident" : "not resident");
+        if (vec[i] & 1) resident++;
+    }
+    printf("Resident pages: %d/%zu\n", resident, npages);
+    printf("At least 2 resident: %s\n", resident >= 2 ? "yes" : "no");
+    munmap(m, size);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: mincore sur 1 page ====================== */
+void example_mincore(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    char *p = mmap(NULL, (size_t)ps, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    p[0] = 'x';
+    unsigned char v;
+    mincore(p, (size_t)ps, &v);
+    printf("1 page resident: %d\n", v & 1);
+    munmap(p, (size_t)ps);
+}
+
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t size = (size_t)ps * 4;
+    char *m = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (m == MAP_FAILED) { perror("mmap"); return 1; }
+    size_t npages = size / (size_t)ps;
+    unsigned char vec[4];
+    memset(m, 'A', (size_t)ps);
+    memset(m + 2*ps, 'C', (size_t)ps);
+    int rc = mincore(m, size, vec);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (size_t i = 0; i < npages; i++) {
+        printf("Page %zu: %s\n", i, (vec[i]&1)?"resident":"not resident");
+        if (vec[i]&1) resident++;
+    }
+    printf("Resident pages: %d/%zu\n", resident, npages);
+    printf("At least 2 resident: %s\n", resident>=2?"yes":"no");
+    munmap(m, size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t size = (size_t)ps * 4;
+    char *m = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (m == MAP_FAILED) { perror("mmap"); return 1; }
+    size_t npages = size / (size_t)ps;
+    unsigned char vec[4];
+    memset(m, 'A', (size_t)ps);
+    memset(m + 2*ps, 'C', (size_t)ps);
+    int rc = mincore(m, size, ____);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (size_t i = 0; i < npages; i++) {
+        printf("Page %zu: %s\n", i, (vec[i]&1)?"resident":"not resident");
+        if (vec[i]&1) resident++;
+    }
+    printf("Resident pages: %d/%zu\n", resident, npages);
+    printf("At least 2 resident: %s\n", resident>=2?"yes":"no");
+    munmap(m, size);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    size_t size = (size_t)ps * 4;
+    char *m = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (m == MAP_FAILED) { perror("mmap"); return 1; }
+    size_t npages = size / (size_t)ps;
+    unsigned char vec[4];
+    memset(m, 'A', (size_t)ps);
+    memset(m + 2*ps, 'C', (size_t)ps);
+    int rc = ____(m, size, ____);
+    printf("mincore result: %d\n", rc);
+    int resident = 0;
+    for (size_t i = 0; i < npages; i++) {
+        printf("Page %zu: %s\n", i, (vec[i]&1)?"resident":"not resident");
+        if (vec[i]&1) resident++;
+    }
+    printf("Resident pages: %d/%zu\n", resident, npages);
+    printf("At least 2 resident: %s\n", resident>=2?"yes":"no");
+    munmap(m, size);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+// Allouez 4 pages, touchez-en 2, utilisez mincore pour vérifier
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "mincore: pages résidentes en RAM"
+
+[validation]
+expected_output = "REGEX:(?s)mincore OK"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "2 pages touchées sur 4"
+heap = []
+label = "4 pages mmap"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "npages"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "page 0"
+value = "écrite (A)"
+
+[[visualizer.steps.stack]]
+name = "page 1"
+value = "non touchée"
+
+[[visualizer.steps.stack]]
+name = "page 2"
+value = "écrite (C)"
+
+[[visualizer.steps.stack]]
+name = "page 3"
+value = "non touchée"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Seules les pages écrites sont résidentes"
+heap = []
+label = "mincore résultat"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "vec[0]"
+value = "1 (résident)"
+
+[[visualizer.steps.stack]]
+name = "vec[1]"
+value = "0 (non-résident)"
+
+[[visualizer.steps.stack]]
+name = "vec[2]"
+value = "1 (résident)"
+
+[[visualizer.steps.stack]]
+name = "vec[3]"
+value = "0 (non-résident)"

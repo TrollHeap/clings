@@ -1,0 +1,581 @@
+common_mistake = "Ne pas re-vérifier head après hp_set — un autre thread peut avoir modifié head entre le load et le hp_set"
+description = """
+NSY103 — Les hazard pointers sont un mécanisme de réclamation mémoire pour les structures lock-free. Chaque thread publie les pointeurs qu'il utilise dans un tableau de hazard pointers. Avant de libérer un noeud, on vérifie qu'aucun thread ne le référence dans ses hazard pointers.
+
+Implémentez un système simplifié de hazard pointers pour une pile lock-free."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "hp_set indexe le tableau avec tid : hazard_ptrs[tid]",
+    "hp_clear met le hazard pointer à NULL pour indiquer que le thread n'utilise plus le noeud",
+    "is_hazardous compare chaque hazard pointer avec ptr — le pointeur qu'on veut libérer",
+]
+id = "sync-hazard-01"
+kc_ids = ["KC-C22"]
+key_concept = "Hazard pointers : chaque thread publie les noeuds qu'il utilise — avant free, on scanne tous les HP pour éviter use-after-free"
+lang = "c"
+prerequisites = [
+    "sync-lockfree-01",
+    "sync-rcu-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+#define MAX_THREADS 4
+#define MAX_RETIRED 8
+
+typedef struct Node {
+    int value;
+    struct Node *next;
+} Node;
+
+Node *head = NULL;
+Node *hazard_ptrs[MAX_THREADS] = {NULL};
+
+typedef struct {
+    Node *retired[MAX_RETIRED];
+    int count;
+} RetiredList;
+
+__thread int thread_id_local;
+__thread RetiredList retired_list = {{NULL}, 0};
+
+void hp_set(int tid, Node *ptr) {
+    __atomic_store_n(&hazard_ptrs[tid], ptr, __ATOMIC_RELEASE);
+}
+
+void hp_clear(int tid) {
+    __atomic_store_n(&hazard_ptrs[tid], NULL, __ATOMIC_RELEASE);
+}
+
+int is_hazardous(Node *ptr) {
+    for (int i = 0; i < MAX_THREADS; i++) {
+        if (__atomic_load_n(&hazard_ptrs[i], __ATOMIC_ACQUIRE) == ptr)
+            return 1;
+    }
+    return 0;
+}
+
+void retire_node(Node *ptr) {
+    retired_list.retired[retired_list.count++] = ptr;
+    if (retired_list.count >= MAX_RETIRED) {
+        int new_count = 0;
+        for (int i = 0; i < retired_list.count; i++) {
+            if (is_hazardous(retired_list.retired[i])) {
+                retired_list.retired[new_count++] = retired_list.retired[i];
+            } else {
+                free(retired_list.retired[i]);
+            }
+        }
+        retired_list.count = new_count;
+    }
+}
+
+void push(int val) {
+    Node *n = malloc(sizeof(Node));
+    n->value = val;
+    Node *old_head;
+    do {
+        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        n->next = old_head;
+    } while (!__atomic_compare_exchange_n(&head, &old_head, n, 0,
+            __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+}
+
+int safe_pop(int tid, int *val) {
+    Node *old_head;
+    do {
+        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        if (!old_head) return 0;
+        hp_set(tid, old_head);
+        if (__atomic_load_n(&head, __ATOMIC_ACQUIRE) != old_head)
+            continue;
+        break;
+    } while (1);
+    if (__atomic_compare_exchange_n(&head, &old_head,
+            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+        *val = old_head->value;
+        hp_clear(tid);
+        retire_node(old_head);
+        return 1;
+    }
+    hp_clear(tid);
+    return 0;
+}
+
+void *worker(void *arg) {
+    int tid = *(int *)arg;
+    thread_id_local = tid;
+    for (int i = 0; i < 3; i++)
+        push(tid * 10 + i);
+    int val;
+    int popped = 0;
+    while (safe_pop(tid, &val))
+        popped++;
+    printf("Thread %d: %d elements retires\n", tid, popped);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(threads[i], NULL);
+
+    int remaining = 0;
+    Node *cur = head;
+    while (cur) { remaining++; cur = cur->next; }
+    printf("Restant: %d\n", remaining);
+    printf("Hazard pointers: OK\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+#define MAX_THREADS 4
+#define MAX_RETIRED 8
+
+typedef struct Node {
+    int value;
+    struct Node *next;
+} Node;
+
+Node *head = NULL;
+Node *hazard_ptrs[MAX_THREADS] = {NULL};
+
+typedef struct {
+    Node *retired[MAX_RETIRED];
+    int count;
+} RetiredList;
+
+__thread int thread_id_local;
+__thread RetiredList retired_list = {{NULL}, 0};
+
+void hp_set(int tid, Node *ptr) {
+    __atomic_store_n(&hazard_ptrs[____], ptr, __ATOMIC_RELEASE);
+}
+
+void hp_clear(int tid) {
+    __atomic_store_n(&hazard_ptrs[tid], ____, __ATOMIC_RELEASE);
+}
+
+int is_hazardous(Node *ptr) {
+    for (int i = 0; i < MAX_THREADS; i++) {
+        if (__atomic_load_n(&hazard_ptrs[i], __ATOMIC_ACQUIRE) == ____)
+            return 1;
+    }
+    return 0;
+}
+
+void retire_node(Node *ptr) {
+    retired_list.retired[retired_list.count++] = ptr;
+    if (retired_list.count >= MAX_RETIRED) {
+        int new_count = 0;
+        for (int i = 0; i < retired_list.count; i++) {
+            if (is_hazardous(retired_list.retired[i])) {
+                retired_list.retired[new_count++] = retired_list.retired[i];
+            } else {
+                free(retired_list.retired[i]);
+            }
+        }
+        retired_list.count = new_count;
+    }
+}
+
+void push(int val) {
+    Node *n = malloc(sizeof(Node));
+    n->value = val;
+    Node *old_head;
+    do {
+        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        n->next = old_head;
+    } while (!__atomic_compare_exchange_n(&head, &old_head, n, 0,
+            __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+}
+
+int safe_pop(int tid, int *val) {
+    Node *old_head;
+    do {
+        old_head = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        if (!old_head) return 0;
+        hp_set(tid, old_head);
+        if (__atomic_load_n(&head, __ATOMIC_ACQUIRE) != old_head)
+            continue;
+        break;
+    } while (1);
+    if (__atomic_compare_exchange_n(&head, &old_head,
+            old_head->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+        *val = old_head->value;
+        hp_clear(tid);
+        retire_node(old_head);
+        return 1;
+    }
+    hp_clear(tid);
+    return 0;
+}
+
+void *worker(void *arg) {
+    int tid = *(int *)arg;
+    thread_id_local = tid;
+    for (int i = 0; i < 3; i++)
+        push(tid * 10 + i);
+    int val;
+    int popped = 0;
+    while (safe_pop(tid, &val))
+        popped++;
+    printf("Thread %d: %d elements retires\n", tid, popped);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[2];
+    int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++)
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(threads[i], NULL);
+
+    int remaining = 0;
+    Node *cur = head;
+    while (cur) { remaining++; cur = cur->next; }
+    printf("Restant: %d\n", remaining);
+    printf("Hazard pointers: OK\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+/* == EXEMPLE ===============================================
+ * Epoch-based reclamation (plus simple que hazard pointers)
+ * Chaque thread annonce son époque. Les objets retirés dans
+ * une époque ancienne sont libérés quand tous les threads
+ * ont avancé.
+ * ========================================================= */
+/* int global_epoch = 0;
+ * int thread_epoch[MAX_THREADS];
+ * void enter_epoch(int tid) { thread_epoch[tid] = global_epoch; }
+ * void exit_epoch(int tid)  { thread_epoch[tid] = -1; }
+ * bool can_free(int retired_epoch) {
+ *     for all t: if thread_epoch[t] <= retired_epoch return false;
+ *     return true;
+ * }
+ */
+/* Hazard pointers sont plus précis : protection par pointeur exact. */
+
+/* == VOTRE EXERCICE ========================================
+ * Hazard pointers pour pile lock-free.
+ * hp_set : publier le noeud utilisé
+ * hp_clear : retirer la publication
+ * is_hazardous : vérifier si un noeud est référencé
+ * retire_node : ajouter à la retired list, scanner si pleine
+ * ========================================================= */
+
+#define MAX_THREADS 4
+#define MAX_RETIRED 8
+
+typedef struct Node { int value; struct Node *next; } Node;
+Node *head = NULL;
+Node *hazard_ptrs[MAX_THREADS] = {NULL};
+
+typedef struct { Node *retired[MAX_RETIRED]; int count; } RetiredList;
+__thread int thread_id_local;
+__thread RetiredList retired_list = {{NULL}, 0};
+
+void hp_set(int tid, Node *ptr) {
+    __atomic_store_n(&hazard_ptrs[tid], ptr, __ATOMIC_RELEASE);
+}
+void hp_clear(int tid) {
+    __atomic_store_n(&hazard_ptrs[tid], NULL, __ATOMIC_RELEASE);
+}
+int is_hazardous(Node *ptr) {
+    for (int i = 0; i < MAX_THREADS; i++)
+        if (__atomic_load_n(&hazard_ptrs[i], __ATOMIC_ACQUIRE) == ptr) return 1;
+    return 0;
+}
+void retire_node(Node *ptr) {
+    retired_list.retired[retired_list.count++] = ptr;
+    if (retired_list.count >= MAX_RETIRED) {
+        int nc = 0;
+        for (int i = 0; i < retired_list.count; i++) {
+            if (is_hazardous(retired_list.retired[i]))
+                retired_list.retired[nc++] = retired_list.retired[i];
+            else free(retired_list.retired[i]);
+        }
+        retired_list.count = nc;
+    }
+}
+void push(int val) {
+    Node *n = malloc(sizeof(Node)); n->value = val; Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE); n->next = oh;
+    } while (!__atomic_compare_exchange_n(&head, &oh, n, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+}
+int safe_pop(int tid, int *val) {
+    Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        if (!oh) return 0; hp_set(tid, oh);
+        if (__atomic_load_n(&head, __ATOMIC_ACQUIRE) != oh) continue; break;
+    } while (1);
+    if (__atomic_compare_exchange_n(&head, &oh, oh->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+        *val = oh->value; hp_clear(tid); retire_node(oh); return 1;
+    }
+    hp_clear(tid); return 0;
+}
+void *worker(void *arg) {
+    int tid = *(int *)arg; thread_id_local = tid;
+    for (int i = 0; i < 3; i++) push(tid * 10 + i);
+    int val, popped = 0;
+    while (safe_pop(tid, &val)) popped++;
+    printf("Thread %d: %d elements retires\n", tid, popped);
+    return NULL;
+}
+int main(void) {
+    pthread_t threads[2]; int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++) pthread_create(&threads[i], NULL, worker, &ids[i]);
+    for (int i = 0; i < 2; i++) pthread_join(threads[i], NULL);
+    int rem = 0; Node *c = head; while (c) { rem++; c = c->next; }
+    printf("Restant: %d\n", rem);
+    printf("Hazard pointers: OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+#define MAX_THREADS 4
+#define MAX_RETIRED 8
+typedef struct Node { int value; struct Node *next; } Node;
+Node *head = NULL;
+Node *hazard_ptrs[MAX_THREADS] = {NULL};
+typedef struct { Node *retired[MAX_RETIRED]; int count; } RetiredList;
+__thread int thread_id_local;
+__thread RetiredList retired_list = {{NULL}, 0};
+
+void hp_set(int tid, Node *ptr) {
+    __atomic_store_n(&hazard_ptrs[tid], ptr, __ATOMIC_RELEASE);
+}
+void hp_clear(int tid) {
+    __atomic_store_n(&hazard_ptrs[tid], NULL, __ATOMIC_RELEASE);
+}
+int is_hazardous(Node *ptr) {
+    for (int i = 0; i < MAX_THREADS; i++)
+        if (__atomic_load_n(&hazard_ptrs[i], __ATOMIC_ACQUIRE) == ____) /* quoi comparer ? */
+            return 1;
+    return 0;
+}
+void retire_node(Node *ptr) {
+    retired_list.retired[retired_list.count++] = ptr;
+    if (retired_list.count >= MAX_RETIRED) {
+        int nc = 0;
+        for (int i = 0; i < retired_list.count; i++) {
+            if (is_hazardous(retired_list.retired[i]))
+                retired_list.retired[nc++] = retired_list.retired[i];
+            else free(retired_list.retired[i]);
+        }
+        retired_list.count = nc;
+    }
+}
+void push(int val) {
+    Node *n = malloc(sizeof(Node)); n->value = val; Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE); n->next = oh;
+    } while (!__atomic_compare_exchange_n(&head, &oh, n, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+}
+int safe_pop(int tid, int *val) {
+    Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        if (!oh) return 0; hp_set(tid, oh);
+        if (__atomic_load_n(&head, __ATOMIC_ACQUIRE) != oh) continue; break;
+    } while (1);
+    if (__atomic_compare_exchange_n(&head, &oh, oh->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+        *val = oh->value; hp_clear(tid); retire_node(oh); return 1;
+    }
+    hp_clear(tid); return 0;
+}
+void *worker(void *arg) {
+    int tid = *(int *)arg; thread_id_local = tid;
+    for (int i = 0; i < 3; i++) push(tid * 10 + i);
+    int val, popped = 0;
+    while (safe_pop(tid, &val)) popped++;
+    printf("Thread %d: %d elements retires\n", tid, popped);
+    return NULL;
+}
+int main(void) {
+    pthread_t threads[2]; int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++) pthread_create(&threads[i], NULL, worker, &ids[i]);
+    for (int i = 0; i < 2; i++) pthread_join(threads[i], NULL);
+    int rem = 0; Node *c = head; while (c) { rem++; c = c->next; }
+    printf("Restant: %d\n", rem);
+    printf("Hazard pointers: OK\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+#define MAX_THREADS 4
+#define MAX_RETIRED 8
+typedef struct Node { int value; struct Node *next; } Node;
+Node *head = NULL;
+Node *hazard_ptrs[MAX_THREADS] = {NULL};
+typedef struct { Node *retired[MAX_RETIRED]; int count; } RetiredList;
+__thread int thread_id_local;
+__thread RetiredList retired_list = {{NULL}, 0};
+
+void hp_set(int tid, Node *ptr) {
+    __atomic_store_n(&hazard_ptrs[____], ptr, __ATOMIC_RELEASE);
+}
+void hp_clear(int tid) {
+    __atomic_store_n(&hazard_ptrs[tid], ____, __ATOMIC_RELEASE);
+}
+int is_hazardous(Node *ptr) {
+    for (int i = 0; i < MAX_THREADS; i++)
+        if (__atomic_load_n(&hazard_ptrs[i], __ATOMIC_ACQUIRE) == ____)
+            return 1;
+    return 0;
+}
+void retire_node(Node *ptr) {
+    retired_list.retired[retired_list.count++] = ptr;
+    if (retired_list.count >= MAX_RETIRED) {
+        int nc = 0;
+        for (int i = 0; i < retired_list.count; i++) {
+            if (is_hazardous(retired_list.retired[i]))
+                retired_list.retired[nc++] = retired_list.retired[i];
+            else free(retired_list.retired[i]);
+        }
+        retired_list.count = nc;
+    }
+}
+void push(int val) {
+    Node *n = malloc(sizeof(Node)); n->value = val; Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE); n->next = oh;
+    } while (!__atomic_compare_exchange_n(&head, &oh, n, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+}
+int safe_pop(int tid, int *val) {
+    Node *oh;
+    do { oh = __atomic_load_n(&head, __ATOMIC_ACQUIRE);
+        if (!oh) return 0; hp_set(tid, oh);
+        if (__atomic_load_n(&head, __ATOMIC_ACQUIRE) != oh) continue; break;
+    } while (1);
+    if (__atomic_compare_exchange_n(&head, &oh, oh->next, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+        *val = oh->value; hp_clear(tid); retire_node(oh); return 1;
+    }
+    hp_clear(tid); return 0;
+}
+void *worker(void *arg) {
+    int tid = *(int *)arg; thread_id_local = tid;
+    for (int i = 0; i < 3; i++) push(tid * 10 + i);
+    int val, popped = 0;
+    while (safe_pop(tid, &val)) popped++;
+    printf("Thread %d: %d elements retires\n", tid, popped);
+    return NULL;
+}
+int main(void) {
+    pthread_t threads[2]; int ids[2] = {0, 1};
+    for (int i = 0; i < 2; i++) pthread_create(&threads[i], NULL, worker, &ids[i]);
+    for (int i = 0; i < 2; i++) pthread_join(threads[i], NULL);
+    int rem = 0; Node *c = head; while (c) { rem++; c = c->next; }
+    printf("Restant: %d\n", rem);
+    printf("Hazard pointers: OK\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+// Hazard pointers pour pile lock-free
+// hp_set(tid, ptr) : publier le noeud utilisé
+// hp_clear(tid) : retirer la publication (NULL)
+// is_hazardous(ptr) : scanner tous les HP, retourner 1 si trouvé
+// retire_node(ptr) : ajouter à retired list, scanner si pleine
+// push/safe_pop : pile lock-free avec protection HP
+// worker : push 3, pop tout
+// main : 2 threads, afficher restant et OK
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Hazard pointers"
+
+[validation]
+expected_output = 'REGEX:(?s)(Thread \d+: \d+ elements retires\n){2}Restant: 0\nHazard pointers: OK'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le thread 0 publie son hazard pointer vers Node(X). Aucun autre thread ne peut libérer Node(X) tant que le HP est actif."
+label = "Publication du hazard pointer"
+step_label = "Publish"
+
+[[visualizer.steps.arrows]]
+from = "hazard_ptrs[0]"
+to = "Node(X)"
+
+[[visualizer.steps.call_frames]]
+args = "tid=0"
+function_name = "safe_pop"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Node(X)"
+value = "protégé par HP"
+
+[[visualizer.steps.stack]]
+name = "hazard_ptrs[0]"
+value = "→ Node(X)"
+
+[[visualizer.steps.stack]]
+name = "hazard_ptrs[1]"
+value = "NULL"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Après hp_clear, Node(X) est ajouté à la retired list. Lors du scan, si aucun HP ne pointe vers Node(X), il est libéré."
+label = "Scan avant libération"
+step_label = "Scan"
+
+[[visualizer.steps.call_frames]]
+args = "ptr"
+function_name = "retire_node"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "Node(X)"
+value = "retiré, vérification HP..."
+
+[[visualizer.steps.stack]]
+name = "hazard_ptrs[0]"
+value = "NULL (clear)"
+
+[[visualizer.steps.stack]]
+name = "retired_list"
+value = "[Node(X)]"

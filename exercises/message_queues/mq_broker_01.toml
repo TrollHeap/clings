@@ -1,0 +1,353 @@
+common_mistake = "Oublier de mq_unlink les DEUX files → elles persistent dans /dev/mqueue"
+description = """
+NSY103 — Un broker reçoit des messages de producteurs et les redistribue aux consommateurs. Avec les files POSIX, on utilise une file d'entrée (inbox) et une file de sortie (outbox). Le broker lit de l'inbox, transforme le message, et l'envoie dans l'outbox.
+
+Implémentez un broker qui lit 3 messages de l'inbox, les préfixe avec '[BROKER] ' et les renvoie dans l'outbox. Un enfant produit les messages, le parent joue le broker puis lit l'outbox."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "Le producteur (enfant) envoie dans inbox, le broker (parent) lit inbox et écrit dans outbox",
+    "mq_send et mq_receive sont les seules fonctions nécessaires pour le routage",
+    "snprintf permet de préfixer le message avec '[BROKER] '",
+]
+id = "mq-broker-01"
+kc_ids = ["KC-C12"]
+key_concept = "Pattern broker : découpler producteurs et consommateurs via deux files + transformation"
+lang = "c"
+prerequisites = ["mq-timeout-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t inbox = mq_open("/kf_mq_inbox", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t outbox = mq_open("/kf_mq_outbox", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        for (int i = 0; i < 3; i++) {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "event-%d", i);
+            mq_send(inbox, msg, strlen(msg), 0);
+        }
+        mq_close(inbox);
+        mq_close(outbox);
+        _exit(0);
+    }
+
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = mq_receive(inbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[BROKER] %s", buf);
+        mq_send(outbox, out, strlen(out), 0);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = mq_receive(outbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        printf("%s\n", buf);
+    }
+
+    mq_close(inbox);
+    mq_close(outbox);
+    mq_unlink("/kf_mq_inbox");
+    mq_unlink("/kf_mq_outbox");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t inbox = mq_open("/kf_mq_inbox", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t outbox = mq_open("/kf_mq_outbox", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        for (int i = 0; i < 3; i++) {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "event-%d", i);
+            ____(inbox, msg, strlen(msg), 0);
+        }
+        mq_close(inbox);
+        mq_close(outbox);
+        _exit(0);
+    }
+
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = ____(inbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[BROKER] %s", buf);
+        mq_send(outbox, out, strlen(out), 0);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = mq_receive(outbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        printf("%s\n", buf);
+    }
+
+    mq_close(inbox);
+    mq_close(outbox);
+    mq_unlink("/kf_mq_inbox");
+    mq_unlink("/kf_mq_outbox");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * Broker simple : uppercase transformation
+ * ================================================= */
+void example_broker(void) {
+    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };
+    mqd_t in = mq_open("/kf_ex_in", O_CREAT|O_RDWR, 0644, &a);
+    mqd_t out = mq_open("/kf_ex_out", O_CREAT|O_RDWR, 0644, &a);
+    mq_send(in, "hello", 5, 0);
+    char buf[64]; ssize_t n = mq_receive(in, buf, sizeof(buf), NULL);
+    buf[n] = '\0';
+    for (int i = 0; buf[i]; i++) buf[i] -= 32;
+    mq_send(out, buf, strlen(buf), 0);
+    n = mq_receive(out, buf, sizeof(buf), NULL);
+    buf[n] = '\0';
+    printf("Broker: %s\n", buf);
+    mq_close(in); mq_close(out);
+    mq_unlink("/kf_ex_in"); mq_unlink("/kf_ex_out");
+}
+/* Resultat: Broker: HELLO */
+
+/* == VOTRE EXERCICE ================================
+ * Broker avec prefix [BROKER], 3 messages, fork.
+ * ================================================= */
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t inbox = mq_open("/kf_mq_inbox", O_CREAT|O_RDWR, 0644, &attr);
+    mqd_t outbox = mq_open("/kf_mq_outbox", O_CREAT|O_RDWR, 0644, &attr);
+    /* TODO: fork producer, broker loop, read outbox */
+    mq_close(inbox); mq_close(outbox);
+    mq_unlink("/kf_mq_inbox"); mq_unlink("/kf_mq_outbox");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t inbox = ____("/kf_mq_inbox", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t outbox = ____("/kf_mq_outbox", O_CREAT | O_RDWR, 0644, &attr);
+    pid_t pid = fork();
+    if (pid == 0) {
+        for (int i = 0; i < 3; i++) {
+            char msg[64]; snprintf(msg, sizeof(msg), "event-%d", i);
+            ____(inbox, msg, strlen(msg), 0);
+        }
+        mq_close(inbox); mq_close(outbox); _exit(0);
+    }
+    wait(NULL);
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = ____(inbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[BROKER] %s", buf);
+        ____(outbox, out, strlen(out), 0);
+    }
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = mq_receive(outbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        printf("%s\n", buf);
+    }
+    mq_close(inbox); mq_close(outbox);
+    ____("/kf_mq_inbox"); ____("/kf_mq_outbox");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t inbox = mq_open("/kf_mq_inbox", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t outbox = mq_open("/kf_mq_outbox", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        for (int i = 0; i < 3; i++) {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "event-%d", i);
+            ____(inbox, msg, strlen(msg), 0);
+        }
+        mq_close(inbox);
+        mq_close(outbox);
+        _exit(0);
+    }
+
+    wait(NULL);
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = ____(inbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[BROKER] %s", buf);
+        mq_send(outbox, out, strlen(out), 0);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        char buf[256];
+        ssize_t n = mq_receive(outbox, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        printf("%s\n", buf);
+    }
+
+    mq_close(inbox);
+    mq_close(outbox);
+    mq_unlink("/kf_mq_inbox");
+    mq_unlink("/kf_mq_outbox");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // 2 files: inbox + outbox
+    // Enfant envoie event-0,1,2 dans inbox
+    // Parent (broker): lit inbox, préfixe [BROKER], envoie dans outbox
+    // Parent lit outbox et affiche
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Pattern message broker"
+
+[validation]
+expected_output = """
+[BROKER] event-0
+[BROKER] event-1
+[BROKER] event-2
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "L'enfant appelle mq_send() trois fois pour déposer event-0, event-1 et event-2 dans la file inbox du noyau. Les messages persistent dans la file après la mort de l'enfant (_exit), contrairement aux pipes anonymes dont les données sont perdues quand le processus se ferme."
+label = "Producteur → inbox"
+step_label = "Étape 1 — Producteur : mq_send() des événements dans l'inbox"
+
+[[visualizer.steps.edges]]
+label = "mq_send x3"
+source = "prod"
+target = "inbox"
+
+[[visualizer.steps.nodes]]
+id = "prod"
+label = """
+Enfant
+event-0,1,2"""
+
+[[visualizer.steps.nodes]]
+id = "inbox"
+label = "inbox MQ"
+
+[[visualizer.steps]]
+explanation = """Le broker (parent) lit chaque message de l'inbox avec mq_receive(), le transforme via snprintf() en ajoutant le préfixe "[BROKER] ", puis l'envoie dans l'outbox via mq_send(). Ce pattern de découplage entre producteurs et consommateurs est rendu possible par la persistance des messages dans le noyau."""
+label = "Broker: inbox → transform → outbox"
+step_label = "Étape 2 — Broker : inbox → transformation → outbox"
+
+[[visualizer.steps.edges]]
+label = "receive"
+source = "inbox"
+target = "broker"
+
+[[visualizer.steps.edges]]
+label = "send"
+source = "broker"
+target = "outbox"
+
+[[visualizer.steps.nodes]]
+id = "inbox"
+label = "inbox"
+
+[[visualizer.steps.nodes]]
+id = "broker"
+label = """
+Broker
+[BROKER] prefix"""
+
+[[visualizer.steps.nodes]]
+id = "outbox"
+label = "outbox"
+
+[[visualizer.steps]]
+explanation = "Le parent lit les 3 messages transformés de l'outbox via mq_receive() et les affiche avec printf(). Le nettoyage final exige deux mq_unlink() — un pour inbox et un pour outbox — car chaque file POSIX nommée est un objet indépendant dans /dev/mqueue qui persiste jusqu'à sa suppression explicite."
+label = "Lecture outbox → affichage"
+step_label = "Étape 3 — Lecture outbox et affichage des messages transformés"
+
+[[visualizer.steps.edges]]
+label = "receive x3"
+source = "outbox"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "outbox"
+label = "outbox"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "[BROKER] event-X"

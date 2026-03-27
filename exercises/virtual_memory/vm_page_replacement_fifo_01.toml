@@ -1,0 +1,239 @@
+common_mistake = "Oublier le modulo FRAMES dans next = (next + 1) % FRAMES, ou ne pas incrémenter faults à chaque défaut"
+description = """
+NSY103/UTC502 — Quand la mémoire physique est pleine, le noyau doit choisir quelle page expulser. L'algorithme FIFO (First-In First-Out) remplace toujours la page chargée en premier.
+
+Implémentez FIFO avec un pointeur circulaire sur 3 frames. Référence : {1,2,3,4,1,2,5,1,2,3,4,5}."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "in_frames() parcourt le tableau frames[] et renvoie 1 si la page y est présente",
+    "Le pointeur next avance circulairement : next = (next + 1) % FRAMES",
+    "Incrémentez faults à chaque défaut (page absente des frames)",
+]
+id = "vm-page-replacement-fifo-01"
+kc_ids = ["KC-C14"]
+key_concept = "FIFO remplace la page la plus ancienne via un pointeur circulaire — simple mais peut souffrir de l'anomalie de Bélády"
+lang = "c"
+prerequisites = ["vm-page-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int next = 0;  /* pointeur FIFO */
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            frames[next] = refs[i];
+            next = (next + 1) % FRAMES;
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int ____(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int next = 0;  /* pointeur FIFO */
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            frames[next] = refs[i];
+            next = (next + 1) % ____;
+            ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 2
+#define REFS 6
+
+/* == EXEMPLE FIFO resolu : refs={3,2,1,0,3,2}, 2 frames == */
+int in_frames_ex(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+void example_fifo(void) {
+    int refs[] = {3, 2, 1, 0, 3, 2};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0, next = 0;
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames_ex(frames, FRAMES, refs[i])) {
+            frames[next] = refs[i];
+            next = (next + 1) % FRAMES;
+            faults++;
+        }
+    }
+    printf("Example FIFO faults: %d\n", faults); /* 6 */
+}
+
+/* Maintenant implementez FIFO pour refs={1,2,3,4,1,2,5,1,2,3,4,5}, 3 frames */
+int main(void) {
+    example_fifo();
+    /* TODO: copier et adapter la logique ci-dessus */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int next = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            frames[next] = refs[i];
+            next = (next + 1) % FRAMES;
+            ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int ____(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int next = 0;  /* pointeur FIFO */
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            frames[next] = refs[i];
+            next = (next + 1) % ____;
+            ____;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Helper : renvoie 1 si page est dans frames[], 0 sinon */
+int in_frames(int frames[], int n, int page) {
+    /* parcourir frames[0..n-1], comparer chaque element a page */
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));  /* -1 = frame vide */
+    int faults = 0;
+    int next = 0;  /* index FIFO : prochaine frame a remplacer */
+
+    for (int i = 0; i < REFS; i++) {
+        /* si refs[i] n'est pas dans frames : defaut de page */
+        /*   -> charger refs[i] dans frames[next] */
+        /*   -> avancer next de facon circulaire (modulo FRAMES) */
+        /*   -> incrementer faults */
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Remplacement de pages : algorithme FIFO"
+
+[validation]
+expected_output = """
+Page faults: 9
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "t=0..2 : pages 1,2,3 chargées une à une. 3 défauts. frames=[1,2,3], next=0."
+label = "Remplissage initial"
+step_label = "Étape 1"
+
+[[visualizer.steps]]
+explanation = "t=3 : page 4 absente. next=0, on remplace frames[0]=1 par 4. next devient 1. faults=4."
+label = "Éviction FIFO page 1"
+step_label = "Étape 2"
+
+[[visualizer.steps]]
+explanation = "t=7..8 : pages 1 et 2 — HITs. t=9 : page 3 — FAULT. Au total 9 défauts."
+label = "Fin de séquence"
+step_label = "Étape 3"

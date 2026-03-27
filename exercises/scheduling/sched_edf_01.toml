@@ -1,0 +1,202 @@
+common_mistake = "Confondre la période (Ti) avec la deadline ; pour les tâches périodiques implicites, deadline = période"
+description = """
+NSY103 — EDF (Earliest Deadline First) est l'algorithme optimal pour les tâches périodiques temps-réel. Condition de Liu & Layland : sum(Ci/Ti) ≤ 1.
+
+3 tâches périodiques :
+- T1 : période=20, exécution=3 → utilisation = 3/20 = 0.15
+- T2 : période=5,  exécution=1 → utilisation = 1/5  = 0.20
+- T3 : période=10, exécution=2 → utilisation = 2/10 = 0.20
+
+Utilisation totale = 0.55 ≤ 1.00 → ordonnancement faisable.
+
+La WCET (pire utilisation) affichée avec 2 décimales.
+
+Implémentez le calcul d'utilisation par tâche et la condition de faisabilité EDF (Liu & Layland) depuis le squelette fourni."""
+difficulty = 4
+exercise_type = "complete"
+files = []
+hints = [
+    "L'utilisation d'une tâche Ti est exec[i] / period[i] — utilisez la division flottante (les tableaux sont déjà en float)",
+    "Accumulez total en faisant total += util[i] dans la même boucle qui affiche chaque utilisation",
+    "La condition de Liu & Layland : total <= 1.0f — si vrai, EDF peut ordonnancer sans manquer de deadline",
+]
+id = "sched-edf-01"
+kc_ids = ["KC-C6"]
+key_concept = "EDF est optimal pour tâches périodiques ; faisable si sum(Ci/Ti) ≤ 1 (condition de Liu & Layland)"
+lang = "c"
+prerequisites = ["sched-rt-01"]
+solution_code = '''
+#include <stdio.h>
+#define N 3
+
+float calculate_edf_utilization(float exec[], float period[], int n) {
+    float total = 0.0f;
+    for (int i = 0; i < n; i++) {
+        total += exec[i] / period[i];
+    }
+    return total;
+}
+
+int main(void) {
+    float exec[]   = {3.0f, 1.0f, 2.0f};
+    float period[] = {20.0f, 5.0f, 10.0f};
+    float util[N];
+    float total    = 0.0f;
+
+    for (int i = 0; i < N; i++) {
+        util[i] = exec[i] / period[i];   /* utilisation de la tache i */
+        total  += util[i];
+        printf("Utilisation T%d: %.2f\n", i + 1, util[i]);
+    }
+
+    printf("Utilisation totale: %.2f\n", total);
+    printf("EDF faisable: %s\n", total <= 1.0f ? "oui" : "non");
+    return 0;
+}
+'''
+starter_code = """
+#define N 3
+
+float calculate_edf_utilization(float exec[], float period[], int n) {
+    /* TODO: Bouclez sur chaque tâche et calculez util[i] = exec[i] / period[i] */
+    /* TODO: Accumulez et retournez la utilisation totale */
+    return 0.0f;
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* EDF (Earliest Deadline First) — condition de faisabilite de Liu & Layland :
+ *   sum(Ci/Ti) <= 1  =>  ordonnancement faisable
+ *
+ * Algorithme :
+ *   Pour chaque tache i :
+ *     util[i] = exec[i] / period[i]   (utilisation de la tache)
+ *     total  += util[i]
+ *     afficher "Utilisation T<i+1>: %.2f"
+ *   Afficher total, puis tester total <= 1.0f
+ */
+int main(void) {
+    float exec[]   = {3.0f, 1.0f, 2.0f};
+    float period[] = {20.0f, 5.0f, 10.0f};
+    float util[N];
+    float total    = 0.0f;
+
+    for (int i = 0; i < N; i++) {
+        util[i] = exec[i] / period[i];   /* utilisation de la tache i */
+        total  += util[i];
+        printf("Utilisation T%d: %.2f\n", i + 1, util[i]);
+    }
+
+    printf("Utilisation totale: %.2f\n", total);
+    printf("EDF faisable: %s\n", total <= 1.0f ? "oui" : "non");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+int main(void) {
+    float exec[]   = {3.0f, 1.0f, 2.0f};
+    float period[] = {20.0f, 5.0f, 10.0f};
+    float util[N];
+    float total    = 0.0f;
+
+    for (int i = 0; i < N; i++) {
+        util[i] = ____; /* exec[i] / period[i] */
+        total  += ____; /* accumuler */
+        printf("Utilisation T%d: %.2f\n", ____, ____); /* i+1, util[i] */
+    }
+
+    printf("Utilisation totale: %.2f\n", ____);
+    printf("EDF faisable: %s\n", total <= 1.0f ? ____ : ____); /* "oui" ou "non" */
+    return 0;
+}''',
+    """
+#define N 3
+
+float calculate_edf_utilization(float exec[], float period[], int n) {
+    /* TODO: Bouclez sur chaque tâche et calculez util[i] = exec[i] / period[i] */
+    /* TODO: Accumulez et retournez la utilisation totale */
+    return 0.0f;
+}
+
+int main(void) {
+    /* code ici */
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 3
+
+float calculate_edf_utilization(float exec[], float period[], int n) {
+    /* TODO */
+    return 0.0f;
+}
+
+int main(void) {
+    float exec[]   = {3.0f, 1.0f, 2.0f};
+    float period[] = {20.0f, 5.0f, 10.0f};
+    float util[N];
+    float total    = 0.0f;
+
+    for (int i = 0; i < N; i++) {
+        util[i] = exec[i] / period[i];   /* utilisation de la tache i */
+        total  += util[i];
+        printf("Utilisation T%d: %.2f\n", i + 1, util[i]);
+    }
+
+    printf("Utilisation totale: %.2f\n", total);
+    printf("EDF faisable: %s\n", total <= 1.0f ? "oui" : "non");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 3
+
+float calculate_edf_utilization(float exec[], float period[], int n) { return 0.0f; }
+
+int main(void) {
+    float exec[]   = {3.0f, 1.0f, 2.0f};
+    float period[] = {20.0f, 5.0f, 10.0f};
+    float util[N];
+    float total    = 0.0f;
+
+    for (int i = 0; i < N; i++) {
+        util[i] = exec[i] / period[i];   /* utilisation de la tache i */
+        total  += util[i];
+        printf("Utilisation T%d: %.2f\n", i + 1, util[i]);
+    }
+
+    printf("Utilisation totale: %.2f\n", total);
+    printf("EDF faisable: %s\n", total <= 1.0f ? "oui" : "non");
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "EDF : ordonnancement temps-réel et condition de faisabilité"
+
+[validation]
+expected_output = """
+Utilisation T1: 0.15
+Utilisation T2: 0.20
+Utilisation T3: 0.20
+Utilisation totale: 0.55
+EDF faisable: oui"""
+mode = "output"
+
+[visualizer]
+steps = []
+type = "dataflow"

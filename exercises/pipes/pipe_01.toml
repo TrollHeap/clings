@@ -1,0 +1,249 @@
+common_mistake = "Lire avant de fermer fd[1] : si le kernel buffer est plein, read peut bloquer indéfiniment"
+description = """
+NSY103 — Un pipe crée deux descripteurs de fichier : fd[0] (lecture) et fd[1] (écriture). Ce mécanisme IPC est unidirectionnel. Sans fork, un seul processus peut écrire dans fd[1] puis lire dans fd[0].
+
+Créez un pipe, écrivez 'hello pipe', fermez fd[1], puis lisez et affichez le message."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "pipe(fd) remplit fd[0] (lecture) et fd[1] (écriture)",
+    "Écrire dans fd[1], lire depuis fd[0]",
+    "Fermer fd[1] avant de lire signale EOF au lecteur",
+]
+id = "pipe-01"
+kc_ids = ["KC-C10"]
+key_concept = "fd[0]=lecture, fd[1]=écriture ; fermer l'extrémité écriture signale EOF"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    const char *msg = "hello pipe";
+    write(fd[1], msg, strlen(msg));
+    close(fd[1]);
+    char buf[32];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd[0]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int fd[2];
+    ____(____);
+    const char *msg = "hello pipe";
+    write(fd[____], msg, strlen(msg));
+    close(fd[____]);
+    char buf[32];
+    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd[____]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Envoyer un entier via un pipe
+ * pipe(fd) cree fd[0]=lecture, fd[1]=ecriture.
+ * write dans fd[1], close fd[1], read depuis fd[0].
+ * ================================================= */
+void example_pipe_int(void) {
+    int fd[2];
+    pipe(fd);
+    int value = 42;
+    write(fd[1], &value, sizeof(value));
+    close(fd[1]);
+    int received = 0;
+    read(fd[0], &received, sizeof(received));
+    printf("Got: %d\n", received);
+    close(fd[0]);
+}
+/* Resultat: Got: 42 */
+
+/* == VOTRE EXERCICE ================================
+ * Envoyer une chaine via un pipe
+ * Inspirez-vous de example_pipe_int ci-dessus.
+ * Ecrivez "hello pipe" dans fd[1], lisez depuis fd[0].
+ * ================================================= */
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    const char *msg = "hello pipe";
+    /* TODO: write(fd[?], msg, strlen(msg)); */
+    /* TODO: close(fd[?]); */
+    char buf[32];
+    ssize_t n = 0;
+    /* TODO: n = read(fd[?], buf, sizeof(buf) - 1); */
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd[0]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    const char *msg = "hello pipe";
+    write(fd[1], msg, strlen(msg));
+    close(fd[1]);
+    char buf[32];
+    ssize_t n = read(fd[____], buf, sizeof(buf) - 1); // quel fd?
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd[0]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int fd[2];
+    ____(____);
+    const char *msg = "hello pipe";
+    write(fd[____], msg, strlen(msg));
+    close(fd[____]);
+    char buf[32];
+    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Received: %s\n", buf);
+    close(fd[____]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int fd[2];
+    // Créez un pipe, écrivez "hello pipe" dans fd[1]
+    // Fermez fd[1], lisez depuis fd[0], affichez "Received: hello pipe"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Pipe anonyme : écriture et lecture"
+
+[mission]
+clientId = "hobbylab"
+clientName = "HobbyLab"
+contactEmail = "dave@hobbylab.sys"
+failureEmail = """
+La sortie n'est pas correcte. Assure-toi d'écrire dans p[1] et lire depuis p[0].
+
+Dave"""
+incidentEmail = """
+Hey,
+
+J'essaie de faire communiquer deux parties de mon programme via un pipe UNIX. Montre-moi comment écrire dans p[1] et lire depuis p[0] avec write() et read().
+
+Dave @ HobbyLab"""
+payout = 100
+prereqMissionIds = []
+receivedTime = "08:20"
+subject = "IPC basique — pipe anonyme write/read"
+successEmail = """
+Top ! Le pipe fonctionne parfaitement. Je comprends maintenant comment p[0] et p[1] sont les deux extrémités.
+
+Dave"""
+syscallsInvolved = [
+    "pipe",
+    "write",
+    "read",
+    "close",
+]
+tier = 1
+
+[validation]
+expected_output = """
+Received: hello pipe
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "pipe(fd) est un appel système qui demande au noyau de créer une paire de descripteurs liés : fd[0] pour la lecture, fd[1] pour l'écriture. Ils partagent un buffer circulaire de 4096 octets (PIPE_BUF) géré entièrement par le kernel."
+label = "pipe(fd) — deux descripteurs créés"
+step_label = "Étape 1 — pipe() crée la paire de file descriptors"
+
+[[visualizer.steps.edges]]
+label = "kernel buffer"
+source = "w"
+target = "r"
+
+[[visualizer.steps.nodes]]
+id = "w"
+label = """
+fd[1]
+(write)"""
+
+[[visualizer.steps.nodes]]
+id = "r"
+label = """
+fd[0]
+(read)"""
+
+[[visualizer.steps]]
+explanation = "write() transfère les octets dans le buffer kernel du pipe. Le kernel maintient un buffer circulaire (PIPE_BUF = 4096 octets) ; l'écriture est atomique si n ≤ PIPE_BUF et le buffer n'est pas plein."
+label = 'write(fd[1], "hello pipe", 10)'
+step_label = "Étape 2 — write() remplit le buffer kernel"
+
+[[visualizer.steps.edges]]
+label = "10 bytes"
+source = "msg"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "msg"
+label = '"hello pipe"'
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "kernel buffer"
+
+[[visualizer.steps]]
+explanation = "read() extrait les octets du buffer kernel et les place dans le tableau buf de l'espace utilisateur. Fermer fd[1] avant read() est crucial : si l'extrémité écriture reste ouverte, read() bloque indéfiniment même si le buffer est vide (pas d'EOF)."
+label = "read(fd[0], buf, 31) — récupère le message"
+step_label = "Étape 3 — read() consomme le buffer kernel"
+
+[[visualizer.steps.edges]]
+label = "n bytes"
+source = "buf"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "kernel buffer"
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "buf[]"

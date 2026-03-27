@@ -1,0 +1,325 @@
+common_mistake = "Oublier #define _XOPEN_SOURCE 500 avant les includes — nftw() nécessite cette macro"
+description = """
+NSY103 — `nftw()` (new file tree walk) parcourt récursivement une arborescence. Le callback reçoit le chemin, un `struct stat *`, un type (FTW_F pour fichier, FTW_D pour répertoire), et un `struct FTW` avec des infos de profondeur. Le flag `FTW_DEPTH` traite les enfants avant le parent.
+
+Utilisez `nftw()` pour compter les fichiers réguliers dans une arborescence temporaire."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "`FTW_F` indique un fichier régulier dans le callback de nftw",
+    "`nftw(chemin, callback, nopenfd, flags)` — nopenfd limite les fd ouverts simultanément",
+    "Le callback doit retourner 0 pour continuer le parcours, non-0 pour arrêter",
+]
+id = "fs-walk-01"
+kc_ids = ["KC-C19"]
+key_concept = "nftw() parcourt récursivement une arborescence avec un callback"
+lang = "c"
+prerequisites = [
+    "fs-readdir-01",
+    "fs-stat-01",
+]
+solution_code = '''
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+static int file_count = 0;
+
+static int callback(const char *fpath, const struct stat *sb,
+                    int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)sb; (void)ftwbuf;
+    if (typeflag == FTW_F) {
+        file_count++;
+    }
+    return 0;
+}
+
+int main(void) {
+    const char *base = "/tmp/kf_nftw";
+    mkdir(base, 0755);
+    char sub[256];
+    snprintf(sub, sizeof(sub), "%s/subdir", base);
+    mkdir(sub, 0755);
+    FILE *f;
+    char p[256];
+    snprintf(p, sizeof(p), "%s/a.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/b.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/subdir/c.txt", base); f = fopen(p, "w"); fclose(f);
+
+    file_count = 0;
+    nftw(base, callback, 20, 0);
+    printf("Fichiers trouves : %d\n", file_count);
+
+    unlink("/tmp/kf_nftw/a.txt");
+    unlink("/tmp/kf_nftw/b.txt");
+    unlink("/tmp/kf_nftw/subdir/c.txt");
+    rmdir("/tmp/kf_nftw/subdir");
+    rmdir("/tmp/kf_nftw");
+    return 0;
+}'''
+starter_code = '''
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+static int file_count = 0;
+
+static int callback(const char *fpath, const struct stat *sb,
+                    int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)sb; (void)ftwbuf;
+    if (typeflag == ____) {
+        file_count++;
+    }
+    return 0;
+}
+
+int main(void) {
+    const char *base = "/tmp/kf_nftw";
+    mkdir(base, 0755);
+    char sub[256];
+    snprintf(sub, sizeof(sub), "%s/subdir", base);
+    mkdir(sub, 0755);
+    FILE *f;
+    char p[256];
+    snprintf(p, sizeof(p), "%s/a.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/b.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/subdir/c.txt", base); f = fopen(p, "w"); fclose(f);
+
+    file_count = 0;
+    ____(base, callback, 20, 0);
+    printf("Fichiers trouves : %d\n", file_count);
+
+    unlink("/tmp/kf_nftw/a.txt");
+    unlink("/tmp/kf_nftw/b.txt");
+    unlink("/tmp/kf_nftw/subdir/c.txt");
+    rmdir("/tmp/kf_nftw/subdir");
+    rmdir("/tmp/kf_nftw");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+/* == EXEMPLE ================================================
+ * Calculer la taille totale des fichiers avec nftw()
+ * Le callback recoit le chemin, stat, type, et infos FTW.
+ * =========================================================== */
+static long total_size = 0;
+
+static int size_callback(const char *fpath, const struct stat *sb,
+                         int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)ftwbuf;
+    if (typeflag == FTW_F) {
+        total_size += sb->st_size;
+    }
+    return 0;
+}
+
+void example_total_size(void) {
+    total_size = 0;
+    nftw("/tmp", size_callback, 20, 0);
+    printf("Taille totale /tmp : %ld octets\n", total_size);
+}
+
+/* == VOTRE EXERCICE =========================================
+ * Compter les fichiers reguliers dans une arborescence
+ * avec nftw(). Testez typeflag == FTW_F.
+ * =========================================================== */
+static int file_count = 0;
+
+static int callback(const char *fpath, const struct stat *sb,
+                    int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)sb; (void)ftwbuf;
+    /* TODO: incrementer file_count si FTW_F */
+    return 0;
+}
+
+int main(void) {
+    const char *base = "/tmp/kf_nftw";
+    mkdir(base, 0755);
+    char sub[256];
+    snprintf(sub, sizeof(sub), "%s/subdir", base);
+    mkdir(sub, 0755);
+    FILE *f; char p[256];
+    snprintf(p, sizeof(p), "%s/a.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/b.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/subdir/c.txt", base); f = fopen(p, "w"); fclose(f);
+
+    file_count = 0;
+    nftw(base, callback, 20, 0);
+    printf("Fichiers trouves : %d\n", file_count);
+
+    unlink("/tmp/kf_nftw/a.txt");
+    unlink("/tmp/kf_nftw/b.txt");
+    unlink("/tmp/kf_nftw/subdir/c.txt");
+    rmdir("/tmp/kf_nftw/subdir");
+    rmdir("/tmp/kf_nftw");
+    return 0;
+}''',
+    '''
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+static int file_count = 0;
+
+static int callback(const char *fpath, const struct stat *sb,
+                    int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)sb; (void)ftwbuf;
+    if (typeflag == FTW_F) { // fichier regulier
+        file_count++;
+    }
+    return 0;
+}
+
+int main(void) {
+    const char *base = "/tmp/kf_nftw";
+    mkdir(base, 0755);
+    char sub[256];
+    snprintf(sub, sizeof(sub), "%s/subdir", base);
+    mkdir(sub, 0755);
+    FILE *f; char p[256];
+    snprintf(p, sizeof(p), "%s/a.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/b.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/subdir/c.txt", base); f = fopen(p, "w"); fclose(f);
+    file_count = 0;
+    ____(base, callback, 20, 0); // appeler nftw
+    printf("Fichiers trouves : %d\n", file_count);
+    unlink("/tmp/kf_nftw/a.txt"); unlink("/tmp/kf_nftw/b.txt");
+    unlink("/tmp/kf_nftw/subdir/c.txt"); rmdir("/tmp/kf_nftw/subdir"); rmdir("/tmp/kf_nftw");
+    return 0;
+}''',
+    '''
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
+
+static int file_count = 0;
+
+static int callback(const char *fpath, const struct stat *sb,
+                    int typeflag, struct FTW *ftwbuf) {
+    (void)fpath; (void)sb; (void)ftwbuf;
+    if (typeflag == ____) {
+        file_count++;
+    }
+    return 0;
+}
+
+int main(void) {
+    const char *base = "/tmp/kf_nftw";
+    mkdir(base, 0755);
+    char sub[256];
+    snprintf(sub, sizeof(sub), "%s/subdir", base);
+    mkdir(sub, 0755);
+    FILE *f; char p[256];
+    snprintf(p, sizeof(p), "%s/a.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/b.txt", base); f = fopen(p, "w"); fclose(f);
+    snprintf(p, sizeof(p), "%s/subdir/c.txt", base); f = fopen(p, "w"); fclose(f);
+    file_count = 0;
+    ____(base, callback, 20, 0);
+    printf("Fichiers trouves : %d\n", file_count);
+    unlink("/tmp/kf_nftw/a.txt"); unlink("/tmp/kf_nftw/b.txt");
+    unlink("/tmp/kf_nftw/subdir/c.txt"); rmdir("/tmp/kf_nftw/subdir"); rmdir("/tmp/kf_nftw");
+    return 0;
+}''',
+    """
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+// Ecrivez un callback qui compte les fichiers (FTW_F)
+// Creez une arborescence avec 3 fichiers dans 2 niveaux
+// Appelez nftw() et affichez le resultat
+
+int main(void) {
+    return 0;
+}""",
+    """
+#define _XOPEN_SOURCE 500
+#include <stdio.h>
+#include <ftw.h>
+#include <sys/stat.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Parcours récursif d'arborescence (nftw)"
+
+[validation]
+expected_output = """
+Fichiers trouves : 3
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On crée une arborescence avec 2 fichiers à la racine et 1 dans un sous-répertoire. nftw() va parcourir tout récursivement."
+heap = []
+label = "Arborescence créée"
+step_label = "Arborescence de test"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "base"
+value = '"/tmp/kf_nftw"'
+
+[[visualizer.steps.stack]]
+name = "structure"
+value = "kf_nftw/{a.txt,b.txt,subdir/c.txt}"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "nftw() appelle le callback pour chaque entrée. Pour les fichiers réguliers, typeflag == FTW_F. Pour les répertoires, FTW_D. On incrémente file_count uniquement pour FTW_F."
+heap = []
+label = "nftw() appelle le callback"
+step_label = "Callback — FTW_F = fichier régulier"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "fpath, sb, FTW_F, ftwbuf"
+function_name = "callback"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fpath"
+value = '"/tmp/kf_nftw/a.txt"'
+
+[[visualizer.steps.stack]]
+name = "typeflag"
+value = "FTW_F"
+
+[[visualizer.steps.stack]]
+name = "file_count"
+value = "1"

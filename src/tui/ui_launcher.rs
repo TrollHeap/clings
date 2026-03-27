@@ -32,6 +32,7 @@ pub enum LaunchChoice {
 pub enum LaunchMode {
     Watch,
     Piscine,
+    Nsy103,
 }
 
 /// Which screen the launcher is showing.
@@ -56,11 +57,13 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
         match &screen {
             Screen::Mode => {
                 let has_continue = last_session.is_some();
-                let item_count = if has_continue { 3 } else { 2 };
+                let item_count = if has_continue { 4 } else { 3 };
 
-                let _ = terminal.draw(|f| {
-                    draw_mode_screen(f, cursor, &last_session);
-                });
+                terminal
+                    .draw(|f| {
+                        draw_mode_screen(f, cursor, &last_session);
+                    })
+                    .expect("render failed");
 
                 match read_key() {
                     Some(Action::Up) => {
@@ -84,10 +87,17 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                                 cursor = 0;
                                 list_state.select(Some(0));
                             }
-                            _ => {
+                            1 => {
                                 screen = Screen::Chapter(LaunchMode::Piscine);
                                 cursor = 0;
                                 list_state.select(Some(0));
+                            }
+                            _ => {
+                                // NSY103 mode
+                                break LaunchChoice::Start {
+                                    mode: LaunchMode::Nsy103,
+                                    chapter: None,
+                                };
                             }
                         }
                     }
@@ -100,7 +110,7 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 }
             }
             Screen::Help => {
-                let _ = terminal.draw(draw_help_screen);
+                terminal.draw(draw_help_screen).expect("render failed");
                 if read_key().is_some() {
                     screen = Screen::Mode;
                 }
@@ -110,9 +120,11 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 // "Tous les chapitres" + 16 chapters
                 let item_count = 1 + CHAPTERS.len();
 
-                let _ = terminal.draw(|f| {
-                    draw_chapter_screen(f, cursor, mode);
-                });
+                terminal
+                    .draw(|f| {
+                        draw_chapter_screen(f, cursor, mode);
+                    })
+                    .expect("render failed");
 
                 match read_key() {
                     Some(Action::Up) => {
@@ -257,6 +269,13 @@ fn draw_mode_screen(
         idx == cursor,
         common::C_WARNING,
     ));
+    idx += 1;
+
+    items.push(make_item(
+        "NSY103 (annales/examen)",
+        idx == cursor,
+        common::C_MAUVE,
+    ));
 
     let list = List::new(items)
         .block(
@@ -294,6 +313,7 @@ fn draw_chapter_screen(f: &mut Frame, cursor: usize, mode: LaunchMode) {
     let mode_name = match mode {
         LaunchMode::Watch => "Watch",
         LaunchMode::Piscine => "Piscine",
+        LaunchMode::Nsy103 => "NSY103",
     };
 
     // Header

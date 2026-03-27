@@ -1,0 +1,221 @@
+common_mistake = "Supposer que read() lit toujours exactement n octets — en réalité c'est un maximum"
+description = """
+NSY103 — read() peut retourner moins d'octets que demandé (short read). Pour lire un fichier entier, il faut boucler jusqu'à ce que read() retourne 0 (EOF).
+
+Implémentez une lecture par blocs de 4 octets et comptez les blocs lus."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "read(fd, buf, n) lit au plus n octets et retourne le nombre lu",
+    "read retourne 0 à EOF",
+    "count++ incrémente le compteur de blocs",
+]
+id = "fd-read-01"
+kc_ids = ["KC-C16"]
+key_concept = "read() peut retourner moins que demandé — toujours boucler jusqu'à EOF (retour 0)"
+lang = "c"
+prerequisites = ["fd-open-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_read_blocks.txt";
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, "AABBCCDDEE", 10);
+    close(fd);
+    fd = open(path, O_RDONLY);
+    char block[5];
+    ssize_t n;
+    int count = 0;
+    while ((n = read(fd, block, 4)) > 0) {
+        block[n] = '\0';
+        count++;
+        printf("Block %d: [%s] (%zd bytes)\n", count, block, n);
+    }
+    printf("Total blocks: %d\n", count);
+    close(fd);
+    unlink(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_read_blocks.txt";
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, "AABBCCDDEE", 10);
+    close(fd);
+    fd = open(path, O_RDONLY);
+    char block[5];
+    ssize_t n;
+    int count = 0;
+    while ((n = ____(fd, block, 4)) > 0) {
+        block[n] = '\0';
+        count____;
+        printf("Block %d: [%s] (%zd bytes)\n", count, block, n);
+    }
+    printf("Total blocks: %d\n", count);
+    close(fd);
+    unlink(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    const char *path = "/tmp/kf_read_blocks.txt";
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, "AABBCCDDEE", 10); close(fd);
+    fd = open(path, O_RDONLY);
+    char block[5]; ssize_t n; int count = 0;
+    while ((n = /* TODO: appeler read() pour lire 4 octets */ 0) > 0) {
+        block[n] = '\0';
+        /* TODO: incrémenter count */
+        printf("Block %d: [%s] (%zd bytes)\n", count, block, n);
+    }
+    printf("Total blocks: %d\n", count);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_read_blocks.txt";
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, "AABBCCDDEE", 10); close(fd);
+    fd = open(path, O_RDONLY);
+    char block[5]; ssize_t n; int count = 0;
+    while ((n = ____(fd, block, 4)) > 0) {
+        block[n] = '\0'; count____
+        printf("Block %d: [%s] (%zd bytes)\n", count, block, n);
+    }
+    printf("Total blocks: %d\n", count);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_read_blocks.txt";
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, "AABBCCDDEE", 10); close(fd);
+    fd = open(path, O_RDONLY);
+    char block[5]; ssize_t n; int count = 0;
+    while ((n = ____(fd, block, 4)) > 0) {
+        block[n] = '\0'; count____;
+        printf("Block %d: [%s] (%zd bytes)\n", count, block, n);
+    }
+    printf("Total blocks: %d\n", count);
+    close(fd); unlink(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    // Écrivez "AABBCCDDEE" dans un fichier
+    // Lisez par blocs de 4 octets, comptez les blocs
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "Lecture par blocs avec read()"
+
+[validation]
+expected_output = """
+Block 1: [AABB] (4 bytes)
+Block 2: [CCDD] (4 bytes)
+Block 3: [EE] (2 bytes)
+Total blocks: 3
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Premier bloc de 4 octets lu"
+heap = []
+label = "read(fd, block, 4) → 4 octets"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "block"
+value = '"AABB"'
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "count"
+value = "1"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Dernier bloc: seulement 2 octets restants"
+heap = []
+label = "read() → 2 octets (short read)"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "block"
+value = '"EE"'
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "count"
+value = "3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Fin de fichier atteinte, la boucle s'arrête"
+heap = []
+label = "read() → 0 (EOF)"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "0"

@@ -1,0 +1,284 @@
+common_mistake = "Utiliser . au lieu de -> sur un pointeur"
+description = """
+NSY103 — Quand une struct est allouée dynamiquement, on accède à ses champs via `->` (équivalent de `(*ptr).champ`).
+
+Allouez un `Rectangle` sur le tas, calculez son aire et périmètre via pointeur."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "`Rectangle *r = malloc(sizeof(Rectangle));`",
+    "`r->width = 5.0f;` pour assigner via pointeur (équivalent à `(*r).width = 5.0f;`)",
+    "N'oubliez pas `free(r);` en fin de programme",
+]
+id = "struct-ptr-01"
+kc_ids = ["KC-C03"]
+key_concept = "L'opérateur -> est du sucre syntaxique : ptr->champ équivaut à (*ptr).champ — déréférence et accès au membre en une seule étape"
+lang = "c"
+prerequisites = ["struct-point-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct { float width; float height; } Rectangle;
+float rect_area(Rectangle *r) { return r->width * r->height; }
+float rect_perimeter(Rectangle *r) { return 2.0f * (r->width + r->height); }
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", r->width);
+    printf("Hauteur : %.1f\n", r->height);
+    printf("Aire : %.1f\n", rect_area(r));
+    printf("Perimetre : %.1f\n", rect_perimeter(r));
+    free(r);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { float width; float height; } Rectangle;
+
+float rect_area(Rectangle *r) {
+    return r->width * r->height;
+}
+
+float rect_perimeter(Rectangle *r) {
+    return 2.0f * (r->width + r->height);
+}
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", r.____);
+    printf("Hauteur : %.1f\n", r.____);
+    printf("Aire : %.1f\n", rect_area(____));
+    printf("Perimetre : %.1f\n", rect_perimeter(____));
+    free(r);
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Struct Circle sur le tas avec -> pour aire et perimetre
+ * malloc(sizeof(T)) alloue sur le tas, -> accede aux champs.
+ * =========================================================== */
+typedef struct { float radius; } Circle;
+
+void example_circle(void) {
+    Circle *c = malloc(sizeof(Circle));
+    if (!c) return;
+    c->radius = 4.0f;
+    float pi = 3.14159f;
+    printf("Rayon : %.1f\n", c->radius);
+    printf("Aire : %.2f\n", pi * c->radius * c->radius);
+    printf("Circonference : %.2f\n", 2.0f * pi * c->radius);
+    free(c);
+}
+/* Resultat: Rayon : 4.0 / Aire : 50.27 / Circonference : 25.13 */
+
+/* == VOTRE EXERCICE =========================================
+ * Struct Rectangle sur le tas avec -> pour aire et perimetre
+ * Inspirez-vous de example_circle ci-dessus.
+ * Allouez Rectangle, assignez width=5, height=3, affichez.
+ * =========================================================== */
+typedef struct { float width; float height; } Rectangle;
+
+int main(void) {
+    /* TODO: allouez un Rectangle sur le tas avec malloc */
+    /* TODO: assignez width=5.0, height=3.0 via -> */
+    /* TODO: affichez largeur, hauteur, aire, perimetre */
+    /* TODO: liberez avec free() */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { float width; float height; } Rectangle;
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width  = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", ____); // accès via ->
+    printf("Hauteur : %.1f\n", ____);
+    printf("Aire : %.1f\n", ____);
+    printf("Perimetre : %.1f\n", 2.0f * (r->width + r->height));
+    free(r);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { float width; float height; } Rectangle;
+
+float rect_area(Rectangle *r) {
+    return r->width * r->height;
+}
+
+float rect_perimeter(Rectangle *r) {
+    return 2.0f * (r->width + r->height);
+}
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", r.____);
+    printf("Hauteur : %.1f\n", r.____);
+    printf("Aire : %.1f\n", rect_area(____));
+    printf("Perimetre : %.1f\n", rect_perimeter(____));
+    free(r);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct { float width; float height; } Rectangle;
+float rect_area(Rectangle *r) {
+    /* TODO */
+    return 0.0f;
+}
+float rect_perimeter(Rectangle *r) {
+    /* TODO */
+    return 0.0f;
+}
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", r->width);
+    printf("Hauteur : %.1f\n", r->height);
+    printf("Aire : %.1f\n", rect_area(r));
+    printf("Perimetre : %.1f\n", rect_perimeter(r));
+    free(r);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct { float width; float height; } Rectangle;
+float rect_area(Rectangle *r) { return 0.0f; }
+float rect_perimeter(Rectangle *r) { return 0.0f; }
+
+int main(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    if (!r) return 1;
+    r->width = 5.0f;
+    r->height = 3.0f;
+    printf("Largeur : %.1f\n", r->width);
+    printf("Hauteur : %.1f\n", r->height);
+    printf("Aire : %.1f\n", rect_area(r));
+    printf("Perimetre : %.1f\n", rect_perimeter(r));
+    free(r);
+    return 0;
+}
+''',
+]
+subject = "structs"
+title = "Struct sur le tas et opérateur ->"
+
+[validation]
+mode = "test"
+test_code = """
+void test_rect_area(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    TEST_ASSERT_NOT_NULL(r);
+    r->width = 5.0f;
+    r->height = 3.0f;
+    float area = rect_area(r);
+    TEST_ASSERT_EQUAL_FLOAT(15.0f, area);
+    free(r);
+}
+
+void test_rect_area_square(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    r->width = 4.0f;
+    r->height = 4.0f;
+    TEST_ASSERT_EQUAL_FLOAT(16.0f, rect_area(r));
+    free(r);
+}
+
+void test_rect_perimeter(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    r->width = 5.0f;
+    r->height = 3.0f;
+    float perim = rect_perimeter(r);
+    TEST_ASSERT_EQUAL_FLOAT(16.0f, perim);
+    free(r);
+}
+
+void test_rect_perimeter_unit(void) {
+    Rectangle *r = malloc(sizeof(Rectangle));
+    r->width = 1.0f;
+    r->height = 1.0f;
+    TEST_ASSERT_EQUAL_FLOAT(4.0f, rect_perimeter(r));
+    free(r);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_rect_area);
+    RUN_TEST(test_rect_area_square);
+    RUN_TEST(test_rect_perimeter);
+    RUN_TEST(test_rect_perimeter_unit);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+label = "malloc(sizeof(Rectangle))"
+
+[[visualizer.steps.arrows]]
+from = "r"
+to = "Rectangle"
+
+[[visualizer.steps.heap]]
+address = "Rectangle"
+value = "{width:5.0, height:3.0}"
+
+[[visualizer.steps.stack]]
+name = "r"
+value = "→heap:Rectangle"
+
+[[visualizer.steps]]
+label = "Calcul via r->"
+
+[[visualizer.steps.arrows]]
+from = "r"
+label = "r->"
+to = "Rectangle"
+
+[[visualizer.steps.heap]]
+address = "Rectangle"
+value = "{width:5.0, height:3.0}"
+
+[[visualizer.steps.stack]]
+name = "r"
+value = "→heap:Rectangle"
+
+[[visualizer.steps.stack]]
+name = "aire"
+value = "15.0"
+
+[[visualizer.steps.stack]]
+name = "périm."
+value = "16.0"

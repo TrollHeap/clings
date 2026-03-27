@@ -1,0 +1,378 @@
+common_mistake = "Oublier sigemptyset() avant de commencer — sigset_t non initialisée a un contenu aléatoire"
+description = """
+NSY103 — sigset_t est un ensemble de signaux (bitmask). Les fonctions sigemptyset, sigfullset, sigaddset, sigdelset, sigismember permettent de manipuler cet ensemble.
+
+Constituez un masque incluant SIGINT, SIGTERM, SIGCHLD, puis testez sigismember.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "sigemptyset(&set); // initialise à vide — TOUJOURS faire en premier",
+    "sigaddset(&set, SIGINT); // ajoute SIGINT",
+    "sigismember(&set, SIGTERM) retourne 1 si présent, 0 sinon",
+]
+id = "sigset-ops-01"
+kc_ids = ["KC-C08"]
+key_concept = "sigemptyset vide l'ensemble, sigaddset ajoute, sigismember teste — ce sont des opérations bit à bit"
+lang = "c"
+prerequisites = ["signal-constants-01"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+
+/* Test mode: sigset operations are tested directly */
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <signal.h>
+
+/* Test mode: no main() needed */
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <signal.h>
+
+/* Test mode: understand sigemptyset, sigaddset, sigdelset, sigismember */
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* Empty set: sigemptyset(&set) */
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* Add signals: sigaddset(&set, SIG...) */
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+/* Test and delete: sigismember, sigdelset */
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <signal.h>
+
+int main(void) {
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigaddset(&s, SIGCHLD);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+        printf("%d\n", (int)(sigismember(&s, SIGCHLD)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        sigaddset(&s, SIGINT);
+        sigaddset(&s, SIGTERM);
+        sigdelset(&s, SIGTERM);
+        printf("%d\n", (int)(sigismember(&s, SIGINT)));
+        printf("%d\n", (int)(sigismember(&s, SIGTERM)));
+    }
+    {
+        sigset_t s;
+        sigemptyset(&s);
+        printf("%d\n", (int)(sigismember(&s, SIGUSR1)));
+        printf("%d\n", (int)(sigismember(&s, SIGKILL)));
+    }
+    return 0;
+}
+''',
+]
+subject = "signals"
+title = "Manipulation de sigset_t"
+
+[validation]
+expected_output = """
+0
+0
+1
+0
+1
+1
+1
+0
+1
+0
+0
+0"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "sigemptyset — set vide"
+
+[[visualizer.steps.stack]]
+name = "set"
+value = "0x0000...0000 (tous bits à 0)"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "sigaddset SIGINT(2), SIGTERM(15), SIGCHLD(17)"
+
+[[visualizer.steps.stack]]
+name = "set"
+value = "bit2=1, bit15=1, bit17=1"
+
+[[visualizer.steps.stack]]
+name = "SIGKILL(9)"
+value = "bit9=0 → membre: 0"
+
+[[visualizer.steps.stack]]
+name = "SIGUSR1(10)"
+value = "bit10=0 → membre: 0"
+
+[[visualizer.steps]]
+arrows = []
+heap = []
+label = "sigdelset SIGTERM(15)"
+
+[[visualizer.steps.stack]]
+name = "set"
+value = "bit15=0 (retiré)"
+
+[[visualizer.steps.stack]]
+name = "SIGTERM membre"
+value = "0"

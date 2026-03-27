@@ -1,0 +1,241 @@
+common_mistake = "Confondre p++ (modifie p) avec *(p+i) (lit sans modifier)"
+description = """
+NSY103 — L'arithmétique de pointeurs permet de parcourir des tableaux efficacement. `p + i` pointe vers le i-ième élément après p.
+
+Complétez `sum_array()` qui additionne les éléments d'un tableau `int[]` via arithmétique de pointeurs (sans crochets `[]`)."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Dans la boucle, utilisez `*(arr + i)` pour accéder à l'élément i",
+    "La condition d'arrêt : `i < n`",
+    "Initialisez `sum = 0` avant la boucle",
+]
+id = "ptr-arith-01"
+kc_ids = ["KC-C01"]
+key_concept = "Ajouter i à un pointeur avance de i×sizeof(*p) octets : p+i == &arr[i] et *(p+i) == arr[i]"
+lang = "c"
+prerequisites = ["ptr-deref-01"]
+solution_code = '''
+#include <stdio.h>
+
+int sum_array(const int *arr, int n) {
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += *(arr + i);
+    }
+    return sum;
+}
+
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    int total = sum_array(nums, 5);
+    printf("Somme : %d\n", total);
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+
+int sum_array(const int *arr, int n) {
+    return 0;
+}
+
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    printf("Somme : %d\n", sum_array(nums, 5));
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}
+'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* ══ EXEMPLE ══════════════════════════════════════
+ * Trouver le maximum d'un tableau via pointeurs
+ * p+i pointe vers le i-ieme element apres p
+ * *(p+i) lit la valeur a cette adresse
+ * ═══════════════════════════════════════════════ */
+int example_max(const int *arr, int n) {
+    int max = *arr;  /* premier element = *(arr+0) */
+    for (int i = 1; i < n; i++) {
+        if (*(arr + i) > max) {  /* arithmetique de pointeurs */
+            max = *(arr + i);
+        }
+    }
+    return max;
+}
+/* Resultat: example_max({3,7,2,9,1}, 5) → 9 */
+
+/* ══ VOTRE EXERCICE ═══════════════════════════════
+ * Calculer la SOMME d'un tableau via pointeurs
+ * Inspirez-vous de example_max ci-dessus.
+ * Utilisez *(arr + i) au lieu de arr[i]
+ * ═══════════════════════════════════════════════ */
+int sum_array(const int *arr, int n) {
+    return 0; /* TODO */
+}
+
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    int total = sum_array(nums, 5);
+    printf("Somme : %d\n", total);
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int sum_array(const int *arr, int n) {
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += ____; // accès par arithmétique de pointeurs
+    }
+    return sum;
+}
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    int total = sum_array(nums, 5);
+    printf("Somme : %d\n", total);
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int sum_array(const int *arr, int n) {
+    int sum = ____;
+    for (int i = 0; i < ____; i++) {
+        sum += ____;
+    }
+    return sum;
+}
+
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    int total = sum_array(nums, 5);
+    printf("Somme : %d\n", total);
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+// Implémentez sum_array qui additionne arr[0..n-1]
+// via arithmétique de pointeurs (*(arr+i)), sans crochets
+int sum_array(const int *arr, int n) {
+    return 0; // TODO
+}
+int main(void) {
+    int nums[] = {10, 20, 30, 40, 50};
+    printf("Somme : %d\n", sum_array(nums, 5));
+    printf("Element 2 : %d\n", *(nums + 2));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int sum_array(const int *arr, int n) {
+    return 0;
+}
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "Arithmétique de pointeurs sur tableau"
+
+[validation]
+expected_output = """
+Somme : 150
+Element 2 : 30"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "nums[] est un tableau local de 5 ints contigus sur la pile — 20 octets. Lors du passage à sum_array, nums décroît en pointeur vers nums[0]."
+heap = []
+label = "Tableau nums en mémoire"
+step_label = "Tableau nums en mémoire"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "20"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "30"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "40"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "50"
+
+[[visualizer.steps]]
+explanation = "Dans sum_array, arr+2 décale le pointeur de 2 * sizeof(int) = 8 octets — il pointe vers nums[2]=30. *(arr+i) et arr[i] sont strictement équivalents."
+heap = []
+label = "Pointeur arr avance (i=2)"
+step_label = "Pointeur arr avance (i=2)"
+
+[[visualizer.steps.arrows]]
+from = "arr"
+label = "i=2→nums[2]"
+to = "nums[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "arr=nums, n=5"
+function_name = "sum_array"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "nums[0]"
+value = "10"
+
+[[visualizer.steps.stack]]
+name = "nums[1]"
+value = "20"
+
+[[visualizer.steps.stack]]
+name = "nums[2]"
+value = "30"
+
+[[visualizer.steps.stack]]
+name = "nums[3]"
+value = "40"
+
+[[visualizer.steps.stack]]
+name = "nums[4]"
+value = "50"
+
+[[visualizer.steps.stack]]
+name = "arr"
+value = "→nums[0]"
+
+[[visualizer.steps.stack]]
+name = "i"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "*(arr+2)"
+value = "30"

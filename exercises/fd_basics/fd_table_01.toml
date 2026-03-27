@@ -1,0 +1,184 @@
+common_mistake = "Atteindre la limite de fd sans les fermer — fuite de descripteurs de fichier"
+description = """
+NSY103 — Chaque processus a une limite sur le nombre de descripteurs de fichier ouverts (RLIMIT_NOFILE). getrlimit() et setrlimit() permettent de consulter et modifier ces limites.
+
+Affichez les limites soft/hard de RLIMIT_NOFILE et ouvrez plusieurs fd pour vérifier l'allocation séquentielle."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "getrlimit(RLIMIT_NOFILE, &rl) remplit rl.rlim_cur et rl.rlim_max",
+    "Les fd sont alloués séquentiellement à partir du plus petit disponible",
+    "Après stdin(0), stdout(1), stderr(2), le prochain fd libre est 3",
+]
+id = "fd-table-01"
+kc_ids = ["KC-C16"]
+key_concept = "RLIMIT_NOFILE limite le nombre de fd par processus, allocation séquentielle"
+lang = "c"
+prerequisites = ["fd-fcntl-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+int main(void) {
+    struct rlimit rl;
+    getrlimit(RLIMIT_NOFILE, &rl);
+    printf("NOFILE soft: %lu\n", (unsigned long)rl.rlim_cur);
+    printf("NOFILE hard: %lu\n", (unsigned long)rl.rlim_max);
+    int fds[3];
+    for (int i = 0; i < 3; i++) {
+        fds[i] = open("/dev/null", O_RDONLY);
+    }
+    printf("fd0=%d, fd1=%d, fd2=%d\n", fds[0], fds[1], fds[2]);
+    printf("Sequential: %s\n", (fds[1] == fds[0]+1 && fds[2] == fds[1]+1) ? "yes" : "no");
+    for (int i = 0; i < 3; i++) close(fds[i]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    struct rlimit rl;
+    ____(RLIMIT_NOFILE, &rl);
+    printf("NOFILE soft: %lu\n", (unsigned long)rl.rlim_cur);
+    printf("NOFILE hard: %lu\n", (unsigned long)rl.rlim_max);
+    int fds[3];
+    for (int i = 0; i < 3; i++) {
+        fds[i] = open("/dev/null", O_RDONLY);
+    }
+    printf("fd0=%d, fd1=%d, fd2=%d\n", fds[0], fds[1], fds[2]);
+    printf("Sequential: %s\n", (fds[1] == fds[0]+1 && fds[2] == fds[1]+1) ? "yes" : "no");
+    for (int i = 0; i < 3; i++) close(fds[i]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    struct rlimit rl;
+    /* TODO: appeler getrlimit(RLIMIT_NOFILE, &rl) */
+    printf("NOFILE soft: %lu\n", (unsigned long)rl.rlim_cur);
+    printf("NOFILE hard: %lu\n", (unsigned long)rl.rlim_max);
+    int fds[3];
+    for (int i = 0; i < 3; i++) {
+        /* TODO: ouvrir /dev/null en lecture et stocker dans fds[i] */
+        fds[i] = -1;
+    }
+    printf("fd0=%d, fd1=%d, fd2=%d\n", fds[0], fds[1], fds[2]);
+    printf("Sequential: %s\n", (fds[1] == fds[0]+1 && fds[2] == fds[1]+1) ? "yes" : "no");
+    for (int i = 0; i < 3; i++) close(fds[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    struct rlimit rl;
+    ____(RLIMIT_NOFILE, &rl);
+    printf("NOFILE soft: %lu\n", (unsigned long)rl.rlim_cur);
+    printf("NOFILE hard: %lu\n", (unsigned long)rl.rlim_max);
+    int fds[3];
+    for (int i = 0; i < 3; i++) {
+        fds[i] = open("/dev/null", ____);
+    }
+    printf("fd0=%d, fd1=%d, fd2=%d\n", fds[0], fds[1], fds[2]);
+    printf("Sequential: %s\n", (fds[1] == fds[0]+1 && fds[2] == fds[1]+1) ? "yes" : "no");
+    for (int i = 0; i < 3; i++) close(fds[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    struct rlimit rl;
+    ____(RLIMIT_NOFILE, &rl);
+    printf("NOFILE soft: %lu\n", (unsigned long)rl.rlim_cur);
+    printf("NOFILE hard: %lu\n", (unsigned long)rl.rlim_max);
+    int fds[3];
+    for (int i = 0; i < 3; i++) fds[i] = open("/dev/null", O_RDONLY);
+    printf("fd0=%d, fd1=%d, fd2=%d\n", fds[0], fds[1], fds[2]);
+    printf("Sequential: %s\n", (fds[1]==fds[0]+1 && fds[2]==fds[1]+1) ? "yes" : "no");
+    for (int i = 0; i < 3; i++) close(fds[i]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    // Affichez RLIMIT_NOFILE soft/hard
+    // Ouvrez 3 fd et vérifiez l'allocation séquentielle
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/resource.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "Table des descripteurs (RLIMIT_NOFILE)"
+
+[validation]
+expected_output = 'REGEX:(?s)NOFILE soft: \d+\nNOFILE hard: \d+\nfd0=3, fd1=4, fd2=5\nSequential: yes'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Limites soft et hard du nombre de fd"
+heap = []
+label = "getrlimit(RLIMIT_NOFILE)"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "rl.rlim_cur"
+value = "1024 (soft)"
+
+[[visualizer.steps.stack]]
+name = "rl.rlim_max"
+value = "1048576 (hard)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque open() prend le plus petit fd disponible"
+heap = []
+label = "Allocation séquentielle de fd"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fds[0]"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "fds[1]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "fds[2]"
+value = "5"

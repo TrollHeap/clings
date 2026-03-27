@@ -1,0 +1,270 @@
+common_mistake = "Oublier _exit() dans l'enfant — il continue la boucle et crée 2^n processus"
+description = """
+NSY103 — Un processus peut créer plusieurs enfants avec fork() dans une boucle. Chaque enfant doit faire _exit() pour ne pas continuer la boucle du parent. Le parent attend chaque enfant séquentiellement avec waitpid() pour un ordre déterministe.
+
+Créez 3 enfants numérotés qui affichent leur rang, puis le parent les attend dans l'ordre."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "L'enfant reçoit 0 de fork() — il doit _exit() immédiatement après son printf",
+    "Sans _exit(), l'enfant continue la boucle et crée ses propres enfants",
+    "waitpid(pids[i], ...) attend un enfant spécifique — garantit l'ordre",
+]
+id = "fork-multi-01"
+kc_ids = ["KC-C07"]
+key_concept = "Dans une boucle fork, l'enfant DOIT _exit() sinon il continue la boucle (fork bomb)"
+lang = "c"
+prerequisites = ["exec-basic-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+int main(void) {
+    setbuf(stdout, NULL);
+    pid_t pids[N_CHILDREN];
+
+    for (int i = 0; i < N_CHILDREN; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) { perror("fork"); return 1; }
+        if (pids[i] == 0) {
+            printf("Child %d: PID=%d\n", i + 1, getpid());
+            _exit(i + 1); /* code de sortie = numéro */
+        }
+    }
+
+    /* Parent attend chaque enfant dans l'ordre */
+    for (int i = 0; i < N_CHILDREN; i++) {
+        int status;
+        waitpid(pids[i], &status, 0);
+        if (WIFEXITED(status))
+            printf("Parent: child %d exited with %d\n", i + 1, WEXITSTATUS(status));
+    }
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+int main(void) {
+    setbuf(stdout, NULL);
+    pid_t pids[N_CHILDREN];
+
+    for (int i = 0; i < N_CHILDREN; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) { perror("fork"); return 1; }
+        if (pids[i] == ____) {
+            printf("Child %d: PID=%d\n", i + 1, getpid());
+            ____(i + 1); /* code de sortie = numéro */
+        }
+    }
+
+    /* Parent attend chaque enfant dans l'ordre */
+    for (int i = 0; i < N_CHILDREN; i++) {
+        int status;
+        waitpid(____[i], &status, 0);
+        if (WIFEXITED(status))
+            printf("Parent: child %d exited with %d\n", i + 1, WEXITSTATUS(____));
+    }
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+/* == EXEMPLE =======================================
+ * Créer 2 enfants avec une boucle fork
+ * Chaque enfant _exit immédiatement
+ * ================================================= */
+void example_multi_fork(void) {
+    pid_t pids[2];
+    for (int i = 0; i < 2; i++) {
+        pids[i] = fork();
+        if (pids[i] == 0) {
+            printf("example child %d\n", i);
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) waitpid(pids[i], NULL, 0);
+    printf("example: all children done\n");
+}
+
+/* == VOTRE EXERCICE ================================
+ * 3 enfants numérotés, chacun _exit(i+1)
+ * Parent waitpid dans l'ordre et affiche les codes
+ * ================================================= */
+int main(void) {
+    setbuf(stdout, NULL);
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+int main(void) {
+    setbuf(stdout, NULL);
+    pid_t pids[N_CHILDREN];
+    for (int i = 0; i < N_CHILDREN; i++) {
+        pids[i] = ____();
+        if (pids[i] == -1) { perror("fork"); return 1; }
+        if (pids[i] == ____) {
+            printf("Child %d: PID=%d\n", i + 1, getpid());
+            ____(i + 1);
+        }
+    }
+    for (int i = 0; i < N_CHILDREN; i++) {
+        int status;
+        waitpid(pids[i], &status, 0);
+        if (WIFEXITED(status))
+            printf("Parent: child %d exited with %d\n", i + 1, ____(status));
+    }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+int main(void) {
+    setbuf(stdout, NULL);
+    pid_t pids[N_CHILDREN];
+
+    for (int i = 0; i < N_CHILDREN; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) { perror("fork"); return 1; }
+        if (pids[i] == ____) {
+            printf("Child %d: PID=%d\n", i + 1, getpid());
+            ____(i + 1);
+        }
+    }
+
+    for (int i = 0; i < N_CHILDREN; i++) {
+        int status;
+        waitpid(____[i], &status, 0);
+        if (WIFEXITED(status))
+            printf("Parent: child %d exited with %d\n", i + 1, WEXITSTATUS(____));
+    }
+
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define N_CHILDREN 3
+
+int main(void) {
+    setbuf(stdout, NULL);
+    // pid_t pids[N_CHILDREN]
+    // Boucle: fork, enfant printf + _exit(i+1)
+    // Boucle: waitpid(pids[i]) et afficher code sortie
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    setbuf(stdout, NULL);
+    return 0;
+}""",
+]
+subject = "processes"
+title = "Fork multiple: N enfants"
+
+[validation]
+expected_output = 'REGEX:(?s)(?=.*Child 1: PID=\d+)(?=.*Child 2: PID=\d+)(?=.*Child 3: PID=\d+)(?=.*Parent: child 1 exited with 1)(?=.*Parent: child 2 exited with 2)(?=.*Parent: child 3 exited with 3).*'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque fork crée un enfant qui _exit() immédiatement"
+heap = []
+label = "Boucle fork — 3 enfants créés"
+step_label = "Fork x3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "pids[0]"
+value = "PID enfant 1"
+
+[[visualizer.steps.stack]]
+name = "pids[1]"
+value = "PID enfant 2"
+
+[[visualizer.steps.stack]]
+name = "pids[2]"
+value = "PID enfant 3"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Sans _exit, l'enfant continuerait la boucle et créerait ses propres enfants"
+heap = []
+label = "Enfant i fait _exit(i+1)"
+step_label = "_exit"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (child)"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Enfant 1"
+value = "_exit(1)"
+
+[[visualizer.steps.stack]]
+name = "Enfant 2"
+value = "_exit(2)"
+
+[[visualizer.steps.stack]]
+name = "Enfant 3"
+value = "_exit(3)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "waitpid avec PID spécifique garantit l'ordre de collecte"
+heap = []
+label = "Parent waitpid dans l'ordre"
+step_label = "waitpid"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "waitpid(pids[0])"
+value = "→ exit code 1"
+
+[[visualizer.steps.stack]]
+name = "waitpid(pids[1])"
+value = "→ exit code 2"
+
+[[visualizer.steps.stack]]
+name = "waitpid(pids[2])"
+value = "→ exit code 3"

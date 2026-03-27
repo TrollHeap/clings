@@ -1,0 +1,262 @@
+common_mistake = "Penser que counter++ est une opération indivisible — en réalité c'est 3 instructions assembleur"
+description = """
+NSY103 — Une race condition se produit quand deux threads accèdent simultanément à une variable partagée sans synchronisation. Le résultat dépend de l'ordre d'exécution (non déterministe).
+
+Créez deux threads qui incrémentent un compteur partagé 100000 fois chacun, puis affichez le résultat (qui sera probablement < 200000)."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "L'incrémentation est simplement counter++ dans la boucle",
+    "La fonction à passer à pthread_create est increment",
+    "L'opérateur de comparaison est < (counter < 200000)",
+]
+id = "sync-race-01"
+kc_ids = ["KC-C22"]
+key_concept = "counter++ n'est pas atomique : read-modify-write peut être interrompu entre threads"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        counter++;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Expected: 200000\n");
+    printf("Race condition: %s\n", counter < 200000 ? "OUI" : "NON");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        ____;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, ____, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Expected: 200000\n");
+    printf("Race condition: %s\n", counter ____ 200000 ? "OUI" : "NON");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Race condition avec deux threads sur un tableau
+ * Deux threads écrivent dans le même index sans protection.
+ * ========================================================= */
+int shared_array[10] = {0};
+
+void *writer_example(void *arg) {
+    int id = *(int *)arg;
+    for (int i = 0; i < 10; i++) {
+        shared_array[i] += id;  /* race condition ici */
+    }
+    return NULL;
+}
+
+void example_race(void) {
+    pthread_t ta, tb;
+    int id_a = 1, id_b = 2;
+    pthread_create(&ta, NULL, writer_example, &id_a);
+    pthread_create(&tb, NULL, writer_example, &id_b);
+    pthread_join(ta, NULL);
+    pthread_join(tb, NULL);
+    /* Chaque case devrait contenir 3 (1+2) mais pas garanti */
+    for (int i = 0; i < 10; i++)
+        printf("array[%d]=%d ", i, shared_array[i]);
+    printf("\n");
+}
+
+/* == VOTRE EXERCICE ========================================
+ * Démonstration de race condition sur un compteur entier.
+ * Deux threads incrémentent counter 100000 fois chacun.
+ * ========================================================= */
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        counter++;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    /* TODO: créer deux threads exécutant increment */
+    /* TODO: joindre les deux threads */
+    printf("Counter: %d\n", counter);
+    printf("Expected: 200000\n");
+    printf("Race condition: %s\n", counter < 200000 ? "OUI" : "NON");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        counter++;  /* incrémentation non-atomique */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, increment, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Expected: 200000\n");
+    printf("Race condition: %s\n", counter ____ 200000 ? "OUI" : "NON"); /* opérateur < */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+int counter = 0;
+
+void *increment(void *arg) {
+    (void)arg;
+    for (int i = 0; i < 100000; i++) {
+        ____;
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, ____, NULL);
+    pthread_create(&t2, NULL, increment, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("Counter: %d\n", counter);
+    printf("Expected: 200000\n");
+    printf("Race condition: %s\n", counter ____ 200000 ? "OUI" : "NON");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Variable globale counter = 0
+// Fonction increment : boucle 100000 fois, counter++
+// main : créer 2 threads, les joindre, afficher counter et si race condition
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Démonstration de race condition"
+
+[validation]
+expected_output = 'REGEX:(?s)Counter: \d+\nExpected: 200000\nRace condition: OUI'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le compteur global est initialisé à 0. Deux threads vont l'incrémenter."
+heap = []
+label = "État initial"
+step_label = "Init"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "0 (global)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux threads lisent la même valeur (42), incrémentent, et écrivent 43. Une incrémentation est perdue."
+heap = []
+label = "Exécution concurrente — race condition"
+step_label = "Race"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "increment (t1)"
+is_active = true
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "increment (t2)"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "??? (non déterministe)"
+
+[[visualizer.steps.stack]]
+name = "t1"
+value = "read=42, write=43"
+
+[[visualizer.steps.stack]]
+name = "t2"
+value = "read=42, write=43"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le compteur final est inférieur à 200000 à cause des incrémentations perdues par la race condition."
+heap = []
+label = "Résultat final"
+step_label = "Résultat"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "counter"
+value = "< 200000"

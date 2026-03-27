@@ -1,0 +1,325 @@
+common_mistake = "Confondre p1[0] et p1[1] : 0=lecture, 1=écriture — toujours dans ce sens"
+description = """
+NSY103 — Un pipeline Unix chaîne des processus via des pipes. Chaque étape lit depuis un pipe, traite, et écrit dans le suivant. Sans fork, on simule avec deux pipes dans le même processus.
+
+Créez deux pipes : écrivez '42' dans pipe1, lisez et doublez (×2), écrivez '84' dans pipe2, lisez et affichez."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "fd[1]=écriture, fd[0]=lecture — même règle pour p1 et p2",
+    "Fermez fd[1] avant de lire pour signaler EOF au lecteur",
+    "atoi() convertit une chaîne en int, snprintf() fait l'inverse",
+]
+id = "pipe-02"
+kc_ids = ["KC-C10"]
+key_concept = "Pipeline = chaîne de pipes ; fermer l'extrémité écriture avant de lire pour obtenir EOF"
+lang = "c"
+prerequisites = ["pipe-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p1[2], p2[2];
+    pipe(p1);
+    pipe(p2);
+    write(p1[1], "42", 2);
+    close(p1[1]);
+    char buf1[8];
+    ssize_t n1 = read(p1[0], buf1, sizeof(buf1) - 1);
+    buf1[n1] = '\0';
+    close(p1[0]);
+    printf("Pipe1: %s\n", buf1);
+    int val = atoi(buf1) * 2;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%d", val);
+    write(p2[1], buf2, strlen(buf2));
+    close(p2[1]);
+    char out[8];
+    ssize_t n2 = read(p2[0], out, sizeof(out) - 1);
+    out[n2] = '\0';
+    close(p2[0]);
+    printf("Pipe2: %s\n", out);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p1[2], p2[2];
+    pipe(p1);
+    pipe(p2);
+    write(p1[____], "42", 2);
+    close(p1[____]);
+    char buf1[8];
+    ssize_t n1 = read(p1[____], buf1, sizeof(buf1) - 1);
+    buf1[n1] = '\0';
+    close(p1[____]);
+    printf("Pipe1: %s\n", buf1);
+    int val = atoi(buf1) * 2;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%d", val);
+    write(p2[____], buf2, strlen(buf2));
+    close(p2[____]);
+    char out[8];
+    ssize_t n2 = read(p2[____], out, sizeof(out) - 1);
+    out[n2] = '\0';
+    close(p2[____]);
+    printf("Pipe2: %s\n", out);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE =======================================
+ * Pipeline deux pipes : ajouter 10
+ * Meme pattern : pipe1 -> lire -> transformer -> pipe2.
+ * Ici on ajoute 10 au lieu de multiplier par 2.
+ * ================================================= */
+void example_pipeline_add(void) {
+    int p1[2], p2[2];
+    pipe(p1);
+    pipe(p2);
+    write(p1[1], "5", 1);
+    close(p1[1]);
+    char b1[8];
+    ssize_t n1 = read(p1[0], b1, sizeof(b1) - 1);
+    b1[n1] = '\0';
+    close(p1[0]);
+    int v = atoi(b1) + 10;
+    char b2[8];
+    snprintf(b2, sizeof(b2), "%d", v);
+    write(p2[1], b2, strlen(b2));
+    close(p2[1]);
+    char out[8];
+    ssize_t n2 = read(p2[0], out, sizeof(out) - 1);
+    out[n2] = '\0';
+    close(p2[0]);
+    printf("In: 5, Out: %s\n", out);
+}
+/* Resultat: In: 5, Out: 15 */
+
+/* == VOTRE EXERCICE ================================
+ * Pipeline deux pipes : multiplier par 2
+ * Inspirez-vous de example_pipeline_add ci-dessus.
+ * Ecrivez "42" dans pipe1, lisez, doublez, ecrivez
+ * dans pipe2, lisez et affichez.
+ * ================================================= */
+int main(void) {
+    int p1[2], p2[2];
+    pipe(p1);
+    pipe(p2);
+    /* TODO: write "42" dans p1[1], close p1[1] */
+    char buf1[8];
+    ssize_t n1 = 0;
+    /* TODO: n1 = read(p1[0], ...) */
+    buf1[n1] = '\0';
+    close(p1[0]);
+    printf("Pipe1: %s\n", buf1);
+    int val = atoi(buf1) * 2;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%d", val);
+    /* TODO: write buf2 dans p2[1], close p2[1] */
+    char out[8];
+    ssize_t n2 = 0;
+    /* TODO: n2 = read(p2[0], ...) */
+    out[n2] = '\0';
+    close(p2[0]);
+    printf("Pipe2: %s\n", out);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p1[2], p2[2];
+    ____(p1);
+    ____(p2);
+    write(p1[____], "42", 2);
+    ____(p1[____]);
+    char buf1[8];
+    ssize_t n1 = read(p1[____], buf1, sizeof(buf1) - 1);
+    buf1[n1] = '\0';
+    close(p1[0]);
+    printf("Pipe1: %s\n", buf1);
+    int val = atoi(buf1) * 2;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%d", val);
+    write(p2[____], buf2, strlen(buf2));
+    ____(p2[____]);
+    char out[8];
+    ssize_t n2 = read(p2[____], out, sizeof(out) - 1);
+    out[n2] = '\0';
+    close(p2[0]);
+    printf("Pipe2: %s\n", out);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p1[2], p2[2];
+    pipe(p1);
+    pipe(p2);
+    write(p1[____], "42", 2);
+    close(p1[____]);
+    char buf1[8];
+    ssize_t n1 = read(p1[____], buf1, sizeof(buf1) - 1);
+    buf1[n1] = '\0';
+    close(p1[____]);
+    printf("Pipe1: %s\n", buf1);
+    int val = atoi(buf1) * 2;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%d", val);
+    write(p2[____], buf2, strlen(buf2));
+    close(p2[____]);
+    char out[8];
+    ssize_t n2 = read(p2[____], out, sizeof(out) - 1);
+    out[n2] = '\0';
+    close(p2[____]);
+    printf("Pipe2: %s\n", out);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int p1[2], p2[2];
+    // Créez deux pipes
+    // Écrivez "42" dans p1, lisez, doublez, écrivez "84" dans p2, lisez
+    // Sortie: "Pipe1: 42\nPipe2: 84\n"
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Pipeline deux pipes : transformation en chaîne"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+La transformation n'est pas correcte. Vérifie que tu lis depuis p1[0] et écris dans p2[1] après transformation.
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+On doit enchaîner deux transformations sur les flux de données capteurs : d'abord un filtre, puis un formateur. Chaque étape utilise un pipe distinct.
+
+Démontre le pattern deux-pipes : read pipe1, transform, write pipe2.
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = ["pipe-01"]
+receivedTime = "09:45"
+subject = "Pipeline transformation données capteurs — deux pipes"
+successEmail = """
+Pipeline validé. Les données traversent les deux étapes correctement. On va l'intégrer dans notre stack de traitement.
+
+SensorGrid Ops"""
+syscallsInvolved = [
+    "pipe",
+    "write",
+    "read",
+    "close",
+]
+tier = 2
+
+[validation]
+expected_output = """
+Pipe1: 42
+Pipe2: 84
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = """write() dépose les octets dans le buffer kernel de pipe1. La donnée "42" attend dans ce buffer jusqu'à être consommée par un read() — c'est le modèle producteur/consommateur élémentaire via pipe."""
+label = 'write(p1[1], "42") → pipe1 buffer'
+step_label = "Étape 1 — write() alimente le premier pipe"
+
+[[visualizer.steps.edges]]
+label = "2 bytes"
+source = "src"
+target = "p1"
+
+[[visualizer.steps.nodes]]
+id = "src"
+label = '"42"'
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = 'pipe1\nbuffer'
+
+[[visualizer.steps]]
+explanation = "C'est le cœur du pipeline : on lit depuis pipe1 (consommer), on applique une transformation (ici ×2), puis on écrit dans pipe2 (produire). Ce pattern est la brique fondamentale de toute chaîne de traitement Unix."
+label = "read(p1[0]) → transform ×2 → write(p2[1])"
+step_label = "Étape 2 — Transformation et transfert pipe1 → pipe2"
+
+[[visualizer.steps.edges]]
+label = '"42"'
+source = "p1"
+target = "proc"
+
+[[visualizer.steps.edges]]
+label = '"84"'
+source = "proc"
+target = "p2"
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = 'pipe1\nbuffer'
+
+[[visualizer.steps.nodes]]
+id = "proc"
+label = 'atoi→×2\n→snprintf'
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = 'pipe2\nbuffer'
+
+[[visualizer.steps]]
+explanation = "La lecture finale depuis pipe2 délivre le résultat transformé. On ferme systématiquement fd[1] avant de lire pour que le kernel détecte la fin des données (EOF) et ne fasse pas bloquer read() en attente d'autres octets."
+label = "read(p2[0]) → printf"
+step_label = "Étape 3 — read() extrait le résultat final depuis pipe2"
+
+[[visualizer.steps.edges]]
+label = '"84"'
+source = "p2"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = 'pipe2\nbuffer'
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "stdout"

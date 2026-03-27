@@ -125,6 +125,12 @@ pub fn order_by_chapters<'a>(
         .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s, i)))
         .collect();
 
+    // Build subject→position-within-chapter map to preserve pedagogical ordering
+    let subject_position: std::collections::HashMap<&str, usize> = CHAPTERS
+        .iter()
+        .flat_map(|ch| ch.subjects.iter().enumerate().map(|(pos, &s)| (s, pos)))
+        .collect();
+
     // Partition exercises into chapter buckets in a single pass
     let mut buckets: Vec<Vec<&'a Exercise>> = vec![Vec::new(); CHAPTERS.len()];
     let mut uncategorized: Vec<&'a Exercise> = Vec::new();
@@ -144,10 +150,14 @@ pub fn order_by_chapters<'a>(
         .filter(|(_, b)| !b.is_empty())
     {
         bucket.sort_by(|a, b| {
-            a.difficulty.cmp(&b.difficulty).then_with(|| {
-                let ma = subject_mastery.get(a.subject.as_str()).unwrap_or(&0.0);
-                let mb = subject_mastery.get(b.subject.as_str()).unwrap_or(&0.0);
-                ma.partial_cmp(mb).unwrap_or(std::cmp::Ordering::Equal)
+            let pa = subject_position.get(a.subject.as_str()).unwrap_or(&0);
+            let pb = subject_position.get(b.subject.as_str()).unwrap_or(&0);
+            pa.cmp(pb).then_with(|| {
+                a.difficulty.cmp(&b.difficulty).then_with(|| {
+                    let ma = subject_mastery.get(a.subject.as_str()).unwrap_or(&0.0);
+                    let mb = subject_mastery.get(b.subject.as_str()).unwrap_or(&0.0);
+                    ma.partial_cmp(mb).unwrap_or(std::cmp::Ordering::Equal)
+                })
             })
         });
         blocks.push(ChapterBlock {
@@ -196,6 +206,92 @@ pub fn filter_by_chapter(blocks: &mut Vec<ChapterBlock<'_>>, chapter: Option<u8>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_exercise(id: &str, subject: &str, difficulty: crate::models::Difficulty) -> Exercise {
+        Exercise {
+            id: id.to_string(),
+            subject: subject.to_string(),
+            lang: crate::models::Lang::C,
+            difficulty,
+            title: id.to_string(),
+            description: "test".to_string(),
+            starter_code: String::new(),
+            solution_code: String::new(),
+            hints: vec![],
+            validation: crate::models::ValidationConfig {
+                expected_output: Some("test".to_string()),
+                ..Default::default()
+            },
+            prerequisites: vec![],
+            files: vec![],
+            exercise_type: Default::default(),
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            starter_code_stages: vec![],
+            visualizer: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_order_by_chapters_respects_chapter_order() {
+        // "sockets" = Ch14, "pointers" = Ch1 → pointers block must come first
+        let exercises = [
+            make_exercise("sock_01", "sockets", crate::models::Difficulty::Easy),
+            make_exercise("ptr_01", "pointers", crate::models::Difficulty::Easy),
+        ];
+        let blocks = order_by_chapters(&exercises, &[]);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(
+            blocks[0].chapter.number, 1,
+            "pointers (ch1) should come first"
+        );
+        assert_eq!(
+            blocks[1].chapter.number, 14,
+            "sockets (ch14) should come second"
+        );
+    }
+
+    #[test]
+    fn test_order_by_chapters_difficulty_ascending_within_chapter() {
+        let exercises = [
+            make_exercise("ptr_hard", "pointers", crate::models::Difficulty::Hard),
+            make_exercise("ptr_easy", "pointers", crate::models::Difficulty::Easy),
+            make_exercise("ptr_med", "pointers", crate::models::Difficulty::Medium),
+        ];
+        let blocks = order_by_chapters(&exercises, &[]);
+        assert_eq!(blocks.len(), 1);
+        let ids: Vec<&str> = blocks[0].exercises.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["ptr_easy", "ptr_med", "ptr_hard"]);
+    }
+
+    #[test]
+    fn test_order_by_chapters_unknown_subject_goes_last() {
+        let exercises = [
+            make_exercise(
+                "unk_01",
+                "unknown_subject_xyz",
+                crate::models::Difficulty::Easy,
+            ),
+            make_exercise("ptr_01", "pointers", crate::models::Difficulty::Easy),
+        ];
+        let blocks = order_by_chapters(&exercises, &[]);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(
+            blocks[0].chapter.number, 1,
+            "known subject (ch1) should come first"
+        );
+        assert_eq!(
+            blocks[1].chapter.number, 0,
+            "unknown subject should be in uncategorized chapter (number 0)"
+        );
+    }
+
+    #[test]
+    fn test_order_by_chapters_empty_input() {
+        let blocks = order_by_chapters(&[], &[]);
+        assert!(blocks.is_empty());
+    }
 
     #[test]
     fn test_chapters_not_empty() {

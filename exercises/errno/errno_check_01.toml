@@ -1,0 +1,194 @@
+common_mistake = "Consulter errno sans vérifier le retour — errno n'est valide que si l'appel a échoué"
+description = """
+NSY103 — Après un appel système qui échoue, il faut vérifier la valeur de retour (-1 pour open) puis consulter errno pour connaître la raison de l'échec.
+
+Tentez d'ouvrir un fichier inexistant, vérifiez le retour, puis affichez errno et son message."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "open() retourne -1 en cas d'erreur",
+    "strerror(errno) donne le message d'erreur en chaîne",
+    "ENOENT = 2 = No such file or directory",
+]
+id = "errno-check-01"
+kc_ids = ["KC-C15"]
+key_concept = "Toujours vérifier la valeur de retour avant de consulter errno"
+lang = "c"
+prerequisites = ["errno-strerror-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+int main(void) {
+    int fd = open("/tmp/clings_nonexistent_file_xyz.txt", O_RDONLY);
+    if (fd == -1) {
+        printf("open failed: errno=%d (%s)\n", errno, strerror(errno));
+    } else {
+        printf("open succeeded (unexpected)\n");
+        close(fd);
+    }
+    printf("ENOENT=%d\n", ENOENT);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = open("/tmp/clings_nonexistent_file_xyz.txt", O_RDONLY);
+    if (fd == ____) {
+        printf("open failed: errno=%d (%s)\n", errno, ____(errno));
+    } else {
+        printf("open succeeded (unexpected)\n");
+        close(fd);
+    }
+    printf("ENOENT=%d\n", ENOENT);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* == EXEMPLE ===============================================
+ * Tenter de créer un fichier dans un répertoire inexistant
+ * ========================================================= */
+void example_check_errno(void) {
+    int fd = open("/no_such_dir/file.txt", O_CREAT | O_WRONLY, 0644);
+    if (fd == -1) {
+        printf("Echec: errno=%d (%s)\n", errno, strerror(errno));
+    } else {
+        close(fd);
+    }
+}
+/* Resultat: Echec: errno=2 (No such file or directory) */
+
+/* == VOTRE EXERCICE ======================================== */
+int main(void) {
+    int fd = open("/tmp/clings_nonexistent_file_xyz.txt", O_RDONLY);
+    if (fd == -1) {
+        printf("open failed: errno=%d (%s)\n", errno, strerror(errno));
+    } else {
+        printf("open succeeded (unexpected)\n");
+        close(fd);
+    }
+    printf("ENOENT=%d\n", ENOENT);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = open("/tmp/clings_nonexistent_file_xyz.txt", O_RDONLY);
+    if (fd == -1) {
+        printf("open failed: errno=%d (%s)\n", errno, ____(errno));
+    } else {
+        printf("open succeeded (unexpected)\n");
+        close(fd);
+    }
+    printf("ENOENT=%d\n", ENOENT);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    int fd = open("/tmp/clings_nonexistent_file_xyz.txt", O_RDONLY);
+    if (fd == ____) {
+        printf("open failed: errno=%d (%s)\n", errno, ____(errno));
+    } else {
+        printf("open succeeded (unexpected)\n");
+        close(fd);
+    }
+    printf("ENOENT=%d\n", ENOENT);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    // Ouvrez /tmp/clings_nonexistent_file_xyz.txt en lecture
+    // Vérifiez fd==-1, affichez errno et strerror(errno)
+    // Affichez ENOENT=2
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "Vérification errno après open()"
+
+[validation]
+expected_output = """
+open failed: errno=2 (No such file or directory)
+ENOENT=2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le fichier n'existe pas, open met errno à ENOENT"
+heap = []
+label = "open() échoue → retourne -1"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "2 (ENOENT)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "On teste fd==-1 puis on lit errno pour le diagnostic"
+heap = []
+label = "Vérification et affichage"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "2"

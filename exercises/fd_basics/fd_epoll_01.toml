@@ -1,0 +1,245 @@
+common_mistake = "Ne pas fermer l'instance epoll (epfd) — fuite de descripteur"
+description = """
+NSY103 — epoll est l'API Linux haute performance pour surveiller de nombreux descripteurs. epoll_create1() crée l'instance, epoll_ctl() ajoute/supprime des fd, epoll_wait() attend les événements.
+
+Créez un epoll qui surveille deux pipes et traitez les événements."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "epoll_create1(0) crée une instance epoll",
+    "epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) enregistre un fd",
+    "epoll_wait(epfd, events, maxevents, timeout_ms) attend les événements",
+]
+id = "fd-epoll-01"
+kc_ids = ["KC-C16"]
+key_concept = "epoll: O(1) pour surveiller N fd — epoll_create1/epoll_ctl/epoll_wait"
+lang = "c"
+prerequisites = ["fd-poll-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    int epfd = epoll_create1(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = pipe1[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, pipe1[0], &ev);
+    ev.data.fd = pipe2[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, pipe2[0], &ev);
+    write(pipe1[1], "ep1", 3); close(pipe1[1]);
+    write(pipe2[1], "ep2", 3); close(pipe2[1]);
+    struct epoll_event events[2];
+    int n = epoll_wait(epfd, events, 2, 100);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[16];
+        ssize_t r = read(events[i].data.fd, buf, sizeof(buf) - 1);
+        buf[r] = '\0';
+        printf("fd=%s data=%s\n",
+            events[i].data.fd == pipe1[0] ? "pipe1" : "pipe2", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(epfd);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    int epfd = ____(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = pipe1[0];
+    ____(epfd, EPOLL_CTL_ADD, pipe1[0], &ev);
+    ev.data.fd = pipe2[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, pipe2[0], &ev);
+    write(pipe1[1], "ep1", 3); close(pipe1[1]);
+    write(pipe2[1], "ep2", 3); close(pipe2[1]);
+    struct epoll_event events[2];
+    int n = ____(epfd, events, 2, 100);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[16];
+        ssize_t r = read(events[i].data.fd, buf, sizeof(buf) - 1);
+        buf[r] = '\0';
+        printf("fd=%s data=%s\n",
+            events[i].data.fd == pipe1[0] ? "pipe1" : "pipe2", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(epfd);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    int epfd = /* TODO: créer epoll avec epoll_create1(0) */ -1;
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = pipe1[0];
+    /* TODO: ajouter pipe1[0] à epoll avec EPOLL_CTL_ADD */
+    ev.data.fd = pipe2[0];
+    /* TODO: ajouter pipe2[0] à epoll avec EPOLL_CTL_ADD */
+    write(pipe1[1], "ep1", 3); close(pipe1[1]);
+    write(pipe2[1], "ep2", 3); close(pipe2[1]);
+    struct epoll_event events[2];
+    int n = /* TODO: attendre les événements avec epoll_wait(), timeout 100ms */ 0;
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        printf("fd %d ready\n", events[i].data.fd);
+        if (events[i].data.fd == pipe1[0]) {
+            char buf[16]; read(pipe1[0], buf, sizeof(buf)); printf("pipe1: %s\n", buf);
+        }
+        if (events[i].data.fd == pipe2[0]) {
+            char buf[16]; read(pipe2[0], buf, sizeof(buf)); printf("pipe2: %s\n", buf);
+        }
+    }
+    close(pipe1[0]); close(pipe2[0]); close(epfd);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1); pipe(pipe2);
+    int epfd = ____(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = pipe1[0];
+    ____(epfd, ____, pipe1[0], &ev);
+    ev.data.fd = pipe2[0];
+    ____(epfd, ____, pipe2[0], &ev);
+    write(pipe1[1], "ep1", 3); close(pipe1[1]);
+    write(pipe2[1], "ep2", 3); close(pipe2[1]);
+    struct epoll_event events[2];
+    int n = ____(epfd, events, 2, 100);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        printf("fd %d ready\n", events[i].data.fd);
+        if (events[i].data.fd == pipe1[0]) {
+            char buf[16]; read(pipe1[0], buf, sizeof(buf)); printf("pipe1: %s\n", buf);
+        }
+        if (events[i].data.fd == pipe2[0]) {
+            char buf[16]; read(pipe2[0], buf, sizeof(buf)); printf("pipe2: %s\n", buf);
+        }
+    }
+    close(pipe1[0]); close(pipe2[0]); close(epfd);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    int pipe1[2], pipe2[2]; pipe(pipe1); pipe(pipe2);
+    int epfd = ____(0);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = pipe1[0]; ____(epfd, EPOLL_CTL_ADD, pipe1[0], &ev);
+    ev.data.fd = pipe2[0]; epoll_ctl(epfd, EPOLL_CTL_ADD, pipe2[0], &ev);
+    write(pipe1[1], "ep1", 3); close(pipe1[1]);
+    write(pipe2[1], "ep2", 3); close(pipe2[1]);
+    struct epoll_event events[2];
+    int n = ____(epfd, events, 2, 100);
+    printf("Events: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        char buf[16]; ssize_t r=read(events[i].data.fd,buf,15); buf[r]='\0';
+        printf("fd=%s data=%s\n", events[i].data.fd==pipe1[0]?"pipe1":"pipe2", buf);
+    }
+    close(pipe1[0]); close(pipe2[0]); close(epfd);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+
+int main(void) {
+    // Créez epoll, surveillez 2 pipes, traitez les événements
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "epoll: event loop basique"
+
+[validation]
+expected_output = """
+Events: 2
+fd=pipe1 data=ep1
+fd=pipe2 data=ep2
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Deux fd surveillés pour EPOLLIN"
+heap = []
+label = "epoll_create1 + epoll_ctl"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "epfd"
+value = "instance epoll"
+
+[[visualizer.steps.stack]]
+name = "pipe1[0]"
+value = "enregistré EPOLLIN"
+
+[[visualizer.steps.stack]]
+name = "pipe2[0]"
+value = "enregistré EPOLLIN"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux pipes ont des données prêtes"
+heap = []
+label = "epoll_wait → 2 événements"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "events[0]"
+value = "pipe1 EPOLLIN"
+
+[[visualizer.steps.stack]]
+name = "events[1]"
+value = "pipe2 EPOLLIN"

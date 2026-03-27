@@ -30,15 +30,8 @@ pub fn run_list(
         .collect();
 
     if filtered.is_empty() {
-        terminal.draw(|f| {
-            let area = f.area();
-            f.render_widget(
-                Paragraph::new("Aucun exercice trouvé.").block(Block::bordered()),
-                area,
-            );
-        })?;
-        std::thread::sleep(Duration::from_secs(1));
         ratatui::restore();
+        eprintln!("Aucun exercice trouvé.");
         return Ok(());
     }
 

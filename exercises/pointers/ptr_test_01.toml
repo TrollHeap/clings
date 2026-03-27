@@ -1,0 +1,74 @@
+common_mistake = "Oublier que `arr + n` est un pointeur passé la fin — déréférencer ce pointeur est UB."
+description = "Implémentez la fonction `int sum_array(int *arr, int n)` qui retourne la somme des éléments d'un tableau en utilisant l'arithmétique de pointeurs (pas d'accès par index)."
+difficulty = 2
+exercise_type = "complete"
+files = []
+hints = [
+    "Utilisez un pointeur `p` qui commence à `arr` et s'arrête à `arr + n`.",
+    "La boucle : `for (int *p = arr; p < arr + n; p++) { sum += *p; }`",
+]
+id = "ptr-test-01"
+kc_ids = [
+    "ptr-arith",
+    "ptr-deref",
+]
+key_concept = "L'arithmétique de pointeurs permet de parcourir un tableau sans index : `p++` avance d'un `sizeof(int)` en mémoire."
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+
+int sum_array(int *arr, int n) {
+    int sum = 0;
+    int *end = arr + n;
+    for (int *p = arr; p < end; p++) {
+        sum += *p;
+    }
+    return sum;
+}
+
+int main(void) {
+    {
+        int arr[] = {0};
+        printf("%d\n", (int)(sum_array(arr, 0)));
+    }
+    {
+        int arr[] = {42};
+        printf("%d\n", (int)(sum_array(arr, 1)));
+    }
+    {
+        int arr[] = {1, 2, 3, 4, 5};
+        printf("%d\n", (int)(sum_array(arr, 5)));
+    }
+    {
+        int arr[] = {-3, 7, -2};
+        printf("%d\n", (int)(sum_array(arr, 3)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+/* Retourne la somme des n éléments pointés par arr.
+ * Utilisez uniquement l'arithmétique de pointeurs (ptr++, *ptr…). */
+int sum_array(int *arr, int n) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+subject = "pointers"
+title = "Arithmétique de pointeurs — validation par tests"
+
+[validation]
+expected_output = """
+0
+42
+15
+2"""
+mode = "output"

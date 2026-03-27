@@ -1,0 +1,395 @@
+common_mistake = "Confondre h+1 (données) et h (header) — retourner h au lieu de h+1 fait écraser les métadonnées"
+description = """
+NSY103 — Un allocateur mémoire simplifié utilise `sbrk` pour demander de la mémoire au noyau et maintient une liste chaînée de blocs libres. Chaque bloc a un header (taille + libre/occupé + pointeur suivant). `my_malloc` cherche un bloc libre assez grand (first fit), `my_free` marque le bloc comme libre.
+
+Implémentez un mini-malloc avec header, first-fit et free."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "`h + 1` saute le header pour donner l'adresse des données utilisateur (avance de sizeof(Header) octets)",
+    "`(Header *)ptr - 1` recule d'un header pour retrouver les métadonnées depuis le pointeur utilisateur",
+    "find_free parcourt la liste libre et retourne le premier bloc libre assez grand (first fit)",
+]
+id = "malloc-internals-01"
+kc_ids = ["KC-C02"]
+key_concept = "malloc = sbrk (demander au noyau) + header (métadonnées) + free list (recyclage) — le pattern fondamental de tout allocateur"
+lang = "c"
+prerequisites = ["malloc-aligned-01"]
+solution_code = '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct Header {
+    size_t size;
+    int is_free;
+    struct Header *next;
+} Header;
+
+#define HEADER_SIZE sizeof(Header)
+static Header *free_list = NULL;
+
+Header *find_free(size_t size) {
+    Header *curr = free_list;
+    while (curr) {
+        if (curr->is_free && curr->size >= size) return curr;
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+void *my_malloc(size_t size) {
+    if (size == 0) return NULL;
+    Header *h = find_free(size);
+    if (h) { h->is_free = 0; return (void *)(h + 1); }
+    void *block = sbrk(HEADER_SIZE + size);
+    if (block == (void *)-1) return NULL;
+    h = (Header *)block;
+    h->size = size; h->is_free = 0; h->next = free_list; free_list = h;
+    return (void *)(h + 1);
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Header *h = (Header *)ptr - 1;
+    h->is_free = 1;
+}
+
+int main(void) {
+    int *a = my_malloc(4*sizeof(int));
+    int *b = my_malloc(2*sizeof(int));
+    char *c = my_malloc(16);
+    for (int i = 0; i < 4; i++) a[i] = (i+1)*10;
+    b[0] = 100; b[1] = 200; strcpy(c, "sbrk alloc");
+    printf("a:"); for (int i = 0; i < 4; i++) printf(" %d", a[i]); printf("\n");
+    printf("b: %d %d\n", b[0], b[1]);
+    printf("c: %s\n", c);
+    printf("HEADER_SIZE = %zu\n", HEADER_SIZE);
+    my_free(b);
+    int *d = my_malloc(2*sizeof(int));
+    d[0] = 999;
+    printf("d (reuse b): %d\n", d[0]);
+    return 0;
+}'''
+starter_code = """
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct Header {
+    size_t size;
+    int is_free;
+    struct Header *next;
+} Header;
+
+#define HEADER_SIZE sizeof(Header)
+
+static Header *free_list = NULL;
+
+Header *find_free(size_t size) {
+    /* TODO: search free_list for first block with is_free=1 and size >= size */
+    return NULL;
+}
+
+void *my_malloc(size_t size) {
+    /* TODO: if size==0 return NULL; try find_free; if found, mark !free and return h+1; else sbrk new block, add to free_list, return h+1 */
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    /* TODO: if ptr non-null, get header at ptr-1, mark is_free=1 */
+}
+
+int main(void) {
+    // TODO: allouer a(4 ints), b(2 ints), c(16 chars)
+    // free(b), réallouer d(1 int) qui réutilise b
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * sbrk basique : demander de la memoire au noyau
+ * sbrk(n) avance le break de n octets et retourne l'ancien break.
+ * =========================================================== */
+void example_demo(void) {
+    void *start = sbrk(0);  /* position actuelle */
+    int *p = sbrk(sizeof(int));
+    *p = 42;
+    void *end = sbrk(0);
+    printf("Allocated %d at break\n", *p);
+    printf("Break moved by %td octets\n", (char *)end - (char *)start);
+}
+/* Resultat: Allocated 42 at break / Break moved by 4 octets */
+
+/* == VOTRE EXERCICE =========================================
+ * Mini-malloc avec header + free list + first fit
+ * =========================================================== */
+typedef struct Header { size_t size; int is_free; struct Header *next; } Header;
+#define HEADER_SIZE sizeof(Header)
+static Header *free_list = NULL;
+
+Header *find_free(size_t size) { (void)size; return NULL; }
+void *my_malloc(size_t size) { (void)size; return NULL; }
+void my_free(void *ptr) { (void)ptr; }
+
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct Header { size_t size; int is_free; struct Header *next; } Header;
+#define HEADER_SIZE sizeof(Header)
+static Header *free_list = NULL;
+
+Header *find_free(size_t size) {
+    Header *curr = free_list;
+    while (curr) {
+        if (curr->is_free && curr->size >= size) return curr;
+        curr = curr->next;
+    }
+    return NULL;
+}
+void *my_malloc(size_t size) {
+    if (size == 0) return NULL;
+    Header *h = find_free(size);
+    if (h) { h->is_free = 0; return (void *)(h + 1); }
+    void *block = sbrk(HEADER_SIZE + size);
+    if (block == (void *)-1) return NULL;
+    h = (Header *)block;
+    h->size = size; h->is_free = 0;
+    h->next = free_list; free_list = h;
+    return (void *)(h + 1);
+}
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Header *h = (Header *)ptr - ____;
+    h->____ = 1;
+}
+
+int main(void) {
+    int *a = my_malloc(4*sizeof(int));
+    int *b = my_malloc(2*sizeof(int));
+    char *c = my_malloc(16);
+    for (int i = 0; i < 4; i++) a[i] = (i+1)*10;
+    b[0]=100; b[1]=200; strcpy(c, "sbrk alloc");
+    printf("a:"); for (int i=0;i<4;i++) printf(" %d",a[i]); printf("\n");
+    printf("b: %d %d\n", b[0], b[1]);
+    printf("c: %s\n", c);
+    printf("HEADER_SIZE = %zu\n", HEADER_SIZE);
+    my_free(b);
+    int *d = my_malloc(sizeof(int)); *d = 999;
+    printf("d (reuse b): %d\n", *d);
+    my_free(a); my_free(c); my_free(d);
+    return 0;
+}''',
+    '''
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct Header {
+    size_t size;
+    int is_free;
+    struct Header *next;
+} Header;
+
+#define HEADER_SIZE sizeof(Header)
+
+static Header *free_list = NULL;
+
+Header *find_free(size_t size) {
+    Header *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size)
+            return curr;
+        curr = curr->____;
+    }
+    return NULL;
+}
+
+void *my_malloc(size_t size) {
+    if (size == 0) return NULL;
+    Header *h = find_free(size);
+    if (h) {
+        h->is_free = ____;
+        return (void *)(h + 1);
+    }
+    void *block = sbrk(HEADER_SIZE + ____);
+    if (block == (void *)-1) return NULL;
+    h = (Header *)block;
+    h->size = size;
+    h->is_free = 0;
+    h->next = free_list;
+    free_list = h;
+    return (void *)(h + ____);
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    Header *h = (Header *)ptr - ____;
+    h->is_free = 1;
+}
+
+int main(void) {
+    int *a = my_malloc(4 * sizeof(int));
+    int *b = my_malloc(2 * sizeof(int));
+    char *c = my_malloc(16);
+
+    for (int i = 0; i < 4; i++) a[i] = (i + 1) * 10;
+    b[0] = 100; b[1] = 200;
+    strcpy(c, "sbrk alloc");
+
+    printf("a:"); for (int i = 0; i < 4; i++) printf(" %d", a[i]); printf("\n");
+    printf("b: %d %d\n", b[0], b[1]);
+    printf("c: %s\n", c);
+    printf("HEADER_SIZE = %zu\n", HEADER_SIZE);
+
+    my_free(b);
+    int *d = my_malloc(sizeof(int));
+    *d = 999;
+    printf("d (reuse b): %d\n", *d);
+
+    my_free(a); my_free(c); my_free(d);
+    return 0;
+}''',
+    """
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct Header { size_t size; int is_free; struct Header *next; } Header;
+#define HEADER_SIZE sizeof(Header)
+
+// Implémentez find_free (first fit), my_malloc (sbrk), my_free
+int main(void) {
+    // TODO: allouer a(4 ints), b(2 ints), c(16 chars)
+    // free(b), réallouer d(1 int) qui réutilise b
+    return 0;
+}""",
+    """
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Mini-malloc : sbrk + liste libre"
+
+[validation]
+expected_output = """
+a: 10 20 30 40
+b: 100 200
+c: sbrk alloc
+HEADER_SIZE = 24
+d (reuse b): 999
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Chaque allocation sbrk réserve header+data. Le pointeur utilisateur pointe après le header (h+1). Les headers forment une liste chaînée (insertion en tête)."
+label = "3 blocs alloués via sbrk"
+step_label = "sbrk blocks — header | data"
+
+[[visualizer.steps.arrows]]
+from = "free_list"
+label = "head"
+to = "header_c"
+
+[[visualizer.steps.arrows]]
+from = "header_c"
+label = "next"
+to = "header_b"
+
+[[visualizer.steps.arrows]]
+from = "header_b"
+label = "next"
+to = "header_a"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "header_a"
+value = "{size:16, free:0, next:NULL}"
+
+[[visualizer.steps.heap]]
+address = "data_a"
+value = "[10, 20, 30, 40]"
+
+[[visualizer.steps.heap]]
+address = "header_b"
+value = "{size:8, free:0, next:→header_a}"
+
+[[visualizer.steps.heap]]
+address = "data_b"
+value = "[100, 200]"
+
+[[visualizer.steps.heap]]
+address = "header_c"
+value = "{size:16, free:0, next:→header_b}"
+
+[[visualizer.steps.heap]]
+address = "data_c"
+value = '"sbrk alloc"'
+
+[[visualizer.steps.stack]]
+name = "free_list"
+value = "→header_c"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→data_a"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→data_b"
+
+[[visualizer.steps.stack]]
+name = "c"
+value = "→data_c"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "my_free(b) met is_free=1. Le prochain my_malloc(4) trouve ce bloc (8 >= 4, first fit) et le réutilise. Pas besoin de sbrk. C'est le principe du recyclage mémoire."
+label = "Après free(b) + malloc(4) — réutilisation"
+step_label = "First fit — réutilisation du bloc libéré"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "header_b"
+value = "{size:8, free:0, next:→header_a}"
+
+[[visualizer.steps.heap]]
+address = "data_b"
+value = "[999, ...]"
+
+[[visualizer.steps.stack]]
+name = "d"
+value = "→data_b (réutilisé)"

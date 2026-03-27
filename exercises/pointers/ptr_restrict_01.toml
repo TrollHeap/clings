@@ -1,0 +1,333 @@
+common_mistake = "Utiliser restrict alors que les pointeurs se chevauchent → comportement indéfini"
+description = """
+NSY103 — Le qualificateur `restrict` promet au compilateur que le pointeur est le seul moyen d'accéder à la mémoire pointée, ce qui permet des optimisations (vectorisation, réordonnancement). Sans restrict, le compilateur doit supposer que deux pointeurs peuvent pointer vers la même mémoire (aliasing).
+
+Implémentez deux versions de `vector_add` (avec et sans restrict) et démontrez la différence conceptuelle en mesurant le nombre d'opérations."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "`restrict` se place après le `*` : `int *restrict p`",
+    "Le corps des deux fonctions est identique — la différence est dans les garanties au compilateur",
+    "L'exemple avec overlap montre l'aliasing : a et b pointent vers des zones qui se chevauchent",
+]
+id = "ptr-restrict-01"
+kc_ids = ["KC-C01"]
+key_concept = "restrict promet au compilateur que les pointeurs ne se chevauchent pas — permet vectorisation et optimisation"
+lang = "c"
+prerequisites = ["ptr-generic-02"]
+solution_code = '''
+#include <stdio.h>
+
+void vec_add_alias(int *a, const int *b, const int *c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = b[i] + c[i];
+    }
+}
+
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = b[i] + c[i];
+    }
+}
+
+int main(void) {
+    int x[] = {1, 2, 3, 4, 5};
+    int y[] = {10, 20, 30, 40, 50};
+    int result[5];
+    vec_add_restrict(result, x, y, 5);
+    printf("restrict : ");
+    for (int i = 0; i < 5; i++) printf("%d ", result[i]);
+    printf("\n");
+    int overlap[5] = {1, 2, 3, 4, 5};
+    vec_add_alias(overlap + 1, overlap, overlap, 4);
+    printf("alias    : ");
+    for (int i = 0; i < 5; i++) printf("%d ", overlap[i]);
+    printf("\n");
+    printf("sizeof(int*) : %lu\n", (unsigned long)sizeof(int *));
+    printf("restrict est un contrat compilateur, pas une garantie runtime\n");
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+void vec_add_alias(int *a, const int *b, const int *c, int n) {
+}
+
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * memcpy vs memmove — restrict en pratique
+ * memcpy utilise restrict (pas de chevauchement)
+ * memmove gere le chevauchement (plus lent)
+ * =========================================================== */
+void example_demo(void) {
+    char buf[] = "ABCDEF";
+    memmove(buf + 2, buf, 4);  /* chevauchement OK */
+    printf("memmove: %s\n", buf);
+    
+    char src[] = "Hello";
+    char dst[6];
+    memcpy(dst, src, 6);  /* pas de chevauchement — restrict */
+    printf("memcpy : %s\n", dst);
+}
+/* Resultat: memmove: ABABCD / memcpy : Hello */
+
+/* == VOTRE EXERCICE =========================================
+ * Implementez vec_add avec et sans restrict
+ * Montrez l'effet de l'aliasing sur le resultat.
+ * =========================================================== */
+
+void vec_add_alias(int *a, const int *b, const int *c, int n) {
+    (void)a; (void)b; (void)c; (void)n; /* TODO */
+}
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {
+    (void)a; (void)b; (void)c; (void)n; /* TODO */
+}
+
+int main(void) {
+    int x[] = {1, 2, 3, 4, 5};
+    int y[] = {10, 20, 30, 40, 50};
+    int result[5];
+    vec_add_restrict(result, x, y, 5);
+    printf("restrict : ");
+    for (int i = 0; i < 5; i++) printf("%d ", result[i]);
+    printf("\n");
+    int overlap[5] = {1, 2, 3, 4, 5};
+    vec_add_alias(overlap + 1, overlap, overlap, 4);
+    printf("alias    : ");
+    for (int i = 0; i < 5; i++) printf("%d ", overlap[i]);
+    printf("\n");
+    printf("sizeof(int*) : %lu\n", (unsigned long)sizeof(int *));
+    printf("restrict est un contrat compilateur, pas une garantie runtime\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void vec_add_alias(int *a, const int *b, const int *c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = b[i] + c[i];
+    }
+}
+
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = ____; // même opération
+    }
+}
+
+int main(void) {
+    int x[] = {1, 2, 3, 4, 5};
+    int y[] = {10, 20, 30, 40, 50};
+    int result[5];
+    vec_add_restrict(result, x, y, 5);
+    printf("restrict : ");
+    for (int i = 0; i < 5; i++) printf("%d ", result[i]);
+    printf("\n");
+    int overlap[5] = {1, 2, 3, 4, 5};
+    vec_add_alias(overlap + 1, overlap, overlap, ____);
+    printf("alias    : ");
+    for (int i = 0; i < 5; i++) printf("%d ", overlap[i]);
+    printf("\n");
+    printf("sizeof(int*) : %lu\n", (unsigned long)sizeof(int *));
+    printf("restrict est un contrat compilateur, pas une garantie runtime\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void vec_add_alias(int *a, const int *b, const int *c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = ____;
+    }
+}
+
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {
+    for (int i = 0; i < n; i++) {
+        a[i] = ____;
+    }
+}
+
+int main(void) {
+    int x[] = {1, 2, 3, 4, 5};
+    int y[] = {10, 20, 30, 40, 50};
+    int result[5];
+    int n = 5;
+
+    vec_add_restrict(result, x, y, n);
+    printf("restrict : ");
+    for (int i = 0; i < n; i++) printf("%d ", ____);
+    printf("\n");
+
+    int overlap[5] = {1, 2, 3, 4, 5};
+    vec_add_alias(overlap + 1, overlap, overlap, ____);
+    printf("alias    : ");
+    for (int i = 0; i < n; i++) printf("%d ", ____);
+    printf("\n");
+
+    printf("sizeof(int*) : %lu\n", (unsigned long)sizeof(int *));
+    printf("restrict est un contrat compilateur, pas une garantie runtime\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Implémentez vec_add_alias et vec_add_restrict
+// Les deux font a[i] = b[i] + c[i]
+// restrict permet au compilateur d'optimiser
+// Démontrez l'aliasing avec overlap
+void vec_add_alias(int *a, const int *b, const int *c, int n) {}
+void vec_add_restrict(int *restrict a, const int *restrict b,
+                      const int *restrict c, int n) {}
+
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "restrict, aliasing, optimisation compilateur"
+
+[validation]
+expected_output = """
+restrict : 11 22 33 44 55
+alias    : 1 2 4 8 16
+sizeof(int*) : 8
+restrict est un contrat compilateur, pas une garantie runtime"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Avec restrict, le compilateur sait que a, b, c ne se chevauchent pas. Il peut vectoriser la boucle (SIMD), réordonner les accès mémoire, et charger b[i] et c[i] une seule fois."
+heap = []
+label = "vec_add_restrict — pas d'aliasing"
+step_label = "restrict — zones séparées, optimisable"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "result, x, y, 5"
+function_name = "vec_add_restrict"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x[]"
+value = "1 2 3 4 5"
+
+[[visualizer.steps.stack]]
+name = "y[]"
+value = "10 20 30 40 50"
+
+[[visualizer.steps.stack]]
+name = "result[]"
+value = "11 22 33 44 55"
+
+[[visualizer.steps]]
+explanation = "a=overlap+1 et b=overlap se chevauchent. Écrire dans a[0] modifie b[1]. Sans restrict, le compilateur DOIT recharger b[i] après chaque écriture — pas de vectorisation possible."
+heap = []
+label = "vec_add_alias — overlap"
+step_label = "alias — chevauchement, chaque écriture affecte la lecture suivante"
+
+[[visualizer.steps.arrows]]
+from = "a=overlap+1"
+label = "écriture"
+to = "overlap[1]"
+
+[[visualizer.steps.arrows]]
+from = "b=overlap"
+label = "lecture"
+to = "overlap[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "overlap+1, overlap, overlap, 4"
+function_name = "vec_add_alias"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "overlap[0]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "overlap[1]"
+value = "1+1=2"
+
+[[visualizer.steps.stack]]
+name = "overlap[2]"
+value = "2+2=4"
+
+[[visualizer.steps.stack]]
+name = "overlap[3]"
+value = "4+4=8"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Itération séquentielle : a[0]=b[0]+c[0]=1+1=2, a[1]=b[1]+c[1]=2+2=4 (b[1]=a[0]=2), a[2]=b[2]+c[2]=4+4=8 (b[2]=a[1]=4), a[3]=b[3]+c[3]=8+8=16 (b[3]=a[2]=8). Le résultat dépend de l'ordre des opérations."
+heap = []
+label = "Résultat final avec aliasing"
+step_label = "Résultat aliasé — 1 2 4 8 16"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "overlap[0]"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "overlap[1]"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "overlap[2]"
+value = "4"
+
+[[visualizer.steps.stack]]
+name = "overlap[3]"
+value = "8"
+
+[[visualizer.steps.stack]]
+name = "overlap[4]"
+value = "16"

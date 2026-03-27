@@ -1,0 +1,146 @@
+common_mistake = "Modifier les paramètres struct dans la fonction et s'attendre à voir le changement côté appelant — les structs sont copiées à l'appel, il faut retourner la struct modifiée ou passer un pointeur"
+description = """
+Implémentez quatre fonctions opérant sur une struct `Point` validées par des tests unitaires Unity.
+
+```c
+typedef struct { int x; int y; } Point;
+```
+
+- `make_point(int x, int y)` : retourne un Point initialisé
+- `manhattan(Point a, Point b)` : distance de Manhattan — `|a.x - b.x| + |a.y - b.y|`
+- `add_points(Point a, Point b)` : retourne un Point dont `x = a.x + b.x`, `y = a.y + b.y`
+- `point_eq(Point a, Point b)` : retourne 1 si a.x == b.x et a.y == b.y, 0 sinon"""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Pour `make_point` : initialisez les deux champs — `Point p = {x, y}; return p;` ou avec désignateurs `.x = x, .y = y`.",
+    "Pour `manhattan` : calculez `dx = a.x - b.x` et `dy = a.y - b.y`, puis appliquez la valeur absolue manuellement : `dx < 0 ? -dx : dx`.",
+    "Les structs en C se passent par VALEUR — modifier `a` dans `add_points` ne modifie pas l'appelant. Retournez un nouveau Point.",
+]
+id = "struct-test-unity-01"
+kc_ids = ["KC-STRUCT"]
+key_concept = "Une struct C agrège des champs typés — elle se passe et se retourne par valeur (copie complète), contrairement à un pointeur qui passe une référence"
+lang = "c"
+solution_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+Point make_point(int x, int y) {
+    Point p = {x, y};
+    return p;
+}
+
+int manhattan(Point a, Point b) {
+    int dx = a.x - b.x;
+    int dy = a.y - b.y;
+    return (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+}
+
+Point add_points(Point a, Point b) {
+    Point r = {a.x + b.x, a.y + b.y};
+    return r;
+}
+
+int point_eq(Point a, Point b) {
+    return a.x == b.x && a.y == b.y;
+}
+"""
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+/* Retourne un Point avec les coordonnées données. */
+Point make_point(int x, int y) {
+    /* TODO */
+    Point p = {0, 0};
+    return p;
+}
+
+/* Retourne |a.x - b.x| + |a.y - b.y|. */
+int manhattan(Point a, Point b) {
+    /* TODO */
+    return 0;
+}
+
+/* Retourne un Point dont x = a.x + b.x, y = a.y + b.y. */
+Point add_points(Point a, Point b) {
+    /* TODO */
+    Point r = {0, 0};
+    return r;
+}
+
+/* Retourne 1 si a.x == b.x ET a.y == b.y, sinon 0. */
+int point_eq(Point a, Point b) {
+    /* TODO */
+    return 0;
+}
+"""
+subject = "structs"
+title = "Opérations sur les structures — tests Unity"
+
+[validation]
+mode = "test"
+test_code = """
+void test_make_point(void) {
+    Point p = make_point(3, 4);
+    TEST_ASSERT_EQUAL_INT(3, p.x);
+    TEST_ASSERT_EQUAL_INT(4, p.y);
+    Point origin = make_point(0, 0);
+    TEST_ASSERT_EQUAL_INT(0, origin.x);
+    TEST_ASSERT_EQUAL_INT(0, origin.y);
+    Point neg = make_point(-1, -2);
+    TEST_ASSERT_EQUAL_INT(-1, neg.x);
+    TEST_ASSERT_EQUAL_INT(-2, neg.y);
+}
+
+void test_manhattan(void) {
+    Point a = make_point(0, 0);
+    Point b = make_point(3, 4);
+    TEST_ASSERT_EQUAL_INT(7, manhattan(a, b));
+    TEST_ASSERT_EQUAL_INT(7, manhattan(b, a));
+    Point c = make_point(-1, -1);
+    Point d = make_point(1, 1);
+    TEST_ASSERT_EQUAL_INT(4, manhattan(c, d));
+    TEST_ASSERT_EQUAL_INT(0, manhattan(a, a));
+}
+
+void test_add_points(void) {
+    Point a = make_point(1, 2);
+    Point b = make_point(3, 4);
+    Point r = add_points(a, b);
+    TEST_ASSERT_EQUAL_INT(4, r.x);
+    TEST_ASSERT_EQUAL_INT(6, r.y);
+    Point neg = make_point(-1, -2);
+    Point zero = add_points(a, neg);
+    TEST_ASSERT_EQUAL_INT(0, zero.x);
+    TEST_ASSERT_EQUAL_INT(0, zero.y);
+}
+
+void test_point_eq(void) {
+    Point a = make_point(1, 2);
+    Point b = make_point(1, 2);
+    Point c = make_point(1, 3);
+    TEST_ASSERT_EQUAL_INT(1, point_eq(a, b));
+    TEST_ASSERT_EQUAL_INT(0, point_eq(a, c));
+    TEST_ASSERT_EQUAL_INT(1, point_eq(a, a));
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_make_point);
+    RUN_TEST(test_manhattan);
+    RUN_TEST(test_add_points);
+    RUN_TEST(test_point_eq);
+    return UNITY_END();
+}
+"""

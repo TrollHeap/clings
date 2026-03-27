@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use ratatui::widgets::ListState;
+
 use crate::chapters::CHAPTERS;
 use crate::error::Result;
 use crate::models::Exercise;
@@ -53,6 +55,10 @@ pub struct OverlayState {
     pub nav_confirm_active: bool,
     /// true = aller au suivant, false = aller au précédent.
     pub nav_confirm_next: bool,
+    /// ListState persistant pour l'overlay liste [l] — préserve l'offset de scroll entre les frames.
+    pub list_list_state: ListState,
+    /// ListState persistant pour l'overlay recherche [/] — préserve l'offset de scroll entre les frames.
+    pub search_list_state: ListState,
 }
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
@@ -277,7 +283,7 @@ impl App {
         // Boucle TEA
         loop {
             self.state.update_due_count_cache();
-            terminal.draw(|f| crate::tui::ui_watch::view(f, &self.state))?;
+            terminal.draw(|f| crate::tui::ui_watch::view(f, &mut self.state))?;
 
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(msg) => self.update_watch(msg, conn),
@@ -1063,7 +1069,7 @@ impl App {
 
         // Boucle TEA
         loop {
-            terminal.draw(|f| crate::tui::ui_piscine::view(f, &self.state))?;
+            terminal.draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))?;
 
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(msg) => self.update_piscine(msg, conn, session_id),

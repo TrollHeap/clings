@@ -1,0 +1,353 @@
+common_mistake = "Oublier listen() entre bind() et accept() → accept échoue"
+description = """
+NSY103 — Un serveur TCP suit le cycle : socket → bind → listen → accept → recv/send → close. listen() met le socket en mode écoute, accept() bloque jusqu'à une connexion entrante.
+
+Implémentez un serveur echo qui traite un seul client. Le client est forké dans le même process."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "bind(srv, addr, addrlen) attache le socket à une adresse locale",
+    "listen(srv, backlog) met le socket en mode écoute avec backlog=5 connexions en attente",
+    "accept() retourne un nouveau fd pour la connexion acceptée",
+]
+id = "sock-server-01"
+kc_ids = ["KC-C14"]
+key_concept = "bind() attache à une adresse, listen() active l'écoute, accept() bloque jusqu'à une connexion"
+lang = "c"
+prerequisites = ["sock-connect-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    listen(srv, 5);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+        connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+        send(fd, "PING", 4, 0);
+        char buf[64];
+        int n = recv(fd, buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("Client received: %s\n", buf);
+        close(fd);
+        return 0;
+    }
+    int cli = accept(srv, NULL, NULL);
+    char buf[64];
+    int n = recv(cli, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Server received: %s\n", buf);
+    send(cli, buf, n, 0);
+    close(cli);
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ____(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    ____(srv, 5);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+        connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+        send(fd, "PING", 4, 0);
+        char buf[64];
+        int n = recv(fd, buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("Client received: %s\n", buf);
+        close(fd);
+        return 0;
+    }
+    int cli = accept(srv, NULL, NULL);
+    char buf[64];
+    int n = recv(cli, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Server received: %s\n", buf);
+    send(cli, buf, n, 0);
+    close(cli);
+    close(srv);
+    wait(NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+/* == VOTRE EXERCICE ========================================
+ * Serveur echo single-client avec fork
+ * ========================================================= */
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    /* TODO: bind(srv, ...) */
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    /* TODO: listen(srv, 5) */
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+        connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+        send(fd, "PING", 4, 0);
+        char buf[64];
+        int n = recv(fd, buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("Client received: %s\n", buf);
+        close(fd);
+        return 0;
+    }
+    int cli = accept(srv, NULL, NULL);
+    char buf[64];
+    int n = recv(cli, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Server received: %s\n", buf);
+    send(cli, buf, n, 0);
+    close(cli); close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    ____(srv, 5);  // mettre en écoute
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+        connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+        send(fd, "PING", 4, 0);
+        char buf[64];
+        int n = recv(fd, buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("Client received: %s\n", buf);
+        close(fd);
+        return 0;
+    }
+    int cli = accept(srv, NULL, NULL);
+    char buf[64];
+    int n = recv(cli, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Server received: %s\n", buf);
+    send(cli, buf, n, 0);
+    close(cli); close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ____(srv, (struct sockaddr *)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(srv, (struct sockaddr *)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    ____(srv, 5);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+        connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+        send(fd, "PING", 4, 0);
+        char buf[64];
+        int n = recv(fd, buf, sizeof(buf) - 1, 0);
+        buf[n] = '\0';
+        printf("Client received: %s\n", buf);
+        close(fd);
+        return 0;
+    }
+    int cli = accept(srv, NULL, NULL);
+    char buf[64];
+    int n = recv(cli, buf, sizeof(buf) - 1, 0);
+    buf[n] = '\0';
+    printf("Server received: %s\n", buf);
+    send(cli, buf, n, 0);
+    close(cli); close(srv);
+    wait(NULL);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
+// Serveur TCP echo: socket→bind→listen→accept→recv→send
+// Client forké envoie "PING", reçoit l'echo
+// Sortie: Server received: PING, Client received: PING
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sockets"
+title = "Serveur TCP echo single-client"
+
+[validation]
+expected_output = 'REGEX:(?s)((Server|Client) received: PING\n?){2}'
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+edges = []
+label = "bind + listen — serveur prêt"
+
+[[visualizer.steps.nodes]]
+id = "srv"
+label = """
+Server
+bind → listen"""
+
+[[visualizer.steps]]
+label = "Client connect → Server accept"
+
+[[visualizer.steps.edges]]
+label = "SYN/ACK"
+source = "cli"
+target = "srv"
+
+[[visualizer.steps.nodes]]
+id = "cli"
+label = """
+Client
+connect()"""
+
+[[visualizer.steps.nodes]]
+id = "srv"
+label = """
+Server
+accept()"""
+
+[[visualizer.steps]]
+label = "Echo: PING → PING"
+
+[[visualizer.steps.edges]]
+label = "PING"
+source = "cli"
+target = "srv"
+
+[[visualizer.steps.edges]]
+label = "PING (echo)"
+source = "srv"
+target = "cli"
+
+[[visualizer.steps.nodes]]
+id = "cli"
+label = """
+Client
+send(PING)"""
+
+[[visualizer.steps.nodes]]
+id = "srv"
+label = """
+Server
+recv→send"""

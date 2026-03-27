@@ -1,0 +1,427 @@
+common_mistake = "Oublier de fermer le fd epoll avec close(epfd) → fuite de descripteur kernel"
+description = """
+NSY103 — epoll est l'API Linux scalable pour le multiplexage I/O, supérieure à select() pour un grand nombre de fd. epoll_create1() crée une instance, epoll_ctl() ajoute/modifie/supprime des fd, et epoll_wait() attend des événements.
+
+Créez 3 pipes. 3 enfants écrivent chacun dans un pipe. Le parent utilise epoll pour collecter les messages au fur et à mesure, puis les affiche triés par ordre alphabétique."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "epoll_create1(0) crée une instance epoll (le flag 0 = pas de EPOLL_CLOEXEC)",
+    "ev.events = EPOLLIN pour surveiller la disponibilité en lecture",
+    "epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) ajoute un fd à l'instance epoll",
+]
+id = "pipe-epoll-01"
+kc_ids = ["KC-C10"]
+key_concept = "epoll = multiplexage O(1) ; epoll_create1 + epoll_ctl(ADD) + epoll_wait en boucle"
+lang = "c"
+prerequisites = ["pipe-splice-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+static int cmp_str32(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+#define N 3
+
+int main(void) {
+    int pipes[N][2];
+    for (int i = 0; i < N; i++)
+        pipe(pipes[i]);
+
+    for (int i = 0; i < N; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < N; j++) {
+                close(pipes[j][0]);
+                if (j != i) close(pipes[j][1]);
+            }
+            char msg[32];
+            snprintf(msg, sizeof(msg), "epoll-%d", i);
+            write(pipes[i][1], msg, strlen(msg));
+            close(pipes[i][1]);
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < N; i++)
+        close(pipes[i][1]);
+
+    int epfd = epoll_create1(0);
+    for (int i = 0; i < N; i++) {
+        struct epoll_event ev;
+        ev.events = EPOLLIN;
+        ev.data.fd = pipes[i][0];
+        epoll_ctl(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);
+    }
+
+    char results[N][32];
+    int count = 0;
+    while (count < N) {
+        struct epoll_event events[N];
+        int nfds = epoll_wait(epfd, events, N, -1);
+        for (int i = 0; i < nfds; i++) {
+            char buf[32];
+            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = '\0';
+                strcpy(results[count++], buf);
+            }
+            close(events[i].data.fd);
+        }
+    }
+    close(epfd);
+    for (int i = 0; i < N; i++)
+        wait(NULL);
+    qsort(results, count, 32, cmp_str32);
+    for (int i = 0; i < count; i++)
+        printf("Event: %s\n", results[i]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+static int cmp_str32(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+#define N 3
+
+int main(void) {
+    int pipes[N][2];
+    for (int i = 0; i < N; i++)
+        pipe(pipes[i]);
+
+    for (int i = 0; i < N; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < N; j++) {
+                close(pipes[j][0]);
+                if (j != i) close(pipes[j][1]);
+            }
+            char msg[32];
+            snprintf(msg, sizeof(msg), "epoll-%d", i);
+            write(pipes[i][1], msg, strlen(msg));
+            close(pipes[i][1]);
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < N; i++)
+        close(pipes[i][1]);
+
+    int epfd = ____(____);
+    for (int i = 0; i < N; i++) {
+        struct epoll_event ev;
+        ev.events = ____;
+        ev.data.fd = pipes[i][0];
+        ____(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);
+    }
+
+    char results[N][32];
+    int count = 0;
+    while (count < N) {
+        struct epoll_event events[N];
+        int nfds = epoll_wait(epfd, events, N, -1);
+        for (int i = 0; i < nfds; i++) {
+            char buf[32];
+            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = '\0';
+                strcpy(results[count++], buf);
+            }
+            close(events[i].data.fd);
+        }
+    }
+    close(epfd);
+    for (int i = 0; i < N; i++)
+        wait(NULL);
+    qsort(results, count, 32, cmp_str32);
+    for (int i = 0; i < count; i++)
+        printf("Event: %s\n", results[i]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+#define N 3
+
+/* == EXEMPLE =======================================
+ * epoll avec 1 pipe : registre, attente, lecture
+ * ================================================= */
+void example_epoll_one(void) {
+    int fd[2]; pipe(fd);
+    if (fork() == 0) {
+        close(fd[0]);
+        write(fd[1], "evt", 3);
+        close(fd[1]); _exit(0);
+    }
+    close(fd[1]);
+    int epfd = epoll_create1(0);
+    struct epoll_event ev = { .events = EPOLLIN, .data.fd = fd[0] };
+    epoll_ctl(epfd, EPOLL_CTL_ADD, fd[0], &ev);
+    struct epoll_event evts[1];
+    epoll_wait(epfd, evts, 1, -1);
+    char buf[16];
+    ssize_t n = read(evts[0].data.fd, buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("Got: %s\n", buf);
+    close(fd[0]); close(epfd); wait(NULL);
+}
+/* Resultat: Got: evt */
+
+/* == VOTRE EXERCICE ================================
+ * epoll avec 3 pipes : event loop complet.
+ * ================================================= */
+int main(void) {
+    int pipes[N][2];
+    for (int i = 0; i < N; i++) pipe(pipes[i]);
+    for (int i = 0; i < N; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < N; j++) { close(pipes[j][0]); if (j!=i) close(pipes[j][1]); }
+            char msg[32]; snprintf(msg, sizeof(msg), "epoll-%d", i);
+            write(pipes[i][1], msg, strlen(msg)); close(pipes[i][1]); _exit(0);
+        }
+    }
+    for (int i = 0; i < N; i++) close(pipes[i][1]);
+    /* TODO: create epoll, add all pipe read ends, loop epoll_wait, read, collect */
+    for (int i = 0; i < N; i++) { close(pipes[i][0]); wait(NULL); }
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+static int cmp_str32(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+#define N 3
+
+int main(void) {
+    int pipes[N][2];
+    for (int i = 0; i < N; i++) pipe(pipes[i]);
+    for (int i = 0; i < N; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < N; j++) { close(pipes[j][0]); if (j!=i) close(pipes[j][1]); }
+            char msg[32]; snprintf(msg, sizeof(msg), "epoll-%d", i);
+            write(pipes[i][1], msg, strlen(msg)); close(pipes[i][1]); _exit(0);
+        }
+    }
+    for (int i = 0; i < N; i++) close(pipes[i][1]);
+    int epfd = epoll_create1(0);
+    for (int i = 0; i < N; i++) {
+        struct epoll_event ev = { .events = EPOLLIN, .data.fd = pipes[i][0] };
+        epoll_ctl(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);
+    }
+    char results[N][32]; int count = 0;
+    while (count < N) {
+        struct epoll_event events[N];
+        int nfds = ____(epfd, events, N, -1);  // quelle fonction ?
+        for (int i = 0; i < nfds; i++) {
+            char buf[32];
+            ssize_t n = read(events[i].data.fd, buf, sizeof(buf)-1);
+            if (n > 0) { buf[n]='\0'; strcpy(results[count++], buf); }
+            close(events[i].data.fd);
+        }
+    }
+    close(epfd);
+    for (int i = 0; i < N; i++) wait(NULL);
+    qsort(results, count, 32, cmp_str32);
+    for (int i = 0; i < count; i++) printf("Event: %s\n", results[i]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+static int cmp_str32(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+#define N 3
+
+int main(void) {
+    int pipes[N][2];
+    for (int i = 0; i < N; i++)
+        pipe(pipes[i]);
+
+    for (int i = 0; i < N; i++) {
+        if (fork() == 0) {
+            for (int j = 0; j < N; j++) {
+                close(pipes[j][0]);
+                if (j != i) close(pipes[j][1]);
+            }
+            char msg[32];
+            snprintf(msg, sizeof(msg), "epoll-%d", i);
+            write(pipes[i][1], msg, strlen(msg));
+            close(pipes[i][1]);
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < N; i++)
+        close(pipes[i][1]);
+
+    int epfd = ____(____);
+    for (int i = 0; i < N; i++) {
+        struct epoll_event ev;
+        ev.events = ____;
+        ev.data.fd = pipes[i][0];
+        ____(epfd, EPOLL_CTL_ADD, pipes[i][0], &ev);
+    }
+
+    char results[N][32];
+    int count = 0;
+    while (count < N) {
+        struct epoll_event events[N];
+        int nfds = epoll_wait(epfd, events, N, -1);
+        for (int i = 0; i < nfds; i++) {
+            char buf[32];
+            ssize_t n = read(events[i].data.fd, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = '\0';
+                strcpy(results[count++], buf);
+            }
+            close(events[i].data.fd);
+        }
+    }
+    close(epfd);
+    for (int i = 0; i < N; i++)
+        wait(NULL);
+    qsort(results, count, 32, cmp_str32);
+    for (int i = 0; i < count; i++)
+        printf("Event: %s\n", results[i]);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/epoll.h>
+
+#define N 3
+
+int main(void) {
+    // Créez 3 pipes, 3 enfants écrivent "epoll-0", "epoll-1", "epoll-2"
+    // Parent: epoll_create1, epoll_ctl ADD pour chaque pipe
+    // Boucle epoll_wait, read, collecte résultats
+    // Affiche "Event: epoll-X" pour chaque
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Event loop avec epoll et pipes"
+
+[validation]
+expected_output = """
+Event: epoll-0
+Event: epoll-1
+Event: epoll-2
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "epoll_create1(0) crée une instance epoll dans le kernel — une structure de données qui surveille un ensemble de fd. epoll_ctl(EPOLL_CTL_ADD) enregistre chaque pipe read-end avec l'événement EPOLLIN : le kernel notifiera quand des données seront disponibles en lecture."
+label = "3 pipes enregistrés dans epoll avec EPOLLIN"
+step_label = "Étape 1 — epoll_create1() + epoll_ctl() enregistrent les 3 pipes"
+
+[[visualizer.steps.edges]]
+label = "EPOLL_CTL_ADD"
+source = "p0"
+target = "epoll"
+
+[[visualizer.steps.edges]]
+label = "EPOLL_CTL_ADD"
+source = "p1"
+target = "epoll"
+
+[[visualizer.steps.edges]]
+label = "EPOLL_CTL_ADD"
+source = "p2"
+target = "epoll"
+
+[[visualizer.steps.nodes]]
+id = "p0"
+label = "pipe[0]"
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = "pipe[1]"
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = "pipe[2]"
+
+[[visualizer.steps.nodes]]
+id = "epoll"
+label = "epoll instance"
+
+[[visualizer.steps]]
+explanation = "epoll_wait() bloque jusqu'à ce qu'au moins un fd enregistré ait des données. Il retourne directement le tableau des fd prêts (events[]) — contrairement à select() qui retourne un bitmap à scanner, epoll retourne uniquement les fd actifs, d'où sa complexité O(nombre d'événements) et non O(maxfd)."
+label = "epoll_wait() retourne les fd prêts"
+step_label = "Étape 2 — epoll_wait() retourne les fd prêts directement"
+
+[[visualizer.steps.edges]]
+label = "EPOLLIN triggered"
+source = "epoll"
+target = "events"
+
+[[visualizer.steps.nodes]]
+id = "epoll"
+label = "epoll_wait()"
+
+[[visualizer.steps.nodes]]
+id = "events"
+label = """
+events[]
+nfds ready"""
+
+[[visualizer.steps]]
+explanation = "Pour chaque événement retourné par epoll_wait(), on lit depuis events[i].data.fd — le fd que l'on avait stocké dans ev.data.fd lors de l'epoll_ctl(). Fermer le fd après lecture le retire automatiquement de l'instance epoll (EPOLL_CTL_DEL implicite), empêchant les événements parasites."
+label = "read() sur chaque événement → résultats collectés"
+step_label = "Étape 3 — read() sur chaque fd prêt, fermeture retire le fd de l'epoll"
+
+[[visualizer.steps.edges]]
+label = "read()"
+source = "events"
+target = "results"
+
+[[visualizer.steps.nodes]]
+id = "events"
+label = "events[i].data.fd"
+
+[[visualizer.steps.nodes]]
+id = "results"
+label = """
+results[]
+epoll-0,1,2"""

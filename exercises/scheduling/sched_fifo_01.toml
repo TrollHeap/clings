@@ -1,0 +1,404 @@
+common_mistake = "Oublier que le premier processus a un temps d'attente de 0, pas burst[0]"
+description = """
+NSY103 — L'ordonnancement FCFS (First Come First Served) exécute les processus dans l'ordre d'arrivée. Avec 3 processus arrivant tous à t=0 (P1=6, P2=3, P3=9 unités de burst), calculez les temps d'attente et de complétion.
+
+Affichez la moyenne des temps d'attente et de rotation (turnaround)."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "En FCFS, le premier processus attend 0 ; chaque processus attend la somme des burst précédents",
+    "wait[i] = wait[i-1] + burst[i-1] — le temps d'attente s'accumule",
+    "turnaround[i] = wait[i] + burst[i] — temps de rotation = attente + exécution",
+]
+id = "sched-fifo-01"
+kc_ids = ["KC-C6"]
+key_concept = "FCFS : wait[0]=0, wait[i]=wait[i-1]+burst[i-1] ; turnaround=wait+burst"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#define N 3
+
+void compute_waiting_times_fcfs(int burst[], int n, int wait[]) {
+    wait[0] = 0;
+    for (int i = 1; i < n; i++)
+        wait[i] = wait[i-1] + burst[i-1];
+}
+
+void compute_turnaround_times(int burst[], int wait[], int n, int turnaround[]) {
+    for (int i = 0; i < n; i++)
+        turnaround[i] = wait[i] + burst[i];
+}
+
+float compute_average(int array[], int n) {
+    float total = 0;
+    for (int i = 0; i < n; i++)
+        total += array[i];
+    return total / n;
+}
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1];
+        compute_waiting_times_fcfs(burst, 1, wait);
+        printf("%d\n", (int)(wait[0]));
+    }
+    {
+        int burst[] = {3, 2};
+        int wait[2];
+        compute_waiting_times_fcfs(burst, 2, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3];
+        compute_waiting_times_fcfs(burst, 3, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[] = {0, 6, 9};
+        int turnaround[3];
+        compute_turnaround_times(burst, wait, 3, turnaround);
+        printf("%d\n", (int)(turnaround[0]));
+        printf("%d\n", (int)(turnaround[1]));
+        printf("%d\n", (int)(turnaround[2]));
+    }
+    {
+        int wait[] = {0, 6, 9};
+        int avg_int = (int)(compute_average(wait, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    {
+        int turnaround[] = {6, 9, 18};
+        int avg_int = (int)(compute_average(turnaround, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#define N 3
+
+void compute_waiting_times_fcfs(int burst[], int n, int wait[]) {
+    wait[____] = 0;
+    for (int i = 1; i < n; i++)
+        wait[i] = wait[____] + burst[____];
+}
+
+void compute_turnaround_times(int burst[], int wait[], int n, int turnaround[]) {
+    for (int i = 0; i < n; i++)
+        turnaround[i] = ____ + ____;
+}
+
+float compute_average(int array[], int n) {
+    float total = 0;
+    for (int i = 0; i < n; i++)
+        total += ____;
+    return ____ / ____;
+}
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int wait[N], turnaround[N];
+    // wait[0] = 0
+    // wait[i] = wait[i-1] + burst[i-1]
+    // turnaround[i] = wait[i] + burst[i]
+    // Affichez les moyennes avec %.2f
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* == EXEMPLE =======================================
+ * FCFS avec 2 processus : P1(burst=4), P2(burst=2)
+ * Ordre : P1 -> P2
+ * wait[0]=0, wait[1]=0+4=4
+ * turnaround[0]=0+4=4, turnaround[1]=4+2=6
+ * Moyenne wait=(0+4)/2=2.00, ta=(4+6)/2=5.00
+ * ================================================= */
+void example_fcfs_2(void) {
+    int burst[] = {4, 2};
+    int wait[2], turnaround[2];
+    wait[0] = 0;
+    wait[1] = wait[0] + burst[0];
+    turnaround[0] = wait[0] + burst[0];
+    turnaround[1] = wait[1] + burst[1];
+    printf("Avg wait: %.2f\n", (wait[0] + wait[1]) / 2.0f);
+    printf("Avg ta:   %.2f\n", (turnaround[0] + turnaround[1]) / 2.0f);
+}
+
+/* == VOTRE EXERCICE ================================
+ * P1(6), P2(3), P3(9) — tous arrivent a t=0
+ * Calculez wait[] et turnaround[] pour 3 processus
+ * ================================================= */
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int wait[N], turnaround[N];
+    /* TODO: wait[0] = 0; */
+    /* TODO: boucle pour wait[1..N-1] */
+    float total_wait = 0, total_ta = 0;
+    /* TODO: boucle turnaround et sommes */
+    printf("Average waiting time: %.2f\n", total_wait / N);
+    printf("Average turnaround time: %.2f\n", total_ta / N);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int wait[N], turnaround[N];
+
+    wait[0] = 0;
+    for (int i = 1; i < N; i++)
+        wait[i] = wait[i-1] + burst[i-1];
+
+    float total_wait = 0, total_ta = 0;
+    for (int i = 0; i < N; i++) {
+        turnaround[i] = ____ + ____; // wait[i] + burst[i]
+        total_wait += wait[i];
+        total_ta += turnaround[i];
+    }
+
+    printf("Average waiting time: %.2f\n", total_wait / N);
+    printf("Average turnaround time: %.2f\n", total_ta / N);
+    return 0;
+}''',
+    """
+#define N 3
+
+void compute_waiting_times_fcfs(int burst[], int n, int wait[]) {
+    wait[____] = 0;
+    for (int i = 1; i < n; i++)
+        wait[i] = wait[____] + burst[____];
+}
+
+void compute_turnaround_times(int burst[], int wait[], int n, int turnaround[]) {
+    for (int i = 0; i < n; i++)
+        turnaround[i] = ____ + ____;
+}
+
+float compute_average(int array[], int n) {
+    float total = 0;
+    for (int i = 0; i < n; i++)
+        total += ____;
+    return ____ / ____;
+}
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int wait[N], turnaround[N];
+    // wait[0] = 0
+    // wait[i] = wait[i-1] + burst[i-1]
+    // turnaround[i] = wait[i] + burst[i]
+    // Affichez les moyennes avec %.2f
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 3
+
+void compute_waiting_times_fcfs(int burst[], int n, int wait[]) {
+    /* TODO */
+}
+
+void compute_turnaround_times(int burst[], int wait[], int n, int turnaround[]) {
+    /* TODO */
+}
+
+float compute_average(int array[], int n) {
+    /* TODO */
+    return 0.0f;
+}
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1];
+        compute_waiting_times_fcfs(burst, 1, wait);
+        printf("%d\n", (int)(wait[0]));
+    }
+    {
+        int burst[] = {3, 2};
+        int wait[2];
+        compute_waiting_times_fcfs(burst, 2, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3];
+        compute_waiting_times_fcfs(burst, 3, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[] = {0, 6, 9};
+        int turnaround[3];
+        compute_turnaround_times(burst, wait, 3, turnaround);
+        printf("%d\n", (int)(turnaround[0]));
+        printf("%d\n", (int)(turnaround[1]));
+        printf("%d\n", (int)(turnaround[2]));
+    }
+    {
+        int wait[] = {0, 6, 9};
+        int avg_int = (int)(compute_average(wait, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    {
+        int turnaround[] = {6, 9, 18};
+        int avg_int = (int)(compute_average(turnaround, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 3
+
+void compute_waiting_times_fcfs(int burst[], int n, int wait[]) { }
+
+void compute_turnaround_times(int burst[], int wait[], int n, int turnaround[]) { }
+
+float compute_average(int array[], int n) { return 0.0f; }
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1];
+        compute_waiting_times_fcfs(burst, 1, wait);
+        printf("%d\n", (int)(wait[0]));
+    }
+    {
+        int burst[] = {3, 2};
+        int wait[2];
+        compute_waiting_times_fcfs(burst, 2, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3];
+        compute_waiting_times_fcfs(burst, 3, wait);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[] = {0, 6, 9};
+        int turnaround[3];
+        compute_turnaround_times(burst, wait, 3, turnaround);
+        printf("%d\n", (int)(turnaround[0]));
+        printf("%d\n", (int)(turnaround[1]));
+        printf("%d\n", (int)(turnaround[2]));
+    }
+    {
+        int wait[] = {0, 6, 9};
+        int avg_int = (int)(compute_average(wait, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    {
+        int turnaround[] = {6, 9, 18};
+        int avg_int = (int)(compute_average(turnaround, 3) * 100);
+        printf("%d\n", (int)(avg_int));
+    }
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "FCFS : temps d'attente moyen"
+
+[validation]
+expected_output = """
+0
+0
+3
+0
+6
+9
+6
+9
+18
+500
+1100"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "FCFS exécute les processus dans l'ordre d'arrivée, sans préemption. P1 monopolise le CPU pendant burst=6 unités avant que P2 puisse s'exécuter. C'est l'algorithme le plus simple mais il souffre du problème du convoi : un long processus bloque tous ceux qui arrivent derrière lui."
+label = "Ordre d'exécution FCFS : P1 → P2 → P3"
+step_label = "Étape 1 — FCFS : ordre d'arrivée, pas de préemption"
+
+[[visualizer.steps.edges]]
+label = "t=6"
+source = "p1"
+target = "p2"
+
+[[visualizer.steps.edges]]
+label = "t=9"
+source = "p2"
+target = "p3"
+
+[[visualizer.steps.nodes]]
+id = "p1"
+label = """
+P1
+burst=6"""
+
+[[visualizer.steps.nodes]]
+id = "p2"
+label = """
+P2
+burst=3"""
+
+[[visualizer.steps.nodes]]
+id = "p3"
+label = """
+P3
+burst=9"""
+
+[[visualizer.steps]]
+explanation = "wait[0]=0 car P1 est le premier ; wait[i] = somme des burst précédents (accumulation). Le temps de rotation (turnaround) = wait + burst. La moyenne élevée de FCFS est due à l'effet convoi : les processus courts attendent longtemps derrière les longs."
+label = "Calcul des temps d'attente"
+step_label = "Étape 2 — Calcul wait[] et turnaround[] cumulatifs"
+
+[[visualizer.steps.edges]]
+label = "+burst[P1]"
+source = "w1"
+target = "w2"
+
+[[visualizer.steps.edges]]
+label = "+burst[P2]"
+source = "w2"
+target = "w3"
+
+[[visualizer.steps.nodes]]
+id = "w1"
+label = "wait[P1]=0"
+
+[[visualizer.steps.nodes]]
+id = "w2"
+label = "wait[P2]=6"
+
+[[visualizer.steps.nodes]]
+id = "w3"
+label = "wait[P3]=9"

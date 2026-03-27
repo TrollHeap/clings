@@ -1,0 +1,259 @@
+common_mistake = "Oublier htons() pour sin_port → port inversé sur x86 (80=0x0050 stocké en 0x5000=20480)"
+description = """
+NSY103 — struct sockaddr_in représente une adresse IPv4 réseau. sin_family=AF_INET (2), sin_port en big-endian (htons), sin_addr.s_addr en binaire réseau (inet_pton). inet_ntop reconvertit en chaîne lisible.
+
+Initialisez une sockaddr_in pour 127.0.0.1:80 et affichez ses champs.
+
+⚠ Note : cet exercice simule le comportement des appels système dans un environnement WASM. Les vrais syscalls (fork, signal, shmget, etc.) ne sont pas disponibles dans le sandbox."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "AF_INET = 2 — famille d'adresses IPv4",
+    "htons(80) convertit le port 80 en big-endian réseau (= 20480 sur x86 little-endian)",
+    "inet_pton(AF_INET, str, &addr) convertit chaîne dotted-decimal en binaire 4 octets",
+]
+id = "sockets-01"
+kc_ids = ["KC-C14"]
+key_concept = "htons() convertit port hôte→réseau (little-endian→big-endian sur x86) ; inet_pton convertit chaîne IP→binaire réseau"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+int main(void) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(80);
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    printf("sin_family = %d\n", addr.sin_family);
+    printf("sin_port = %d\n", addr.sin_port);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    printf("Address: %s\n", ip);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+int main(void) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = ____;                          // AF_INET
+    addr.sin_port = htons(____);                     // port 80
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    printf("sin_family = %d\n", addr.sin_family);
+    printf("sin_port = %d\n", addr.sin_port);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    printf("Address: %s\n", ip);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+/* == EXEMPLE ===============================================
+ * sockaddr_in : configurer une adresse IPv4 pour 192.168.0.1:443
+ * htons convertit le port en big-endian, inet_pton l'IP en binaire.
+ * ========================================================= */
+void example_setup_addr(void) {
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons(443);
+    inet_pton(AF_INET, "192.168.0.1", &a.sin_addr);
+    char buf[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &a.sin_addr, buf, sizeof(buf));
+    printf("example: %s:%d (family=%d)\n", buf, ntohs(a.sin_port), a.sin_family);
+}
+/* Resultat: example: 192.168.0.1:443 (family=2) */
+
+/* == VOTRE EXERCICE ========================================
+ * Structure socket : sockaddr_in, inet_pton, htons
+ * Inspirez-vous de example_setup_addr ci-dessus.
+ * Configurez 127.0.0.1:80 et affichez sin_family, sin_port, Address.
+ * ========================================================= */
+
+int main(void) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    /* TODO: addr.sin_family = AF_INET */
+    /* TODO: addr.sin_port = htons(80) */
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    printf("sin_family = %d\n", addr.sin_family);
+    printf("sin_port = %d\n", addr.sin_port);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    printf("Address: %s\n", ip);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+int main(void) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(____);               // quel port?
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    printf("sin_family = %d\n", addr.sin_family);
+    printf("sin_port = %d\n", addr.sin_port);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    printf("Address: %s\n", ip);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+int main(void) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = ____;                          // AF_INET
+    addr.sin_port = htons(____);                     // port 80
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    printf("sin_family = %d\n", addr.sin_family);
+    printf("sin_port = %d\n", addr.sin_port);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    printf("Address: %s\n", ip);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+
+int main(void) {
+    struct sockaddr_in addr;
+    // Zéro-initialisez addr, configurez sin_family=AF_INET, sin_port=htons(80)
+    // Convertissez "127.0.0.1" en binaire avec inet_pton
+    // Affichez sin_family, sin_port, puis l'IP via inet_ntop
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sockets"
+title = "Structure socket : sockaddr_in, inet_pton, htons"
+
+[mission]
+clientId = "sensorgrid"
+clientName = "SensorGrid"
+contactEmail = "ops@sensorgrid.sys"
+failureEmail = """
+L'adresse n'est pas correcte. sin_family doit être AF_INET(2), le port htons(80)=20480, l'IP via inet_pton puis inet_ntop.
+
+Ops @ SensorGrid"""
+incidentEmail = """
+Bonjour,
+
+Notre stack réseau IoT doit manipuler des adresses IPv4. Montrez-nous comment initialiser struct sockaddr_in avec AF_INET, htons() pour le port 80, et inet_pton() pour 127.0.0.1. Affichez via inet_ntop().
+
+Ops @ SensorGrid"""
+payout = 180
+prereqMissionIds = []
+receivedTime = "09:20"
+subject = "Configuration adresse réseau — sockaddr_in IPv4"
+successEmail = """
+Configuration réseau validée. sin_family=2 sin_port=20480 Address:127.0.0.1 — notre stack IoT est prêt.
+
+SensorGrid Ops"""
+syscallsInvolved = [
+    "socket",
+    "bind",
+    "inet_pton",
+    "inet_ntop",
+    "htons",
+]
+tier = 2
+
+[validation]
+expected_output = """
+sin_family = 2
+sin_port = 20480
+Address: 127.0.0.1
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+label = "htons(80) → sin_port"
+
+[[visualizer.steps.edges]]
+label = "htons()"
+source = "host"
+target = "net"
+
+[[visualizer.steps.nodes]]
+id = "host"
+label = """
+port 80
+(host order)"""
+
+[[visualizer.steps.nodes]]
+id = "net"
+label = """
+sin_port=20480
+(network order)"""
+
+[[visualizer.steps]]
+label = "inet_pton('127.0.0.1') → sin_addr"
+
+[[visualizer.steps.edges]]
+label = "inet_pton()"
+source = "str"
+target = "addr"
+
+[[visualizer.steps.nodes]]
+id = "str"
+label = "'127.0.0.1'"
+
+[[visualizer.steps.nodes]]
+id = "addr"
+label = """
+sin_addr
+(binary)"""
+
+[[visualizer.steps]]
+label = "inet_ntop(sin_addr) → ip string"
+
+[[visualizer.steps.edges]]
+label = "inet_ntop()"
+source = "addr"
+target = "out"
+
+[[visualizer.steps.nodes]]
+id = "addr"
+label = """
+sin_addr
+(binary)"""
+
+[[visualizer.steps.nodes]]
+id = "out"
+label = "ip = '127.0.0.1'"

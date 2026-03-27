@@ -1,0 +1,326 @@
+common_mistake = "Oublier d'appeler free(ptr) dans tracked_free — le compteur augmente mais la mémoire n'est pas libérée"
+description = """
+NSY103 — Une technique simple de détection de fuites mémoire consiste à wrapper malloc/free avec des compteurs. Si `allocs != frees` à la fin du programme, il y a une fuite.
+
+Implémentez `tracked_malloc` et `tracked_free` avec un compteur global, puis démontrez la détection d'une fuite intentionnelle."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "`tracked_malloc` : incrémenter `g_allocs++` après un malloc réussi",
+    "`tracked_free` : appeler `free(ptr)` ET incrémenter `g_frees++`",
+    "La différence `g_allocs - g_frees` donne le nombre de blocs non libérés",
+]
+id = "malloc-leak-01"
+kc_ids = ["KC-C02"]
+key_concept = "Wrapper malloc/free avec compteurs pour détecter les fuites — allocs != frees = fuite mémoire"
+lang = "c"
+prerequisites = ["malloc-pool-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int g_allocs = 0;
+static int g_frees = 0;
+static size_t g_total_bytes = 0;
+
+void *tracked_malloc(size_t size) {
+    void *ptr = malloc(size);
+    if (ptr) {
+        g_allocs++;
+        g_total_bytes += size;
+    }
+    return ptr;
+}
+
+void tracked_free(void *ptr) {
+    if (ptr) {
+        free(ptr);
+        g_frees++;
+    }
+}
+
+void leak_report(void) {
+    printf("=== Leak Report ===\n");
+    printf("allocs: %d\n", g_allocs);
+    printf("frees:  %d\n", g_frees);
+    printf("total bytes: %zu\n", g_total_bytes);
+    if (g_allocs == g_frees)
+        printf("Status: OK\n");
+    else
+        printf("LEAK: %d bloc(s) non libere(s)\n", g_allocs - g_frees);
+}
+
+int main(void) {
+    char *a = tracked_malloc(32);
+    char *b = tracked_malloc(64);
+    char *c = tracked_malloc(16);
+    strcpy(a, "hello"); strcpy(b, "world"); strcpy(c, "leak");
+    tracked_free(a); tracked_free(b);
+    leak_report();
+    free(c);
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int g_allocs = 0;
+static int g_frees = 0;
+static size_t g_total_bytes = 0;
+
+void *tracked_malloc(size_t size) {
+    /* TODO: malloc, increment g_allocs if successful, accumulate g_total_bytes */
+    return NULL;
+}
+
+void tracked_free(void *ptr) {
+    /* TODO: if ptr non-null, free and increment g_frees */
+}
+
+void leak_report(void) {
+    /* TODO: print allocs, frees, total bytes, and leak count (allocs - frees) */
+}
+
+int main(void) {
+    // TODO: 3 allocs, 2 frees, rapport
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Comptage simple alloc/free avec wrapper
+ * =========================================================== */
+static int ex_allocs = 0, ex_frees = 0;
+void *ex_malloc(size_t s) { void *p = malloc(s); if (p) ex_allocs++; return p; }
+void ex_free(void *p) { if (p) { free(p); ex_frees++; } }
+
+void example_demo(void) {
+    int *a = ex_malloc(sizeof(int));
+    int *b = ex_malloc(sizeof(int));
+    ex_free(a);
+    printf("allocs=%d frees=%d leaks=%d\n", ex_allocs, ex_frees, ex_allocs - ex_frees);
+    ex_free(b);
+}
+/* Resultat: allocs=2 frees=1 leaks=1 */
+
+/* == VOTRE EXERCICE =========================================
+ * tracked_malloc/tracked_free avec rapport de fuites
+ * =========================================================== */
+static int g_allocs = 0, g_frees = 0;
+static size_t g_total_bytes = 0;
+
+void *tracked_malloc(size_t size) { (void)size; return NULL; }
+void tracked_free(void *ptr) { (void)ptr; }
+void leak_report(void) { }
+
+int main(void) {
+    /* TODO: 3 allocs, 2 frees, leak_report */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int g_allocs = 0, g_frees = 0;
+static size_t g_total_bytes = 0;
+
+void *tracked_malloc(size_t size) {
+    void *ptr = malloc(size);
+    if (ptr) { g_allocs++; g_total_bytes += size; }
+    return ptr;
+}
+void tracked_free(void *ptr) {
+    if (ptr) { free(ptr); g_frees++; }
+}
+void leak_report(void) {
+    printf("=== Leak Report ===\n");
+    printf("allocs: %d\n", g_allocs);
+    printf("frees:  %d\n", g_frees);
+    printf("total bytes: %zu\n", g_total_bytes);
+    if (g_allocs == g_frees) printf("Status: OK\n");
+    else printf("LEAK: %d bloc(s) non libere(s)\n", g_allocs - ____);
+}
+
+int main(void) {
+    char *a = tracked_malloc(32);
+    char *b = tracked_malloc(64);
+    char *c = tracked_malloc(16);
+    strcpy(a, "hello"); strcpy(b, "world"); strcpy(c, "leak");
+    tracked_free(a); tracked_free(b);
+    leak_report();
+    free(c);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int g_allocs = 0;
+static int g_frees = 0;
+static size_t g_total_bytes = 0;
+
+void *tracked_malloc(size_t size) {
+    void *ptr = malloc(size);
+    if (ptr) {
+        g_allocs____;
+        g_total_bytes += size;
+    }
+    return ptr;
+}
+
+void tracked_free(void *ptr) {
+    if (ptr) {
+        ____;
+        g_frees++;
+    }
+}
+
+void leak_report(void) {
+    printf("=== Leak Report ===\n");
+    printf("allocs: %d\n", g_allocs);
+    printf("frees:  %d\n", g_frees);
+    printf("total bytes: %zu\n", g_total_bytes);
+    if (g_allocs == g_frees)
+        printf("Status: OK\n");
+    else
+        printf("LEAK: %d bloc(s) non libere(s)\n", g_allocs - ____);
+}
+
+int main(void) {
+    char *a = tracked_malloc(32);
+    char *b = tracked_malloc(64);
+    char *c = tracked_malloc(16);
+
+    strcpy(a, "hello");
+    strcpy(b, "world");
+    strcpy(c, "leak");
+
+    tracked_free(a);
+    tracked_free(b);
+    /* c est intentionnellement NON libere */
+
+    leak_report();
+    /* cleanup pour valgrind */
+    free(c);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int g_allocs = 0, g_frees = 0;
+static size_t g_total_bytes = 0;
+
+// Implémentez tracked_malloc, tracked_free, leak_report
+// Démontrez la détection d'une fuite intentionnelle
+int main(void) {
+    // TODO: 3 allocs, 2 frees, rapport
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Détection de fuite : compteur alloc/free"
+
+[validation]
+expected_output = """
+=== Leak Report ===
+allocs: 3
+frees:  2
+total bytes: 112
+LEAK: 1 bloc(s) non libere(s)"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque tracked_malloc incrémente g_allocs et accumule la taille. 32+64+16 = 112 octets alloués au total."
+label = "3 allocations trackées"
+step_label = "3 allocs — compteur = 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap_a"
+value = '"hello" (32 octets)'
+
+[[visualizer.steps.heap]]
+address = "heap_b"
+value = '"world" (64 octets)'
+
+[[visualizer.steps.heap]]
+address = "heap_c"
+value = '"leak" (16 octets)'
+
+[[visualizer.steps.stack]]
+name = "g_allocs"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "g_frees"
+value = "0"
+
+[[visualizer.steps.stack]]
+name = "g_total_bytes"
+value = "112"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→heap (32)"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→heap (64)"
+
+[[visualizer.steps.stack]]
+name = "c"
+value = "→heap (16)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "a et b sont libérés, mais c ne l'est pas avant le rapport. allocs(3) - frees(2) = 1 bloc fuité. En production, on utilise Valgrind ou ASan pour détecter automatiquement."
+label = "Après 2 frees — 1 fuite"
+step_label = "allocs - frees = 1 — FUITE détectée"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "heap_c"
+value = '"leak" (16 octets) — non libéré'
+
+[[visualizer.steps.stack]]
+name = "g_allocs"
+value = "3"
+
+[[visualizer.steps.stack]]
+name = "g_frees"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "c"
+value = "→heap (16) — FUITE"

@@ -1,0 +1,241 @@
+common_mistake = "Passer une taille qui n'est pas un multiple de l'alignement à aligned_alloc — comportement indéfini"
+description = """
+NSY103 — Certaines opérations (SIMD, DMA, cache lines) requièrent des adresses alignées sur des puissances de 2 spécifiques. `aligned_alloc(alignment, size)` (C11) alloue de la mémoire avec un alignement garanti. L'alignement doit être une puissance de 2 et size doit être un multiple de alignment.
+
+Démontrez les différences d'alignement entre malloc et aligned_alloc."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "`is_aligned` : un pointeur est aligné sur N si `(uintptr_t)ptr % N == 0`",
+    "`aligned_alloc(64, size)` : l'alignement (64) doit être une puissance de 2, et size un multiple de l'alignement",
+    "malloc garantit typiquement un alignement de 16 sur x86-64, mais pas 64",
+]
+id = "malloc-aligned-01"
+kc_ids = ["KC-C02"]
+key_concept = "aligned_alloc garantit un alignement spécifique pour SIMD/cache — malloc ne garantit que l'alignement par défaut (16 sur x86-64)"
+lang = "c"
+prerequisites = ["malloc-arena-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int is_aligned(void *ptr, size_t alignment) {
+    return ((uintptr_t)ptr % alignment) == 0;
+}
+
+int main(void) {
+    {
+        int *p = malloc(sizeof(int));
+        printf("%d\n", (int)(is_aligned(p, 4)));
+        free(p);
+    }
+    {
+        int *p = malloc(sizeof(int));
+        int result = is_aligned(p, 64);
+        /* malloc typically gives 16-byte alignment on x86-64, not 64 */
+        printf("%d\n", (p) != NULL ? 1 : 0);
+        free(p);
+    }
+    {
+        int *b = aligned_alloc(64, 64 * sizeof(int));
+        printf("%d\n", (b) != NULL ? 1 : 0);
+        printf("%d\n", (int)(is_aligned(b, 4)));
+        printf("%d\n", (int)(is_aligned(b, 16)));
+        printf("%d\n", (int)(is_aligned(b, 64)));
+        free(b);
+    }
+    {
+        int *b = aligned_alloc(64, 64 * sizeof(int));
+        printf("%d\n", (b) != NULL ? 1 : 0);
+        for (int i = 0; i < 8; i++) b[i] = i * i;
+        printf("%d\n", (int)(b[0]));
+        printf("%d\n", (int)(b[1]));
+        printf("%d\n", (int)(b[7]));
+        free(b);
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int is_aligned(void *ptr, size_t alignment) {
+    /* TODO: return ((uintptr_t)ptr % alignment) == 0 */
+    return 0;
+}
+
+int main(void) {
+    // TODO
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+/* == EXEMPLE ================================================
+ * Vérification d'alignement avec uintptr_t
+ * Un pointeur est aligne sur N si addr % N == 0.
+ * =========================================================== */
+void example_demo(void) {
+    double *p = malloc(sizeof(double));
+    printf("aligne 8 : %d\n", ((uintptr_t)p % 8) == 0);
+    printf("aligne 16: %d\n", ((uintptr_t)p % 16) == 0);
+    free(p);
+    double *q = aligned_alloc(32, 32);
+    printf("aligned_alloc(32) aligne 32: %d\n", ((uintptr_t)q % 32) == 0);
+    free(q);
+}
+/* Resultat: aligne 8: 1 / aligne 16: 1 / aligned 32: 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Comparez malloc (align 16) vs aligned_alloc (align 64)
+ * =========================================================== */
+int is_aligned(void *ptr, size_t alignment) { (void)ptr; (void)alignment; return 0; }
+
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int is_aligned(void *ptr, size_t alignment) {
+    return ((uintptr_t)ptr % alignment) == 0;
+}
+
+int main(void) {
+    printf("=== malloc (alignement par defaut) ===\n");
+    int *a = malloc(sizeof(int));
+    printf("aligne 4  : %d\n", is_aligned(a, 4));
+    printf("aligne 16 : %d\n", is_aligned(a, 16));
+    printf("aligne 64 : %d\n", is_aligned(a, 64));
+    free(a);
+    printf("=== aligned_alloc (64 octets) ===\n");
+    int *b = aligned_alloc(64, 64 * sizeof(int));
+    if (!b) return 1;
+    printf("aligne 4  : %d\n", is_aligned(b, 4));
+    printf("aligne 16 : %d\n", is_aligned(b, 16));
+    printf("aligne 64 : %d\n", is_aligned(b, ____));
+    for (int i = 0; i < 8; i++) b[i] = i * i;
+    printf("b[0..7] :"); for (int i = 0; i < 8; i++) printf(" %d", ____[i]); printf("\n");
+    printf("sizeof(int) = %zu\n", sizeof(int));
+    free(b);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int is_aligned(void *ptr, size_t alignment) {
+    return ((uintptr_t)ptr % ____) == 0;
+}
+
+int main(void) {
+    printf("=== malloc (alignement par defaut) ===\n");
+    int *a = malloc(sizeof(int));
+    printf("aligne 4  : %d\n", is_aligned(a, 4));
+    printf("aligne 16 : %d\n", is_aligned(a, 16));
+    printf("aligne 64 : %d\n", is_aligned(a, 64));
+    free(a);
+
+    printf("=== aligned_alloc (64 octets) ===\n");
+    int *b = aligned_alloc(____, 64 * sizeof(int));
+    if (!b) return 1;
+    printf("aligne 4  : %d\n", is_aligned(b, 4));
+    printf("aligne 16 : %d\n", is_aligned(b, 16));
+    printf("aligne 64 : %d\n", is_aligned(b, ____));
+
+    for (int i = 0; i < 8; i++) b[i] = i * i;
+    printf("b[0..7] :");
+    for (int i = 0; i < 8; i++) printf(" %d", b[i]);
+    printf("\n");
+    printf("sizeof(int) = %zu\n", sizeof(int));
+    ____;
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+// is_aligned(ptr, N) : (uintptr_t)ptr % N == 0
+// Comparez malloc vs aligned_alloc(64, ...)
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "aligned_alloc et contraintes d'alignement"
+
+[validation]
+expected_output = """
+1
+1
+1
+1
+1
+1
+1
+0
+1
+49"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Sur x86-64, malloc garantit un alignement de 16 octets (pour SSE). Un int (4 octets) est donc aligné sur 4 et 16, mais pas nécessairement sur 64."
+label = "malloc — alignement par défaut (16)"
+step_label = "malloc — align 16 garanti"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0x...0"
+value = "int (aligné 4 et 16, pas 64)"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→heap (align 16)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "aligned_alloc(64, 256) garantit que l'adresse est un multiple de 64. Nécessaire pour les opérations SIMD (AVX-512) et l'alignement sur cache line (typiquement 64 octets)."
+label = "aligned_alloc — alignement 64"
+step_label = "aligned_alloc — cache line alignment"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0x...00"
+value = "64 ints (256 octets, aligné 64)"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→heap (align 64)"

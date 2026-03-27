@@ -1,0 +1,262 @@
+common_mistake = "Confondre st_ino (numéro d'inode) avec st_dev (identifiant du device/filesystem)"
+description = """
+NSY103 — Chaque fichier est identifié par un numéro d'inode unique dans son système de fichiers. L'inode stocke toutes les métadonnées (taille, permissions, timestamps, compteur de liens) mais PAS le nom. Le nom est stocké dans l'entrée du répertoire qui pointe vers l'inode.
+
+Explorez les champs de `struct stat` pour démontrer que deux fichiers ont des inodes différents, et qu'un hard link partage le même inode."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Le numéro d'inode est dans `sb.st_ino` — chaque fichier a un inode unique",
+    "Le nombre de liens (hard links) est dans `sb.st_nlink`",
+    "Le device (filesystem) est dans `sb.st_dev`, la taille dans `sb.st_size`",
+]
+id = "fs-inode-01"
+kc_ids = ["KC-C19"]
+key_concept = "L'inode stocke toutes les métadonnées sauf le nom du fichier"
+lang = "c"
+prerequisites = [
+    "fs-stat-01",
+    "fs-link-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *f1 = "/tmp/kf_ino_a";
+    const char *f2 = "/tmp/kf_ino_b";
+    const char *hl = "/tmp/kf_ino_hl";
+    unlink(f1); unlink(f2); unlink(hl);
+
+    FILE *fp;
+    fp = fopen(f1, "w"); fprintf(fp, "fichier_a"); fclose(fp);
+    fp = fopen(f2, "w"); fprintf(fp, "fichier_bb"); fclose(fp);
+    link(f1, hl);
+
+    struct stat s1, s2, shl;
+    stat(f1, &s1);
+    stat(f2, &s2);
+    stat(hl, &shl);
+
+    printf("Inodes differents : %d\n", (s1.st_ino != s2.st_ino) ? 1 : 0);
+    printf("Hard link meme inode : %d\n", (s1.st_ino == shl.st_ino) ? 1 : 0);
+    printf("Nlinks f1 : %lu\n", (unsigned long)s1.st_nlink);
+    printf("Meme device : %d\n", (s1.st_dev == s2.st_dev) ? 1 : 0);
+    printf("Taille f1 : %ld\n", (long)s1.st_size);
+    printf("Taille f2 : %ld\n", (long)s2.st_size);
+
+    unlink(f1); unlink(f2); unlink(hl);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *f1 = "/tmp/kf_ino_a";
+    const char *f2 = "/tmp/kf_ino_b";
+    const char *hl = "/tmp/kf_ino_hl";
+    unlink(f1); unlink(f2); unlink(hl);
+
+    FILE *fp;
+    fp = fopen(f1, "w"); fprintf(fp, "fichier_a"); fclose(fp);
+    fp = fopen(f2, "w"); fprintf(fp, "fichier_bb"); fclose(fp);
+    link(f1, hl);
+
+    struct stat s1, s2, shl;
+    stat(f1, &s1);
+    stat(f2, &s2);
+    stat(hl, &shl);
+
+    printf("Inodes differents : %d\n", (s1.____ != s2.st_ino) ? 1 : 0);
+    printf("Hard link meme inode : %d\n", (s1.st_ino == shl.____) ? 1 : 0);
+    printf("Nlinks f1 : %lu\n", (unsigned long)s1.____);
+    printf("Meme device : %d\n", (s1.____ == s2.st_dev) ? 1 : 0);
+    printf("Taille f1 : %ld\n", (long)s1.st_size);
+    printf("Taille f2 : %ld\n", (long)s2.____);
+
+    unlink(f1); unlink(f2); unlink(hl);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+/* == EXEMPLE ================================================
+ * Explorer les metadonnees du repertoire /tmp
+ * struct stat contient inode, device, liens, uid, taille, etc.
+ * =========================================================== */
+void example_dir_meta(void) {
+    struct stat sb;
+    stat("/tmp", &sb);
+    printf("Inode /tmp > 0 : %d\n", sb.st_ino > 0 ? 1 : 0);
+    printf("Type : repertoire = %d\n", S_ISDIR(sb.st_mode) ? 1 : 0);
+    printf("Liens >= 2 : %d\n", sb.st_nlink >= 2 ? 1 : 0);
+}
+/* Un repertoire a nlink >= 2 (. et le lien parent) */
+
+/* == VOTRE EXERCICE =========================================
+ * Creer deux fichiers et un hard link. Comparer les inodes.
+ * Verifier: inodes differents, hard link = meme inode,
+ * nlink, meme device, tailles.
+ * =========================================================== */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *f1 = "/tmp/kf_ino_a";
+    const char *f2 = "/tmp/kf_ino_b";
+    const char *hl = "/tmp/kf_ino_hl";
+    unlink(f1); unlink(f2); unlink(hl);
+    FILE *fp;
+    fp = fopen(f1, "w"); fprintf(fp, "fichier_a"); fclose(fp);
+    fp = fopen(f2, "w"); fprintf(fp, "fichier_bb"); fclose(fp);
+    link(f1, hl);
+    struct stat s1, s2, shl;
+    stat(f1, &s1); stat(f2, &s2); stat(hl, &shl);
+    printf("Inodes differents : %d\n", (s1.st_ino != s2.st_ino) ? 1 : 0);
+    printf("Hard link meme inode : %d\n", (s1.st_ino == shl.____) ? 1 : 0);
+    printf("Nlinks f1 : %lu\n", (unsigned long)s1.st_nlink);
+    printf("Meme device : %d\n", (s1.____ == s2.st_dev) ? 1 : 0);
+    printf("Taille f1 : %ld\n", (long)s1.st_size);
+    printf("Taille f2 : %ld\n", (long)s2.st_size);
+    unlink(f1); unlink(f2); unlink(hl);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    const char *f1 = "/tmp/kf_ino_a";
+    const char *f2 = "/tmp/kf_ino_b";
+    const char *hl = "/tmp/kf_ino_hl";
+    unlink(f1); unlink(f2); unlink(hl);
+    FILE *fp;
+    fp = fopen(f1, "w"); fprintf(fp, "fichier_a"); fclose(fp);
+    fp = fopen(f2, "w"); fprintf(fp, "fichier_bb"); fclose(fp);
+    link(f1, hl);
+    struct stat s1, s2, shl;
+    stat(f1, &s1); stat(f2, &s2); stat(hl, &shl);
+    printf("Inodes differents : %d\n", (s1.____ != s2.____) ? 1 : 0);
+    printf("Hard link meme inode : %d\n", (s1.____ == shl.____) ? 1 : 0);
+    printf("Nlinks f1 : %lu\n", (unsigned long)s1.____);
+    printf("Meme device : %d\n", (s1.____ == s2.____) ? 1 : 0);
+    printf("Taille f1 : %ld\n", (long)s1.____);
+    printf("Taille f2 : %ld\n", (long)s2.____);
+    unlink(f1); unlink(f2); unlink(hl);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    // Creer deux fichiers et un hard link du premier
+    // stat() sur les trois, comparer:
+    // - st_ino different entre fichiers
+    // - st_ino identique entre fichier et hard link
+    // - st_nlink, st_dev, st_size
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Inodes et métadonnées système"
+
+[validation]
+expected_output = """
+Inodes differents : 1
+Hard link meme inode : 1
+Nlinks f1 : 2
+Meme device : 1
+Taille f1 : 9
+Taille f2 : 10
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque fichier a un numéro d'inode unique dans son filesystem. st_ino est unique par (st_dev, st_ino). Deux fichiers sur le même filesystem ont le même st_dev mais des st_ino différents."
+heap = []
+label = "Deux fichiers, deux inodes"
+step_label = "Inodes différents pour fichiers différents"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "s1.st_ino"
+value = "N (unique)"
+
+[[visualizer.steps.stack]]
+name = "s2.st_ino"
+value = "M (different)"
+
+[[visualizer.steps.stack]]
+name = "s1.st_dev"
+value = "device X"
+
+[[visualizer.steps.stack]]
+name = "s2.st_dev"
+value = "device X (meme FS)"
+
+[[visualizer.steps]]
+explanation = "Un hard link crée une deuxième entrée de répertoire pointant vers le même inode. st_nlink passe à 2. Le nom n'est PAS dans l'inode — c'est pourquoi un fichier peut avoir plusieurs noms."
+label = "Hard link = même inode"
+step_label = "Hard link — même inode, nlink=2"
+
+[[visualizer.steps.arrows]]
+from = "f1"
+label = "→"
+to = "inode N"
+
+[[visualizer.steps.arrows]]
+from = "hl"
+label = "→"
+to = "inode N"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "inode N"
+value = "{size=9, nlink=2}"
+
+[[visualizer.steps.stack]]
+name = "s1.st_ino"
+value = "N"
+
+[[visualizer.steps.stack]]
+name = "shl.st_ino"
+value = "N (identique!)"
+
+[[visualizer.steps.stack]]
+name = "s1.st_nlink"
+value = "2"

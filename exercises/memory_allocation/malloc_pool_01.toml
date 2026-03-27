@@ -1,0 +1,379 @@
+common_mistake = "Oublier que le Block* next est stocké DANS les données du bloc libre — quand le bloc est alloué, le next est écrasé par les données utilisateur"
+description = """
+NSY103 — Un pool allocator pré-alloue un bloc de mémoire et distribue des objets de taille fixe sans appeler malloc à chaque fois. Il utilise une liste libre (free list) de blocs disponibles. C'est plus rapide que malloc pour des allocations fréquentes de même taille.
+
+Implémentez un pool de 8 blocs de 16 octets avec alloc/free/stats."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "L'initialisation chaîne tous les blocs dans la free list : chaque Block* pointe vers le suivant",
+    "pool_alloc détache le premier bloc de la free list : `b = free_list; free_list = b->next`",
+    "pool_free réattache le bloc en tête de free list : `b->next = free_list; free_list = b`",
+]
+id = "malloc-pool-01"
+kc_ids = ["KC-C02"]
+key_concept = "Le pool allocator évite malloc/free répétés en pré-allouant et recyclant des blocs de taille fixe via une free list"
+lang = "c"
+prerequisites = ["malloc-2d-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+
+typedef struct Block {
+    struct Block *next;
+} Block;
+
+typedef struct {
+    char memory[POOL_SIZE * BLOCK_SIZE];
+    Block *free_list;
+    int alloc_count;
+} Pool;
+
+void pool_init(Pool *p) {
+    p->free_list = NULL;
+    p->alloc_count = 0;
+    for (int i = POOL_SIZE - 1; i >= 0; i--) {
+        Block *b = (Block *)&p->memory[i * BLOCK_SIZE];
+        b->next = p->free_list;
+        p->free_list = b;
+    }
+}
+
+void *pool_alloc(Pool *p) {
+    if (!p->free_list) return NULL;
+    Block *b = p->free_list;
+    p->free_list = b->next;
+    p->alloc_count++;
+    return (void *)b;
+}
+
+void pool_free(Pool *p, void *ptr) {
+    if (!ptr) return;
+    Block *b = (Block *)ptr;
+    b->next = p->free_list;
+    p->free_list = b;
+    p->alloc_count--;
+}
+
+int main(void) {
+    Pool pool; pool_init(&pool);
+    printf("Pool: %d blocs de %d octets\n", POOL_SIZE, BLOCK_SIZE);
+    printf("alloc_count = %d\n", pool.alloc_count);
+    void *a = pool_alloc(&pool);
+    void *b = pool_alloc(&pool);
+    void *c = pool_alloc(&pool);
+    printf("Apres 3 allocs: count = %d\n", pool.alloc_count);
+    memset(a, 'A', BLOCK_SIZE); memset(b, 'B', BLOCK_SIZE);
+    pool_free(&pool, b);
+    printf("Apres 1 free: count = %d\n", pool.alloc_count);
+    void *d = pool_alloc(&pool);
+    printf("Reuse apres free: %d\n", d == b);
+    printf("Final count = %d\n", pool.alloc_count);
+    (void)a; (void)c; (void)d;
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+
+typedef struct Block {
+    struct Block *next;
+} Block;
+
+typedef struct {
+    char memory[POOL_SIZE * BLOCK_SIZE];
+    Block *free_list;
+    int alloc_count;
+} Pool;
+
+void pool_init(Pool *p) {
+    /* TODO: link all blocks into free_list */
+}
+
+void *pool_alloc(Pool *p) {
+    /* TODO: detach from free_list, increment alloc_count */
+    return NULL;
+}
+
+void pool_free(Pool *p, void *ptr) {
+    /* TODO: reattach to free_list, decrement alloc_count */
+}
+
+int main(void) {
+    // TODO: init, alloc 3x, free 1x, alloc 1x, vérifier réutilisation
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* == EXEMPLE ================================================
+ * Mini free list avec 4 blocs de 8 octets
+ * Montre le pattern detach/reattach.
+ * =========================================================== */
+typedef struct FreeNode { struct FreeNode *next; } FreeNode;
+
+void example_demo(void) {
+    char buf[4 * 8];
+    FreeNode *fl = NULL;
+    for (int i = 3; i >= 0; i--) {
+        FreeNode *n = (FreeNode *)&buf[i * 8];
+        n->next = fl; fl = n;
+    }
+    /* alloc */
+    FreeNode *a = fl; fl = fl->next;
+    FreeNode *b = fl; fl = fl->next;
+    /* free a */
+    a->next = fl; fl = a;
+    /* alloc again */
+    FreeNode *c = fl; fl = fl->next;
+    printf("c == a : %d\n", c == a); /* LIFO */
+    (void)b;
+}
+/* Resultat: c == a : 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Pool allocator : 8 blocs de 16 octets
+ * pool_init, pool_alloc, pool_free
+ * =========================================================== */
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+typedef struct Block { struct Block *next; } Block;
+typedef struct { char memory[POOL_SIZE*BLOCK_SIZE]; Block *free_list; int alloc_count; } Pool;
+
+void pool_init(Pool *p) { (void)p; }
+void *pool_alloc(Pool *p) { (void)p; return NULL; }
+void pool_free(Pool *p, void *ptr) { (void)p; (void)ptr; }
+
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+typedef struct Block { struct Block *next; } Block;
+typedef struct { char memory[POOL_SIZE*BLOCK_SIZE]; Block *free_list; int alloc_count; } Pool;
+
+void pool_init(Pool *p) {
+    p->free_list = NULL; p->alloc_count = 0;
+    for (int i = POOL_SIZE-1; i >= 0; i--) {
+        Block *b = (Block *)&p->memory[i * BLOCK_SIZE];
+        b->next = p->free_list; p->free_list = b;
+    }
+}
+void *pool_alloc(Pool *p) {
+    if (!p->free_list) return NULL;
+    Block *b = p->free_list;
+    p->free_list = b->next;
+    p->alloc_count++;
+    return (void *)b;
+}
+void pool_free(Pool *p, void *ptr) {
+    if (!ptr) return;
+    Block *b = (Block *)ptr;
+    b->next = p->free_list;
+    p->free_list = b;
+    p->____--;
+}
+
+int main(void) {
+    Pool pool; pool_init(&pool);
+    printf("Pool: %d blocs de %d octets\n", POOL_SIZE, BLOCK_SIZE);
+    printf("alloc_count = %d\n", pool.alloc_count);
+    void *a = pool_alloc(&pool);
+    void *b = pool_alloc(&pool);
+    void *c = pool_alloc(&pool);
+    printf("Apres 3 allocs: count = %d\n", pool.alloc_count);
+    memset(a, 'A', BLOCK_SIZE); memset(b, 'B', BLOCK_SIZE);
+    pool_free(&pool, b);
+    printf("Apres 1 free: count = %d\n", pool.alloc_count);
+    void *d = pool_alloc(&pool);
+    printf("Reuse apres free: %d\n", d == b);
+    printf("Final count = %d\n", pool.alloc_count);
+    (void)a; (void)c; (void)d;
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+
+typedef struct Block {
+    struct Block *next;
+} Block;
+
+typedef struct {
+    char memory[POOL_SIZE * BLOCK_SIZE];
+    Block *free_list;
+    int alloc_count;
+} Pool;
+
+void pool_init(Pool *p) {
+    p->free_list = NULL;
+    p->alloc_count = 0;
+    for (int i = POOL_SIZE - 1; i >= 0; i--) {
+        Block *b = (Block *)&p->memory[i * ____];
+        b->next = p->free_list;
+        p->free_list = ____;
+    }
+}
+
+void *pool_alloc(Pool *p) {
+    if (!p->____) return NULL;
+    Block *b = p->free_list;
+    p->free_list = b->____;
+    p->alloc_count++;
+    return (void *)b;
+}
+
+void pool_free(Pool *p, void *ptr) {
+    if (!ptr) return;
+    Block *b = (Block *)ptr;
+    b->next = p->free_list;
+    p->free_list = b;
+    p->____--;
+}
+
+int main(void) {
+    Pool pool;
+    pool_init(&pool);
+    printf("Pool: %d blocs de %d octets\n", POOL_SIZE, BLOCK_SIZE);
+    printf("alloc_count = %d\n", pool.alloc_count);
+
+    void *a = pool_alloc(&pool);
+    void *b = pool_alloc(&pool);
+    void *c = pool_alloc(&pool);
+    printf("Apres 3 allocs: count = %d\n", pool.alloc_count);
+
+    memset(a, 'A', BLOCK_SIZE);
+    memset(b, 'B', BLOCK_SIZE);
+
+    pool_free(&pool, b);
+    printf("Apres 1 free: count = %d\n", pool.alloc_count);
+
+    void *d = pool_alloc(&pool);
+    printf("Reuse apres free: %d\n", d == b);
+    printf("Final count = %d\n", pool.alloc_count);
+    (void)a; (void)c; (void)d;
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define POOL_SIZE 8
+#define BLOCK_SIZE 16
+typedef struct Block { struct Block *next; } Block;
+typedef struct { char memory[POOL_SIZE*BLOCK_SIZE]; Block *free_list; int alloc_count; } Pool;
+
+// Implémentez pool_init, pool_alloc, pool_free
+int main(void) {
+    // TODO: init, alloc 3x, free 1x, alloc 1x, vérifier réutilisation
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "memory_allocation"
+title = "Pool allocator simplifié"
+
+[validation]
+expected_output = """
+Pool: 8 blocs de 16 octets
+alloc_count = 0
+Apres 3 allocs: count = 3
+Apres 1 free: count = 2
+Reuse apres free: 1
+Final count = 3"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Les 8 blocs de 16 octets sont chaînés en liste libre. Chaque bloc commence par un pointeur next vers le suivant. L'allocation = détacher de la liste, le free = réattacher."
+label = "Pool initialisé — 8 blocs libres"
+step_label = "Free list — 128 octets pré-alloués"
+
+[[visualizer.steps.arrows]]
+from = "pool.free_list"
+label = "free_list"
+to = "pool.memory"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "pool.memory"
+value = "[blk0|→blk1|→blk2|...|blk7→NULL]"
+
+[[visualizer.steps.stack]]
+name = "pool.free_list"
+value = "→block[0]"
+
+[[visualizer.steps.stack]]
+name = "pool.alloc_count"
+value = "0"
+
+[[visualizer.steps]]
+explanation = "Après free(b), block[1] est remis en tête de la free list. Le prochain alloc retournera block[1] (LIFO). d == b car le pool réutilise le dernier bloc libéré."
+label = "Après 3 allocs + 1 free"
+step_label = "Free remet le bloc en tête — LIFO"
+
+[[visualizer.steps.arrows]]
+from = "pool.free_list"
+label = "free_list"
+to = "block[1]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "block[1]"
+value = "libre → block[3] → ..."
+
+[[visualizer.steps.stack]]
+name = "pool.free_list"
+value = "→block[1]"
+
+[[visualizer.steps.stack]]
+name = "pool.alloc_count"
+value = "2"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→block[0] (AAAA...)"
+
+[[visualizer.steps.stack]]
+name = "c"
+value = "→block[2]"

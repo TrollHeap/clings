@@ -1,0 +1,85 @@
+common_mistake = "Utiliser `signal()` au lieu de `sigaction()` (comportement non portable). Oublier `sigemptyset(&sa.sa_mask)` — sans cela, `sa_mask` contient des valeurs indéterminées."
+description = """
+Implémentez deux fonctions :
+- `void handler_sigusr1(int sig)` — handler qui incrémente un compteur global `volatile sig_atomic_t g_count`.
+- `int install_handler(void)` — installe `handler_sigusr1` pour SIGUSR1 via `sigaction` (SA_RESTART, sans SA_SIGINFO), retourne 0 en cas de succès ou -1 sinon.
+
+Déclarez `volatile sig_atomic_t g_count = 0;` en global."""
+difficulty = 2
+exercise_type = "complete"
+files = []
+hints = [
+    "Initialisez `struct sigaction sa` : `sa.sa_handler = handler_sigusr1; sigemptyset(&sa.sa_mask); sa.sa_flags = SA_RESTART;`",
+    "Appelez `sigaction(SIGUSR1, &sa, NULL)` et vérifiez que la valeur retournée est 0 (succès).",
+    "Dans le handler, `g_count++` suffit — les opérations sur `sig_atomic_t` sont atomiques par rapport aux signaux.",
+]
+id = "signal-handler-test-01"
+kc_ids = [
+    "sigaction",
+    "SIGUSR1",
+    "sig_atomic_t",
+    "SA_RESTART",
+]
+key_concept = "`sigaction` est la méthode POSIX recommandée pour installer des handlers de signaux. `volatile sig_atomic_t` garantit un accès sûr depuis le handler. `SA_RESTART` relance automatiquement les appels système interrompus."
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+
+volatile sig_atomic_t g_count = 0;
+
+void handler_sigusr1(int sig) {
+    (void)sig;
+    g_count++;
+}
+
+int install_handler(void) {
+    struct sigaction sa;
+    sa.sa_handler = handler_sigusr1;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    return sigaction(SIGUSR1, &sa, NULL) == 0 ? 0 : -1;
+}
+
+int main(void) {
+    if (install_handler() != 0) return 1;
+    kill(getpid(), SIGUSR1);
+    printf("count=%d\n", (int)g_count);
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+
+volatile sig_atomic_t g_count = 0;
+
+/* Handler : incrémente g_count. */
+void handler_sigusr1(int sig) {
+    /* TODO */
+    (void)sig;
+}
+
+/* Installe handler_sigusr1 pour SIGUSR1 via sigaction.
+ * Retourne 0 si succès, -1 sinon. */
+int install_handler(void) {
+    /* TODO */
+    return -1;
+}
+
+int main(void) {
+    if (install_handler() != 0) return 1;
+    kill(getpid(), SIGUSR1);
+    printf("count=%d\n", (int)g_count);
+    return 0;
+}
+'''
+subject = "signals"
+title = "sigaction — installer un handler SIGUSR1"
+
+[validation]
+expected_output = "count=1"
+mode = "output"

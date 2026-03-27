@@ -1,0 +1,192 @@
+common_mistake = "Oublier O_EXCL — sans lui, open réussit même si le fichier existe déjà"
+description = """
+NSY103 — O_CREAT crée le fichier s'il n'existe pas. Combiné avec O_EXCL, l'appel échoue si le fichier existe déjà (création atomique). Le mode (permissions) est le troisième argument.
+
+Créez un fichier avec des permissions spécifiques et vérifiez-les."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "O_EXCL avec O_CREAT fait échouer open si le fichier existe",
+    "0640 = rw-r----- (propriétaire lit/écrit, groupe lit)",
+    "st_mode & 0777 extrait les bits de permission",
+]
+id = "fd-create-01"
+kc_ids = ["KC-C16"]
+key_concept = "O_CREAT|O_EXCL = création atomique, mode = permissions UNIX en octal"
+lang = "c"
+prerequisites = ["fd-open-01"]
+solution_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+int main(void) {
+    const char *path = "/tmp/kf_create_test.txt";
+    unlink(path);
+    int fd = open(path, O_CREAT | O_WRONLY | O_EXCL, 0640);
+    if (fd == -1) { perror("open"); return 1; }
+    write(fd, "created\n", 8);
+    close(fd);
+    struct stat st;
+    stat(path, &st);
+    printf("File created\n");
+    printf("Mode: %o\n", st.st_mode & 0777);
+    printf("Size: %ld\n", (long)st.st_size);
+    unlink(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_create_test.txt";
+    unlink(path);
+    int fd = open(path, O_CREAT | O_WRONLY | ____, 0640);
+    if (fd == -1) { perror("open"); return 1; }
+    write(fd, "created\n", 8);
+    close(fd);
+    struct stat st;
+    stat(path, &st);
+    printf("File created\n");
+    printf("Mode: %o\n", st.st_mode & 0777);
+    printf("Size: %ld\n", (long)st.st_size);
+    unlink(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+/* == VOTRE EXERCICE ====================================== */
+int main(void) {
+    const char *path = "/tmp/kf_create_test.txt";
+    unlink(path);
+    /* TODO: ouvrir path avec O_CREAT|O_WRONLY|O_EXCL, mode 0640 */
+    int fd = -1;
+    if (fd == -1) { perror("open"); return 1; }
+    write(fd, "created\n", 8);
+    close(fd);
+    struct stat st;
+    stat(path, &st);
+    printf("File created\n");
+    printf("Mode: %o\n", st.st_mode & 0777);
+    printf("Size: %ld\n", (long)st.st_size);
+    unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_create_test.txt";
+    unlink(path);
+    int fd = open(path, O_CREAT | O_WRONLY | ____, 0640);
+    if (fd == -1) { perror("open"); return 1; }
+    write(fd, "created\n", 8);
+    close(fd);
+    struct stat st;
+    stat(path, &st);
+    printf("File created\n");
+    printf("Mode: %o\n", st.st_mode & 0777);
+    printf("Size: %ld\n", (long)st.st_size);
+    unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_create_test.txt";
+    unlink(path);
+    int fd = open(path, O_CREAT | O_WRONLY | ____, 0640);
+    if (fd == -1) { perror("open"); return 1; }
+    write(fd, "created\n", 8);
+    close(fd);
+    struct stat st;
+    stat(path, &st);
+    printf("File created\n");
+    printf("Mode: %o\n", st.st_mode & 0777);
+    printf("Size: %ld\n", (long)st.st_size);
+    unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int main(void) {
+    // Créez un fichier avec O_CREAT|O_EXCL, mode 0640
+    // Écrivez "created\n", vérifiez mode et taille avec stat
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "fd_basics"
+title = "Créer un fichier avec open+O_CREAT"
+
+[validation]
+expected_output = """
+File created
+Mode: 640
+Size: 8
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Création unique garantie par O_EXCL"
+heap = []
+label = "open(O_CREAT|O_EXCL) → création atomique"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = ">= 0"
+
+[[visualizer.steps.stack]]
+name = "flags"
+value = "O_CREAT|O_WRONLY|O_EXCL"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "stat récupère les métadonnées du fichier"
+heap = []
+label = "stat() → métadonnées"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "st.st_mode"
+value = "0640"
+
+[[visualizer.steps.stack]]
+name = "st.st_size"
+value = "8"

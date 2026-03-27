@@ -1,0 +1,264 @@
+common_mistake = "Oublier lseek(fd, 0, SEEK_SET) après write — splice lit depuis la position courante"
+description = """
+NSY103 — splice() transfère des données entre un fd et un pipe sans copie en espace utilisateur (zero-copy). C'est plus efficace que read()+write() pour de grandes quantités de données. splice() nécessite qu'au moins un des deux fd soit un pipe.
+
+Créez un fichier temporaire avec du contenu, utilisez splice() pour transférer ce contenu vers un pipe, puis lisez depuis le pipe et affichez."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "splice(fd_in, off_in, fd_out, off_out, len, flags) — un des fd doit être un pipe",
+    "On transfère du fichier (tmpfd) vers le pipe (fd[1])",
+    "Le fichier doit être repositionné au début avec lseek avant splice",
+]
+id = "pipe-splice-01"
+kc_ids = ["KC-C10"]
+key_concept = "splice() transfère des données entre fd et pipe dans le kernel, sans copie en espace utilisateur"
+lang = "c"
+prerequisites = ["pipe-select-01"]
+solution_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_splice_XXXXXX";
+    int tmpfd = mkstemp(tmpfile);
+    const char *data = "splice zero-copy";
+    write(tmpfd, data, strlen(data));
+    lseek(tmpfd, 0, SEEK_SET);
+
+    int fd[2];
+    pipe(fd);
+    ssize_t moved = splice(tmpfd, NULL, fd[1], NULL, strlen(data), 0);
+    close(tmpfd);
+    unlink(tmpfile);
+
+    char buf[64];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Spliced %zd bytes: %s\n", moved, buf);
+    close(fd[0]);
+    close(fd[1]);
+    return 0;
+}'''
+starter_code = '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_splice_XXXXXX";
+    int tmpfd = mkstemp(tmpfile);
+    const char *data = "splice zero-copy";
+    write(tmpfd, data, strlen(data));
+    lseek(tmpfd, 0, SEEK_SET);
+
+    int fd[2];
+    pipe(fd);
+    ssize_t moved = ____(tmpfd, NULL, fd[____], NULL, strlen(data), 0);
+    close(tmpfd);
+    unlink(tmpfile);
+
+    char buf[64];
+    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Spliced %zd bytes: %s\n", moved, buf);
+    close(fd[0]);
+    close(fd[1]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* == EXEMPLE =======================================
+ * splice() entre 2 pipes : zero-copy pipe-to-pipe
+ * ================================================= */
+void example_splice_pipes(void) {
+    int p1[2], p2[2];
+    pipe(p1); pipe(p2);
+    write(p1[1], "hello", 5);
+    close(p1[1]);
+    splice(p1[0], NULL, p2[1], NULL, 5, 0);
+    close(p2[1]);
+    char buf[16];
+    ssize_t n = read(p2[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("Pipe-to-pipe: %s\n", buf);
+    close(p1[0]); close(p2[0]);
+}
+/* Resultat: Pipe-to-pipe: hello */
+
+/* == VOTRE EXERCICE ================================
+ * splice() fichier → pipe : zero-copy file-to-pipe
+ * ================================================= */
+int main(void) {
+    char tmpfile[] = "/tmp/kf_splice_XXXXXX";
+    int tmpfd = mkstemp(tmpfile);
+    const char *data = "splice zero-copy";
+    write(tmpfd, data, strlen(data));
+    lseek(tmpfd, 0, SEEK_SET);
+    int fd[2]; pipe(fd);
+    /* TODO: splice(tmpfd, NULL, fd[1], NULL, strlen(data), 0) */
+    close(tmpfd); unlink(tmpfile);
+    char buf[64];
+    ssize_t n = read(fd[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("Spliced %zd bytes: %s\n", (ssize_t)strlen(data), buf);
+    close(fd[0]); close(fd[1]);
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_splice_XXXXXX";
+    int tmpfd = mkstemp(tmpfile);
+    const char *data = "splice zero-copy";
+    write(tmpfd, data, strlen(data));
+    lseek(tmpfd, 0, SEEK_SET);
+    int fd[2]; pipe(fd);
+    ssize_t moved = splice(tmpfd, NULL, fd[____], NULL, strlen(data), 0);  // quel fd ?
+    close(tmpfd); unlink(tmpfile);
+    char buf[64];
+    ssize_t n = read(fd[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("Spliced %zd bytes: %s\n", moved, buf);
+    close(fd[0]); close(fd[1]);
+    return 0;
+}''',
+    '''
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    char tmpfile[] = "/tmp/kf_splice_XXXXXX";
+    int tmpfd = mkstemp(tmpfile);
+    const char *data = "splice zero-copy";
+    write(tmpfd, data, strlen(data));
+    lseek(tmpfd, 0, SEEK_SET);
+
+    int fd[2];
+    pipe(fd);
+    ssize_t moved = ____(tmpfd, NULL, fd[____], NULL, strlen(data), 0);
+    close(tmpfd);
+    unlink(tmpfile);
+
+    char buf[64];
+    ssize_t n = read(fd[____], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("Spliced %zd bytes: %s\n", moved, buf);
+    close(fd[0]);
+    close(fd[1]);
+    return 0;
+}''',
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    // Créez un fichier temporaire avec "splice zero-copy"
+    // Utilisez splice() pour transférer vers un pipe
+    // Lisez depuis le pipe, affichez "Spliced 16 bytes: splice zero-copy"
+    return 0;
+}""",
+    """
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Zero-copy avec splice()"
+
+[validation]
+expected_output = """
+Spliced 16 bytes: splice zero-copy
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "mkstemp() crée un fichier temporaire unique et retourne un fd ouvert. Après le write(), lseek(tmpfd, 0, SEEK_SET) repositionne le curseur au début — sans cette étape, splice() lirait depuis la position courante (fin du fichier) et ne transférerait rien."
+label = "Fichier temporaire créé avec mkstemp"
+step_label = "Étape 1 — mkstemp() crée le fichier source, lseek() remet le curseur au début"
+
+[[visualizer.steps.edges]]
+label = "write + lseek(0)"
+source = "file"
+target = "fd"
+
+[[visualizer.steps.nodes]]
+id = "file"
+label = """
+tmpfile
+"splice zero-copy""""
+
+[[visualizer.steps.nodes]]
+id = "fd"
+label = "tmpfd"
+
+[[visualizer.steps]]
+explanation = "splice() déplace les pages du page cache du fichier directement dans le buffer circulaire du pipe, sans jamais copier les données en espace utilisateur. Le kernel déplace des pointeurs de pages plutôt que du contenu — la performance est constante quelle que soit la taille transférée."
+label = "splice(tmpfd → fd[1]) — zero-copy kernel transfer"
+step_label = "Étape 2 — splice() transfère sans copie du fichier vers le pipe"
+
+[[visualizer.steps.edges]]
+label = "splice (no userspace copy)"
+source = "tmpfd"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "tmpfd"
+label = "tmpfd (fichier)"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe fd[1]"
+
+[[visualizer.steps]]
+explanation = "read(fd[0]) récupère les données depuis le pipe — l'extrémité lecture du buffer circulaire kernel. Le nombre d'octets retourné par splice() correspond exactement à ce qui sera disponible en lecture, ce qui permet d'imprimer le compte précis sans appel supplémentaire."
+label = "read(fd[0]) — récupérer les données"
+step_label = "Étape 3 — read(fd[0]) consomme les données transférées par splice()"
+
+[[visualizer.steps.edges]]
+label = "16 bytes"
+source = "pipe"
+target = "buf"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe fd[0]"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = 'buf = "splice zero-copy"'

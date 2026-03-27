@@ -1,0 +1,365 @@
+common_mistake = "Retourner 0 au lieu de n dans next_use() quand la page n'est plus accédée — une page jamais réutilisée doit avoir priorité maximale d'éviction"
+description = """
+NSY103/UTC502 — L'algorithme optimal de Bélády (OPT) remplace la page dont le prochain accès est le plus éloigné dans le futur. Irréalisable en pratique (nécessite de connaître le futur), il sert de borne inférieure théorique pour évaluer les autres algorithmes.
+
+Implémentez OPT : pour chaque défaut, calculez next_use() pour chaque page en mémoire et expulsez celle dont l'utilisation future est la plus lointaine. Référence : {1,2,3,4,1,2,5,1,2,3,4,5}, 3 frames."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "next_use() parcourt refs[from..n-1] et retourne l'index du premier accès futur à page — retournez n (infini) si la page n'est plus utilisée",
+    "find_opt() appelle next_use() pour chaque frame et retourne l'index de la frame avec le next_use le plus grand",
+    "Dans main, appelez find_opt(frames, refs, REFS, i + 1) — le +1 car on cherche l'utilisation APRÈS l'accès courant",
+]
+id = "vm-page-replacement-opt-01"
+kc_ids = ["KC-C14"]
+key_concept = "OPT remplace la page dont l'accès futur est le plus éloigné — borne théorique inférieure, impossible en production"
+lang = "c"
+prerequisites = ["vm-page-replacement-lru-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int next_use(int refs[], int n, int from, int page) {
+    for (int i = from; i < n; i++)
+        if (refs[i] == page) return i;
+    return n;
+}
+
+int find_opt(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    for (int i = 0; i < FRAMES; i++) {
+        int nu = next_use(refs, n, from, frames[i]);
+        if (nu > farthest) {
+            farthest = nu;
+            victim = i;
+        }
+    }
+    return victim;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int filled = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) {
+                frames[filled++] = refs[i];
+            } else {
+                int victim = find_opt(frames, refs, REFS, i + 1);
+                frames[victim] = refs[i];
+            }
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Retourne le prochain index d'utilisation de page a partir de from, ou n si jamais */
+int next_use(int refs[], int n, int from, int page) {
+    for (int i = from; i < n; i++)
+        if (refs[i] == page) return i;
+    return ____;
+}
+
+/* Retourne l'index de la frame victime (prochain acces le plus lointain) */
+int find_opt(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    for (int i = 0; i < FRAMES; i++) {
+        int nu = ____(refs, n, from, frames[i]);
+        if (nu > farthest) {
+            farthest = nu;
+            victim = i;
+        }
+    }
+    return victim;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int filled = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) {
+                frames[filled++] = refs[i];
+            } else {
+                int victim = ____(frames, refs, REFS, i + 1);
+                frames[victim] = refs[i];
+            }
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 2
+#define REFS 6
+
+/* == EXEMPLE OPT resolu : refs={3,2,1,0,3,2}, 2 frames == */
+int next_use_ex(int refs[], int n, int from, int page) {
+    for (int i = from; i < n; i++)
+        if (refs[i] == page) return i;
+    return n;  /* jamais = infini */
+}
+
+int find_opt_ex(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    for (int i = 0; i < FRAMES; i++) {
+        int nu = next_use_ex(refs, n, from, frames[i]);
+        if (nu > farthest) { farthest = nu; victim = i; }
+    }
+    return victim;
+}
+
+int in_frames_ex(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+void example_opt(void) {
+    int refs[] = {3, 2, 1, 0, 3, 2};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0, filled = 0;
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames_ex(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) frames[filled++] = refs[i];
+            else { int v = find_opt_ex(frames, refs, REFS, i+1); frames[v] = refs[i]; }
+            faults++;
+        }
+    }
+    printf("Example OPT faults: %d\n", faults); /* 4 */
+}
+
+/* Maintenant implementez OPT pour refs={1,2,3,4,1,2,5,1,2,3,4,5}, 3 frames */
+int main(void) {
+    example_opt();
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int next_use(int refs[], int n, int from, int page) {
+    for (int i = from; i < n; i++)
+        if (refs[i] == page) return i;
+    return n;
+}
+
+int find_opt(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    for (int i = 0; i < FRAMES; i++) {
+        int nu = next_use(refs, n, from, frames[i]);
+        if (nu > farthest) {
+            farthest = nu;
+            victim = i;
+        }
+    }
+    return victim;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int filled = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) {
+                frames[filled++] = refs[i];
+            } else {
+                int victim = find_opt(frames, refs, REFS, ____);
+                frames[victim] = refs[i];
+            }
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Retourne le prochain index d'utilisation de page a partir de from, ou n si jamais */
+int next_use(int refs[], int n, int from, int page) {
+    for (int i = from; i < n; i++)
+        if (refs[i] == page) return i;
+    return ____;
+}
+
+/* Retourne l'index de la frame victime (prochain acces le plus lointain) */
+int find_opt(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    for (int i = 0; i < FRAMES; i++) {
+        int nu = ____(refs, n, from, frames[i]);
+        if (nu > farthest) {
+            farthest = nu;
+            victim = i;
+        }
+    }
+    return victim;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int filled = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) {
+                frames[filled++] = refs[i];
+            } else {
+                int victim = ____(frames, refs, REFS, i + 1);
+                frames[victim] = refs[i];
+            }
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+/* Parcourir refs[from..n-1], retourner l'index du premier refs[i]==page
+   Si page n'apparait plus, retourner n (traite comme infini) */
+int next_use(int refs[], int n, int from, int page) {
+    return n;
+}
+
+/* Pour chaque frame, calculer next_use(). Retourner l'index de la frame
+   avec le next_use le plus grand (la plus lointaine dans le futur) */
+int find_opt(int frames[], int refs[], int n, int from) {
+    int farthest = -1, victim = 0;
+    /* appeler next_use pour chaque frame, comparer a farthest */
+    return victim;
+}
+
+int in_frames(int frames[], int n, int page) {
+    for (int i = 0; i < n; i++)
+        if (frames[i] == page) return 1;
+    return 0;
+}
+
+int main(void) {
+    int refs[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int frames[FRAMES];
+    memset(frames, -1, sizeof(frames));
+    int faults = 0;
+    int filled = 0;
+
+    for (int i = 0; i < REFS; i++) {
+        if (!in_frames(frames, FRAMES, refs[i])) {
+            if (filled < FRAMES) {
+                /* remplissage initial */
+                frames[filled++] = refs[i];
+            } else {
+                /* frames pleines : trouver la victime OPT, puis remplacer */
+            }
+            faults++;
+        }
+    }
+    printf("Page faults: %d\n", faults);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+
+#define FRAMES 3
+#define REFS 12
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "Remplacement de pages : algorithme OPT (Bélády)"
+
+[validation]
+expected_output = """
+Page faults: 7
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Pages 1,2,3 chargées. frames=[1,2,3]. 3 défauts."
+label = "Remplissage i=0..2"
+step_label = "Étape 1"
+
+[[visualizer.steps]]
+explanation = "next_use: 1→idx4, 2→idx5, 3→idx9. Page 3 la plus lointaine → victime. frames=[1,2,4]. faults=4."
+label = "i=3 page 4 — victime OPT"
+step_label = "Étape 2"
+
+[[visualizer.steps]]
+explanation = "next_use: 1→idx7, 2→idx8, 4→idx10. Page 4 la plus lointaine → victime. frames=[1,2,5]. Puis 3 défauts en fin. Total=7."
+label = "i=6 page 5 — victime OPT"
+step_label = "Étape 3"

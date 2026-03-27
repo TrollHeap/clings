@@ -1,0 +1,315 @@
+common_mistake = "Oublier les parenthèses dans (*out)[i] — sans elles, *out[i] déréférence out[i] (mauvais)"
+description = """
+NSY103 — Un double pointeur `int **pp` permet à une fonction d'allouer de la mémoire et de renvoyer le résultat via un paramètre de sortie. C'est un pattern courant dans les API C (ex: `getline`).
+
+Implémentez `alloc_sequence(int **out, int n)` qui alloue un tableau de n entiers et le remplit avec la séquence 0, 1, 4, 9, ... (carrés)."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Le double pointeur permet de modifier data dans main : `*out = malloc(...)`",
+    "Pour accéder aux éléments : `(*out)[i]` — les parenthèses sont obligatoires",
+    "Appeler avec `alloc_sequence(&data, n)` — passer l'adresse du pointeur",
+]
+id = "ptr-ptr-03"
+kc_ids = ["KC-C01"]
+key_concept = "int **out permet à une fonction d'allouer et retourner un pointeur via paramètre de sortie"
+lang = "c"
+prerequisites = ["ptr-ptr-02"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int alloc_sequence(int **out, int n) {
+    *out = malloc(n * sizeof(int));
+    if (!*out) return -1;
+    for (int i = 0; i < n; i++) {
+        (*out)[i] = i * i;
+    }
+    return 0;
+}
+
+int main(void) {
+    int *data = NULL;
+    int n = 6;
+    if (alloc_sequence(&data, n) != 0) {
+        fprintf(stderr, "Erreur allocation\n");
+        return 1;
+    }
+    for (int i = 0; i < n; i++) printf("%d ", data[i]);
+    printf("\n");
+    free(data);
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+#include <stdlib.h>
+
+int alloc_sequence(int **out, int n) {
+    return -1;
+}
+
+int main(void) {
+    int *data = NULL;
+    // TODO: appeler alloc_sequence, afficher, free
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Allocation d'un buffer de chars via double pointeur
+ * La fonction alloue et remplit, l'appelant libere.
+ * =========================================================== */
+int example_alloc_greeting(char **out, const char *name) {
+    int len = 7 + (int)strlen(name) + 1;
+    *out = malloc(len);
+    if (!*out) return -1;
+    snprintf(*out, len, "Bonjour %s", name);
+    return 0;
+}
+void example_demo(void) {
+    char *msg = NULL;
+    if (example_alloc_greeting(&msg, "Alice") == 0) {
+        printf("%s\n", msg);
+        free(msg);
+    }
+}
+/* Resultat: Bonjour Alice */
+
+/* == VOTRE EXERCICE =========================================
+ * Allocation d'un tableau de carres via double pointeur
+ * Inspirez-vous de example_alloc_greeting ci-dessus.
+ * alloc_sequence(&data, n) remplit avec i*i.
+ * =========================================================== */
+#include <string.h>
+
+int alloc_sequence(int **out, int n) {
+    (void)out; (void)n;
+    return -1; /* TODO */
+}
+
+int main(void) {
+    int *data = NULL;
+    int n = 6;
+    if (alloc_sequence(&data, n) != 0) {
+        fprintf(stderr, "Erreur allocation\n");
+        return 1;
+    }
+    for (int i = 0; i < n; i++) printf("%d ", data[i]);
+    printf("\n");
+    free(data);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int alloc_sequence(int **out, int n) {
+    *out = malloc(n * sizeof(int));
+    if (!*out) return -1;
+    for (int i = 0; i < n; i++) {
+        (*out)[i] = ____; // carré de i
+    }
+    return 0;
+}
+
+int main(void) {
+    int *data = NULL;
+    int n = 6;
+    if (alloc_sequence(&data, n) != 0) {
+        fprintf(stderr, "Erreur allocation\n");
+        return 1;
+    }
+    for (int i = 0; i < n; i++) printf("%d ", ____);
+    printf("\n");
+    free(data);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int alloc_sequence(____ **out, int n) {
+    *out = ____;
+    if (!____) return -1;
+    for (int i = 0; i < n; i++) {
+        (*out)[i] = ____;
+    }
+    return 0;
+}
+
+int main(void) {
+    int *data = NULL;
+    int n = 6;
+    if (alloc_sequence(____, n) != 0) {
+        fprintf(stderr, "Erreur allocation\n");
+        return 1;
+    }
+    for (int i = 0; i < n; i++) {
+        printf("%d ", data[i]);
+    }
+    printf("\n");
+    free(data);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+// Implémentez alloc_sequence(int **out, int n)
+// Alloue n ints, remplit avec i*i, retourne 0 ou -1
+int alloc_sequence(int **out, int n) {
+    (void)out; (void)n;
+    return -1;
+}
+
+int main(void) {
+    int *data = NULL;
+    // TODO: appeler alloc_sequence, afficher, free
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+int alloc_sequence(int **out, int n) {
+    (void)out; (void)n;
+    return -1;
+}
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "Allocation dynamique via double pointeur"
+
+[validation]
+expected_output = "0 1 4 9 16 25"
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "data est un pointeur initialisé à NULL. Pour que alloc_sequence puisse modifier data, on passe &data (l'adresse du pointeur)."
+heap = []
+label = "Avant alloc_sequence — data = NULL"
+step_label = "data = NULL — avant allocation"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "NULL"
+
+[[visualizer.steps.stack]]
+name = "n"
+value = "6"
+
+[[visualizer.steps]]
+explanation = "out pointe vers data (dans main). *out = malloc(...) modifie directement data. (*out)[i] = i*i remplit le tableau via double déréférencement."
+label = "Dans alloc_sequence — *out = malloc(...)"
+step_label = "*out = malloc — data modifié via double pointeur"
+
+[[visualizer.steps.arrows]]
+from = "out"
+label = "*out"
+to = "data"
+
+[[visualizer.steps.arrows]]
+from = "data"
+label = "data[i]"
+to = "[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = false
+
+[[visualizer.steps.call_frames]]
+args = "&data, 6"
+function_name = "alloc_sequence"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "[0]"
+value = "0"
+
+[[visualizer.steps.heap]]
+address = "[1]"
+value = "1"
+
+[[visualizer.steps.heap]]
+address = "[2]"
+value = "4"
+
+[[visualizer.steps.heap]]
+address = "[3]"
+value = "9"
+
+[[visualizer.steps.heap]]
+address = "[4]"
+value = "16"
+
+[[visualizer.steps.heap]]
+address = "[5]"
+value = "25"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "→heap"
+
+[[visualizer.steps.stack]]
+name = "out"
+value = "→data"
+
+[[visualizer.steps]]
+explanation = "data pointe maintenant vers le bloc alloué par alloc_sequence. main peut utiliser data[i] et doit appeler free(data) quand c'est terminé."
+label = "Retour dans main — data pointe vers le heap"
+step_label = "Retour — data prêt à utiliser"
+
+[[visualizer.steps.arrows]]
+from = "data"
+to = "[0]"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "[0]"
+value = "0"
+
+[[visualizer.steps.heap]]
+address = "[1]"
+value = "1"
+
+[[visualizer.steps.heap]]
+address = "[2]"
+value = "4"
+
+[[visualizer.steps.heap]]
+address = "[3]"
+value = "9"
+
+[[visualizer.steps.heap]]
+address = "[4]"
+value = "16"
+
+[[visualizer.steps.heap]]
+address = "[5]"
+value = "25"
+
+[[visualizer.steps.stack]]
+name = "data"
+value = "→heap"

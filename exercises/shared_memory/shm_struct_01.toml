@@ -1,0 +1,294 @@
+common_mistake = "Allouer moins que sizeof(struct) avec ftruncate → les champs en fin de struct sont en dehors du segment"
+description = """
+NSY103 — On peut mapper une struct entière en mémoire partagée. Le pointeur retourné par mmap est casté vers le type de la struct. Tous les champs sont alors accessibles par les deux processus.
+
+Créez un segment partagé contenant une struct avec un compteur et un message. L'enfant initialise les champs, le parent lit après wait()."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "ftruncate(fd, sizeof(SharedState)) alloue exactement la taille de la struct",
+    "Le cast (SharedState *)mmap(...) permet d'accéder aux champs via ->",
+    '''strncpy avec limite 63 pour le buffer de 64 (garder place pour '\0')''',
+]
+id = "shm-struct-01"
+kc_ids = ["KC-C13"]
+key_concept = "On peut mapper n'importe quel type C en mémoire partagée ; sizeof() pour la taille"
+lang = "c"
+prerequisites = ["shm-readwrite-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int counter;
+    char message[64];
+} SharedState;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_struct", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedState));
+    SharedState *state = (SharedState *)mmap(NULL, sizeof(SharedState),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (fork() == 0) {
+        state->counter = 7;
+        strncpy(state->message, "shared struct", 63);
+        _exit(0);
+    }
+    wait(NULL);
+    printf("counter=%d message=%s\n", state->counter, state->message);
+
+    munmap(state, sizeof(SharedState));
+    shm_unlink("/kf_shm_struct");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int counter;
+    char message[64];
+} SharedState;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_struct", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(____));
+    SharedState *state = (SharedState *)mmap(NULL, sizeof(SharedState),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (fork() == 0) {
+        state->____ = 7;
+        strncpy(state->____, "shared struct", 63);
+        _exit(0);
+    }
+    wait(NULL);
+    printf("counter=%d message=%s\n", state->counter, state->message);
+
+    munmap(state, sizeof(SharedState));
+    shm_unlink("/kf_shm_struct");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct { int counter; char message[64]; } SharedState;
+
+/* == EXEMPLE =======================================
+ * Struct Config partagee : port + host
+ * ================================================= */
+typedef struct { int port; char host[32]; } Config;
+void example_shm_struct(void) {
+    int fd = shm_open("/kf_ex_cfg", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, sizeof(Config));
+    Config *c = (Config *)mmap(NULL, sizeof(Config), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    if (fork() == 0) { c->port = 8080; strncpy(c->host, "localhost", 31); _exit(0); }
+    wait(NULL);
+    printf("port=%d host=%s\n", c->port, c->host);
+    munmap(c, sizeof(Config)); shm_unlink("/kf_ex_cfg");
+}
+/* Resultat: port=8080 host=localhost */
+
+/* == VOTRE EXERCICE ================================
+ * SharedState{counter, message} en shm.
+ * ================================================= */
+int main(void) {
+    int fd = shm_open("/kf_shm_struct", O_CREAT|O_RDWR, 0644);
+    ftruncate(fd, sizeof(SharedState));
+    SharedState *state = (SharedState *)mmap(NULL, sizeof(SharedState), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    /* TODO: fork, child sets counter=7 and message="shared struct", parent reads */
+    munmap(state, sizeof(SharedState)); shm_unlink("/kf_shm_struct");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int counter;
+    char message[64];
+} SharedState;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_struct", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(____));
+    SharedState *state = (SharedState *)mmap(NULL, sizeof(SharedState),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (fork() == 0) {
+        state->____ = 7;
+        strncpy(state->____, "shared struct", 63);
+        _exit(0);
+    }
+    wait(NULL);
+    printf("counter=%d message=%s\n", state->counter, state->message);
+
+    munmap(state, sizeof(SharedState));
+    shm_unlink("/kf_shm_struct");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct {
+    int counter;
+    char message[64];
+} SharedState;
+
+int main(void) {
+    int fd = shm_open("/kf_shm_struct", O_CREAT | O_RDWR, 0644);
+    ftruncate(fd, sizeof(____));
+    SharedState *state = (SharedState *)mmap(NULL, sizeof(SharedState),
+        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (fork() == 0) {
+        state->____ = 7;
+        strncpy(state->____, "shared struct", 63);
+        _exit(0);
+    }
+    wait(NULL);
+    printf("counter=%d message=%s\n", state->counter, state->message);
+
+    munmap(state, sizeof(SharedState));
+    shm_unlink("/kf_shm_struct");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+typedef struct { int counter; char message[64]; } SharedState;
+
+int main(void) {
+    // Créez /kf_shm_struct, mappez SharedState
+    // fork: enfant écrit counter=7 et message="shared struct"
+    // Parent wait + affiche
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "shared_memory"
+title = "Struct en mémoire partagée"
+
+[validation]
+expected_output = """
+counter=7 message=shared struct
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Le segment est mappé et casté vers SharedState*. sizeof(SharedState) garantit la bonne taille."
+label = "mmap retourne un pointeur SharedState*"
+step_label = "mmap SharedState"
+
+[[visualizer.steps.arrows]]
+from = "state (SharedState*)"
+to = "SharedState"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedState"
+value = "counter=? message=?"
+
+[[visualizer.steps.stack]]
+name = "state (SharedState*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = """L'enfant écrit counter=7 et message="shared struct" dans le segment partagé."""
+label = "Enfant initialise les champs"
+step_label = "child writes"
+
+[[visualizer.steps.arrows]]
+from = "state (SharedState*)"
+to = "SharedState"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (child)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedState"
+value = 'counter=7 message="shared struct"'
+
+[[visualizer.steps.stack]]
+name = "state (SharedState*)"
+value = "0xSHM"
+
+[[visualizer.steps]]
+explanation = "Le parent voit les valeurs écrites par l'enfant grâce au mapping MAP_SHARED."
+label = "Parent lit les champs après wait()"
+step_label = "parent reads"
+
+[[visualizer.steps.arrows]]
+from = "state (SharedState*)"
+to = "SharedState"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main (parent)"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "0xSHM"
+name = "SharedState"
+value = 'counter=7 message="shared struct"'
+
+[[visualizer.steps.stack]]
+name = "state (SharedState*)"
+value = "0xSHM"

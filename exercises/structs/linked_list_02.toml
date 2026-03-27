@@ -1,0 +1,485 @@
+common_mistake = "Oublier de mettre à jour prev lors de l'insertion — la liste fonctionne forward mais pas backward"
+description = """
+NSY103 — Une liste doublement chaînée ajoute un pointeur `prev` à chaque nœud. Cela permet de parcourir la liste dans les deux sens et de supprimer un nœud en O(1) si on a déjà son adresse.
+
+Implémentez `insert_front`, `insert_back`, `print_forward`, `print_backward` et `free_list`."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Chaque nœud a deux pointeurs : `prev` et `next`, initialisés à NULL",
+    "insert_front : le nouveau nœud pointe next vers l'ancien head, et l'ancien head pointe prev vers le nouveau",
+    "print_backward : partir de tail, suivre prev jusqu'à NULL",
+]
+id = "linked-list-02"
+kc_ids = ["KC-C03"]
+key_concept = "Le double chaînage (prev+next) permet le parcours bidirectionnel et la suppression O(1)"
+lang = "c"
+prerequisites = ["linked-list-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode {
+    int val;
+    struct DNode *prev;
+    struct DNode *next;
+} DNode;
+
+typedef struct { DNode *head; DNode *tail; } DList;
+
+DNode *make_dnode(int val) {
+    DNode *n = malloc(sizeof(DNode));
+    if (!n) return NULL;
+    n->val = val;
+    n->prev = NULL;
+    n->next = NULL;
+    return n;
+}
+
+void insert_front(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->next = list->head;
+    if (list->head) list->head->prev = n;
+    list->head = n;
+    if (!list->tail) list->tail = n;
+}
+
+void insert_back(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->prev = list->tail;
+    if (list->tail) list->tail->next = n;
+    list->tail = n;
+    if (!list->head) list->head = n;
+}
+
+void print_forward(const DList *list) {
+    for (DNode *c = list->head; c; c = c->next)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void print_backward(const DList *list) {
+    for (DNode *c = list->tail; c; c = c->prev)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void free_list(DList *list) {
+    DNode *c = list->head;
+    while (c) {
+        DNode *tmp = c->next;
+        free(c);
+        c = tmp;
+    }
+    list->head = list->tail = NULL;
+}
+
+int main(void) {
+    DList list = {NULL, NULL};
+    insert_back(&list, 1);
+    insert_back(&list, 2);
+    insert_back(&list, 3);
+    insert_front(&list, 0);
+    printf("Forward  : ");
+    print_forward(&list);
+    printf("Backward : ");
+    print_backward(&list);
+    free_list(&list);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode {
+    int val;
+    struct DNode *prev;
+    struct DNode *next;
+} DNode;
+
+typedef struct { DNode *head; DNode *tail; } DList;
+
+DNode *make_dnode(int val) {
+    DNode *n = malloc(sizeof(DNode));
+    if (!n) return NULL;
+    n->val = val;
+    n->prev = ____;
+    n->next = ____;
+    return n;
+}
+
+void insert_front(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->next = ____;
+    if (list->head) list->head->____ = n;
+    list->head = n;
+    if (!list->____) list->tail = n;
+}
+
+void insert_back(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->prev = list->tail;
+    if (list->tail) list->tail->next = n;
+    list->tail = n;
+    if (!list->head) list->head = n;
+}
+
+void print_forward(const DList *list) {
+    for (DNode *c = list->head; c; c = c->____)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void print_backward(const DList *list) {
+    for (DNode *c = list->tail; c; c = c->____)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void free_list(DList *list) {
+    DNode *c = list->head;
+    while (c) {
+        DNode *tmp = c->next;
+        free(c);
+        c = tmp;
+    }
+    list->head = list->tail = NULL;
+}
+
+int main(void) {
+    DList list = {NULL, NULL};
+    insert_back(&list, 1);
+    insert_back(&list, 2);
+    insert_back(&list, 3);
+    insert_front(&list, 0);
+    printf("Forward  : ");
+    print_forward(&list);
+    printf("Backward : ");
+    print_backward(&list);
+    free_list(&list);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* == EXEMPLE ================================================
+ * Deque (double-ended queue) avec push_front et push_back
+ * Chaque noeud a prev et next pour parcours bidirectionnel.
+ * =========================================================== */
+typedef struct QNode { char c; struct QNode *prev, *next; } QNode;
+typedef struct { QNode *head, *tail; } Deque;
+
+void example_push_back(Deque *d, char c) {
+    QNode *n = malloc(sizeof(QNode));
+    if (!n) return;
+    n->c = c; n->prev = d->tail; n->next = NULL;
+    if (d->tail) d->tail->next = n;
+    d->tail = n;
+    if (!d->head) d->head = n;
+}
+void example_demo(void) {
+    Deque d = {NULL, NULL};
+    example_push_back(&d, 'A');
+    example_push_back(&d, 'B');
+    example_push_back(&d, 'C');
+    for (QNode *c = d.head; c; c = c->next) printf("%c ", c->c);
+    printf("\n");
+    for (QNode *c = d.tail; c; c = c->prev) printf("%c ", c->c);
+    printf("\n");
+    QNode *c = d.head;
+    while (c) { QNode *t = c->next; free(c); c = t; }
+}
+/* Resultat: A B C / C B A */
+
+/* == VOTRE EXERCICE =========================================
+ * Liste doublement chainee avec insert_front, insert_back
+ * print_forward, print_backward, free_list
+ * =========================================================== */
+typedef struct DNode { int val; struct DNode *prev, *next; } DNode;
+typedef struct { DNode *head, *tail; } DList;
+
+DNode *make_dnode(int val) { (void)val; return NULL; }
+void insert_front(DList *list, int val) { (void)list; (void)val; }
+void insert_back(DList *list, int val) { (void)list; (void)val; }
+void print_forward(const DList *list) { (void)list; }
+void print_backward(const DList *list) { (void)list; }
+void free_list(DList *list) { (void)list; }
+
+int main(void) {
+    DList list = {NULL, NULL};
+    insert_back(&list, 1); insert_back(&list, 2); insert_back(&list, 3);
+    insert_front(&list, 0);
+    printf("Forward  : "); print_forward(&list);
+    printf("Backward : "); print_backward(&list);
+    free_list(&list);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode { int val; struct DNode *prev, *next; } DNode;
+typedef struct { DNode *head, *tail; } DList;
+
+DNode *make_dnode(int val) {
+    DNode *n = malloc(sizeof(DNode));
+    if (!n) return NULL;
+    n->val = val; n->prev = NULL; n->next = NULL;
+    return n;
+}
+void insert_front(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->next = list->head;
+    if (list->head) list->head->prev = n;
+    list->head = n;
+    if (!list->tail) list->tail = n;
+}
+void insert_back(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->prev = list->tail;
+    if (list->tail) list->tail->next = n;
+    list->tail = n;
+    if (!list->head) list->head = n;
+}
+void print_forward(const DList *list) {
+    for (DNode *c = list->head; c; c = c->next)
+        printf("%d ", c->val);
+    printf("\n");
+}
+void print_backward(const DList *list) {
+    for (DNode *c = list->tail; c; c = c->____)
+        printf("%d ", c->val);
+    printf("\n");
+}
+void free_list(DList *list) {
+    DNode *c = list->head;
+    while (c) { DNode *tmp = c->next; free(c); c = tmp; }
+    list->head = list->tail = NULL;
+}
+
+int main(void) {
+    DList list = {NULL, NULL};
+    insert_back(&list, 1); insert_back(&list, 2); insert_back(&list, 3);
+    insert_front(&list, 0);
+    printf("Forward  : "); print_forward(&list);
+    printf("Backward : "); print_backward(&list);
+    free_list(&list);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode {
+    int val;
+    struct DNode *prev;
+    struct DNode *next;
+} DNode;
+
+typedef struct { DNode *head; DNode *tail; } DList;
+
+DNode *make_dnode(int val) {
+    DNode *n = malloc(sizeof(DNode));
+    if (!n) return NULL;
+    n->val = val;
+    n->prev = ____;
+    n->next = ____;
+    return n;
+}
+
+void insert_front(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->next = ____;
+    if (list->head) list->head->____ = n;
+    list->head = n;
+    if (!list->____) list->tail = n;
+}
+
+void insert_back(DList *list, int val) {
+    DNode *n = make_dnode(val);
+    if (!n) return;
+    n->prev = list->tail;
+    if (list->tail) list->tail->next = n;
+    list->tail = n;
+    if (!list->head) list->head = n;
+}
+
+void print_forward(const DList *list) {
+    for (DNode *c = list->head; c; c = c->____)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void print_backward(const DList *list) {
+    for (DNode *c = list->tail; c; c = c->____)
+        printf("%d ", c->val);
+    printf("\n");
+}
+
+void free_list(DList *list) {
+    DNode *c = list->head;
+    while (c) {
+        DNode *tmp = c->next;
+        free(c);
+        c = tmp;
+    }
+    list->head = list->tail = NULL;
+}
+
+int main(void) {
+    DList list = {NULL, NULL};
+    insert_back(&list, 1);
+    insert_back(&list, 2);
+    insert_back(&list, 3);
+    insert_front(&list, 0);
+    printf("Forward  : ");
+    print_forward(&list);
+    printf("Backward : ");
+    print_backward(&list);
+    free_list(&list);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode { int val; struct DNode *prev, *next; } DNode;
+typedef struct { DNode *head, *tail; } DList;
+
+// Implémentez make_dnode, insert_front, insert_back,
+// print_forward, print_backward, free_list
+int main(void) {
+    // TODO
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct DNode { int val; struct DNode *prev, *next; } DNode;
+typedef struct { DNode *head, *tail; } DList;
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "structs"
+title = "Liste doublement chaînée"
+
+[validation]
+expected_output = """
+Forward  : 0 1 2 3 
+Backward : 3 2 1 0 
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Trois nœuds doublement chaînés. head→1↔2↔3←tail. Chaque nœud connaît son voisin précédent ET suivant."
+label = "Après insert_back(1, 2, 3)"
+step_label = "Liste 1↔2↔3 — doublement chaînée"
+
+[[visualizer.steps.arrows]]
+from = "Node{1}"
+label = "next"
+to = "Node{2}"
+
+[[visualizer.steps.arrows]]
+from = "Node{2}"
+label = "next"
+to = "Node{3}"
+
+[[visualizer.steps.arrows]]
+from = "Node{3}"
+label = "prev"
+to = "Node{2}"
+
+[[visualizer.steps.arrows]]
+from = "Node{2}"
+label = "prev"
+to = "Node{1}"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Node{1}"
+value = "val:1, prev:NULL, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{2}"
+value = "val:2, prev→, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{3}"
+value = "val:3, prev→, next:NULL"
+
+[[visualizer.steps.stack]]
+name = "list.head"
+value = "→Node{1}"
+
+[[visualizer.steps.stack]]
+name = "list.tail"
+value = "→Node{3}"
+
+[[visualizer.steps]]
+explanation = "insert_front crée Node{0}, le lie à l'ancien head (Node{1}), et met à jour list.head. Forward: 0→1→2→3, Backward: 3→2→1→0."
+label = "Après insert_front(0)"
+step_label = "Après insert_front(0) — 0↔1↔2↔3"
+
+[[visualizer.steps.arrows]]
+from = "Node{0}"
+label = "next"
+to = "Node{1}"
+
+[[visualizer.steps.arrows]]
+from = "Node{1}"
+label = "prev"
+to = "Node{0}"
+
+[[visualizer.steps.arrows]]
+from = "list.head"
+label = "head"
+to = "Node{0}"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "Node{0}"
+value = "val:0, prev:NULL, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{1}"
+value = "val:1, prev→, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{2}"
+value = "val:2, prev→, next→"
+
+[[visualizer.steps.heap]]
+address = "Node{3}"
+value = "val:3, prev→, next:NULL"
+
+[[visualizer.steps.stack]]
+name = "list.head"
+value = "→Node{0}"
+
+[[visualizer.steps.stack]]
+name = "list.tail"
+value = "→Node{3}"

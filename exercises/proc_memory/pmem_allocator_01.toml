@@ -1,0 +1,436 @@
+common_mistake = "Ne pas soustraire sizeof(header) pour retrouver le header depuis le pointeur data"
+description = """
+NSY103 — Un allocateur mémoire basique utilise mmap pour obtenir des pages du noyau, puis découpe ces pages en blocs avec des headers contenant la taille et le statut (libre/occupé). C'est le principe de malloc simplifié.
+
+Implémentez un mini-allocateur qui gère un pool mmap avec allocation et libération."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "mmap fournit le pool de mémoire brute — un seul appel pour POOL_SIZE octets",
+    "curr->free vérifie si le bloc est disponible pour allocation",
+    "sizeof(block_header_t) est le décalage entre le header et les données utiles",
+]
+id = "pmem-allocator-01"
+kc_ids = ["KC-C17"]
+key_concept = "Allocateur mémoire: mmap + liste chaînée de blocs (header + data) avec splitting"
+lang = "c"
+prerequisites = ["pmem-guard-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#define POOL_SIZE 4096
+typedef struct block_header {
+    size_t size;
+    int free;
+    struct block_header *next;
+} block_header_t;
+static char *pool = NULL;
+static block_header_t *free_list = NULL;
+void pool_init(void) {
+    pool = (char *)mmap(NULL, POOL_SIZE,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    free_list = (block_header_t *)pool;
+    free_list->size = POOL_SIZE - sizeof(block_header_t);
+    free_list->free = 1;
+    free_list->next = NULL;
+}
+void *pool_alloc(size_t size) {
+    block_header_t *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->size >= size) {
+            if (curr->size > size + sizeof(block_header_t) + 8) {
+                block_header_t *new_block = (block_header_t *)((char *)curr + sizeof(block_header_t) + size);
+                new_block->size = curr->size - size - sizeof(block_header_t);
+                new_block->free = 1;
+                new_block->next = curr->next;
+                curr->next = new_block;
+                curr->size = size;
+            }
+            curr->free = 0;
+            return (char *)curr + sizeof(block_header_t);
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+void pool_free(void *ptr) {
+    if (!ptr) return;
+    block_header_t *header = (block_header_t *)((char *)ptr - sizeof(block_header_t));
+    header->free = 1;
+}
+void pool_destroy(void) {
+    munmap(pool, POOL_SIZE);
+}
+int main(void) {
+    pool_init();
+    printf("Pool initialized\n");
+    int *a = (int *)pool_alloc(sizeof(int));
+    int *b = (int *)pool_alloc(sizeof(int));
+    char *s = (char *)pool_alloc(32);
+    if (!a || !b || !s) { printf("Alloc failed\n"); return 1; }
+    *a = 42; *b = 99;
+    strcpy(s, "mini-alloc");
+    printf("a=%d b=%d s=%s\n", *a, *b, s);
+    pool_free(a);
+    printf("Freed a\n");
+    int *c = (int *)pool_alloc(sizeof(int));
+    *c = 77;
+    printf("c=%d (reused: %s)\n", *c, (char *)c == (char *)a ? "yes" : "maybe");
+    pool_free(b);
+    pool_free(s);
+    pool_free(c);
+    pool_destroy();
+    printf("Pool destroyed\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+
+#define POOL_SIZE 4096
+
+typedef struct block_header {
+    size_t size;
+    int free;
+    struct block_header *next;
+} block_header_t;
+
+static char *pool = NULL;
+static block_header_t *free_list = NULL;
+
+void pool_init(void) {
+    pool = (char *)____(NULL, POOL_SIZE,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    free_list = (block_header_t *)pool;
+    free_list->size = POOL_SIZE - ____;
+    free_list->free = ____;
+    free_list->next = NULL;
+}
+
+void *pool_alloc(size_t size) {
+    block_header_t *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size) {
+            if (curr->size > size + sizeof(block_header_t) + 8) {
+                block_header_t *new_block = (block_header_t *)((char *)curr + sizeof(block_header_t) + size);
+                new_block->size = curr->size - size - sizeof(block_header_t);
+                new_block->free = 1;
+                new_block->next = curr->next;
+                curr->next = new_block;
+                curr->size = size;
+            }
+            curr->free = ____;
+            return (char *)curr + sizeof(block_header_t);
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+void pool_free(void *ptr) {
+    if (!ptr) return;
+    block_header_t *header = (block_header_t *)((char *)ptr - ____(block_header_t));
+    header->free = ____;
+}
+
+void pool_destroy(void) {
+    munmap(pool, POOL_SIZE);
+}
+
+int main(void) {
+    pool_init();
+    printf("Pool initialized\n");
+    int *a = (int *)pool_alloc(sizeof(int));
+    int *b = (int *)pool_alloc(sizeof(int));
+    char *s = (char *)pool_alloc(32);
+    if (!a || !b || !s) { printf("Alloc failed\n"); return 1; }
+    *a = 42; *b = 99;
+    strcpy(s, "mini-alloc");
+    printf("a=%d b=%d s=%s\n", *a, *b, s);
+    pool_free(a);
+    printf("Freed a\n");
+    int *c = (int *)pool_alloc(sizeof(int));
+    *c = 77;
+    printf("c=%d (reused: %s)\n", *c, (char *)c == (char *)a ? "yes" : "maybe");
+    pool_free(b);
+    pool_free(s);
+    pool_free(c);
+    pool_destroy();
+    printf("Pool destroyed\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#define POOL_SIZE 4096
+typedef struct block_header { size_t size; int free; struct block_header *next; } block_header_t;
+static char *pool = NULL;
+static block_header_t *free_list = NULL;
+
+/* Solution complète — exercice D5 */
+void pool_init(void) {
+    pool = (char *)mmap(NULL, POOL_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    free_list = (block_header_t *)pool;
+    free_list->size = POOL_SIZE - sizeof(block_header_t);
+    free_list->free = 1; free_list->next = NULL;
+}
+void *pool_alloc(size_t size) {
+    block_header_t *curr = free_list;
+    while (curr) {
+        if (curr->free && curr->size >= size) {
+            if (curr->size > size + sizeof(block_header_t) + 8) {
+                block_header_t *nb = (block_header_t *)((char *)curr + sizeof(block_header_t) + size);
+                nb->size = curr->size - size - sizeof(block_header_t);
+                nb->free = 1; nb->next = curr->next; curr->next = nb; curr->size = size;
+            }
+            curr->free = 0;
+            return (char *)curr + sizeof(block_header_t);
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+void pool_free(void *ptr) {
+    if (!ptr) return;
+    block_header_t *h = (block_header_t *)((char *)ptr - sizeof(block_header_t));
+    h->free = 1;
+}
+void pool_destroy(void) { munmap(pool, POOL_SIZE); }
+int main(void) {
+    pool_init(); printf("Pool initialized\n");
+    int *a = (int *)pool_alloc(sizeof(int));
+    int *b = (int *)pool_alloc(sizeof(int));
+    char *s = (char *)pool_alloc(32);
+    if (!a||!b||!s) { printf("Alloc failed\n"); return 1; }
+    *a=42; *b=99; strcpy(s, "mini-alloc");
+    printf("a=%d b=%d s=%s\n", *a, *b, s);
+    pool_free(a); printf("Freed a\n");
+    int *c = (int *)pool_alloc(sizeof(int)); *c=77;
+    printf("c=%d (reused: %s)\n", *c, (char*)c==(char*)a?"yes":"maybe");
+    pool_free(b); pool_free(s); pool_free(c);
+    pool_destroy(); printf("Pool destroyed\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#define POOL_SIZE 4096
+typedef struct block_header { size_t size; int free; struct block_header *next; } block_header_t;
+static char *pool = NULL;
+static block_header_t *free_list = NULL;
+void pool_init(void) {
+    pool = (char *)____(NULL, POOL_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    free_list = (block_header_t *)pool;
+    free_list->size = POOL_SIZE - ____;
+    free_list->free = ____; free_list->next = NULL;
+}
+void *pool_alloc(size_t size) {
+    block_header_t *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size) {
+            if (curr->size > size + sizeof(block_header_t) + 8) {
+                block_header_t *nb = (block_header_t *)((char *)curr + sizeof(block_header_t) + size);
+                nb->size = curr->size - size - sizeof(block_header_t);
+                nb->free = 1; nb->next = curr->next; curr->next = nb; curr->size = size;
+            }
+            curr->free = ____;
+            return (char *)curr + sizeof(block_header_t);
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+void pool_free(void *ptr) {
+    if (!ptr) return;
+    block_header_t *h = (block_header_t *)((char *)ptr - ____(block_header_t));
+    h->free = ____;
+}
+void pool_destroy(void) { munmap(pool, POOL_SIZE); }
+int main(void) {
+    pool_init(); printf("Pool initialized\n");
+    int *a=(int*)pool_alloc(sizeof(int)); int *b=(int*)pool_alloc(sizeof(int));
+    char *s=(char*)pool_alloc(32);
+    if (!a||!b||!s) { printf("Alloc failed\n"); return 1; }
+    *a=42; *b=99; strcpy(s,"mini-alloc");
+    printf("a=%d b=%d s=%s\n",*a,*b,s);
+    pool_free(a); printf("Freed a\n");
+    int *c=(int*)pool_alloc(sizeof(int)); *c=77;
+    printf("c=%d (reused: %s)\n",*c,(char*)c==(char*)a?"yes":"maybe");
+    pool_free(b); pool_free(s); pool_free(c);
+    pool_destroy(); printf("Pool destroyed\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#define POOL_SIZE 4096
+typedef struct block_header { size_t size; int free; struct block_header *next; } block_header_t;
+static char *pool = NULL;
+static block_header_t *free_list = NULL;
+void pool_init(void) {
+    pool = (char *)____(NULL, POOL_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    free_list = (block_header_t *)pool;
+    free_list->size = POOL_SIZE - sizeof(block_header_t);
+    free_list->free = 1; free_list->next = NULL;
+}
+void *pool_alloc(size_t size) {
+    block_header_t *curr = free_list;
+    while (curr) {
+        if (curr->____ && curr->size >= size) {
+            if (curr->size > size + sizeof(block_header_t) + 8) {
+                block_header_t *nb = (block_header_t *)((char *)curr + sizeof(block_header_t) + size);
+                nb->size = curr->size - size - sizeof(block_header_t);
+                nb->free = 1; nb->next = curr->next; curr->next = nb; curr->size = size;
+            }
+            curr->free = 0;
+            return (char *)curr + sizeof(block_header_t);
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+void pool_free(void *ptr) {
+    if (!ptr) return;
+    block_header_t *h = (block_header_t *)((char *)ptr - ____(block_header_t));
+    h->free = 1;
+}
+void pool_destroy(void) { munmap(pool, POOL_SIZE); }
+int main(void) {
+    pool_init(); printf("Pool initialized\n");
+    int *a=(int*)pool_alloc(sizeof(int)); int *b=(int*)pool_alloc(sizeof(int));
+    char *s=(char*)pool_alloc(32);
+    if (!a||!b||!s) { printf("Alloc failed\n"); return 1; }
+    *a=42; *b=99; strcpy(s,"mini-alloc");
+    printf("a=%d b=%d s=%s\n",*a,*b,s);
+    pool_free(a); printf("Freed a\n");
+    int *c=(int*)pool_alloc(sizeof(int)); *c=77;
+    printf("c=%d (reused: %s)\n",*c,(char*)c==(char*)a?"yes":"maybe");
+    pool_free(b); pool_free(s); pool_free(c);
+    pool_destroy(); printf("Pool destroyed\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#define POOL_SIZE 4096
+
+typedef struct block_header {
+    size_t size;
+    int free;
+    struct block_header *next;
+} block_header_t;
+
+// Implémentez pool_init, pool_alloc, pool_free, pool_destroy
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "proc_memory"
+title = "Mini-allocateur avec mmap"
+
+[validation]
+expected_output = """
+Pool initialized
+a=42 b=99 s=mini-alloc
+Freed a
+c=77 (reused: yes)
+Pool destroyed
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Un seul bloc libre couvrant tout le pool"
+label = "Pool initialisé"
+step_label = "Étape 1"
+
+[[visualizer.steps.arrows]]
+from = "free_list"
+to = "pool"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "pool_init"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "pool"
+content = "[header|free=1|size=4072]"
+
+[[visualizer.steps.stack]]
+name = "pool"
+value = "→ 4096 octets mmap"
+
+[[visualizer.steps.stack]]
+name = "free_list"
+value = "→ 1 bloc libre"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque alloc découpe le bloc libre"
+label = "3 allocations"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "pool"
+content = "[a:4|occupied][b:4|occupied][s:32|occupied][reste|free]"
+
+[[visualizer.steps.stack]]
+name = "a"
+value = "→ bloc 4B"
+
+[[visualizer.steps.stack]]
+name = "b"
+value = "→ bloc 4B"
+
+[[visualizer.steps.stack]]
+name = "s"
+value = "→ bloc 32B"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "pool_free(a) → pool_alloc réutilise le même emplacement"
+label = "Free + réutilisation"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "pool"
+content = "[c:4|occupied][b:4|occupied][s:32|occupied][reste|free]"
+
+[[visualizer.steps.stack]]
+name = "c"
+value = "→ ancien bloc de a"

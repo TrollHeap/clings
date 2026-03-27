@@ -1,0 +1,355 @@
+common_mistake = "Trier burst[] en place au lieu de sorted[] — les indices ne correspondent plus aux processus d'origine"
+description = """
+NSY103 — SJF (Shortest Job First) réduit le temps d'attente moyen en exécutant en premier le processus avec le burst le plus court. Avec P1(6), P2(3), P3(9), triez par burst croissant puis calculez les temps d'attente.
+
+Ordre optimal : P2(3) → P1(6) → P3(9)."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Copiez burst[] dans sorted[] avant de trier pour ne pas modifier l'original",
+    "Tri à bulles : si sorted[j] > sorted[j+1], échangez avec une variable temporaire",
+    "Après tri, appliquez la même formule FCFS sur sorted[] : wait[0]=0, wait[i]=wait[i-1]+sorted[i-1]",
+]
+id = "sched-sjf-01"
+kc_ids = ["KC-C6"]
+key_concept = "SJF minimise l'attente moyenne en triant par burst croissant avant d'appliquer FCFS"
+lang = "c"
+prerequisites = ["sched-fifo-01"]
+solution_code = '''
+#include <stdio.h>
+#define N 3
+
+void simulate_sjf(int burst[], int n, int wait[], int turnaround[]) {
+    int sorted[N];
+    for (int i = 0; i < n; i++) sorted[i] = burst[i];
+    for (int i = 0; i < n - 1; i++)
+        for (int j = 0; j < n - 1 - i; j++)
+            if (sorted[j] > sorted[j+1]) {
+                int tmp = sorted[j]; sorted[j] = sorted[j+1]; sorted[j+1] = tmp;
+            }
+    wait[0] = 0;
+    for (int i = 1; i < n; i++)
+        wait[i] = wait[i-1] + sorted[i-1];
+    for (int i = 0; i < n; i++)
+        turnaround[i] = wait[i] + sorted[i];
+}
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1], ta[1];
+        simulate_sjf(burst, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {3, 3};
+        int wait[2], ta[2];
+        simulate_sjf(burst, 2, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(ta[0]));
+        printf("%d\n", (int)(ta[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {3,6,9} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {8, 2, 5};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {2,5,8} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#define N 3
+
+void simulate_sjf(int burst[], int n, int wait[], int turnaround[]) {
+    int sorted[N];
+    /* TODO: Copiez burst[] dans sorted[] */
+    /* TODO: Tri à bulles par burst croissant sur sorted[] */
+    /* TODO: wait[0]=0, wait[i]=wait[i-1]+sorted[i-1] */
+    /* TODO: turnaround[i]=wait[i]+sorted[i] */
+}
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int sorted[N];
+    // 1. Copiez burst dans sorted
+    // 2. Tri a bulles par burst croissant sur sorted
+    // 3. wait[0]=0, wait[i]=wait[i-1]+sorted[i-1]
+    // 4. turnaround[i]=wait[i]+sorted[i]
+    // 5. Affichez les moyennes avec %.2f
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+#define N 3
+
+/* == EXEMPLE =======================================
+ * SJF avec {5, 2, 8} → tri → {2, 5, 8}
+ * wait[0]=0, wait[1]=2, wait[2]=7
+ * avg_wait=(0+2+7)/3=3.00
+ * ================================================= */
+void example_sjf(void) {
+    int b[] = {5, 2, 8};
+    int s[] = {5, 2, 8};
+    /* tri a bulles */
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2 - i; j++)
+            if (s[j] > s[j+1]) { int t = s[j]; s[j] = s[j+1]; s[j+1] = t; }
+    int w[3]; w[0] = 0;
+    for (int i = 1; i < 3; i++) w[i] = w[i-1] + s[i-1];
+    printf("Avg wait: %.2f\n", (w[0]+w[1]+w[2])/3.0f);
+}
+
+/* == VOTRE EXERCICE ================================
+ * burst[] = {6, 3, 9}
+ * Triez dans sorted[], calculez wait et turnaround
+ * ================================================= */
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int sorted[N];
+    /* TODO: copier burst dans sorted */
+    /* TODO: tri a bulles sur sorted */
+    /* TODO: wait[0]=0, boucle wait[i] */
+    /* TODO: boucle turnaround et sommes */
+    printf("Average waiting time: %.2f\n", 0.0f);
+    printf("Average turnaround time: %.2f\n", 0.0f);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define N 3
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int sorted[N];
+
+    for (int i = 0; i < N; i++) sorted[i] = burst[i];
+    for (int i = 0; i < N - 1; i++)
+        for (int j = 0; j < N - 1 - i; j++)
+            if (sorted[j] > sorted[j+1]) {
+                int tmp = sorted[j]; sorted[j] = sorted[j+1]; sorted[j+1] = tmp;
+            }
+
+    int wait[N], turnaround[N];
+    wait[0] = 0;
+    for (int i = 1; i < N; i++)
+        wait[i] = wait[i-1] + sorted[____]; // quel indice?
+
+    float total_wait = 0, total_ta = 0;
+    for (int i = 0; i < N; i++) {
+        turnaround[i] = wait[i] + sorted[i];
+        total_wait += wait[i];
+        total_ta += turnaround[i];
+    }
+
+    printf("Average waiting time: %.2f\n", total_wait / N);
+    printf("Average turnaround time: %.2f\n", total_ta / N);
+    return 0;
+}''',
+    """
+#define N 3
+
+void simulate_sjf(int burst[], int n, int wait[], int turnaround[]) {
+    int sorted[N];
+    /* TODO: Copiez burst[] dans sorted[] */
+    /* TODO: Tri à bulles par burst croissant sur sorted[] */
+    /* TODO: wait[0]=0, wait[i]=wait[i-1]+sorted[i-1] */
+    /* TODO: turnaround[i]=wait[i]+sorted[i] */
+}
+
+int main(void) {
+    int burst[] = {6, 3, 9};
+    int sorted[N];
+    // 1. Copiez burst dans sorted
+    // 2. Tri a bulles par burst croissant sur sorted
+    // 3. wait[0]=0, wait[i]=wait[i-1]+sorted[i-1]
+    // 4. turnaround[i]=wait[i]+sorted[i]
+    // 5. Affichez les moyennes avec %.2f
+    return 0;
+}
+""",
+    '''
+#include <stdio.h>
+#define N 3
+
+void simulate_sjf(int burst[], int n, int wait[], int turnaround[]) {
+    /* TODO */
+}
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1], ta[1];
+        simulate_sjf(burst, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {3, 3};
+        int wait[2], ta[2];
+        simulate_sjf(burst, 2, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(ta[0]));
+        printf("%d\n", (int)(ta[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {3,6,9} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {8, 2, 5};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {2,5,8} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#define N 3
+
+void simulate_sjf(int burst[], int n, int wait[], int turnaround[]) { }
+
+int main(void) {
+    {
+        int burst[] = {5};
+        int wait[1], ta[1];
+        simulate_sjf(burst, 1, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(ta[0]));
+    }
+    {
+        int burst[] = {3, 3};
+        int wait[2], ta[2];
+        simulate_sjf(burst, 2, wait, ta);
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(ta[0]));
+        printf("%d\n", (int)(ta[1]));
+    }
+    {
+        int burst[] = {6, 3, 9};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {3,6,9} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    {
+        int burst[] = {8, 2, 5};
+        int wait[3], ta[3];
+        simulate_sjf(burst, 3, wait, ta);
+        /* After sort: {2,5,8} */
+        printf("%d\n", (int)(wait[0]));
+        printf("%d\n", (int)(wait[1]));
+        printf("%d\n", (int)(wait[2]));
+    }
+    return 0;
+}
+''',
+]
+subject = "scheduling"
+title = "SJF : ordonnancement par burst le plus court"
+
+[validation]
+expected_output = """
+0
+5
+0
+3
+3
+6
+0
+3
+9
+0
+2
+7"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "SJF (Shortest Job First) trie les processus par burst croissant avant toute exécution. En réordonnant P2(3) → P1(6) → P3(9), on garantit que les processus courts n'attendent pas derrière les longs. C'est l'algorithme optimal pour minimiser le temps d'attente moyen dans le cas non-préemptif."
+label = "Tri SJF : burst croissant → P2(3), P1(6), P3(9)"
+step_label = "Étape 1 — SJF : tri par burst croissant pour minimiser l'attente"
+
+[[visualizer.steps.edges]]
+label = "bubble sort"
+source = "orig"
+target = "sort"
+
+[[visualizer.steps.nodes]]
+id = "orig"
+label = """
+burst[]
+{6,3,9}"""
+
+[[visualizer.steps.nodes]]
+id = "sort"
+label = """
+sorted[]
+{3,6,9}"""
+
+[[visualizer.steps]]
+explanation = "Une fois trié, on applique FCFS sur sorted[] : wait[0]=0, wait[1]=3 (seul P2 avant), wait[2]=9 (P2+P1 avant). La moyenne d'attente de SJF (4.00) est meilleure que FCFS (5.00) sur les mêmes processus, ce qui démontre l'optimalité de l'algorithme."
+label = "Calcul des temps d'attente sur sorted[]"
+step_label = "Étape 2 — Application FCFS sur sorted[] : wait[i] = wait[i-1] + sorted[i-1]"
+
+[[visualizer.steps.edges]]
+label = "+3"
+source = "w0"
+target = "w1"
+
+[[visualizer.steps.edges]]
+label = "+6"
+source = "w1"
+target = "w2"
+
+[[visualizer.steps.nodes]]
+id = "w0"
+label = """
+wait[0]=0
+(P2)"""
+
+[[visualizer.steps.nodes]]
+id = "w1"
+label = """
+wait[1]=3
+(P1)"""
+
+[[visualizer.steps.nodes]]
+id = "w2"
+label = """
+wait[2]=9
+(P3)"""

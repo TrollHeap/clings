@@ -1,0 +1,225 @@
+common_mistake = "Oublier mq_unlink → la file persiste dans /dev/mqueue après la fin du programme"
+description = """
+NSY103 — mq_open() crée ou ouvre une file de messages POSIX. Les flags O_CREAT|O_RDWR créent la file si elle n'existe pas. On spécifie les permissions (0644) et les attributs (mq_maxmsg, mq_msgsize) via struct mq_attr.
+
+Créez une file '/kf_mq_create', vérifiez qu'elle est valide avec mq_getattr, affichez ses attributs, puis fermez et supprimez."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    'mq_open("/nom", O_CREAT|O_RDWR, 0644, &attr) crée la file avec les attributs',
+    "Le nom doit commencer par '/' et ne pas contenir d'autre '/'",
+    "mq_unlink() supprime la file du système — comme unlink pour les fichiers",
+]
+id = "mq-create-01"
+kc_ids = ["KC-C12"]
+key_concept = "mq_open crée une file POSIX ; mq_attr définit capacité et taille des messages"
+lang = "c"
+prerequisites = ["mq-01"]
+solution_code = '''
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct mq_attr attr;
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = 128;
+    attr.mq_curmsgs = 0;
+
+    mqd_t mq = mq_open("/kf_mq_create", O_CREAT | O_RDWR, 0644, &attr);
+    struct mq_attr cur;
+    mq_getattr(mq, &cur);
+    printf("maxmsg=%ld msgsize=%ld curmsgs=%ld\n",
+           cur.mq_maxmsg, cur.mq_msgsize, cur.mq_curmsgs);
+    mq_close(mq);
+    mq_unlink("/kf_mq_create");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct mq_attr attr;
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = 128;
+    attr.mq_curmsgs = 0;
+
+    mqd_t mq = ____("____", O_CREAT | O_RDWR, 0644, &attr);
+    struct mq_attr cur;
+    mq_getattr(mq, &cur);
+    printf("maxmsg=%ld msgsize=%ld curmsgs=%ld\n",
+           cur.mq_maxmsg, cur.mq_msgsize, cur.mq_curmsgs);
+    mq_close(mq);
+    ____("/kf_mq_create");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+/* == EXEMPLE =======================================
+ * Creer une file POSIX temporaire et afficher son nom
+ * ================================================= */
+void example_mq_open(void) {
+    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };
+    mqd_t q = mq_open("/kf_example_mq", O_CREAT|O_RDWR, 0644, &a);
+    struct mq_attr c;
+    mq_getattr(q, &c);
+    printf("Example: maxmsg=%ld\n", c.mq_maxmsg);
+    mq_close(q);
+    mq_unlink("/kf_example_mq");
+}
+/* Resultat: Example: maxmsg=5 */
+
+/* == VOTRE EXERCICE ================================
+ * Creer /kf_mq_create avec maxmsg=10, msgsize=128
+ * Afficher les 3 attributs, fermer, supprimer.
+ * ================================================= */
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    /* TODO: mq_open, mq_getattr, printf, mq_close, mq_unlink */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct mq_attr attr;
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = 128;
+    attr.mq_curmsgs = 0;
+    mqd_t mq = ____("/kf_mq_create", O_CREAT | O_RDWR, 0644, &attr);
+    struct mq_attr cur;
+    mq_getattr(mq, &cur);
+    printf("maxmsg=%ld msgsize=%ld curmsgs=%ld\n",
+           cur.mq_maxmsg, cur.mq_msgsize, cur.mq_curmsgs);
+    mq_close(mq);
+    ____("/kf_mq_create");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+int main(void) {
+    struct mq_attr attr;
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = 128;
+    attr.mq_curmsgs = 0;
+
+    mqd_t mq = ____("____", O_CREAT | O_RDWR, 0644, &attr);
+    struct mq_attr cur;
+    mq_getattr(mq, &cur);
+    printf("maxmsg=%ld msgsize=%ld curmsgs=%ld\n",
+           cur.mq_maxmsg, cur.mq_msgsize, cur.mq_curmsgs);
+    mq_close(mq);
+    ____("/kf_mq_create");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+int main(void) {
+    // Créez une file POSIX "/kf_mq_create" avec maxmsg=10, msgsize=128
+    // Affichez maxmsg, msgsize, curmsgs avec mq_getattr
+    // Fermez et supprimez la file
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Création et ouverture mq_open"
+
+[validation]
+expected_output = """
+maxmsg=10 msgsize=128 curmsgs=0
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "mq_open() crée une file de messages POSIX dans l'espace du noyau, identifiée par le nom /kf_mq_create. Sous Linux, la file apparaît dans /dev/mqueue. Les attributs mq_maxmsg et mq_msgsize définissent la capacité maximale et la taille des messages ; la file persiste dans le noyau jusqu'à mq_unlink()."
+label = "mq_open — création de la file POSIX"
+step_label = "Étape 1 — mq_open() crée la file nommée"
+
+[[visualizer.steps.edges]]
+label = "mq_open O_CREAT"
+source = "attr"
+target = "mq"
+
+[[visualizer.steps.nodes]]
+id = "attr"
+label = """
+mq_attr
+maxmsg=10
+msgsize=128"""
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_create"
+
+[[visualizer.steps]]
+explanation = "mq_getattr() interroge le noyau pour obtenir l'état courant de la file : mq_curmsgs indique le nombre de messages en attente (0 ici, aucun envoi encore effectué). C'est l'équivalent d'un stat() sur un fichier : une lecture non destructive des métadonnées du descripteur."
+label = "mq_getattr — lecture des attributs courants"
+step_label = "Étape 2 — mq_getattr() lit les attributs de la file"
+
+[[visualizer.steps.edges]]
+label = "mq_getattr"
+source = "mq"
+target = "cur"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_create"
+
+[[visualizer.steps.nodes]]
+id = "cur"
+label = """
+cur: maxmsg=10
+msgsize=128
+curmsgs=0"""
+
+[[visualizer.steps]]
+explanation = "mq_close() ferme le descripteur local (comme close() pour un fd), mais la file reste dans le noyau. mq_unlink() supprime le nom du filesystem (/dev/mqueue/kf_mq_create) et détruit la file quand tous les descripteurs sont fermés. Omettre mq_unlink() laisse la file persister après la fin du processus."
+label = "mq_close + mq_unlink — nettoyage"
+step_label = "Étape 3 — mq_close() et mq_unlink() nettoient la file"
+
+[[visualizer.steps.edges]]
+label = "close+unlink"
+source = "mq"
+target = "gone"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_create"
+
+[[visualizer.steps.nodes]]
+id = "gone"
+label = "(supprimé)"

@@ -1,0 +1,160 @@
+common_mistake = "strerror() n'est pas thread-safe sur certains systèmes — utiliser strerror_r() en multithread"
+description = """
+NSY103 — `strerror()` convertit un code errno en chaîne de caractères, contrairement à `perror()` qui écrit directement sur stderr. Utile pour construire des messages d'erreur personnalisés.
+
+Affichez les messages d'erreur pour EINVAL, ENOMEM et ERANGE avec strerror()."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "strerror() est dans <string.h>",
+    "strerror(code) retourne un const char* décrivant l'erreur",
+    "Ne pas confondre avec perror() qui écrit sur stderr",
+]
+id = "errno-strerror-01"
+kc_ids = ["KC-C15"]
+key_concept = "strerror() retourne une chaîne pour un code errno, utile pour messages personnalisés"
+lang = "c"
+prerequisites = ["errno-basic-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+int main(void) {
+    printf("EINVAL: %s\n", strerror(EINVAL));
+    printf("ENOMEM: %s\n", strerror(ENOMEM));
+    printf("ERANGE: %s\n", strerror(ERANGE));
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main(void) {
+    printf("EINVAL: %s\n", ____(EINVAL));
+    printf("ENOMEM: %s\n", ____(ENOMEM));
+    printf("ERANGE: %s\n", ____(ERANGE));
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+/* == EXEMPLE ===============================================
+ * Utiliser strerror pour afficher un message d'erreur custom
+ * strerror(code) retourne un const char*
+ * ========================================================= */
+void example_strerror(void) {
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Erreur custom: %s (code %d)", strerror(EEXIST), EEXIST);
+    printf("%s\n", msg);
+}
+/* Resultat: Erreur custom: File exists (code 17) */
+
+/* == VOTRE EXERCICE ========================================
+ * Affichez les messages pour EINVAL, ENOMEM, ERANGE
+ * ========================================================= */
+int main(void) {
+    printf("EINVAL: %s\n", strerror(EINVAL));
+    printf("ENOMEM: %s\n", "?"); /* TODO */
+    printf("ERANGE: %s\n", "?"); /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main(void) {
+    printf("EINVAL: %s\n", strerror(EINVAL));
+    printf("ENOMEM: %s\n", strerror(____));
+    printf("ERANGE: %s\n", strerror(ERANGE));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main(void) {
+    printf("EINVAL: %s\n", ____(EINVAL));
+    printf("ENOMEM: %s\n", ____(ENOMEM));
+    printf("ERANGE: %s\n", ____(ERANGE));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main(void) {
+    // Affichez les messages strerror pour EINVAL, ENOMEM, ERANGE
+    // Format: "EINVAL: Invalid argument"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "strerror: message d'erreur en chaîne"
+
+[validation]
+expected_output = """
+EINVAL: Invalid argument
+ENOMEM: Cannot allocate memory
+ERANGE: Numerical result out of range
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "strerror retourne un pointeur vers une chaîne statique"
+label = "strerror(EINVAL) → chaîne statique"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "strerror result"
+value = '"Invalid argument"'
+
+[[visualizer.steps.stack]]
+name = "EINVAL"
+value = "22"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Chaque code errno a un message associé"
+label = "strerror(ENOMEM) et strerror(ERANGE)"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "messages"
+value = "chaînes statiques"
+
+[[visualizer.steps.stack]]
+name = "ENOMEM"
+value = "12"
+
+[[visualizer.steps.stack]]
+name = "ERANGE"
+value = "34"

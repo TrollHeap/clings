@@ -1,0 +1,270 @@
+common_mistake = "Relancer sur toutes les erreurs au lieu de seulement EINTR — boucle infinie sur erreurs permanentes"
+description = """
+NSY103 — Un wrapper d'appel système robuste doit gérer EINTR (relance), distinguer les erreurs récupérables des fatales, et fournir un message d'erreur clair.
+
+Implémentez un wrapper safe_open() qui relance sur EINTR et affiche un message clair en cas d'erreur."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "La boucle EINTR est: do { fd=open(...); } while(fd==-1 && errno==EINTR);",
+    "Seul EINTR justifie un retry — les autres erreurs sont définitives",
+    "fd > 0 ? 1 : 0 normalise le fd pour un output déterministe",
+]
+id = "errno-wrapper-01"
+kc_ids = ["KC-C15"]
+key_concept = "Wrapper EINTR: boucle retry pour signaux, retour immédiat pour erreurs réelles"
+lang = "c"
+prerequisites = ["errno-eintr-01"]
+solution_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+int safe_open(const char *path, int flags) {
+    int fd;
+    do {
+        fd = open(path, flags);
+    } while (fd == -1 && errno == EINTR);
+    return fd;
+}
+void try_open(const char *path) {
+    int fd = safe_open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("safe_open(%s): %s\n", path, strerror(errno));
+    } else {
+        printf("safe_open(%s): fd=%d (ok)\n", path, fd > 0 ? 1 : 0);
+        close(fd);
+    }
+}
+int main(void) {
+    try_open("/tmp");
+    try_open("/kf_wrapper_nonexistent");
+    printf("Wrapper handles EINTR: yes\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int safe_open(const char *path, int flags) {
+    int fd;
+    do {
+        fd = open(path, flags);
+    } while (fd == ____ && errno == ____);
+    return fd;
+}
+
+void try_open(const char *path) {
+    int fd = safe_open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("safe_open(%s): %s\n", path, strerror(errno));
+    } else {
+        printf("safe_open(%s): fd=%d (ok)\n", path, fd > 0 ? 1 : 0);
+        close(fd);
+    }
+}
+
+int main(void) {
+    try_open("/tmp");
+    try_open("/kf_wrapper_nonexistent");
+    printf("Wrapper handles EINTR: yes\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* == EXEMPLE: safe_read wrapper ========================= */
+ssize_t example_safe_read(int fd, void *buf, size_t n) {
+    ssize_t r;
+    do { r = read(fd, buf, n); } while (r == -1 && errno == EINTR);
+    return r;
+}
+
+/* == VOTRE EXERCICE: safe_open wrapper ================== */
+int safe_open(const char *path, int flags) {
+    int fd;
+    /* TODO: boucle EINTR comme example_safe_read */
+    fd = open(path, flags);
+    return fd;
+}
+
+void try_open(const char *path) {
+    int fd = safe_open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("safe_open(%s): %s\n", path, strerror(errno));
+    } else {
+        printf("safe_open(%s): fd=%d (ok)\n", path, fd > 0 ? 1 : 0);
+        close(fd);
+    }
+}
+
+int main(void) {
+    try_open("/tmp");
+    try_open("/kf_wrapper_nonexistent");
+    printf("Wrapper handles EINTR: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int safe_open(const char *path, int flags) {
+    int fd;
+    do {
+        fd = open(path, flags);
+    } while (fd == -1 && errno == ____); /* EINTR */
+    return fd;
+}
+
+void try_open(const char *path) {
+    int fd = safe_open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("safe_open(%s): %s\n", path, strerror(errno));
+    } else {
+        printf("safe_open(%s): fd=%d (ok)\n", path, fd > 0 ? 1 : 0);
+        close(fd);
+    }
+}
+
+int main(void) {
+    try_open("/tmp");
+    try_open("/kf_wrapper_nonexistent");
+    printf("Wrapper handles EINTR: yes\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int safe_open(const char *path, int flags) {
+    int fd;
+    do {
+        fd = open(path, flags);
+    } while (fd == ____ && errno == ____);
+    return fd;
+}
+
+void try_open(const char *path) {
+    int fd = safe_open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("safe_open(%s): %s\n", path, strerror(errno));
+    } else {
+        printf("safe_open(%s): fd=%d (ok)\n", path, fd > 0 ? 1 : 0);
+        close(fd);
+    }
+}
+
+int main(void) {
+    try_open("/tmp");
+    try_open("/kf_wrapper_nonexistent");
+    printf("Wrapper handles EINTR: yes\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+// Implémentez safe_open avec boucle EINTR + try_open
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <errno.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "Wrapper d'appel système avec retry"
+
+[validation]
+expected_output = """
+safe_open(/tmp): fd=1 (ok)
+safe_open(/kf_wrapper_nonexistent): No such file or directory
+Wrapper handles EINTR: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "open réussit au premier essai"
+heap = []
+label = 'safe_open("/tmp") → succès'
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = '"/tmp", O_RDONLY'
+function_name = "safe_open"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = ">0"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "inchangé"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Erreur non-EINTR, on sort de la boucle"
+heap = []
+label = "safe_open(inexistant) → ENOENT"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = '"...nonexistent"'
+function_name = "safe_open"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "fd"
+value = "-1"
+
+[[visualizer.steps.stack]]
+name = "errno"
+value = "2 (ENOENT)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le wrapper ne relance que sur EINTR"
+heap = []
+label = "Flux du wrapper"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "EINTR"
+value = "→ retry"
+
+[[visualizer.steps.stack]]
+name = "autre erreur"
+value = "→ retourne -1"

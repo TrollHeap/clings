@@ -1,0 +1,394 @@
+common_mistake = "Lancer les étapes en parallèle sans synchronisation → une étape peut lire avant que la précédente ait écrit"
+description = """
+NSY103 — Un pipeline multi-étapes utilise des files de messages comme buffers entre les étapes de traitement. Chaque étape lit de sa file d'entrée, transforme le message, et l'envoie dans la file suivante. Ce pattern est fondamental en architecture microservices.
+
+Implémentez un pipeline à 3 étapes : stage1 ajoute '[S1]', stage2 ajoute '[S2]', et le résultat est lu à la fin. Utilisez fork() pour chaque étape."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "Chaque étape lit de qN et écrit dans q(N+1)",
+    "waitpid entre chaque fork assure l'ordre séquentiel du pipeline",
+    "Le résultat final est dans q2 : '[S2] [S1] data'",
+]
+id = "mq-pipeline-01"
+kc_ids = ["KC-C12"]
+key_concept = "Pipeline multi-étapes : chaque processus est une étape qui lit/transforme/écrit via MQ"
+lang = "c"
+prerequisites = ["mq-broker-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t q0 = mq_open("/kf_pipe_q0", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q1 = mq_open("/kf_pipe_q1", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q2 = mq_open("/kf_pipe_q2", O_CREAT | O_RDWR, 0644, &attr);
+
+    mq_send(q0, "data", 4, 0);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        char buf[256];
+        ssize_t n = mq_receive(q0, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S1] %s", buf);
+        mq_send(q1, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p1, NULL, 0);
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        char buf[256];
+        ssize_t n = mq_receive(q1, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S2] %s", buf);
+        mq_send(q2, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p2, NULL, 0);
+
+    char result[256];
+    ssize_t n = mq_receive(q2, result, sizeof(result), NULL);
+    result[n] = '\0';
+    printf("Pipeline result: %s\n", result);
+
+    mq_close(q0); mq_close(q1); mq_close(q2);
+    mq_unlink("/kf_pipe_q0");
+    mq_unlink("/kf_pipe_q1");
+    mq_unlink("/kf_pipe_q2");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t q0 = mq_open("/kf_pipe_q0", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q1 = mq_open("/kf_pipe_q1", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q2 = mq_open("/kf_pipe_q2", O_CREAT | O_RDWR, 0644, &attr);
+
+    mq_send(q0, "data", 4, 0);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        char buf[256];
+        ssize_t n = ____(q0, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S1] %s", buf);
+        ____(q1, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p1, NULL, 0);
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        char buf[256];
+        ssize_t n = ____(q1, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S2] %s", buf);
+        ____(q2, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p2, NULL, 0);
+
+    char result[256];
+    ssize_t n = mq_receive(q2, result, sizeof(result), NULL);
+    result[n] = '\0';
+    printf("Pipeline result: %s\n", result);
+
+    mq_close(q0); mq_close(q1); mq_close(q2);
+    mq_unlink("/kf_pipe_q0");
+    mq_unlink("/kf_pipe_q1");
+    mq_unlink("/kf_pipe_q2");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * Pipeline 2 etapes : toupper puis reverse
+ * q0 → stage1(upper) → q1 → stage2(reverse) → q2
+ * ================================================= */
+void example_pipeline(void) {
+    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };
+    mqd_t q0 = mq_open("/kf_ex_p0", O_CREAT|O_RDWR, 0644, &a);
+    mqd_t q1 = mq_open("/kf_ex_p1", O_CREAT|O_RDWR, 0644, &a);
+    mq_send(q0, "abc", 3, 0);
+    char buf[64]; ssize_t n = mq_receive(q0, buf, sizeof(buf), NULL);
+    buf[n] = '\0';
+    for (int i = 0; buf[i]; i++) buf[i] -= 32;
+    mq_send(q1, buf, strlen(buf), 0);
+    n = mq_receive(q1, buf, sizeof(buf), NULL);
+    buf[n] = '\0';
+    printf("Pipeline: %s\n", buf);
+    mq_close(q0); mq_close(q1);
+    mq_unlink("/kf_ex_p0"); mq_unlink("/kf_ex_p1");
+}
+/* Resultat: Pipeline: ABC */
+
+/* == VOTRE EXERCICE ================================
+ * Pipeline 3 etapes avec fork: [S1] et [S2] prefix.
+ * ================================================= */
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t q0 = mq_open("/kf_pipe_q0", O_CREAT|O_RDWR, 0644, &attr);
+    mqd_t q1 = mq_open("/kf_pipe_q1", O_CREAT|O_RDWR, 0644, &attr);
+    mqd_t q2 = mq_open("/kf_pipe_q2", O_CREAT|O_RDWR, 0644, &attr);
+    mq_send(q0, "data", 4, 0);
+    /* TODO: fork stage1 (q0→q1), wait, fork stage2 (q1→q2), wait, read q2 */
+    mq_close(q0); mq_close(q1); mq_close(q2);
+    mq_unlink("/kf_pipe_q0"); mq_unlink("/kf_pipe_q1"); mq_unlink("/kf_pipe_q2");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t q0 = mq_open("/kf_pipe_q0", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q1 = mq_open("/kf_pipe_q1", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q2 = mq_open("/kf_pipe_q2", O_CREAT | O_RDWR, 0644, &attr);
+
+    mq_send(q0, "data", 4, 0);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        char buf[256];
+        ssize_t n = ____(q0, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S1] %s", buf);
+        ____(q1, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p1, NULL, 0);
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        char buf[256];
+        ssize_t n = ____(q1, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S2] %s", buf);
+        ____(q2, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p2, NULL, 0);
+
+    char result[256];
+    ssize_t n = mq_receive(q2, result, sizeof(result), NULL);
+    result[n] = '\0';
+    printf("Pipeline result: %s\n", result);
+
+    mq_close(q0); mq_close(q1); mq_close(q2);
+    mq_unlink("/kf_pipe_q0");
+    mq_unlink("/kf_pipe_q1");
+    mq_unlink("/kf_pipe_q2");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 256 };
+    mqd_t q0 = mq_open("/kf_pipe_q0", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q1 = mq_open("/kf_pipe_q1", O_CREAT | O_RDWR, 0644, &attr);
+    mqd_t q2 = mq_open("/kf_pipe_q2", O_CREAT | O_RDWR, 0644, &attr);
+
+    mq_send(q0, "data", 4, 0);
+
+    pid_t p1 = fork();
+    if (p1 == 0) {
+        char buf[256];
+        ssize_t n = ____(q0, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S1] %s", buf);
+        ____(q1, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p1, NULL, 0);
+
+    pid_t p2 = fork();
+    if (p2 == 0) {
+        char buf[256];
+        ssize_t n = ____(q1, buf, sizeof(buf), NULL);
+        buf[n] = '\0';
+        char out[256];
+        snprintf(out, sizeof(out), "[S2] %s", buf);
+        ____(q2, out, strlen(out), 0);
+        mq_close(q0); mq_close(q1); mq_close(q2);
+        _exit(0);
+    }
+    waitpid(p2, NULL, 0);
+
+    char result[256];
+    ssize_t n = mq_receive(q2, result, sizeof(result), NULL);
+    result[n] = '\0';
+    printf("Pipeline result: %s\n", result);
+
+    mq_close(q0); mq_close(q1); mq_close(q2);
+    mq_unlink("/kf_pipe_q0");
+    mq_unlink("/kf_pipe_q1");
+    mq_unlink("/kf_pipe_q2");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // 3 files: q0, q1, q2
+    // Send "data" to q0
+    // Stage 1 (fork): q0→q1 with [S1] prefix
+    // Stage 2 (fork): q1→q2 with [S2] prefix
+    // Read q2, print "Pipeline result: [S2] [S1] data"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Pipeline multi-étapes via MQ"
+
+[validation]
+expected_output = """
+Pipeline result: [S2] [S1] data
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = """Le processus Stage 1 (fork) lit le message "data" de q0 via mq_receive(), lui ajoute le préfixe "[S1] " avec snprintf(), puis le dépose dans q1 via mq_send(). Le parent attend la fin de Stage 1 avec waitpid() avant de lancer Stage 2, garantissant l'ordre séquentiel du pipeline."""
+label = "q0: 'data' → Stage 1 → q1: '[S1] data'"
+step_label = "Étape 1 — Stage 1 : q0 → [S1] préfixe → q1"
+
+[[visualizer.steps.edges]]
+label = "receive"
+source = "q0"
+target = "s1"
+
+[[visualizer.steps.edges]]
+label = "send"
+source = "s1"
+target = "q1"
+
+[[visualizer.steps.nodes]]
+id = "q0"
+label = """
+q0
+"data""""
+
+[[visualizer.steps.nodes]]
+id = "s1"
+label = """
+Stage 1
+[S1] prefix"""
+
+[[visualizer.steps.nodes]]
+id = "q1"
+label = "q1"
+
+[[visualizer.steps]]
+explanation = """Stage 2 (fork) lit "[S1] data" de q1 via mq_receive() et produit "[S2] [S1] data" via mq_send() dans q2. Chaque file intermédiaire (q1) joue le rôle d'un buffer noyau entre deux processus : les messages survivent à la terminaison de Stage 1 tant que la file n'est pas supprimée par mq_unlink()."""
+label = "q1: '[S1] data' → Stage 2 → q2: '[S2] [S1] data'"
+step_label = "Étape 2 — Stage 2 : q1 → [S2] préfixe → q2"
+
+[[visualizer.steps.edges]]
+label = "receive"
+source = "q1"
+target = "s2"
+
+[[visualizer.steps.edges]]
+label = "send"
+source = "s2"
+target = "q2"
+
+[[visualizer.steps.nodes]]
+id = "q1"
+label = """
+q1
+"[S1] data""""
+
+[[visualizer.steps.nodes]]
+id = "s2"
+label = """
+Stage 2
+[S2] prefix"""
+
+[[visualizer.steps.nodes]]
+id = "q2"
+label = "q2"
+
+[[visualizer.steps]]
+explanation = """Le parent lit le résultat final "[S2] [S1] data" de q2 via mq_receive() après avoir attendu la fin de Stage 2 avec waitpid(). Le nettoyage nécessite trois mq_unlink() distincts pour q0, q1 et q2 : chaque file POSIX est un objet noyau persistant dans /dev/mqueue jusqu'à sa suppression explicite."""
+label = "Parent lit q2 → résultat final"
+step_label = "Étape 3 — Parent : lecture q2 et résultat final du pipeline"
+
+[[visualizer.steps.edges]]
+label = "receive"
+source = "q2"
+target = "result"
+
+[[visualizer.steps.nodes]]
+id = "q2"
+label = "q2"
+
+[[visualizer.steps.nodes]]
+id = "result"
+label = '"[S2] [S1] data"'

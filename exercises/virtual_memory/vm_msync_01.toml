@@ -1,0 +1,238 @@
+common_mistake = "Ne pas appeler msync avant munmap — les données peuvent être perdues en cas de crash"
+description = """
+NSY103 — msync() force l'écriture des pages modifiées d'un mapping vers le fichier backing. MS_SYNC est bloquant (attend la fin), MS_ASYNC demande au noyau de planifier l'écriture.
+
+Utilisez msync pour garantir la persistance des modifications d'un mmap."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "msync(addr, len, flags) synchronise les pages modifiées vers le fichier",
+    "MS_SYNC est bloquant — retourne quand l'écriture est terminée",
+    "MS_ASYNC demande au noyau de planifier — retourne immédiatement",
+]
+id = "vm-msync-01"
+kc_ids = ["KC-C18"]
+key_concept = "msync MS_SYNC force la persistance des pages modifiées vers le fichier"
+lang = "c"
+prerequisites = ["vm-mmap-01"]
+solution_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_msync.txt";
+    int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+    const char *init = "original data here";
+    write(fd, init, strlen(init));
+    size_t len = strlen(init);
+    char *m = (char *)mmap(NULL, len, PROT_READ | PROT_WRITE,
+        MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    memcpy(m, "MODIFIED DATA HERE", len);
+    int rc = msync(m, len, MS_SYNC);
+    printf("msync result: %d\n", rc);
+    fd = open(path, O_RDONLY);
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("File: %s\n", buf);
+    printf("Synced: %s\n", strcmp(buf, "MODIFIED DATA HERE") == 0 ? "yes" : "no");
+    close(fd);
+    munmap(m, len);
+    unlink(path);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(void) {
+    const char *path = "/tmp/kf_msync.txt";
+    int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+    const char *init = "original data here";
+    write(fd, init, strlen(init));
+    size_t len = strlen(init);
+    char *m = (char *)mmap(NULL, len, PROT_READ | PROT_WRITE,
+        MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    memcpy(m, "MODIFIED DATA HERE", len);
+    int rc = ____(m, len, ____);
+    printf("msync result: %d\n", rc);
+    fd = open(path, O_RDONLY);
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("File: %s\n", buf);
+    printf("Synced: %s\n", strcmp(buf, "MODIFIED DATA HERE") == 0 ? "yes" : "no");
+    close(fd);
+    munmap(m, len);
+    unlink(path);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+/* == EXEMPLE: MS_ASYNC vs MS_SYNC ==================== */
+void example_flags(void) {
+    printf("MS_SYNC = %d (bloquant)\n", MS_SYNC);
+    printf("MS_ASYNC = %d (non-bloquant)\n", MS_ASYNC);
+}
+
+int main(void) {
+    const char *path = "/tmp/kf_msync.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *init = "original data here";
+    write(fd, init, strlen(init));
+    size_t len = strlen(init);
+    char *m = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    memcpy(m, "MODIFIED DATA HERE", len);
+    int rc = msync(m, len, MS_SYNC);
+    printf("msync result: %d\n", rc);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File: %s\n", buf);
+    printf("Synced: %s\n", strcmp(buf,"MODIFIED DATA HERE")==0?"yes":"no");
+    close(fd); munmap(m, len); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_msync.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *init = "original data here";
+    write(fd, init, strlen(init));
+    size_t len = strlen(init);
+    char *m = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    memcpy(m, "MODIFIED DATA HERE", len);
+    int rc = msync(m, len, ____);
+    printf("msync result: %d\n", rc);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File: %s\n", buf);
+    printf("Synced: %s\n", strcmp(buf,"MODIFIED DATA HERE")==0?"yes":"no");
+    close(fd); munmap(m, len); unlink(path);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/tmp/kf_msync.txt";
+    int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0644);
+    const char *init = "original data here";
+    write(fd, init, strlen(init));
+    size_t len = strlen(init);
+    char *m = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
+    close(fd);
+    memcpy(m, "MODIFIED DATA HERE", len);
+    int rc = ____(m, len, ____);
+    printf("msync result: %d\n", rc);
+    fd = open(path, O_RDONLY);
+    char buf[64]; ssize_t n = read(fd, buf, 63); buf[n]='\0';
+    printf("File: %s\n", buf);
+    printf("Synced: %s\n", strcmp(buf,"MODIFIED DATA HERE")==0?"yes":"no");
+    close(fd); munmap(m, len); unlink(path);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+// mmap un fichier, modifiez, msync, vérifiez la persistance
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <sys/mman.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "virtual_memory"
+title = "msync: synchronisation mmap vers disque"
+
+[validation]
+expected_output = """
+msync result: 0
+File: MODIFIED DATA HERE
+Synced: yes
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le mapping est modifié mais pas encore sur disque"
+label = "Modification en mémoire"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mapping"
+content = '"MODIFIED DATA HERE"'
+
+[[visualizer.steps.heap]]
+address = "fichier"
+content = '"original data here"'
+
+[[visualizer.steps.stack]]
+name = "m"
+value = "→ mapping modifié"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "msync force l'écriture vers le fichier"
+label = "msync MS_SYNC"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.heap]]
+address = "mapping"
+content = '"MODIFIED DATA HERE"'
+
+[[visualizer.steps.heap]]
+address = "fichier"
+content = '"MODIFIED DATA HERE"'
+
+[[visualizer.steps.stack]]
+name = "rc"
+value = "0 (succès)"

@@ -1,0 +1,345 @@
+common_mistake = "Mélanger sa_handler et sa_sigaction dans la même struct sigaction — comportement indéfini"
+description = """
+NSY103 — Avec SA_SIGINFO, le handler reçoit un siginfo_t riche en informations : si_signo (numéro), si_code (origine : SI_USER, SI_QUEUE, SI_KERNEL), si_pid (PID émetteur), si_uid (UID émetteur). Ces métadonnées permettent de distinguer les sources d'un signal.
+
+Installez un handler SA_SIGINFO et analysez les métadonnées de chaque signal reçu."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "sa_sigaction (pas sa_handler) pour le prototype à 3 arguments",
+    "si_code distingue l'origine : SI_USER (raise/kill), SI_QUEUE (sigqueue), SI_KERNEL",
+    "si_pid contient le PID de l'émetteur — utile pour identifier la source",
+]
+id = "sig-siginfo-01"
+kc_ids = ["KC-C08"]
+key_concept = "siginfo_t fournit si_code, si_pid, si_uid — permet de distinguer les sources de signaux"
+lang = "c"
+prerequisites = ["sig-realtime-01"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+typedef struct {
+    int signo;
+    int code;
+    pid_t sender_pid;
+} SigRecord;
+
+volatile int rec_count = 0;
+SigRecord records[4];
+
+void info_handler(int sig, siginfo_t *info, void *ctx) {
+    (void)ctx;
+    if (rec_count < 4) {
+        records[rec_count].signo = sig;
+        records[rec_count].code = info->si_code;
+        records[rec_count].sender_pid = info->si_pid;
+        rec_count++;
+    }
+}
+
+const char *code_name(int code) {
+    switch (code) {
+        case SI_USER:  return "SI_USER";
+        case SI_QUEUE: return "SI_QUEUE";
+        default:       return "OTHER";
+    }
+}
+
+int main(void) {
+    pid_t my_pid = getpid();
+    printf("My PID: reported\n");
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = info_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+    printf("SA_SIGINFO handlers installed\n");
+
+    /* raise() -> SI_USER (kill/raise) */
+    raise(SIGUSR1);
+
+    /* sigqueue() -> SI_QUEUE */
+    union sigval val = {.sival_int = 42};
+    sigqueue(my_pid, SIGUSR1, val);
+
+    /* Deuxieme signal */
+    raise(SIGUSR2);
+
+    printf("Signals received: %d\n", rec_count);
+    for (int i = 0; i < rec_count; i++) {
+        printf("  sig=%d code=%s sender=self\n",
+               records[i].signo, code_name(records[i].code));
+    }
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+typedef struct {
+    int signo;
+    int code;
+    pid_t sender_pid;
+} SigRecord;
+
+volatile int rec_count = 0;
+SigRecord records[4];
+
+void info_handler(int sig, siginfo_t *info, void *ctx) {
+    (void)ctx;
+    if (rec_count < 4) {
+        records[rec_count].signo = sig;
+        records[rec_count].code = info->____;
+        records[rec_count].sender_pid = info->____;
+        rec_count++;
+    }
+}
+
+const char *code_name(int code) {
+    switch (code) {
+        case SI_USER:  return "SI_USER";
+        case SI_QUEUE: return "SI_QUEUE";
+        default:       return "OTHER";
+    }
+}
+
+int main(void) {
+    pid_t my_pid = getpid();
+    printf("My PID: reported\n");
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.____ = info_handler;
+    sa.sa_flags = ____;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+    printf("SA_SIGINFO handlers installed\n");
+
+    /* raise() -> SI_USER (kill/raise) */
+    raise(SIGUSR1);
+
+    /* sigqueue() -> SI_QUEUE */
+    union sigval val = {.sival_int = 42};
+    ____(my_pid, SIGUSR1, val);
+
+    /* Deuxieme signal */
+    raise(SIGUSR2);
+
+    printf("Signals received: %d\n", rec_count);
+    for (int i = 0; i < rec_count; i++) {
+        printf("  sig=%d code=%s sender=self\n",
+               records[i].signo, code_name(records[i].code));
+    }
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * SA_SIGINFO basique : afficher si_code
+ * ================================================= */
+void ex_info(int sig, siginfo_t *i, void *c) {
+    (void)c;
+    printf("example: sig=%d code=%d pid=%d\n", sig, i->si_code, i->si_pid);
+}
+void example_siginfo(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = ex_info;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGUSR1, &sa, NULL);
+    raise(SIGUSR1);
+}
+
+/* == VOTRE EXERCICE ================================
+ * Enregistrer signo, si_code, si_pid dans un tableau
+ * Comparer raise (SI_USER) vs sigqueue (SI_QUEUE)
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+typedef struct { int signo; int code; pid_t sender_pid; } SigRecord;
+volatile int rec_count = 0;
+SigRecord records[4];
+
+void info_handler(int sig, siginfo_t *info, void *ctx) {
+    (void)ctx;
+    if (rec_count < 4) {
+        records[rec_count].signo = sig;
+        records[rec_count].code = info->____;
+        records[rec_count].sender_pid = info->____;
+        rec_count++;
+    }
+}
+const char *code_name(int code) {
+    switch (code) { case SI_USER: return "SI_USER"; case SI_QUEUE: return "SI_QUEUE"; default: return "OTHER"; }
+}
+
+int main(void) {
+    pid_t my_pid = getpid();
+    printf("My PID: reported\n");
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.____ = info_handler;
+    sa.sa_flags = ____;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+    printf("SA_SIGINFO handlers installed\n");
+    raise(SIGUSR1);
+    union sigval val = {.sival_int = 42};
+    ____(my_pid, SIGUSR1, val);
+    raise(SIGUSR2);
+    printf("Signals received: %d\n", rec_count);
+    for (int i = 0; i < rec_count; i++)
+        printf("  sig=%d code=%s sender=self\n", records[i].signo, code_name(records[i].code));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+typedef struct { int signo; int code; pid_t sender_pid; } SigRecord;
+volatile int rec_count = 0;
+SigRecord records[4];
+
+void info_handler(int sig, siginfo_t *info, void *ctx) {
+    (void)ctx;
+    if (rec_count < 4) {
+        records[rec_count].signo = sig;
+        records[rec_count].code = info->____;
+        records[rec_count].sender_pid = info->____;
+        rec_count++;
+    }
+}
+const char *code_name(int code) {
+    switch (code) { case SI_USER: return "SI_USER"; case SI_QUEUE: return "SI_QUEUE"; default: return "OTHER"; }
+}
+
+int main(void) {
+    pid_t my_pid = getpid();
+    printf("My PID: reported\n");
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.____ = info_handler;
+    sa.sa_flags = ____;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+    printf("SA_SIGINFO handlers installed\n");
+    raise(SIGUSR1);
+    union sigval val = {.sival_int = 42};
+    ____(my_pid, SIGUSR1, val);
+    raise(SIGUSR2);
+    printf("Signals received: %d\n", rec_count);
+    for (int i = 0; i < rec_count; i++)
+        printf("  sig=%d code=%s sender=self\n", records[i].signo, code_name(records[i].code));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+
+// SigRecord: signo, code, sender_pid
+// handler SA_SIGINFO enregistre dans records[]
+// main: sigaction SIGUSR1+SIGUSR2, raise, sigqueue, raise
+// Afficher sig, code_name(si_code), sender
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "SA_SIGINFO et données contextuelles"
+
+[validation]
+expected_output = """
+My PID: reported
+SA_SIGINFO handlers installed
+Signals received: 3
+  sig=10 code=OTHER sender=self
+  sig=10 code=SI_QUEUE sender=self
+  sig=12 code=OTHER sender=self
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "SA_SIGINFO donne accès à siginfo_t avec métadonnées du signal"
+heap = []
+label = "SA_SIGINFO installe un handler riche"
+step_label = "Installation"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sa.sa_sigaction"
+value = "info_handler(sig, info, ctx)"
+
+[[visualizer.steps.stack]]
+name = "sa.sa_flags"
+value = "SA_SIGINFO"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "si_code permet de distinguer la méthode d'envoi du signal"
+heap = []
+label = "raise() → SI_USER, sigqueue() → SI_QUEUE"
+step_label = "Métadonnées"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "siginfo_t*"
+function_name = "info_handler"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "raise(SIGUSR1)"
+value = "si_code=SI_USER"
+
+[[visualizer.steps.stack]]
+name = "sigqueue(SIGUSR1)"
+value = "si_code=SI_QUEUE"
+
+[[visualizer.steps.stack]]
+name = "raise(SIGUSR2)"
+value = "si_code=SI_USER"

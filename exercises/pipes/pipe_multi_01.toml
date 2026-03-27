@@ -1,0 +1,306 @@
+common_mistake = "Oublier _exit(0) dans l'enfant → l'enfant continue la boucle for et crée des petits-enfants"
+description = """
+NSY103 — Plusieurs processus enfants peuvent écrire dans le même pipe. Le noyau garantit l'atomicité des écritures ≤ PIPE_BUF (4096 octets). Le parent lit séquentiellement depuis fd[0].
+
+Créez 3 enfants qui écrivent chacun un message numéroté dans le pipe. Le parent lit et affiche tous les messages. L'ordre est déterministe grâce à des wait() séquentiels et des écritures courtes."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Chaque enfant ferme fd[0] (lecture) et écrit dans fd[1]",
+    "Le parent ferme fd[1] pour pouvoir détecter EOF sur fd[0]",
+    "_exit(0) dans l'enfant pour éviter que le fork continue la boucle",
+]
+id = "pipe-multi-01"
+kc_ids = ["KC-C10"]
+key_concept = "Écritures ≤ PIPE_BUF sont atomiques ; plusieurs processus peuvent partager fd[1]"
+lang = "c"
+prerequisites = ["pipe-nonblock-01"]
+solution_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(fd[0]);
+            char msg[32];
+            snprintf(msg, sizeof(msg), "Worker %d done\n", i);
+            write(fd[1], msg, strlen(msg));
+            close(fd[1]);
+            _exit(0);
+        }
+        wait(NULL);
+    }
+    close(fd[1]);
+
+    char buf[256];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(fd[____]);
+            char msg[32];
+            snprintf(msg, sizeof(msg), "Worker %d done\n", i);
+            write(fd[____], msg, strlen(msg));
+            close(fd[1]);
+            ____(0);
+        }
+    }
+    close(fd[____]);
+    for (int i = 0; i < 3; i++)
+        wait(NULL);
+
+    char buf[256];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* == EXEMPLE =======================================
+ * 2 enfants ecrivent dans un pipe, parent lit tout
+ * ================================================= */
+void example_multi_pipe(void) {
+    int fd[2];
+    pipe(fd);
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            close(fd[0]);
+            char m[32];
+            snprintf(m, sizeof(m), "child %d\n", i);
+            write(fd[1], m, strlen(m));
+            close(fd[1]);
+            _exit(0);
+        }
+    }
+    close(fd[1]);
+    wait(NULL); wait(NULL);
+    char buf[128];
+    ssize_t n = read(fd[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+}
+/* Resultat: child 0\nchild 1\n */
+
+/* == VOTRE EXERCICE ================================
+ * 3 workers ecrivent dans un pipe, parent lit.
+ * ================================================= */
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    for (int i = 0; i < 3; i++) {
+        if (fork() == 0) {
+            close(fd[0]);
+            char msg[32];
+            snprintf(msg, sizeof(msg), "Worker %d done\n", i);
+            /* TODO: write to fd[1], close, _exit */
+            _exit(0);
+        }
+    }
+    close(fd[1]);
+    for (int i = 0; i < 3; i++) wait(NULL);
+    char buf[256];
+    ssize_t n = read(fd[0], buf, sizeof(buf)-1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(fd[0]);
+            char msg[32];
+            snprintf(msg, sizeof(msg), "Worker %d done\n", i);
+            write(fd[1], msg, strlen(msg));
+            close(fd[1]);
+            ____(0);  // quelle fonction pour quitter l'enfant ?
+        }
+    }
+    close(fd[1]);
+    for (int i = 0; i < 3; i++) wait(NULL);
+    char buf[256];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int fd[2];
+    pipe(fd);
+
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(fd[____]);
+            char msg[32];
+            snprintf(msg, sizeof(msg), "Worker %d done\n", i);
+            write(fd[____], msg, strlen(msg));
+            close(fd[1]);
+            ____(0);
+        }
+    }
+    close(fd[____]);
+    for (int i = 0; i < 3; i++)
+        wait(NULL);
+
+    char buf[256];
+    ssize_t n = read(fd[0], buf, sizeof(buf) - 1);
+    buf[n] = '\0';
+    printf("%s", buf);
+    close(fd[0]);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void) {
+    // 3 enfants écrivent "Worker N done\n" dans un pipe
+    // Parent ferme fd[1], wait 3 fois, lit tout, affiche
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pipes"
+title = "Communication N producteurs vers 1 consommateur"
+
+[validation]
+expected_output = """
+Worker 0 done
+Worker 1 done
+Worker 2 done
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "Plusieurs processus enfants peuvent partager le même fd[1] hérité via fork(). Le kernel garantit que les écritures atomiques (≤ PIPE_BUF = 4096 octets) ne s'entremêlent pas — chaque message est déposé intact dans le buffer circulaire."
+label = "3 enfants écrivent dans le même pipe"
+step_label = "Étape 1 — 3 workers écrivent en parallèle dans le même pipe"
+
+[[visualizer.steps.edges]]
+label = "fd[1]"
+source = "w0"
+target = "pipe"
+
+[[visualizer.steps.edges]]
+label = "fd[1]"
+source = "w1"
+target = "pipe"
+
+[[visualizer.steps.edges]]
+label = "fd[1]"
+source = "w2"
+target = "pipe"
+
+[[visualizer.steps.nodes]]
+id = "w0"
+label = "Worker 0"
+
+[[visualizer.steps.nodes]]
+id = "w1"
+label = "Worker 1"
+
+[[visualizer.steps.nodes]]
+id = "w2"
+label = "Worker 2"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = "pipe buffer"
+
+[[visualizer.steps]]
+explanation = "Le parent attend la fin de tous ses enfants avec wait() avant de lire. Cela garantit que tous les messages ont été écrits dans le pipe et que le parent lira la totalité des données en un seul read() — le buffer contient les 3 messages concaténés."
+label = "Parent wait() puis read() — messages séquentiels"
+step_label = "Étape 2 — Parent attend (wait) puis lit tout le contenu du pipe"
+
+[[visualizer.steps.edges]]
+label = "all bytes"
+source = "pipe"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "pipe"
+label = """
+pipe buffer
+3 messages"""
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+Parent
+read(fd[0])"""
+
+[[visualizer.steps]]
+explanation = "Le parent imprime le contenu intégral du buffer en une fois. L'ordre est déterministe ici car les wait() sont séquentiels — chaque enfant s'est terminé dans l'ordre de sa création, donc les messages apparaissent dans l'ordre Worker 0, 1, 2."
+label = "Affichage: Worker 0, 1, 2 done"
+step_label = "Étape 3 — Affichage des 3 messages dans l'ordre"
+
+[[visualizer.steps.edges]]
+label = "printf"
+source = "buf"
+target = "stdout"
+
+[[visualizer.steps.nodes]]
+id = "buf"
+label = "buf[]"
+
+[[visualizer.steps.nodes]]
+id = "stdout"
+label = "stdout"

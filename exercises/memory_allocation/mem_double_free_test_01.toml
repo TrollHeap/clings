@@ -1,0 +1,93 @@
+common_mistake = "Appeler `free(ptr)` sans mettre `ptr = NULL` : si `free` est appelé une deuxième fois par erreur, c'est un comportement indéfini (corruption du tas). Passer `int *` (pas `int **`) à safe_free empêche la nullification de se propager à l'appelant."
+description = """
+Implémentez trois fonctions :
+- `int *safe_alloc(int n)` — alloue `n` entiers via `malloc`, retourne NULL si `n <= 0` ou si l'allocation échoue.
+- `void safe_free(int **pptr)` — libère `*pptr` et met le pointeur à NULL (idiome nullification post-free).
+- `int sum_and_free(int *arr, int n)` — calcule la somme des `n` éléments de `arr`, libère `arr` via `safe_free(&arr)`, retourne la somme.
+
+La nullification empêche le double-free et le use-after-free."""
+difficulty = 3
+exercise_type = "complete"
+files = []
+hints = [
+    "`safe_alloc` : `if (n <= 0) return NULL;` puis `return malloc((size_t)n * sizeof(int));`.",
+    "`safe_free` : vérifiez `pptr && *pptr` avant d'appeler `free`. Puis `*pptr = NULL;` — cela rend un second appel à `safe_free` inoffensif.",
+    "`sum_and_free` : boucle sur `arr[0..n-1]`, accumule la somme, puis appelle `safe_free(&arr)` avant de retourner.",
+]
+id = "mem-double-free-test-01"
+kc_ids = [
+    "malloc",
+    "free",
+    "double_free",
+    "nullification",
+    "use_after_free",
+]
+key_concept = "Nullifier le pointeur après `free` (`*ptr = NULL`) est l'idiome C pour prévenir le double-free et le use-after-free. Un second appel à `free(NULL)` est défini par la norme C comme sans effet."
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+int *safe_alloc(int n) {
+    if (n <= 0) return NULL;
+    return malloc((size_t)n * sizeof(int));
+}
+
+void safe_free(int **pptr) {
+    if (!pptr || !*pptr) return;
+    free(*pptr);
+    *pptr = NULL;
+}
+
+int sum_and_free(int *arr, int n) {
+    int sum = 0;
+    for (int i = 0; i < n; i++)
+        sum += arr[i];
+    safe_free(&arr);
+    return sum;
+}
+
+int main(void) {
+    int *a = safe_alloc(3);
+    if (!a) return 1;
+    a[0] = 10; a[1] = 20; a[2] = 30;
+    printf("%d\n", sum_and_free(a, 3));
+    return 0;
+}
+'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+
+/* Alloue n entiers. Retourne NULL si n <= 0 ou si malloc échoue. */
+int *safe_alloc(int n) {
+    /* TODO */
+    return NULL;
+}
+
+/* Libère *pptr et met *pptr = NULL. */
+void safe_free(int **pptr) {
+    /* TODO */
+}
+
+/* Calcule la somme de arr[0..n-1], libère arr via safe_free, retourne la somme. */
+int sum_and_free(int *arr, int n) {
+    /* TODO */
+    return 0;
+}
+
+int main(void) {
+    int *a = safe_alloc(3);
+    if (!a) return 1;
+    a[0] = 10; a[1] = 20; a[2] = 30;
+    printf("%d\n", sum_and_free(a, 3));
+    return 0;
+}
+'''
+subject = "memory_allocation"
+title = "malloc / free — double-free et use-after-free"
+
+[validation]
+expected_output = "60"
+mode = "output"

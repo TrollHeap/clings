@@ -1,0 +1,365 @@
+common_mistake = "Ne pas utiliser __thread pour last_error — non thread-safe sans TLS"
+description = """
+NSY103 — Un module d'erreur robuste combine : codes d'erreur enum, messages descriptifs, contexte (fichier/ligne), stratégie de récupération et logging. Ce pattern est utilisé dans les bibliothèques système de qualité production.
+
+Implémentez un module complet avec error_context, error_log et recovery."""
+difficulty = 5
+exercise_type = "complete"
+hints = [
+    "kf_set_error stocke code, file, line dans last_error",
+    "KF_ERROR macro utilise __FILE__ et __LINE__ automatiquement",
+    "__thread garantit l'isolation entre threads",
+]
+id = "errno-robust-01"
+kc_ids = ["KC-C15"]
+key_concept = "Module d'erreur complet: enum codes + context struct + __thread + macro __FILE__/__LINE__"
+lang = "c"
+prerequisites = ["errno-recovery-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+typedef enum {
+    KF_OK = 0,
+    KF_ERR_IO,
+    KF_ERR_MEM,
+    KF_ERR_ARG,
+    KF_ERR_PERM
+} kf_error;
+typedef struct {
+    kf_error code;
+    const char *file;
+    int line;
+    char message[128];
+} error_context;
+static __thread error_context last_error = {0};
+void kf_set_error(kf_error code, const char *file, int line, const char *fmt, ...) {
+    last_error.code = code;
+    last_error.file = file;
+    last_error.line = line;
+    snprintf(last_error.message, sizeof(last_error.message), "%s", fmt);
+}
+#define KF_ERROR(code, msg) kf_set_error(code, __FILE__, __LINE__, msg)
+const char *kf_error_name(kf_error e) {
+    switch (e) {
+        case KF_OK:       return "OK";
+        case KF_ERR_IO:   return "IO_ERROR";
+        case KF_ERR_MEM:  return "MEM_ERROR";
+        case KF_ERR_ARG:  return "ARG_ERROR";
+        case KF_ERR_PERM: return "PERM_ERROR";
+        default:          return "UNKNOWN";
+    }
+}
+void kf_print_error(void) {
+    if (last_error.code != KF_OK) {
+        printf("[%s] %s\n", kf_error_name(last_error.code), last_error.message);
+    } else {
+        printf("[OK] no error\n");
+    }
+}
+kf_error process_value(int val) {
+    if (val < 0) {
+        KF_ERROR(KF_ERR_ARG, "negative value");
+        return KF_ERR_ARG;
+    }
+    if (val > 100) {
+        KF_ERROR(KF_ERR_IO, "value too large");
+        return KF_ERR_IO;
+    }
+    last_error.code = KF_OK;
+    return KF_OK;
+}
+int main(void) {
+    process_value(42);
+    kf_print_error();
+    process_value(-1);
+    kf_print_error();
+    process_value(200);
+    kf_print_error();
+    printf("Error module: complete\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+typedef enum {
+    KF_OK = 0,
+    KF_ERR_IO,
+    KF_ERR_MEM,
+    KF_ERR_ARG,
+    KF_ERR_PERM
+} kf_error;
+
+typedef struct {
+    kf_error code;
+    const char *file;
+    int line;
+    char message[128];
+} error_context;
+
+static __thread error_context last_error = {0};
+
+void kf_set_error(kf_error code, const char *file, int line, const char *fmt, ...) {
+    last_error.code = ____;
+    last_error.file = ____;
+    last_error.line = ____;
+    snprintf(last_error.message, sizeof(last_error.message), "%s", fmt);
+}
+
+#define KF_ERROR(code, msg) kf_set_error(code, __FILE__, __LINE__, msg)
+
+const char *kf_error_name(kf_error e) {
+    switch (e) {
+        case KF_OK:       return "OK";
+        case KF_ERR_IO:   return "IO_ERROR";
+        case KF_ERR_MEM:  return "MEM_ERROR";
+        case KF_ERR_ARG:  return "ARG_ERROR";
+        case KF_ERR_PERM: return "PERM_ERROR";
+        default:          return "UNKNOWN";
+    }
+}
+
+void kf_print_error(void) {
+    if (last_error.code != KF_OK) {
+        printf("[%s] %s\n", kf_error_name(last_error.code), last_error.message);
+    } else {
+        printf("[OK] no error\n");
+    }
+}
+
+kf_error process_value(int val) {
+    if (val < 0) {
+        KF_ERROR(KF_ERR_ARG, "negative value");
+        return KF_ERR_ARG;
+    }
+    if (val > 100) {
+        KF_ERROR(KF_ERR_IO, "value too large");
+        return KF_ERR_IO;
+    }
+    last_error.code = KF_OK;
+    return KF_OK;
+}
+
+int main(void) {
+    process_value(42);
+    kf_print_error();
+    process_value(-1);
+    kf_print_error();
+    process_value(200);
+    kf_print_error();
+    printf("Error module: complete\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+/* == EXEMPLE: simple error module ======================== */
+typedef enum { EX_OK=0, EX_ERR=1 } ex_err;
+static __thread ex_err ex_last = EX_OK;
+void ex_set(ex_err e) { ex_last = e; }
+const char *ex_str(ex_err e) { return e == EX_OK ? "ok" : "error"; }
+
+/* == VOTRE EXERCICE: module complet ====================== */
+typedef enum { KF_OK=0, KF_ERR_IO, KF_ERR_MEM, KF_ERR_ARG, KF_ERR_PERM } kf_error;
+typedef struct { kf_error code; const char *file; int line; char message[128]; } error_context;
+static __thread error_context last_error = {0};
+void kf_set_error(kf_error code, const char *file, int line, const char *fmt, ...) {
+    last_error.code = code; last_error.file = file; last_error.line = line;
+    snprintf(last_error.message, sizeof(last_error.message), "%s", fmt);
+}
+#define KF_ERROR(code, msg) kf_set_error(code, __FILE__, __LINE__, msg)
+const char *kf_error_name(kf_error e) {
+    switch(e) { case KF_OK: return "OK"; case KF_ERR_IO: return "IO_ERROR";
+    case KF_ERR_MEM: return "MEM_ERROR"; case KF_ERR_ARG: return "ARG_ERROR";
+    case KF_ERR_PERM: return "PERM_ERROR"; default: return "UNKNOWN"; }
+}
+void kf_print_error(void) {
+    if (last_error.code != KF_OK) printf("[%s] %s\n", kf_error_name(last_error.code), last_error.message);
+    else printf("[OK] no error\n");
+}
+kf_error process_value(int val) {
+    if (val < 0) { KF_ERROR(KF_ERR_ARG, "negative value"); return KF_ERR_ARG; }
+    if (val > 100) { KF_ERROR(KF_ERR_IO, "value too large"); return KF_ERR_IO; }
+    last_error.code = KF_OK; return KF_OK;
+}
+int main(void) {
+    process_value(42); kf_print_error();
+    process_value(-1); kf_print_error();
+    process_value(200); kf_print_error();
+    printf("Error module: complete\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+typedef enum { KF_OK=0, KF_ERR_IO, KF_ERR_MEM, KF_ERR_ARG, KF_ERR_PERM } kf_error;
+typedef struct { kf_error code; const char *file; int line; char message[128]; } error_context;
+static __thread error_context last_error = {0};
+void kf_set_error(kf_error code, const char *file, int line, const char *fmt, ...) {
+    last_error.code = code; last_error.file = file; last_error.line = line;
+    snprintf(last_error.message, sizeof(last_error.message), "%s", fmt);
+}
+#define KF_ERROR(code, msg) kf_set_error(code, __FILE__, __LINE__, msg)
+const char *kf_error_name(kf_error e) {
+    switch(e) { case KF_OK: return "OK"; case KF_ERR_IO: return "IO_ERROR";
+    case KF_ERR_MEM: return "MEM_ERROR"; case KF_ERR_ARG: return "ARG_ERROR";
+    case KF_ERR_PERM: return "PERM_ERROR"; default: return "UNKNOWN"; }
+}
+void kf_print_error(void) {
+    if (last_error.code != KF_OK) printf("[%s] %s\n", kf_error_name(last_error.code), last_error.message);
+    else printf("[OK] no error\n");
+}
+kf_error process_value(int val) {
+    if (val < 0) { KF_ERROR(____, "negative value"); return KF_ERR_ARG; }
+    if (val > 100) { KF_ERROR(____, "value too large"); return KF_ERR_IO; }
+    last_error.code = KF_OK; return KF_OK;
+}
+int main(void) {
+    process_value(42); kf_print_error();
+    process_value(-1); kf_print_error();
+    process_value(200); kf_print_error();
+    printf("Error module: complete\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+typedef enum { KF_OK=0, KF_ERR_IO, KF_ERR_MEM, KF_ERR_ARG, KF_ERR_PERM } kf_error;
+typedef struct { kf_error code; const char *file; int line; char message[128]; } error_context;
+static __thread error_context last_error = {0};
+void kf_set_error(kf_error code, const char *file, int line, const char *fmt, ...) {
+    last_error.code = ____;
+    last_error.file = ____;
+    last_error.line = ____;
+    snprintf(last_error.message, sizeof(last_error.message), "%s", fmt);
+}
+#define KF_ERROR(code, msg) kf_set_error(code, __FILE__, __LINE__, msg)
+const char *kf_error_name(kf_error e) {
+    switch(e) { case KF_OK: return "OK"; case KF_ERR_IO: return "IO_ERROR";
+    case KF_ERR_MEM: return "MEM_ERROR"; case KF_ERR_ARG: return "ARG_ERROR";
+    case KF_ERR_PERM: return "PERM_ERROR"; default: return "UNKNOWN"; }
+}
+void kf_print_error(void) {
+    if (last_error.code != KF_OK) printf("[%s] %s\n", kf_error_name(last_error.code), last_error.message);
+    else printf("[OK] no error\n");
+}
+kf_error process_value(int val) {
+    if (val < 0) { KF_ERROR(KF_ERR_ARG, "negative value"); return KF_ERR_ARG; }
+    if (val > 100) { KF_ERROR(KF_ERR_IO, "value too large"); return KF_ERR_IO; }
+    last_error.code = KF_OK; return KF_OK;
+}
+int main(void) {
+    process_value(42); kf_print_error();
+    process_value(-1); kf_print_error();
+    process_value(200); kf_print_error();
+    printf("Error module: complete\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+// Module d'erreur complet: enum kf_error, error_context struct,
+// kf_set_error, KF_ERROR macro, kf_error_name, kf_print_error
+// process_value qui utilise le module
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "errno"
+title = "Module d'erreur robuste complet"
+
+[validation]
+expected_output = """
+[OK] no error
+[ARG_ERROR] negative value
+[IO_ERROR] value too large
+Error module: complete
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Valeur valide, pas d'erreur"
+heap = []
+label = "process_value(42) → KF_OK"
+step_label = "Étape 1"
+
+[[visualizer.steps.call_frames]]
+args = "42"
+function_name = "process_value"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "last_error.code"
+value = "KF_OK"
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "42"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Valeur négative → erreur d'argument"
+heap = []
+label = "process_value(-1) → KF_ERR_ARG"
+step_label = "Étape 2"
+
+[[visualizer.steps.call_frames]]
+args = "-1"
+function_name = "process_value"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "last_error.code"
+value = "KF_ERR_ARG"
+
+[[visualizer.steps.stack]]
+name = "last_error.message"
+value = '"negative value"'
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le contexte capture l'emplacement exact de l'erreur"
+heap = []
+label = "Structure error_context complète"
+step_label = "Étape 3"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "code"
+value = "enum kf_error"
+
+[[visualizer.steps.stack]]
+name = "file"
+value = "__FILE__"
+
+[[visualizer.steps.stack]]
+name = "line"
+value = "__LINE__"
+
+[[visualizer.steps.stack]]
+name = "message"
+value = "char[128]"

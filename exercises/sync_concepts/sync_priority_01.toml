@@ -1,0 +1,303 @@
+common_mistake = "Confondre PRIO_INHERIT (héritage dynamique) avec PRIO_PROTECT (plafond statique) — PROTECT fixe une priorité maximale à la création"
+description = """
+NSY103 — L'inversion de priorité survient quand un thread haute priorité est bloqué par un thread basse priorité qui détient un mutex. Le protocole d'héritage de priorité (PTHREAD_PRIO_INHERIT) résout ce problème en élevant temporairement la priorité du détenteur du mutex.
+
+Démontrez l'inversion de priorité et sa résolution avec PTHREAD_PRIO_INHERIT."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "La constante pour l'héritage de priorité est PTHREAD_PRIO_INHERIT",
+    "La fonction haute priorité est high_priority",
+    "PRIO_INHERIT élève la priorité du détenteur du mutex au niveau du thread bloqué",
+]
+id = "sync-priority-01"
+kc_ids = ["KC-C22"]
+key_concept = "PTHREAD_PRIO_INHERIT : le thread détenant le mutex hérite de la priorité du thread bloqué le plus prioritaire"
+lang = "c"
+prerequisites = [
+    "sync-mutex-order-01",
+    "sync-condvar-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+pthread_mutex_t mtx;
+
+void *low_priority(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    printf("Low: lock acquis\n");
+    usleep(200000);
+    printf("Low: travail termine\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *high_priority(void *arg) {
+    (void)arg;
+    usleep(50000);
+    printf("High: tentative lock\n");
+    pthread_mutex_lock(&mtx);
+    printf("High: lock acquis\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
+    pthread_mutex_init(&mtx, &attr);
+    pthread_mutexattr_destroy(&attr);
+
+    pthread_t tl, th;
+    pthread_create(&tl, NULL, low_priority, NULL);
+    pthread_create(&th, NULL, high_priority, NULL);
+    pthread_join(tl, NULL);
+    pthread_join(th, NULL);
+    printf("Protocole: PRIO_INHERIT\n");
+    printf("Inversion resolue\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+pthread_mutex_t mtx;
+
+void *low_priority(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    printf("Low: lock acquis\n");
+    usleep(200000);
+    printf("Low: travail termine\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *high_priority(void *arg) {
+    (void)arg;
+    usleep(50000);
+    printf("High: tentative lock\n");
+    pthread_mutex_lock(&mtx);
+    printf("High: lock acquis\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setprotocol(&attr, ____);
+    pthread_mutex_init(&mtx, &attr);
+    pthread_mutexattr_destroy(&attr);
+
+    pthread_t tl, th;
+    pthread_create(&tl, NULL, low_priority, NULL);
+    pthread_create(&th, NULL, ____, NULL);
+    pthread_join(tl, NULL);
+    pthread_join(th, NULL);
+    printf("Protocole: PRIO_INHERIT\n");
+    printf("Inversion resolue\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+/* == EXEMPLE ===============================================
+ * Mutex simple sans attribut de priorité
+ * ========================================================= */
+pthread_mutex_t simple_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(void) {
+    pthread_mutex_lock(&simple_mtx);
+    printf("Mutex lock OK\n");
+    pthread_mutex_unlock(&simple_mtx);
+    printf("Mutex unlock OK\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+pthread_mutex_t mtx;
+
+void *low_priority(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    printf("Low: lock acquis\n");
+    usleep(200000);
+    printf("Low: travail termine\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *high_priority(void *arg) {
+    (void)arg;
+    usleep(50000);
+    printf("High: tentative lock\n");
+    pthread_mutex_lock(&mtx);
+    printf("High: lock acquis\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
+    pthread_mutex_init(&mtx, &attr);
+    pthread_mutexattr_destroy(&attr);
+    pthread_t tl, th;
+    pthread_create(&tl, NULL, low_priority, NULL);
+    pthread_create(&th, NULL, ____, NULL); /* quelle fonction ? */
+    pthread_join(tl, NULL);
+    pthread_join(th, NULL);
+    printf("Protocole: PRIO_INHERIT\n");
+    printf("Inversion resolue\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+pthread_mutex_t mtx;
+
+void *low_priority(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mtx);
+    printf("Low: lock acquis\n");
+    usleep(200000);
+    printf("Low: travail termine\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+void *high_priority(void *arg) {
+    (void)arg;
+    usleep(50000);
+    printf("High: tentative lock\n");
+    pthread_mutex_lock(&mtx);
+    printf("High: lock acquis\n");
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+int main(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setprotocol(&attr, ____);
+    pthread_mutex_init(&mtx, &attr);
+    pthread_mutexattr_destroy(&attr);
+    pthread_t tl, th;
+    pthread_create(&tl, NULL, low_priority, NULL);
+    pthread_create(&th, NULL, ____, NULL);
+    pthread_join(tl, NULL);
+    pthread_join(th, NULL);
+    printf("Protocole: PRIO_INHERIT\n");
+    printf("Inversion resolue\n");
+    pthread_mutex_destroy(&mtx);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+// mutex avec PRIO_INHERIT via pthread_mutexattr
+// low_priority : lock, sleep 200ms, unlock
+// high_priority : sleep 50ms, lock, unlock
+// main : créer les deux threads, afficher résultat
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sync_concepts"
+title = "Inversion de priorité"
+
+[validation]
+expected_output = """
+Low: lock acquis
+High: tentative lock
+Low: travail termine
+High: lock acquis
+Protocole: PRIO_INHERIT
+Inversion resolue
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "High est bloqué car Low détient le mutex. Mais Med préempte Low car sa priorité est plus haute. High attend indirectement Med."
+heap = []
+label = "Inversion de priorité"
+step_label = "Inversion"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "scenario"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Low (prio 10)"
+value = "détient mutex"
+
+[[visualizer.steps.stack]]
+name = "Med (prio 20)"
+value = "s'exécute (préempte Low)"
+
+[[visualizer.steps.stack]]
+name = "High (prio 30)"
+value = "bloqué sur mutex"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Avec PRIO_INHERIT, Low hérite de la priorité de High (30). Med ne peut plus préempter Low. Low finit rapidement et libère le mutex."
+heap = []
+label = "Héritage de priorité"
+step_label = "Résolu"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "scenario"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "Low (prio 10→30)"
+value = "priorité élevée, s'exécute"
+
+[[visualizer.steps.stack]]
+name = "Med (prio 20)"
+value = "ne peut pas préempter Low"
+
+[[visualizer.steps.stack]]
+name = "High (prio 30)"
+value = "attend mutex, libéré bientôt"

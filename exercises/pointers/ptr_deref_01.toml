@@ -1,0 +1,208 @@
+common_mistake = "Oublier * dans la déclaration du type pointeur (int p vs int *p)"
+description = """
+NSY103 — Un pointeur est une variable qui stocke une adresse mémoire. L'opérateur `&` donne l'adresse d'une variable, `*` accède à la valeur pointée.
+
+Déclarez un entier `x = 42`, un pointeur `p` vers `x`, puis affichez la valeur via le pointeur."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Pour déclarer un pointeur vers int : `int *p;`",
+    "Pour obtenir l'adresse de x : `p = &x;`",
+    'Pour lire la valeur via le pointeur : `printf("%d", *p);`',
+]
+id = "ptr-deref-01"
+kc_ids = ["KC-C01"]
+key_concept = "L'opérateur & retourne l'adresse d'une variable ; * déréférence un pointeur pour lire ou écrire la valeur pointée"
+lang = "c"
+prerequisites = []
+solution_code = '''
+#include <stdio.h>
+
+int main(void) {
+    int x = 42;
+    int *p = &x;
+    printf("Valeur de x : %d\n", x);
+    printf("Valeur via *p : %d\n", *p);
+    printf("Adresses egales : %d\n", (p == &x));
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+int main(void) {
+    // Déclarez x=42, un pointeur p vers x
+    // Affichez: "Valeur de x : 42", "Valeur via *p : 42", "Adresses egales : 1"
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Declarer un pointeur vers float et dereferencement
+ * L'operateur & donne l'adresse, * lit la valeur pointee.
+ * =========================================================== */
+void example_float_ptr(void) {
+    float temperature = 36.6f;
+    float *fp = &temperature;
+    printf("temperature = %.1f\n", temperature);
+    printf("via *fp     = %.1f\n", *fp);
+    printf("fp == &temperature : %d\n", (fp == &temperature));
+}
+/* Resultat: temperature = 36.6, via *fp = 36.6, egalite = 1 */
+
+/* == VOTRE EXERCICE =========================================
+ * Declarer et dereferencier un pointeur vers int
+ * Inspirez-vous de example_float_ptr ci-dessus.
+ * Declarez x = 42, un pointeur p vers x, puis affichez.
+ * =========================================================== */
+void exercice(void) {
+    int x = 42;
+    /* TODO: declarez un pointeur p vers x (int *p = ???) */
+    /* TODO: affichez x, *p, et verifiez (p == &x) */
+}
+
+int main(void) {
+    exercice();
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    int x = 42;
+    int *p = ____; // opérateur adresse
+    printf("Valeur de x : %d\n", x);
+    printf("Valeur via *p : %d\n", ____); // déréférencement
+    printf("Adresses egales : %d\n", (p == &x));
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+int main(void) {
+    int x = 42;
+    ____ *p = ____;
+    printf("Valeur de x : %d\n", ____);
+    printf("Valeur via *p : %d\n", ____);
+    printf("Adresses egales : %d\n", (p == &x));
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+int main(void) {
+    // Déclarez x=42, un pointeur p vers x
+    // Affichez: "Valeur de x : 42", "Valeur via *p : 42", "Adresses egales : 1"
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pointers"
+title = "Déclarer et déréférencer un pointeur"
+
+[validation]
+mode = "test"
+test_code = """
+void test_deref_value(void) {
+    int x = 42;
+    int *p = &x;
+    TEST_ASSERT_EQUAL_INT(42, *p);
+    x = -1;
+    TEST_ASSERT_EQUAL_INT(-1, *p);
+    int zero = 0;
+    int *pz = &zero;
+    TEST_ASSERT_EQUAL_INT(0, *pz);
+}
+
+void test_deref_address(void) {
+    int x = 42;
+    int *p = &x;
+    TEST_ASSERT_EQUAL_PTR(&x, p);
+    TEST_ASSERT_TRUE(p == &x);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_deref_value);
+    RUN_TEST(test_deref_address);
+    return UNITY_END();
+}
+"""
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "x est alloué sur la pile — variable locale automatique. Sa valeur 42 est stockée directement dans le frame de main, sans indirection."
+heap = []
+label = "Déclaration de x"
+step_label = "Déclaration de x — variable locale en stack"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "42"
+
+[[visualizer.steps]]
+explanation = "int *p = &x — l'opérateur & retourne l'adresse mémoire de x. p contient cette adresse, pas la valeur 42. p et x sont deux variables distinctes sur la pile."
+heap = []
+label = "Création du pointeur p"
+step_label = "int *p = &x — pointeur p pointe vers x"
+
+[[visualizer.steps.arrows]]
+from = "p"
+label = "→"
+to = "x"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→x"
+
+[[visualizer.steps]]
+explanation = "*p suit le pointeur et lit la valeur à l'adresse contenue dans p. Puisque p == &x, *p == x == 42. Modification via *p affecterait directement x."
+heap = []
+label = "Déréférencement *p"
+step_label = "*p déréférence — accès indirect à la valeur de x"
+
+[[visualizer.steps.arrows]]
+from = "p"
+to = "x"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "x"
+value = "42"
+
+[[visualizer.steps.stack]]
+name = "p"
+value = "→x"
+
+[[visualizer.steps.stack]]
+name = "*p"
+value = "42"

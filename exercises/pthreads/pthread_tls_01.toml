@@ -1,0 +1,296 @@
+common_mistake = "Ne pas free() dans le destructeur → fuite mémoire par thread"
+description = """
+NSY103 — pthread_key_create crée une clé TLS. Chaque thread a sa propre valeur associée à cette clé via pthread_setspecific/getspecific. Un destructeur optionnel est appelé à la fin du thread.
+
+Créez une clé TLS et donnez à chaque thread sa propre valeur."""
+difficulty = 4
+exercise_type = "complete"
+hints = [
+    "pthread_setspecific(key, val) associe val au thread courant pour cette clé",
+    "pthread_getspecific(key) retourne la valeur associée au thread courant",
+    "Le destructeur est appelé automatiquement quand le thread se termine",
+]
+id = "pthread-tls-01"
+kc_ids = ["KC-C09"]
+key_concept = "pthread_key_create + setspecific/getspecific donne à chaque thread son propre stockage privé pour une clé donnée"
+lang = "c"
+prerequisites = ["pthread-barrier-01"]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+pthread_key_t key;
+
+void destructor(void *val) {
+    printf("Destructor: freeing %d\n", *(int *)val);
+    free(val);
+}
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    int *val = malloc(sizeof(int));
+    *val = id * 100;
+    pthread_setspecific(key, val);
+    int *got = (int *)pthread_getspecific(key);
+    printf("Thread %d: TLS value = %d\n", id, *got);
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&key, destructor);
+    pthread_t t[3];
+    int ids[3] = {1, 2, 3};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_key_delete(key);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+pthread_key_t key;
+
+void destructor(void *val) {
+    printf("Destructor: freeing %d\n", *(int *)val);
+    free(val);
+}
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    int *val = malloc(sizeof(int));
+    *val = id * 100;
+    ____(key, val);
+    int *got = (int *)____(key);
+    printf("Thread %d: TLS value = %d\n", id, *got);
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&key, ____);
+    pthread_t t[3];
+    int ids[3] = {1, 2, 3};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_key_delete(key);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * TLS pour stocker un nom de thread
+ * ========================================================= */
+pthread_key_t ex_key;
+void ex_dtor(void *v) { printf("Cleanup: %s\n", (char *)v); free(v); }
+void *ex_thread(void *arg) {
+    char *name = malloc(32);
+    snprintf(name, 32, "Thread-%d", *(int *)arg);
+    pthread_setspecific(ex_key, name);
+    printf("I am %s\n", (char *)pthread_getspecific(ex_key));
+    return NULL;
+}
+/* Resultat: chaque thread a son propre nom */
+
+/* == VOTRE EXERCICE ========================================
+ * TLS avec destructeur pour libérer la mémoire
+ * ========================================================= */
+
+pthread_key_t key;
+
+void destructor(void *val) {
+    printf("Destructor: freeing %d\n", *(int *)val);
+    free(val);
+}
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    int *val = malloc(sizeof(int));
+    *val = id * 100;
+    /* TODO: pthread_setspecific(key, val); */
+    /* TODO: int *got = pthread_getspecific(key); */
+    printf("Thread %d: TLS value = %d\n", id, *val);
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&key, destructor);
+    pthread_t t[3];
+    int ids[3] = {1, 2, 3};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_key_delete(key);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+pthread_key_t key;
+
+void destructor(void *val) {
+    printf("Destructor: freeing %d\n", *(int *)val);
+    free(val);
+}
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    int *val = malloc(sizeof(int));
+    *val = id * 100;
+    pthread_setspecific(key, val);
+    int *got = (int *)____; // récupérer la valeur TLS
+    printf("Thread %d: TLS value = %d\n", id, *got);
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&key, destructor);
+    pthread_t t[3];
+    int ids[3] = {1, 2, 3};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_key_delete(key);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+pthread_key_t key;
+
+void destructor(void *val) {
+    printf("Destructor: freeing %d\n", *(int *)val);
+    free(val);
+}
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    int *val = malloc(sizeof(int));
+    *val = id * 100;
+    ____(key, val);
+    int *got = (int *)____(key);
+    printf("Thread %d: TLS value = %d\n", id, *got);
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&key, ____);
+    pthread_t t[3];
+    int ids[3] = {1, 2, 3};
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&t[i], NULL, worker, &ids[i]);
+        pthread_join(t[i], NULL);
+    }
+    pthread_key_delete(key);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+// Clé TLS avec destructeur qui free + printf
+// 3 threads stockent id*100 via setspecific
+// Sortie: Thread X: TLS value = X00, Destructor: freeing X00
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "pthreads"
+title = "Thread-local storage (pthread_key)"
+
+[validation]
+expected_output = """
+Thread 1: TLS value = 100
+Destructor: freeing 100
+Thread 2: TLS value = 200
+Destructor: freeing 200
+Thread 3: TLS value = 300
+Destructor: freeing 300
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "pthread_key_create crée un slot TLS avec un destructeur"
+heap = []
+label = "Clé TLS créée"
+step_label = "1. Création clé"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "key"
+value = "pthread_key_t"
+
+[[visualizer.steps]]
+explanation = "setspecific associe val=100 au thread 1 pour cette clé"
+label = "Thread 1 set sa valeur TLS"
+step_label = "2. Set TLS"
+
+[[visualizer.steps.arrows]]
+from = "TLS[key]"
+to = "val"
+
+[[visualizer.steps.call_frames]]
+args = "id=1"
+function_name = "worker"
+is_active = true
+
+[[visualizer.steps.heap]]
+name = "val"
+value = "100"
+
+[[visualizer.steps.stack]]
+name = "id"
+value = "1"
+
+[[visualizer.steps.stack]]
+name = "TLS[key]"
+value = "→ 100"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Le destructeur est appelé avec la valeur TLS, qui est libérée"
+heap = []
+label = "Thread 1 termine — destructeur appelé"
+step_label = "3. Cleanup"
+
+[[visualizer.steps.call_frames]]
+args = "val=100"
+function_name = "destructor"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "TLS[key]"
+value = "NULL (freed)"

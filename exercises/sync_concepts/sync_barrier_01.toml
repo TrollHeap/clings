@@ -1,0 +1,277 @@
+common_mistake = "Initialiser la barrière avec un mauvais compte — si count > nombre réel de threads, les threads attendent indéfiniment"
+description = """
+NSY103 — Une barrière pthread bloque tous les threads participants jusqu'à ce que le nombre requis de threads ait atteint la barrière. Tous sont alors libérés simultanément.
+
+pthread_barrier_init initialise avec un compte, pthread_barrier_wait bloque jusqu'à ce que count threads attendent."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "pthread_barrier_wait prend l'adresse : &barrier",
+    "Le nombre de threads pour la barrière est NUM_THREADS",
+    "pthread_barrier_destroy prend aussi &barrier",
+]
+id = "sync-barrier-01"
+kc_ids = ["KC-C22"]
+key_concept = "pthread_barrier_wait bloque jusqu'à ce que count threads aient appelé wait — synchronisation de phase"
+lang = "c"
+prerequisites = ["sync-mutex-order-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define NUM_THREADS 3
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: avant barriere\n", id);
+    pthread_barrier_wait(&barrier);
+    printf("Thread %d: apres barriere\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
+    pthread_barrier_init(&barrier, NULL, NUM_THREADS);
+    for (int i = 0; i < NUM_THREADS; i++) {
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    }
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    pthread_barrier_destroy(&barrier);
+    printf("Tous passes!\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define NUM_THREADS 3
+
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: avant barriere\n", id);
+    pthread_barrier_wait(______);
+    printf("Thread %d: apres barriere\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
+    pthread_barrier_init(&barrier, NULL, ____);
+    for (int i = 0; i < NUM_THREADS; i++) {
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    }
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    pthread_barrier_destroy(______);
+    printf("Tous passes!\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Barrière : synchroniser 2 threads pour un calcul en 2 phases
+ * Phase 1 : chaque thread calcule sa partie
+ * Barrière : attendre que tous aient fini phase 1
+ * Phase 2 : chaque thread utilise le résultat global
+ * ========================================================= */
+pthread_barrier_t ex_barrier;
+int partial[2] = {0, 0};
+
+void *phase_worker(void *arg) {
+    int id = *(int *)arg;
+    partial[id] = (id + 1) * 10; /* phase 1 */
+    pthread_barrier_wait(&ex_barrier);
+    /* phase 2 : tous les partial[] sont remplis */
+    int total = partial[0] + partial[1];
+    printf("Thread %d voit total=%d\n", id, total);
+    return NULL;
+}
+
+void example_barrier(void) {
+    pthread_t t[2];
+    int ids[2] = {0, 1};
+    pthread_barrier_init(&ex_barrier, NULL, 2);
+    for (int i = 0; i < 2; i++)
+        pthread_create(&t[i], NULL, phase_worker, &ids[i]);
+    for (int i = 0; i < 2; i++)
+        pthread_join(t[i], NULL);
+    pthread_barrier_destroy(&ex_barrier);
+}
+
+/* == VOTRE EXERCICE ========================================
+ * 3 threads, une barrière. Chacun affiche avant/après.
+ * ========================================================= */
+
+#define NUM_THREADS 3
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: avant barriere\n", id);
+    /* TODO: pthread_barrier_wait(&barrier) */
+    printf("Thread %d: apres barriere\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
+    pthread_barrier_init(&barrier, NULL, NUM_THREADS);
+    for (int i = 0; i < NUM_THREADS; i++) {
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    }
+    for (int i = 0; i < NUM_THREADS; i++)
+        pthread_join(threads[i], NULL);
+    pthread_barrier_destroy(&barrier);
+    printf("Tous passes!\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define NUM_THREADS 3
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: avant barriere\n", id);
+    pthread_barrier_wait(&barrier);
+    printf("Thread %d: apres barriere\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
+    pthread_barrier_init(&barrier, NULL, ____); /* combien de threads ? */
+    for (int i = 0; i < NUM_THREADS; i++) {
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    }
+    for (int i = 0; i < NUM_THREADS; i++)
+        pthread_join(threads[i], NULL);
+    pthread_barrier_destroy(&barrier);
+    printf("Tous passes!\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define NUM_THREADS 3
+pthread_barrier_t barrier;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d: avant barriere\n", id);
+    pthread_barrier_wait(______);
+    printf("Thread %d: apres barriere\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
+    pthread_barrier_init(&barrier, NULL, ____);
+    for (int i = 0; i < NUM_THREADS; i++) {
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, worker, &ids[i]);
+    }
+    for (int i = 0; i < NUM_THREADS; i++)
+        pthread_join(threads[i], NULL);
+    pthread_barrier_destroy(______);
+    printf("Tous passes!\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// NUM_THREADS = 3, barrière globale
+// worker : affiche avant, barrier_wait, affiche après
+// main : init barrière avec NUM_THREADS, créer threads, joindre, destroy, afficher OK
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "sync_concepts"
+title = "Barrière de synchronisation"
+
+[validation]
+expected_output = 'REGEX:(?s)(Thread \d+: avant barriere\n){3}(Thread \d+: apres barriere\n){3}Tous passes!'
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "T0 et T1 ont atteint la barrière et sont bloqués. Ils attendent T2."
+heap = []
+label = "Threads arrivent à la barrière"
+step_label = "Attente"
+
+[[visualizer.steps.call_frames]]
+args = "id=0,1,2"
+function_name = "worker"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "barrier.count"
+value = "3 (attendus)"
+
+[[visualizer.steps.stack]]
+name = "T0"
+value = "arrive, bloqué"
+
+[[visualizer.steps.stack]]
+name = "T1"
+value = "arrive, bloqué"
+
+[[visualizer.steps.stack]]
+name = "T2"
+value = "en route..."
+
+[[visualizer.steps]]
+arrows = []
+explanation = "T2 arrive, le compte de 3 est atteint. La barrière libère tous les threads simultanément."
+heap = []
+label = "Tous les threads passent"
+step_label = "Libération"
+
+[[visualizer.steps.call_frames]]
+args = "id=0,1,2"
+function_name = "worker"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "barrier.count"
+value = "3/3 atteint"
+
+[[visualizer.steps.stack]]
+name = "T0, T1, T2"
+value = "tous libérés"

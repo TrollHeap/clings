@@ -1,0 +1,410 @@
+common_mistake = "Oublier le ~ dans CLEAR: val & (1<<N) ne clear pas, ça masque tout sauf ce bit"
+description = """
+NSY103 — Les trois opérations de base sur un bit individuel: SET (OR avec masque), CLEAR (AND avec NOT masque), TOGGLE (XOR avec masque). Le masque est (1 << position).
+
+Implémentez set_bit, clear_bit et toggle_bit puis montrez leurs effets."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "SET bit N: val | (1 << N) — force le bit à 1",
+    "CLEAR bit N: val & ~(1 << N) — force le bit à 0",
+    "TOGGLE bit N: val ^ (1 << N) — inverse le bit (0↔1)",
+]
+id = "bit-toggle-01"
+kc_ids = ["KC-C04"]
+key_concept = "SET=OR, CLEAR=AND+NOT, TOGGLE=XOR — les trois opérations atomiques sur un bit avec masque (1<<N)"
+lang = "c"
+prerequisites = ["bit-mask-apply-01"]
+solution_code = '''
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) {
+    return val | (1 << pos);
+}
+
+unsigned char clear_bit(unsigned char val, int pos) {
+    return val & ~(1 << pos);
+}
+
+unsigned char toggle_bit(unsigned char val, int pos) {
+    return val ^ (1 << pos);
+}
+
+int test_bit(unsigned char val, int pos) {
+    return (val >> pos) & 1;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+'''
+starter_code = """
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) {
+    return 0;
+}
+
+unsigned char clear_bit(unsigned char val, int pos) {
+    return 0;
+}
+
+unsigned char toggle_bit(unsigned char val, int pos) {
+    return 0;
+}
+
+int test_bit(unsigned char val, int pos) {
+    return 0;
+}
+
+int main(void) {
+    /* TODO */
+    return 0;
+}
+"""
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == EXEMPLE ================================================
+ * Set/Clear/Toggle de bits individuels
+ * =========================================================== */
+void example_bits(void) {
+    unsigned char x = 0b11110000;
+    printf("set 1:  0x%02X\n", x | (1 << 1));   /* 0xF2 */
+    printf("clr 7:  0x%02X\n", x & ~(1 << 7));  /* 0x70 */
+    printf("tog 4:  0x%02X\n", x ^ (1 << 4));   /* 0xE0 */
+}
+
+unsigned char set_bit(unsigned char val, int pos) {
+    return val | (1 << pos);
+}
+
+unsigned char clear_bit(unsigned char val, int pos) {
+    return val & ~(1 << pos);
+}
+
+unsigned char toggle_bit(unsigned char val, int pos) {
+    return val ^ (1 << pos);
+}
+
+int test_bit(unsigned char val, int pos) {
+    return (val >> pos) & 1;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) {
+    return val | (1 << pos);
+}
+
+unsigned char clear_bit(unsigned char val, int pos) {
+    return val & ____;
+}
+
+unsigned char toggle_bit(unsigned char val, int pos) {
+    return val ____ (1 << pos);
+}
+
+int test_bit(unsigned char val, int pos) {
+    return (val >> pos) & 1;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) {
+    return val | (1 << ____);
+}
+
+unsigned char clear_bit(unsigned char val, int pos) {
+    return val & ~(1 << ____);
+}
+
+unsigned char toggle_bit(unsigned char val, int pos) {
+    return val ^ (1 << ____);
+}
+
+int test_bit(unsigned char val, int pos) {
+    return (val >> pos) & 1;
+}
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) { return 0; }
+unsigned char clear_bit(unsigned char val, int pos) { return 0; }
+unsigned char toggle_bit(unsigned char val, int pos) { return 0; }
+int test_bit(unsigned char val, int pos) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+
+unsigned char set_bit(unsigned char val, int pos) { return 0; }
+unsigned char clear_bit(unsigned char val, int pos) { return 0; }
+unsigned char toggle_bit(unsigned char val, int pos) { return 0; }
+int test_bit(unsigned char val, int pos) { return 0; }
+
+int main(void) {
+    {
+        printf("%d\n", (int)(set_bit(0xA5, 3)));
+        printf("%d\n", (int)(set_bit(0xA5, 5)));
+        printf("%d\n", (int)(set_bit(0xFE, 0)));
+        printf("%d\n", (int)(set_bit(0xFF, 7)));
+    }
+    {
+        printf("%d\n", (int)(clear_bit(0xA5, 2)));
+        printf("%d\n", (int)(clear_bit(0xA5, 5)));
+        printf("%d\n", (int)(clear_bit(0xFE, 7)));
+        printf("%d\n", (int)(clear_bit(0xFF, 0)));
+    }
+    {
+        printf("%d\n", (int)(toggle_bit(0xA5, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA4, 0)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 5)));
+        printf("%d\n", (int)(toggle_bit(0xA5, 7)));
+    }
+    {
+        printf("%d\n", (int)(test_bit(0xA5, 0)));
+        printf("%d\n", (int)(test_bit(0xA5, 1)));
+        printf("%d\n", (int)(test_bit(0xA5, 5)));
+        printf("%d\n", (int)(test_bit(0xA5, 7)));
+    }
+    return 0;
+}
+''',
+]
+subject = "bitwise_ops"
+title = "Set/clear/toggle d'un bit spécifique"
+
+[validation]
+expected_output = """
+173
+165
+255
+255
+161
+133
+126
+254
+164
+165
+133
+37
+1
+0
+1
+1"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "OR avec le masque force le bit à 1 sans toucher les autres"
+heap = []
+label = "SET: val | (1 << 3)"
+step_label = "1. SET"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5, 3"
+function_name = "set_bit"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "10100101"
+
+[[visualizer.steps.stack]]
+name = "1 << 3"
+value = "00001000"
+
+[[visualizer.steps.stack]]
+name = "OR result"
+value = "10101101 (bit 3 → 1)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "AND avec le masque inversé force le bit à 0"
+heap = []
+label = "CLEAR: val & ~(1 << 2)"
+step_label = "2. CLEAR"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5, 2"
+function_name = "clear_bit"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "10100101"
+
+[[visualizer.steps.stack]]
+name = "~(1<<2)"
+value = "11111011"
+
+[[visualizer.steps.stack]]
+name = "AND result"
+value = "10100001 (bit 2 → 0)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "XOR inverse le bit — deux toggles ramènent à l'original"
+heap = []
+label = "TOGGLE: val ^ (1 << 0) (deux fois)"
+step_label = "3. TOGGLE"
+
+[[visualizer.steps.call_frames]]
+args = "0xA5, 0"
+function_name = "toggle_bit"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "val"
+value = "10100101"
+
+[[visualizer.steps.stack]]
+name = "XOR 1x"
+value = "10100100 (bit 0: 1→0)"
+
+[[visualizer.steps.stack]]
+name = "XOR 2x"
+value = "10100101 (bit 0: 0→1)"

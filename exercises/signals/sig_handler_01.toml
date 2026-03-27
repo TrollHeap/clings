@@ -1,0 +1,230 @@
+common_mistake = "Utiliser printf dans un handler de signal n'est pas async-signal-safe — acceptable ici pour l'apprentissage"
+description = """
+NSY103 — La fonction signal(signum, handler) installe un handler pour un signal donné. Quand le signal arrive, le handler est appelé avec le numéro du signal en argument. Après le handler, l'exécution reprend là où elle a été interrompue.
+
+Installez un handler pour SIGUSR1 et déclenchez-le avec raise()."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "signal(signum, handler) retourne l'ancien handler — SIG_DFL ou SIG_IGN",
+    "raise(sig) envoie un signal au processus courant — équivalent à kill(getpid(), sig)",
+    "Le handler reçoit le numéro du signal en argument",
+]
+id = "sig-handler-01"
+kc_ids = ["KC-C08"]
+key_concept = "signal() installe un handler — raise() permet de tester sans dépendre d'un autre processus"
+lang = "c"
+prerequisites = ["signal-constants-01"]
+solution_code = '''
+#include <stdio.h>
+#include <signal.h>
+
+int received = 0;
+
+void handler(int sig) {
+    printf("Caught signal %d\n", sig);
+    received = 1;
+}
+
+int main(void) {
+    /* Installer le handler */
+    signal(SIGUSR1, handler);
+    printf("Handler installed\n");
+
+    /* Envoyer le signal a soi-meme */
+    raise(SIGUSR1);
+
+    if (received)
+        printf("Signal was received\n");
+    else
+        printf("Signal was NOT received\n");
+
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <signal.h>
+
+int received = 0;
+
+void handler(int sig) {
+    printf("Caught signal %d\n", sig);
+    received = 1;
+}
+
+int main(void) {
+    /* Installer le handler */
+    ____(SIGUSR1, handler);
+    printf("Handler installed\n");
+
+    /* Envoyer le signal a soi-meme */
+    ____(SIGUSR1);
+
+    if (____)
+        printf("Signal was received\n");
+    else
+        printf("Signal was NOT received\n");
+
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <signal.h>
+
+/* == EXEMPLE =======================================
+ * Handler pour SIGINT (Ctrl+C)
+ * signal(SIGINT, handler) installe le handler
+ * ================================================= */
+void example_handler(int sig) {
+    printf("example: caught %d\n", sig);
+}
+void example_signal(void) {
+    signal(SIGINT, example_handler);
+    printf("SIGINT handler installed\n");
+    raise(SIGINT); /* se l'envoyer */
+    printf("Back in main\n");
+}
+/* Resultat: SIGINT handler installed, example: caught 2, Back in main */
+
+/* == VOTRE EXERCICE ================================
+ * Installer un handler pour SIGUSR1
+ * raise(SIGUSR1) pour le tester
+ * ================================================= */
+int main(void) {
+    /* TODO */
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+
+int received = 0;
+
+void handler(int sig) {
+    printf("Caught signal %d\n", sig);
+    received = 1;
+}
+
+int main(void) {
+    ____(SIGUSR1, handler);
+    printf("Handler installed\n");
+    ____(SIGUSR1);
+    if (____)
+        printf("Signal was received\n");
+    else
+        printf("Signal was NOT received\n");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <signal.h>
+
+int received = 0;
+
+void handler(int sig) {
+    printf("Caught signal %d\n", sig);
+    received = 1;
+}
+
+int main(void) {
+    ____(SIGUSR1, handler);
+    printf("Handler installed\n");
+    ____(SIGUSR1);
+    if (____)
+        printf("Signal was received\n");
+    else
+        printf("Signal was NOT received\n");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <signal.h>
+
+// variable globale received
+// handler(int sig): printf + set received=1
+// main: signal(SIGUSR1, handler), raise, vérifier received
+
+int main(void) {
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "signals"
+title = "signal() handler basique"
+
+[validation]
+expected_output = """
+Handler installed
+Caught signal 10
+Signal was received
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "signal() remplace le comportement par défaut (TERM) par notre handler"
+heap = []
+label = "signal() installe le handler"
+step_label = "Installation"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "SIGUSR1"
+value = "handler → handler()"
+
+[[visualizer.steps.stack]]
+name = "ancien"
+value = "SIG_DFL (terminate)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "raise() interrompt main(), appelle handler(), puis main() reprend"
+heap = []
+label = "raise(SIGUSR1) déclenche le handler"
+step_label = "Déclenchement"
+
+[[visualizer.steps.call_frames]]
+function_name = "main"
+
+[[visualizer.steps.call_frames]]
+args = "10"
+function_name = "handler"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "sig"
+value = "10 (SIGUSR1)"
+
+[[visualizer.steps.stack]]
+name = "received"
+value = "0 → 1"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "L'exécution reprend après raise() — received vaut maintenant 1"
+heap = []
+label = "Retour dans main()"
+step_label = "Reprise"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "received"
+value = "1 (modifié par handler)"

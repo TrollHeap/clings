@@ -1,0 +1,207 @@
+common_mistake = "Confondre volatile avec atomique — volatile n'empêche PAS les race conditions, il empêche seulement l'optimisation compilateur"
+description = """
+NSY103 — Le mot-clé volatile empêche le compilateur d'optimiser les accès à une variable (cache en registre). C'est nécessaire quand une variable peut être modifiée par un autre thread ou un signal handler.
+
+Démontrez que volatile force le compilateur à relire la variable depuis la mémoire à chaque accès."""
+difficulty = 1
+exercise_type = "complete"
+hints = [
+    "Le mot-clé volatile se place avant le type : volatile int flag",
+    "On attend que flag ne soit plus 0 : while (flag == 0)",
+    "On affiche la valeur de flag directement",
+]
+id = "sync-volatile-01"
+kc_ids = ["KC-C22"]
+key_concept = "volatile empêche la mise en cache en registre — force la relecture mémoire à chaque accès"
+lang = "c"
+prerequisites = ["sync-race-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+volatile int flag = 0;
+
+void *setter(void *arg) {
+    (void)arg;
+    usleep(100000);
+    flag = 1;
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t;
+    pthread_create(&t, NULL, setter, NULL);
+    printf("Attente du flag...\n");
+    while (flag == 0) {
+        /* busy wait */
+    }
+    printf("Flag recu: %d\n", flag);
+    pthread_join(t, NULL);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+____ int flag = 0;
+
+void *setter(void *arg) {
+    (void)arg;
+    usleep(100000);
+    flag = 1;
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t;
+    pthread_create(&t, NULL, setter, NULL);
+    printf("Attente du flag...\n");
+    while (flag == ____) {
+        /* busy wait */
+    }
+    printf("Flag recu: %d\n", ____);
+    pthread_join(t, NULL);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+/* == EXEMPLE ===============================================
+ * Variable volatile simple
+ * Affiche une valeur, sans accès mémoire multi-thread
+ * ========================================================= */
+volatile int counter = 0;
+
+int main(void) {
+    printf("Counter: %d\n", counter);
+    counter = 42;
+    printf("Counter: %d\n", counter);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+volatile int flag = 0;
+
+void *setter(void *arg) {
+    (void)arg;
+    usleep(100000);
+    flag = 1;
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t;
+    pthread_create(&t, NULL, setter, NULL);
+    printf("Attente du flag...\n");
+    while (flag == ____) { /* valeur initiale du flag */
+    }
+    printf("Flag recu: %d\n", flag);
+    pthread_join(t, NULL);
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+____ int flag = 0;
+
+void *setter(void *arg) {
+    (void)arg;
+    usleep(100000);
+    flag = 1;
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t;
+    pthread_create(&t, NULL, setter, NULL);
+    printf("Attente du flag...\n");
+    while (flag == ____) {
+    }
+    printf("Flag recu: %d\n", ____);
+    pthread_join(t, NULL);
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+// Déclarer flag comme volatile int = 0
+// Thread setter : attend 100ms puis flag = 1
+// main : créer thread, busy-wait sur flag == 0, afficher flag
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sync_concepts"
+title = "volatile et optimisations compilateur"
+
+[validation]
+expected_output = """
+Attente du flag...
+Flag recu: 1
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Sans volatile, le compilateur peut garder flag dans un registre. La boucle while ne relit jamais la mémoire et tourne indéfiniment."
+heap = []
+label = "Sans volatile — optimisation compilateur"
+step_label = "Optimisé"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "flag"
+value = "0 (mémoire)"
+
+[[visualizer.steps.stack]]
+name = "registre"
+value = "0 (copie cachée)"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Avec volatile, chaque accès à flag relit la mémoire. Quand le thread setter écrit 1, main le voit immédiatement."
+heap = []
+label = "Avec volatile — relecture mémoire"
+step_label = "Volatile"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "main"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "flag (volatile)"
+value = "0 → 1 (relu depuis mémoire)"

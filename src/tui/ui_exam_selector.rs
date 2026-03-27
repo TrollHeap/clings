@@ -45,9 +45,11 @@ fn run_selector_loop(
     use std::time::Duration;
 
     loop {
-        let _ = terminal.draw(|f| {
-            draw_selector(f, sessions, *cursor);
-        });
+        terminal
+            .draw(|f| {
+                draw_selector(f, sessions, *cursor);
+            })
+            .expect("render failed");
 
         if event::poll(Duration::from_millis(100)).unwrap_or_else(|e| {
             eprintln!("[clings/exam] erreur poll clavier: {e}");

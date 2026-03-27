@@ -1,0 +1,284 @@
+common_mistake = "Faire mq_unlink avant que le parent ait lu → la file est supprimée mais les messages en transit sont perdus"
+description = """
+NSY103 — Les files POSIX permettent la communication entre processus via un nom partagé (/nom). Après fork(), parent et enfant peuvent ouvrir la même file indépendamment. L'enfant envoie un message, le parent le reçoit.
+
+Forkez un enfant qui envoie 'Hello from child' dans la file. Le parent attend l'enfant puis reçoit et affiche le message."""
+difficulty = 3
+exercise_type = "complete"
+hints = [
+    "Après fork(), l'enfant hérite du descripteur mq ouvert",
+    "L'enfant fait mq_send, le parent fait mq_receive après wait()",
+    "mq_close dans l'enfant ferme uniquement sa copie du descripteur",
+]
+id = "mq-multiproc-01"
+kc_ids = ["KC-C12"]
+key_concept = "Les files POSIX nommées sont partagées via le filesystem (/dev/mqueue) ; héritées après fork()"
+lang = "c"
+prerequisites = ["mq-attrs-01"]
+solution_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_multi", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        const char *msg = "Hello from child";
+        mq_send(mq, msg, strlen(msg), 0);
+        mq_close(mq);
+        _exit(0);
+    }
+
+    wait(NULL);
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = mq_receive(mq, buf, sizeof(buf), &prio);
+    buf[n] = '\0';
+    printf("Parent received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_multi");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_multi", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = ____();
+    if (pid == 0) {
+        const char *msg = "Hello from child";
+        ____(mq, msg, strlen(msg), 0);
+        mq_close(mq);
+        _exit(0);
+    }
+
+    wait(NULL);
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(mq, buf, sizeof(buf), &prio);
+    buf[n] = '\0';
+    printf("Parent received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_multi");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* == EXEMPLE =======================================
+ * Enfant envoie un nombre, parent le recoit
+ * ================================================= */
+void example_mq_fork(void) {
+    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };
+    mqd_t q = mq_open("/kf_ex_fork", O_CREAT|O_RDWR, 0644, &a);
+    if (fork() == 0) {
+        mq_send(q, "42", 2, 0); mq_close(q); _exit(0);
+    }
+    wait(NULL);
+    char buf[64]; mq_receive(q, buf, sizeof(buf), NULL);
+    buf[2] = '\0';
+    printf("Parent got: %s\n", buf);
+    mq_close(q); mq_unlink("/kf_ex_fork");
+}
+/* Resultat: Parent got: 42 */
+
+/* == VOTRE EXERCICE ================================
+ * Enfant envoie "Hello from child", parent recoit.
+ * ================================================= */
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_multi", O_CREAT|O_RDWR, 0644, &attr);
+    /* TODO: fork, child sends, parent waits + receives */
+    mq_close(mq); mq_unlink("/kf_mq_multi");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_multi", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = ____();
+    if (pid == 0) {
+        const char *msg = "Hello from child";
+        ____(mq, msg, strlen(msg), 0);
+        mq_close(mq);
+        _exit(0);
+    }
+
+    wait(NULL);
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(mq, buf, sizeof(buf), &prio);
+    buf[n] = '\0';
+    printf("Parent received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_multi");
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };
+    mqd_t mq = mq_open("/kf_mq_multi", O_CREAT | O_RDWR, 0644, &attr);
+
+    pid_t pid = ____();
+    if (pid == 0) {
+        const char *msg = "Hello from child";
+        ____(mq, msg, strlen(msg), 0);
+        mq_close(mq);
+        _exit(0);
+    }
+
+    wait(NULL);
+    char buf[128];
+    unsigned int prio;
+    ssize_t n = ____(mq, buf, sizeof(buf), &prio);
+    buf[n] = '\0';
+    printf("Parent received: %s\n", buf);
+
+    mq_close(mq);
+    mq_unlink("/kf_mq_multi");
+    return 0;
+}''',
+    """
+#include <stdio.h>
+#include <string.h>
+#include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(void) {
+    // Créez /kf_mq_multi, fork
+    // Enfant: mq_send "Hello from child"
+    // Parent: wait, mq_receive, affiche
+    // Nettoyez
+    return 0;
+}""",
+    """
+#include <stdio.h>
+#include <mqueue.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "message_queues"
+title = "Communication inter-processus"
+
+[validation]
+expected_output = """
+Parent received: Hello from child
+"""
+mode = "output"
+
+[visualizer]
+type = "dataflow"
+
+[[visualizer.steps]]
+explanation = "fork() duplique le descripteur mqd_t dans l'espace de l'enfant. Contrairement aux pipes qui nécessitent deux fd (lecture/écriture), une file POSIX nommée est accessible indépendamment par plusieurs processus via son nom dans /dev/mqueue — même sans héritage de descripteur."
+label = "fork() — enfant hérite du descripteur mq"
+step_label = "Étape 1 — fork() : l'enfant hérite du descripteur mq"
+
+[[visualizer.steps.edges]]
+label = "mq descriptor"
+source = "parent"
+target = "mq"
+
+[[visualizer.steps.edges]]
+label = "inherited mq"
+source = "child"
+target = "mq"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = "Parent"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = "Enfant"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_multi"
+
+[[visualizer.steps]]
+explanation = "L'enfant envoie son message dans la file du noyau via mq_send(), puis ferme son descripteur et se termine avec _exit(0). Le message reste dans la file du noyau après la mort du processus enfant — c'est la différence clé avec les pipes : les messages persistent tant que la file existe."
+label = "Enfant: mq_send 'Hello from child'"
+step_label = "Étape 2 — Enfant : mq_send() puis terminaison"
+
+[[visualizer.steps.edges]]
+label = "mq_send"
+source = "child"
+target = "mq"
+
+[[visualizer.steps.nodes]]
+id = "child"
+label = "Enfant"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = """
+/kf_mq_multi
+curmsgs=1"""
+
+[[visualizer.steps]]
+explanation = "Le parent attend la fin de l'enfant avec wait() pour s'assurer que le message est dans la file, puis lit avec mq_receive(). Ce pattern producteur/consommateur IPC est fondamental en NSY103 : les message queues offrent une synchronisation implicite — mq_receive() bloque si la file est vide."
+label = "Parent: wait() puis mq_receive"
+step_label = "Étape 3 — Parent : wait() puis mq_receive() IPC"
+
+[[visualizer.steps.edges]]
+label = "mq_receive"
+source = "mq"
+target = "parent"
+
+[[visualizer.steps.nodes]]
+id = "mq"
+label = "/kf_mq_multi"
+
+[[visualizer.steps.nodes]]
+id = "parent"
+label = """
+Parent
+"Hello from child""""

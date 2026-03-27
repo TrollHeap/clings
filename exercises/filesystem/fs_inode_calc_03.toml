@@ -1,0 +1,288 @@
+common_mistake = "Ne pas soustraire les 12 blocs directs ET les blocs I1 avant de calculer combien de blocs I2 niveau-2 sont nécessaires"
+description = """
+NSY103/UTC502 — Structure annales UTC502 2ème session 2021-2022 (Ex.3).
+
+Paramètres :
+- Taille de bloc : 1024 octets
+- Numéro de bloc : 2 octets
+- Fichier de 64 Mo
+
+Calculez :
+1. Nombre total de blocs : 64 × 1024 = 65 536
+2. Entrées dans un bloc d'indirection : 1024 / 2 = 512
+3. Blocs via indirection simple (I1) : 512 blocs
+4. Blocs via indirection double (I2) : 512 × 512 = 262 144 blocs max
+5. Blocs restants après directs+I1 : 65 536 - 12 - 512 = 65 012
+6. I2 nécessaires : ceil(65 012 / 512) = 127 blocs d'adresses de 2ème niveau
+
+Conclusion : un fichier 64 Mo avec blocs 1 Ko et ptr 2 B nécessite des blocs d'indirection double."""
+difficulty = 3
+exercise_type = "fill_blank"
+files = []
+hints = [
+    "total_blocks = FILE_SIZE_MB * 1024 = 64 * 1024 = 65536 (fichier en Mo × 1024 blocs/Mo avec des blocs de 1 Ko) ; entries_per_block = BLOCK_SIZE / PTR_SIZE = 1024 / 2 = 512",
+    "L'indirection simple I1 adresse exactement entries_per_block blocs (= 512) ; soustraire DIRECT_BLOCKS et i1_capacity pour obtenir les blocs restants : 65536 - 12 - 512 = 65012",
+    "Nombre de blocs I2 de 2ème niveau = ceil(remaining / entries_per_block) = ceil(65012 / 512) = 127 ; la formule entière est (remaining + entries_per_block - 1) / entries_per_block",
+]
+id = "fs-inode-calc-03"
+kc_ids = ["KC-C5"]
+key_concept = "Avec blocs 1 Ko et ptr 2 B : 512 entrées/bloc ; un fichier 64 Mo dépasse l'indirection simple et nécessite I2"
+lang = "c"
+prerequisites = ["fs-inode-calc-02"]
+solution_code = '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int total_blocks      = FILE_SIZE_MB * 1024;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    int i1_capacity       = entries_per_block;
+    int remaining         = total_blocks - DIRECT_BLOCKS - i1_capacity;
+    /* ceil(remaining / entries_per_block) */
+    int i2_l2_blocks      = (remaining + entries_per_block - 1) / entries_per_block;
+
+    printf("Blocs totaux: %d\n", total_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs via I1: %d\n", i1_capacity);
+    printf("Blocs restants après directs+I1: %d\n", remaining);
+    printf("Blocs I2 niveau-2 nécessaires: %d\n", i2_l2_blocks);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int total_blocks      = ____;
+    int entries_per_block = ____;
+    int i1_capacity       = ____;
+    int remaining         = ____;
+    /* ceil(remaining / entries_per_block) */
+    int i2_l2_blocks      = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs totaux: %d\n", total_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs via I1: %d\n", i1_capacity);
+    printf("Blocs restants après directs+I1: %d\n", remaining);
+    printf("Blocs I2 niveau-2 nécessaires: %d\n", i2_l2_blocks);
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+
+/* == RAPPEL =================================================
+ * Annale UTC502 2ème session 2021-2022, Exercice 3
+ *
+ * Avec BLOCK_SIZE=1024, PTR_SIZE=2, FILE=64Mo :
+ *   total_blocks      = 64 * 1024        = 65536
+ *   entries_per_block = 1024 / 2         = 512
+ *   i1_capacity       = 512
+ *   remaining         = 65536 - 12 - 512 = 65012
+ *   i2_l2_blocks      = ceil(65012/512)  = 127
+ *
+ * L'inode unique I2 pointe vers 127 blocs de 2ème niveau,
+ * chacun contenant 512 pointeurs vers des blocs de données.
+ * =========================================================== */
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int total_blocks      = FILE_SIZE_MB * 1024;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    int i1_capacity       = entries_per_block;
+    int remaining         = total_blocks - DIRECT_BLOCKS - i1_capacity;
+    int i2_l2_blocks      = (remaining + entries_per_block - 1) / entries_per_block;
+
+    printf("Blocs totaux: %d\n", total_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs via I1: %d\n", i1_capacity);
+    printf("Blocs restants après directs+I1: %d\n", remaining);
+    printf("Blocs I2 niveau-2 nécessaires: %d\n", i2_l2_blocks);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int total_blocks      = FILE_SIZE_MB * 1024;
+    int entries_per_block = BLOCK_SIZE / PTR_SIZE;
+    /* I1 couvre exactement entries_per_block blocs de données */
+    int i1_capacity       = ____;
+    /* soustraire directs ET blocs couverts par I1 */
+    int remaining         = total_blocks - DIRECT_BLOCKS - ____;
+    int i2_l2_blocks      = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs totaux: %d\n", total_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs via I1: %d\n", i1_capacity);
+    printf("Blocs restants après directs+I1: %d\n", remaining);
+    printf("Blocs I2 niveau-2 nécessaires: %d\n", i2_l2_blocks);
+    return 0;
+}''',
+    '''
+#include <stdio.h>
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    int total_blocks      = ____;
+    int entries_per_block = ____;
+    int i1_capacity       = ____;
+    int remaining         = ____;
+    int i2_l2_blocks      = (remaining + entries_per_block - 1) / ____;
+
+    printf("Blocs totaux: %d\n", total_blocks);
+    printf("Entrées par bloc indirect: %d\n", entries_per_block);
+    printf("Blocs via I1: %d\n", i1_capacity);
+    printf("Blocs restants après directs+I1: %d\n", remaining);
+    printf("Blocs I2 niveau-2 nécessaires: %d\n", i2_l2_blocks);
+    return 0;
+}''',
+    """
+#include <stdio.h>
+
+#define BLOCK_SIZE    1024
+#define PTR_SIZE      2
+#define FILE_SIZE_MB  64
+#define DIRECT_BLOCKS 12
+
+int main(void) {
+    // total_blocks      = FILE_SIZE_MB * 1024
+    // entries_per_block = BLOCK_SIZE / PTR_SIZE
+    // i1_capacity       = entries_per_block (I1 adresse exactement entries_per_block blocs)
+    // remaining         = total_blocks - DIRECT_BLOCKS - i1_capacity
+    // i2_l2_blocks      = ceil(remaining / entries_per_block)
+    //                   = (remaining + entries_per_block - 1) / entries_per_block
+    return 0;
+}""",
+    """
+#include <stdio.h>
+
+int main(void) {
+    return 0;
+}""",
+]
+subject = "filesystem"
+title = "Inode : indirection double pour un fichier 64 Mo (blocs 1 Ko, ptr 2 B)"
+
+[validation]
+expected_output = """
+Blocs totaux: 65536
+Entrées par bloc indirect: 512
+Blocs via I1: 512
+Blocs restants après directs+I1: 65012
+Blocs I2 niveau-2 nécessaires: 127
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+explanation = "Avec PTR_SIZE=2, un bloc contient 512 pointeurs — capacité très élevée par niveau"
+label = "Étape 1 — Paramètres : 64 Mo, blocs 1 Ko, ptr 2 octets"
+step_label = "Étape 1"
+
+[[visualizer.steps.stack]]
+name = "FILE_SIZE_MB"
+value = "64 Mo = 65 536 blocs de 1 Ko"
+
+[[visualizer.steps.stack]]
+name = "BLOCK_SIZE"
+value = "1024 octets"
+
+[[visualizer.steps.stack]]
+name = "PTR_SIZE"
+value = "2 octets"
+
+[[visualizer.steps.stack]]
+name = "entries_per_block"
+value = "1024 / 2 = 512 entrées/bloc"
+
+[[visualizer.steps]]
+explanation = "I1 pointe vers un seul bloc d'adresses qui contient 512 pointeurs vers des données"
+label = "Étape 2 — Capacité de l'indirection simple I1"
+step_label = "Étape 2"
+
+[[visualizer.steps.stack]]
+name = "blocs directs (D0–D11)"
+value = "12 blocs couverts"
+
+[[visualizer.steps.stack]]
+name = "i1_capacity"
+value = "512 blocs supplémentaires via I1"
+
+[[visualizer.steps.stack]]
+name = "total couvert D+I1"
+value = "12 + 512 = 524 blocs (524 Ko)"
+
+[[visualizer.steps]]
+explanation = "65 012 blocs restants dépassent la capacité I1 → il faut l'indirection double I2"
+label = "Étape 3 — Blocs restants après directs + I1"
+step_label = "Étape 3"
+
+[[visualizer.steps.stack]]
+name = "total_blocks"
+value = "65 536 blocs"
+
+[[visualizer.steps.stack]]
+name = "directs + I1"
+value = "12 + 512 = 524 couverts"
+
+[[visualizer.steps.stack]]
+name = "remaining"
+value = "65536 - 12 - 512 = 65 012 blocs"
+
+[[visualizer.steps]]
+explanation = "I2 = 2 niveaux d'indirection ; capacité max = 512 × 512 = 262 144 blocs"
+label = "Étape 4 — Structure de l'indirection double I2"
+step_label = "Étape 4"
+
+[[visualizer.steps.stack]]
+name = "I2 (inode)"
+value = "1 pointeur → bloc de niveau 1"
+
+[[visualizer.steps.stack]]
+name = "bloc I2 niveau-1"
+value = "512 pointeurs → blocs de niveau 2"
+
+[[visualizer.steps.stack]]
+name = "bloc I2 niveau-2"
+value = "512 pointeurs → blocs de données"
+
+[[visualizer.steps]]
+explanation = "L'unique bloc I2 niveau-1 pointe vers 127 blocs de niveau-2 couvrant les 65 012 blocs restants"
+label = "Étape 5 — Calcul des blocs I2 de 2ème niveau nécessaires"
+step_label = "Étape 5"
+
+[[visualizer.steps.stack]]
+name = "remaining"
+value = "65 012 blocs à couvrir"
+
+[[visualizer.steps.stack]]
+name = "entries_per_block"
+value = "512 entrées/bloc"
+
+[[visualizer.steps.stack]]
+name = "i2_l2_blocks"
+value = "ceil(65012 / 512) = 127 blocs"

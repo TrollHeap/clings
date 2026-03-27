@@ -1,0 +1,299 @@
+common_mistake = "Verrouiller mutex_b avant mutex_a dans un thread et inversement dans l'autre — deadlock garanti sous charge"
+description = """
+NSY103 — Un deadlock survient quand deux threads verrouillent deux mutex dans un ordre différent : T1 prend A puis attend B, T2 prend B puis attend A. La solution est d'imposer un ordre de verrouillage global (toujours A avant B).
+
+Corrigez un deadlock en imposant un ordre de verrouillage consistant."""
+difficulty = 2
+exercise_type = "complete"
+hints = [
+    "Pour éviter un deadlock, les deux workers doivent verrouiller dans le MÊME ordre",
+    "L'ordre correct est toujours mutex_a d'abord, puis mutex_b",
+    "Le déverrouillage se fait dans l'ordre inverse : mutex_b puis mutex_a",
+]
+id = "sync-mutex-order-01"
+kc_ids = ["KC-C22"]
+key_concept = "Toujours verrouiller les mutex dans le même ordre global pour éviter les deadlocks (lock ordering)"
+lang = "c"
+prerequisites = ["sync-race-01"]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex_a = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_b = PTHREAD_MUTEX_INITIALIZER;
+int resource_a = 0;
+int resource_b = 0;
+
+void *worker1(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex_a);
+    pthread_mutex_lock(&mutex_b);
+    resource_a += 10;
+    resource_b += 10;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+void *worker2(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex_a);
+    pthread_mutex_lock(&mutex_b);
+    resource_a += 20;
+    resource_b += 20;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, worker1, NULL);
+    pthread_create(&t2, NULL, worker2, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("resource_a: %d\n", resource_a);
+    printf("resource_b: %d\n", resource_b);
+    printf("Pas de deadlock!\n");
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex_a = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_b = PTHREAD_MUTEX_INITIALIZER;
+int resource_a = 0;
+int resource_b = 0;
+
+void *worker1(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex____);
+    pthread_mutex_lock(&mutex____);
+    resource_a += 10;
+    resource_b += 10;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+void *worker2(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex____);
+    pthread_mutex_lock(&mutex____);
+    resource_a += 20;
+    resource_b += 20;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, worker1, NULL);
+    pthread_create(&t2, NULL, worker2, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("resource_a: %d\n", resource_a);
+    printf("resource_b: %d\n", resource_b);
+    printf("Pas de deadlock!\n");
+    return 0;
+}'''
+starter_code_stages = [
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+/* == EXEMPLE ===============================================
+ * Deadlock avec deux verrous : fork gauche/droite
+ * Deux philosophes prennent les fourchettes dans un ordre
+ * identique : left puis right → pas de deadlock
+ * ========================================================= */
+pthread_mutex_t fork_left = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t fork_right = PTHREAD_MUTEX_INITIALIZER;
+
+void *philosopher(void *arg) {
+    int id = *(int *)arg;
+    (void)id;
+    pthread_mutex_lock(&fork_left);
+    pthread_mutex_lock(&fork_right);
+    printf("Philosopher %d eats\n", id);
+    pthread_mutex_unlock(&fork_right);
+    pthread_mutex_unlock(&fork_left);
+    return NULL;
+}
+
+int main(void) {
+    printf("Tous les philosophes prennent left puis right\n");
+    printf("Pas de deadlock!\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex_a = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_b = PTHREAD_MUTEX_INITIALIZER;
+int resource_a = 0, resource_b = 0;
+
+void *worker1(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex_a);
+    pthread_mutex_lock(&mutex_b);
+    resource_a += 10;
+    resource_b += 10;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+void *worker2(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex_a);  /* même ordre que worker1 */
+    pthread_mutex_lock(&mutex____); /* quel mutex ensuite ? */
+    resource_a += 20;
+    resource_b += 20;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, worker1, NULL);
+    pthread_create(&t2, NULL, worker2, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("resource_a: %d\n", resource_a);
+    printf("resource_b: %d\n", resource_b);
+    printf("Pas de deadlock!\n");
+    return 0;
+}
+''',
+    '''
+#include <stdio.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex_a = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_b = PTHREAD_MUTEX_INITIALIZER;
+int resource_a = 0, resource_b = 0;
+
+void *worker1(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex____);
+    pthread_mutex_lock(&mutex____);
+    resource_a += 10;
+    resource_b += 10;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+void *worker2(void *arg) {
+    (void)arg;
+    pthread_mutex_lock(&mutex____);
+    pthread_mutex_lock(&mutex____);
+    resource_a += 20;
+    resource_b += 20;
+    pthread_mutex_unlock(&mutex_b);
+    pthread_mutex_unlock(&mutex_a);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, worker1, NULL);
+    pthread_create(&t2, NULL, worker2, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf("resource_a: %d\n", resource_a);
+    printf("resource_b: %d\n", resource_b);
+    printf("Pas de deadlock!\n");
+    return 0;
+}
+''',
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+// Deux mutex (A et B), deux workers
+// Chaque worker : lock A, lock B, modifier resources, unlock B, unlock A
+// Afficher resource_a, resource_b, "Pas de deadlock!"
+
+int main(void) {
+    return 0;
+}
+""",
+    """
+#include <stdio.h>
+#include <pthread.h>
+
+int main(void) {
+    return 0;
+}
+""",
+]
+subject = "sync_concepts"
+title = "Ordre de verrouillage et deadlock"
+
+[validation]
+expected_output = """
+resource_a: 30
+resource_b: 30
+Pas de deadlock!
+"""
+mode = "output"
+
+[visualizer]
+type = "stack_heap"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "T1 tient A et attend B. T2 tient B et attend A. Aucun ne peut progresser : deadlock."
+heap = []
+label = "Deadlock — ordre inversé"
+step_label = "Deadlock"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "worker1"
+is_active = true
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "worker2"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "T1"
+value = "lock(A) → attend B"
+
+[[visualizer.steps.stack]]
+name = "T2"
+value = "lock(B) → attend A"
+
+[[visualizer.steps]]
+arrows = []
+explanation = "Les deux threads verrouillent toujours A avant B. T2 attend que T1 libère A, puis progresse normalement."
+heap = []
+label = "Solution — même ordre (A puis B)"
+step_label = "Résolu"
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "worker1"
+is_active = true
+
+[[visualizer.steps.call_frames]]
+args = "void"
+function_name = "worker2"
+is_active = true
+
+[[visualizer.steps.stack]]
+name = "T1"
+value = "lock(A) → lock(B) → OK"
+
+[[visualizer.steps.stack]]
+name = "T2"
+value = "attend A → lock(A) → lock(B) → OK"
