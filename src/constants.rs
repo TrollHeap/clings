@@ -2,6 +2,8 @@
 
 // === Timing ===
 pub const EXECUTION_TIMEOUT_SECS: u64 = 10;
+pub const SECS_PER_MINUTE: u64 = 60;
+pub const SECS_PER_HOUR: u64 = 3600;
 pub const SECS_PER_DAY: i64 = 86_400;
 pub const DEBOUNCE_INTERVAL_MS: u64 = 200;
 pub const KEY_CHECK_TIMEOUT_MS: u64 = 50;
@@ -9,6 +11,8 @@ pub const DB_BUSY_TIMEOUT_MS: i32 = 5000;
 pub const SUCCESS_PAUSE_SECS: u64 = 2;
 pub const STATUS_MSG_TIMEOUT_SECS: u64 = 3;
 pub const EVENT_POLL_MS: u64 = 100;
+pub const EXAM_NSY103_DURATION_MINS: u64 = 150;
+pub const EXAM_UTC502_DURATION_MINS: u64 = 180;
 
 // === Mastery thresholds (from mastery.rs) ===
 pub const MASTERY_MAX: f64 = 5.0;

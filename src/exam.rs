@@ -10,9 +10,9 @@ use crate::progress;
 /// Durée par défaut selon le type de session (minutes)
 fn default_duration(session_id: &str) -> u64 {
     if session_id.starts_with("utc502") {
-        180
+        crate::constants::EXAM_UTC502_DURATION_MINS
     } else {
-        150 // NSY103 = 2h30
+        crate::constants::EXAM_NSY103_DURATION_MINS
     }
 }
 

@@ -197,7 +197,7 @@ fn write_exercise_files(exercise: &Exercise, work_dir: &Path) -> std::io::Result
     for file in &exercise.files {
         if file.name.contains("..") || file.name.starts_with('/') {
             eprintln!(
-                "  Warning: fichier ignoré (chemin invalide) : {}",
+                "  Avertissement : fichier ignoré (chemin invalide) : {}",
                 file.name
             );
             continue;
@@ -444,6 +444,93 @@ fn run_output(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRe
     )
 }
 
+/// Write Unity framework files from embedded assets to work directory.
+fn write_unity_files(work_dir: &Path) -> Result<(), String> {
+    let unity_h = include_str!("../assets/unity/unity.h");
+    let unity_int_h = include_str!("../assets/unity/unity_internals.h");
+    let unity_c = include_str!("../assets/unity/unity.c");
+    for (name, content) in [
+        (UNITY_H_FILENAME, unity_h),
+        (UNITY_INTERNALS_H_FILENAME, unity_int_h),
+        (UNITY_C_FILENAME, unity_c),
+    ] {
+        if let Err(e) = std::fs::write(work_dir.join(name), content) {
+            return Err(format!("Impossible d'écrire {name} : {e}"));
+        }
+    }
+    Ok(())
+}
+
+/// Compose test_current.c by concatenating user code (without main) + test harness setup + test code.
+fn compose_test_source(
+    source_path: &Path,
+    test_code: &str,
+    work_dir: &Path,
+) -> Result<PathBuf, String> {
+    let test_c_path = work_dir.join(TEST_C_FILENAME);
+    let source_filename = source_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
+    let user_code = std::fs::read_to_string(source_path)
+        .map_err(|e| format!("Impossible de lire {source_filename} : {e}"))?;
+    let user_code_no_main = strip_main_function(&user_code);
+    // #line préserve les numéros de ligne dans les messages d'erreur gcc
+    // setUp/tearDown sont requis par Unity — stubs injectés si l'exercice ne les définit pas
+    let test_c_content = format!(
+        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"unity.h\"\nvoid setUp(void) {{}}\nvoid tearDown(void) {{}}\n\n{test_code}\n"
+    );
+    std::fs::write(&test_c_path, &test_c_content)
+        .map_err(|e| format!("Impossible d'écrire test_current.c : {e}"))?;
+    Ok(test_c_path)
+}
+
+/// Parse test harness output and determine success based on summary line and expected test count.
+fn evaluate_test_result(
+    stdout: &str,
+    stderr: &str,
+    status: std::process::ExitStatus,
+    expected_pass: Option<usize>,
+) -> RunResult {
+    if !status.success() {
+        return RunResult {
+            success: false,
+            stdout: stdout.to_string(),
+            stderr: if stderr.is_empty() {
+                format!("Process exited with {status}")
+            } else {
+                stderr.to_string()
+            },
+            duration_ms: 0,
+            compile_error: false,
+            timeout: false,
+            gcc_hint: None,
+        };
+    }
+    let (success, failures) = parse_test_summary(stdout);
+    let passed = success && failures == 0;
+    let result_ok = match expected_pass {
+        Some(n) => {
+            // Count OK lines in stdout
+            let ok_count = stdout
+                .lines()
+                .filter(|l| l.trim_start().starts_with("OK"))
+                .count();
+            passed && ok_count >= n
+        }
+        None => passed,
+    };
+    RunResult {
+        success: result_ok,
+        stdout: stdout.to_string(),
+        stderr: stderr.to_string(),
+        duration_ms: 0,
+        compile_error: false,
+        timeout: false,
+        gcc_hint: None,
+    }
+}
+
 /// Run test-harness mode: write Unity assets + test_current.c, compile, run, parse summary.
 fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunResult {
     let test_code = match &exercise.validation.test_code {
@@ -461,46 +548,22 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
         ));
     }
 
-    // Write Unity files from embedded assets
-    let unity_h = include_str!("../assets/unity/unity.h");
-    let unity_int_h = include_str!("../assets/unity/unity_internals.h");
-    let unity_c = include_str!("../assets/unity/unity.c");
-    for (name, content) in [
-        (UNITY_H_FILENAME, unity_h),
-        (UNITY_INTERNALS_H_FILENAME, unity_int_h),
-        (UNITY_C_FILENAME, unity_c),
-    ] {
-        if let Err(e) = std::fs::write(work_dir.join(name), content) {
-            return make_compile_error(format!("Impossible d'écrire {name} : {e}"));
-        }
+    // Step 1: Write Unity framework files
+    if let Err(e) = write_unity_files(work_dir) {
+        return make_compile_error(e);
     }
 
-    // Write test_current.c = user code (sans main) + unity.h + test_code
-    // On inline le contenu de current.c plutôt qu'un #include pour pouvoir supprimer
-    // le main() utilisateur qui entrerait en conflit avec le main() du harness.
-    let test_c_path = work_dir.join(TEST_C_FILENAME);
-    let source_filename = source_path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| CURRENT_C_FILENAME.to_string());
-    let user_code = match std::fs::read_to_string(source_path) {
-        Ok(c) => c,
-        Err(e) => return make_compile_error(format!("Impossible de lire {source_filename} : {e}")),
+    // Step 2: Compose test source file
+    let test_c_path = match compose_test_source(source_path, test_code, work_dir) {
+        Ok(path) => path,
+        Err(e) => return make_compile_error(e),
     };
-    let user_code_no_main = strip_main_function(&user_code);
-    // #line préserve les numéros de ligne dans les messages d'erreur gcc
-    // setUp/tearDown sont requis par Unity — stubs injectés si l'exercice ne les définit pas
-    let test_c_content = format!(
-        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"unity.h\"\nvoid setUp(void) {{}}\nvoid tearDown(void) {{}}\n\n{test_code}\n"
-    );
-    if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {
-        return make_compile_error(format!("Impossible d'écrire test_current.c : {e}"));
-    }
 
     if let Err(e) = write_exercise_files(exercise, work_dir) {
         return make_compile_error(format!("Impossible d'écrire les fichiers d'exercice : {e}"));
     }
 
+    // Step 3: Compile and run
     let output_path = work_dir.join("kf_test");
     let output_path_str = output_path.to_string_lossy().into_owned();
     let test_c_path_str = test_c_path.to_string_lossy().into_owned();
@@ -531,48 +594,15 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
     let start = Instant::now();
     let gcc_result = spawn_gcc_and_collect(&test_c_path, &extra_args, work_dir, timeout);
     let expected_pass = exercise.validation.expected_tests_pass;
+
     dispatch_gcc_result(
         gcc_result,
         timeout,
         start,
         move |stdout, stderr, status, duration_ms| {
-            if !status.success() {
-                return RunResult {
-                    success: false,
-                    stdout,
-                    stderr: if stderr.is_empty() {
-                        format!("Process exited with {status}")
-                    } else {
-                        stderr
-                    },
-                    duration_ms,
-                    compile_error: false,
-                    timeout: false,
-                    gcc_hint: None,
-                };
-            }
-            let (success, failures) = parse_test_summary(&stdout);
-            let passed = success && failures == 0;
-            let result_ok = match expected_pass {
-                Some(n) => {
-                    // Count OK lines in stdout
-                    let ok_count = stdout
-                        .lines()
-                        .filter(|l| l.trim_start().starts_with("OK"))
-                        .count();
-                    passed && ok_count >= n
-                }
-                None => passed,
-            };
-            RunResult {
-                success: result_ok,
-                stdout,
-                stderr,
-                duration_ms,
-                compile_error: false,
-                timeout: false,
-                gcc_hint: None,
-            }
+            let mut result = evaluate_test_result(&stdout, &stderr, status, expected_pass);
+            result.duration_ms = duration_ms;
+            result
         },
     )
 }

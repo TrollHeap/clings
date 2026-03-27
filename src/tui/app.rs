@@ -64,6 +64,10 @@ pub struct HeaderCache {
     pub cached_exercise_type: String,
     pub cached_header_left_len: usize,
     pub cached_mini_map_len: usize,
+    // Tracking fields to detect state changes
+    last_cached_index: usize,
+    last_cached_total: usize,
+    last_cached_mastery: f64,
 }
 
 /// Cache du timer piscine — mis à jour dans Tick quand la seconde change.
@@ -184,22 +188,6 @@ impl AppState {
             .count();
         self.cached_due_count = Some(count);
     }
-
-    /// Invalidate due_count cache (call after modifying review_map).
-    #[allow(dead_code)]
-    pub fn invalidate_due_count_cache(&mut self) {
-        self.cached_due_count = None;
-    }
-
-    /// Recompute subject_to_chapter cache from CHAPTERS.
-    #[allow(dead_code)]
-    pub fn rebuild_subject_to_chapter_cache(&mut self) {
-        self.subject_to_chapter = CHAPTERS
-            .iter()
-            .enumerate()
-            .flat_map(|(i, ch)| ch.subjects.iter().map(move |&s| (s.to_string(), i)))
-            .collect();
-    }
 }
 
 pub struct App {
@@ -214,10 +202,10 @@ impl App {
     }
 
     /// Invalide les caches de header. Appeler après changement d'exercice ou mise à jour mastery.
+    /// Optimisé : ne recompute que si les valeurs de tracking ont changé.
     fn invalidate_header_cache(state: &mut AppState) {
         let idx = state.current_index;
         let total = state.exercises.len();
-        state.header_cache.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
         let mastery = state
             .mastery_map
             .get(
@@ -229,9 +217,27 @@ impl App {
             )
             .copied()
             .unwrap_or(0.0);
-        state.header_cache.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+
+        // Check if exercise counter needs recompute
+        if state.header_cache.last_cached_index != idx
+            || state.header_cache.last_cached_total != total
+        {
+            state.header_cache.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
+            state.header_cache.last_cached_index = idx;
+            state.header_cache.last_cached_total = total;
+        }
+
+        // Check if mastery display needs recompute
+        if (state.header_cache.last_cached_mastery - mastery).abs() > 0.01 {
+            state.header_cache.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+            state.header_cache.last_cached_mastery = mastery;
+        }
+
+        // Mini map always needs recompute (completion status changes)
         state.header_cache.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
         state.header_cache.cached_mini_map_len = state.header_cache.cached_mini_map.chars().count();
+
+        // Exercise type
         state.header_cache.cached_exercise_type = state
             .exercises
             .get(idx)

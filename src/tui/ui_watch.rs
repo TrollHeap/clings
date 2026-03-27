@@ -105,23 +105,22 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
         width.saturating_sub(left2_len + right2.chars().count() + 1)
     };
 
-    let mut line2_spans: Vec<Span<'_>> = vec![
-        Span::styled(
-            format!("clings v{}", env!("CARGO_PKG_VERSION")),
-            Style::default()
-                .fg(common::C_MAUVE)
-                .add_modifier(Modifier::BOLD),
-        ),
-        span!(Style::default().fg(common::C_OVERLAY); " · "),
-        span!(Style::default().fg(common::C_SUCCESS); "{}", counter_str),
-        span!(Style::default().fg(common::C_OVERLAY); " · "),
-        Span::styled(
-            exercise.subject.as_str(),
-            Style::default().fg(common::C_SUBTEXT),
-        ),
-        span!(Style::default().fg(common::C_OVERLAY); " · "),
-        Span::styled(stars, Style::default().fg(stars_color)),
-    ];
+    let mut line2_spans: Vec<Span<'_>> = Vec::with_capacity(10);
+    line2_spans.push(Span::styled(
+        format!("clings v{}", env!("CARGO_PKG_VERSION")),
+        Style::default()
+            .fg(common::C_MAUVE)
+            .add_modifier(Modifier::BOLD),
+    ));
+    line2_spans.push(span!(Style::default().fg(common::C_OVERLAY); " · "));
+    line2_spans.push(span!(Style::default().fg(common::C_SUCCESS); "{}", counter_str));
+    line2_spans.push(span!(Style::default().fg(common::C_OVERLAY); " · "));
+    line2_spans.push(Span::styled(
+        exercise.subject.as_str(),
+        Style::default().fg(common::C_SUBTEXT),
+    ));
+    line2_spans.push(span!(Style::default().fg(common::C_OVERLAY); " · "));
+    line2_spans.push(Span::styled(stars, Style::default().fg(stars_color)));
     if let Some(sb) = stage_badge {
         line2_spans.push(span!(Style::default().fg(common::C_OVERLAY); " · "));
         line2_spans.push(sb);
@@ -141,13 +140,12 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
     let bar = common::mastery_bar_string(mastery, 10);
     let bar_color = common::mastery_color(mastery);
 
-    let mut line3_spans: Vec<Span<'_>> = vec![
-        Span::styled(bar, Style::default().fg(bar_color)),
-        Span::styled(
-            format!(" {:.1}/5.0", mastery),
-            Style::default().fg(bar_color),
-        ),
-    ];
+    let mut line3_spans: Vec<Span<'_>> = Vec::with_capacity(4);
+    line3_spans.push(Span::styled(bar, Style::default().fg(bar_color)));
+    line3_spans.push(Span::styled(
+        format!(" {:.1}/5.0", mastery),
+        Style::default().fg(bar_color),
+    ));
     if let Some(kc) = &exercise.key_concept {
         line3_spans.push(span!(Style::default().fg(common::C_OVERLAY); "  —  "));
         line3_spans.push(Span::styled(
@@ -176,28 +174,28 @@ fn render_body(f: &mut Frame, area: Rect, state: &AppState) {
 /// Ligne de progression de stage : S0 ── S1 ── [S2] ── S3 ── S4
 /// Stage courant en accent+bold, stages passés en vert, futurs en gris.
 fn stage_progress_line(current: Option<u8>) -> Line<'static> {
-    let sep = Span::styled(" ── ", Style::default().fg(common::C_OVERLAY));
-    let spans: Vec<Span<'static>> = (0u8..=4)
-        .flat_map(|s| {
-            let label = match current {
-                Some(c) if s == c => Span::styled(
-                    format!("[S{}]", s),
-                    Style::default()
-                        .fg(common::C_ACCENT)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Some(c) if s < c => {
-                    Span::styled(format!("S{}", s), Style::default().fg(common::C_SUCCESS))
-                }
-                _ => Span::styled(format!("S{}", s), Style::default().fg(common::C_BORDER)),
-            };
-            if s < 4 {
-                vec![label, sep.clone()]
-            } else {
-                vec![label]
+    let sep_style = Style::default().fg(common::C_OVERLAY);
+    let mut spans: Vec<Span<'_>> = Vec::with_capacity(9); // 5 stages + 4 separators
+
+    for s in 0u8..=4 {
+        let label = match current {
+            Some(c) if s == c => Span::styled(
+                format!("[S{}]", s),
+                Style::default()
+                    .fg(common::C_ACCENT)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Some(c) if s < c => {
+                Span::styled(format!("S{}", s), Style::default().fg(common::C_SUCCESS))
             }
-        })
-        .collect();
+            _ => Span::styled(format!("S{}", s), Style::default().fg(common::C_BORDER)),
+        };
+        spans.push(label);
+        if s < 4 {
+            spans.push(Span::styled(" ── ", sep_style));
+        }
+    }
+
     Line::from(spans)
 }
 
