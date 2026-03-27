@@ -489,8 +489,9 @@ fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> RunRes
     };
     let user_code_no_main = strip_main_function(&user_code);
     // #line préserve les numéros de ligne dans les messages d'erreur gcc
+    // setUp/tearDown sont requis par Unity — stubs injectés si l'exercice ne les définit pas
     let test_c_content = format!(
-        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"unity.h\"\n\n{test_code}\n"
+        "#line 1 \"{source_filename}\"\n{user_code_no_main}\n#include \"unity.h\"\nvoid setUp(void) {{}}\nvoid tearDown(void) {{}}\n\n{test_code}\n"
     );
     if let Err(e) = std::fs::write(&test_c_path, &test_c_content) {
         return make_compile_error(format!("Impossible d'écrire test_current.c : {e}"));
