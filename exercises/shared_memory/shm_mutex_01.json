@@ -22,41 +22,111 @@
     "steps": [
       {
         "label": "Mutex PROCESS_SHARED dans le segment",
-        "stack": [{"name": "sc (SharedCounter*)", "value": "0xSHM"}],
-        "heap": [{"name": "SharedCounter", "value": "mutex + counter=0", "address": "0xSHM"}],
-        "arrows": [{"from": "sc (SharedCounter*)", "to": "SharedCounter"}],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "sc (SharedCounter*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "SharedCounter",
+            "value": "mutex + counter=0",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "sc (SharedCounter*)",
+            "to": "SharedCounter"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le mutex est placé dans le segment partagé avec l'attribut PTHREAD_PROCESS_SHARED.",
         "step_label": "init"
       },
       {
         "label": "4 enfants incrémentent avec lock/unlock",
-        "stack": [{"name": "sc (SharedCounter*)", "value": "0xSHM"}],
-        "heap": [{"name": "SharedCounter", "value": "mutex + counter=4000", "address": "0xSHM"}],
-        "arrows": [{"from": "sc (SharedCounter*)", "to": "SharedCounter"}],
-        "call_frames": [{"function_name": "main (children)", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "sc (SharedCounter*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "SharedCounter",
+            "value": "mutex + counter=4000",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "sc (SharedCounter*)",
+            "to": "SharedCounter"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main (children)",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Chaque enfant fait 1000 lock/increment/unlock. Le mutex garantit l'atomicité.",
         "step_label": "concurrent increments"
       },
       {
         "label": "Résultat: 4000 (pas de race condition)",
-        "stack": [{"name": "sc (SharedCounter*)", "value": "0xSHM"}],
-        "heap": [{"name": "SharedCounter", "value": "counter=4000", "address": "0xSHM"}],
-        "arrows": [{"from": "sc (SharedCounter*)", "to": "SharedCounter"}],
-        "call_frames": [{"function_name": "main (parent)", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "sc (SharedCounter*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "SharedCounter",
+            "value": "counter=4000",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "sc (SharedCounter*)",
+            "to": "SharedCounter"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main (parent)",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Sans mutex, le compteur serait < 4000 à cause des races. Avec mutex = exactement 4000.",
         "step_label": "result"
       }
     ]
   },
-  "prerequisites": ["shm-array-01"],
+  "prerequisites": [
+    "shm-array-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "pthread_mutex avec PTHREAD_PROCESS_SHARED protège les accès concurrents entre processus",
   "common_mistake": "Mutex sur la stack locale au lieu du segment partagé → chaque processus a son propre mutex inutile",
-  "kc_ids": ["KC-C13"],
+  "kc_ids": [
+    "KC-C13"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <string.h>\n\ntypedef struct { pthread_mutex_t mutex; int counter; } SharedCounter;\n\n/* == EXEMPLE =======================================\n * Mutex partage avec 2 enfants, 500 increments chacun\n * ================================================= */\nvoid example_shm_mutex(void) {\n    int fd = shm_open(\"/kf_ex_mtx\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *s = (SharedCounter *)mmap(NULL, sizeof(SharedCounter), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    pthread_mutexattr_t a; pthread_mutexattr_init(&a);\n    pthread_mutexattr_setpshared(&a, PTHREAD_PROCESS_SHARED);\n    pthread_mutex_init(&s->mutex, &a); pthread_mutexattr_destroy(&a);\n    s->counter = 0;\n    for (int i = 0; i < 2; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < 500; j++) {\n                pthread_mutex_lock(&s->mutex); s->counter++; pthread_mutex_unlock(&s->mutex);\n            }\n            _exit(0);\n        }\n    }\n    wait(NULL); wait(NULL);\n    printf(\"Total: %d\\n\", s->counter);\n    pthread_mutex_destroy(&s->mutex);\n    munmap(s, sizeof(SharedCounter)); shm_unlink(\"/kf_ex_mtx\");\n}\n/* Resultat: Total: 1000 */\n\n/* == VOTRE EXERCICE ================================\n * 4 enfants, 1000 increments chacun. Resultat: 4000.\n * ================================================= */\nint main(void) {\n    int fd = shm_open(\"/kf_shm_mutex\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *sc = (SharedCounter *)mmap(NULL, sizeof(SharedCounter), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    /* TODO: init mutex PROCESS_SHARED, fork 4 children, 1000 increments each */\n    munmap(sc, sizeof(SharedCounter)); shm_unlink(\"/kf_shm_mutex\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <string.h>\n\ntypedef struct { pthread_mutex_t mutex; int counter; } SharedCounter;\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_mutex\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *sc = (SharedCounter *)mmap(NULL, sizeof(SharedCounter), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    pthread_mutexattr_t attr; pthread_mutexattr_init(&attr);\n    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);\n    pthread_mutex_init(&sc->mutex, &attr); pthread_mutexattr_destroy(&attr);\n    sc->counter = 0;\n    for (int i = 0; i < 4; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < 1000; j++) {\n                pthread_mutex_lock(&sc->____);\n                sc->counter++;\n                pthread_mutex_unlock(&sc->____);\n            }\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < 4; i++) wait(NULL);\n    printf(\"Counter: %d\\n\", sc->counter);\n    pthread_mutex_destroy(&sc->mutex);\n    munmap(sc, sizeof(SharedCounter)); shm_unlink(\"/kf_shm_mutex\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <string.h>\n\ntypedef struct {\n    pthread_mutex_t mutex;\n    int counter;\n} SharedCounter;\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_mutex\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *sc = (SharedCounter *)mmap(NULL, sizeof(SharedCounter),\n        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n\n    pthread_mutexattr_t attr;\n    pthread_mutexattr_init(&attr);\n    pthread_mutexattr_setpshared(&attr, ____);\n    pthread_mutex_init(&sc->mutex, &attr);\n    pthread_mutexattr_destroy(&attr);\n    sc->counter = 0;\n\n    for (int i = 0; i < 4; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < 1000; j++) {\n                pthread_mutex_lock(&sc->____);\n                sc->counter++;\n                pthread_mutex_unlock(&sc->____);\n            }\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < 4; i++) wait(NULL);\n    printf(\"Counter: %d\\n\", sc->counter);\n\n    pthread_mutex_destroy(&sc->mutex);\n    munmap(sc, sizeof(SharedCounter));\n    shm_unlink(\"/kf_shm_mutex\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <pthread.h>\n#include <string.h>\n\ntypedef struct {\n    pthread_mutex_t mutex;\n    int counter;\n} SharedCounter;\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_mutex\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, sizeof(SharedCounter));\n    SharedCounter *sc = (SharedCounter *)mmap(NULL, sizeof(SharedCounter),\n        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n\n    pthread_mutexattr_t attr;\n    pthread_mutexattr_init(&attr);\n    pthread_mutexattr_setpshared(&attr, ____);\n    pthread_mutex_init(&sc->mutex, &attr);\n    pthread_mutexattr_destroy(&attr);\n    sc->counter = 0;\n\n    for (int i = 0; i < 4; i++) {\n        if (fork() == 0) {\n            for (int j = 0; j < 1000; j++) {\n                pthread_mutex_lock(&sc->____);\n                sc->counter++;\n                pthread_mutex_unlock(&sc->____);\n            }\n            _exit(0);\n        }\n    }\n    for (int i = 0; i < 4; i++) wait(NULL);\n    printf(\"Counter: %d\\n\", sc->counter);\n\n    pthread_mutex_destroy(&sc->mutex);\n    munmap(sc, sizeof(SharedCounter));\n    shm_unlink(\"/kf_shm_mutex\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <pthread.h>\n\nint main(void) {\n    // SharedCounter{mutex, counter} en shm\n    // Mutex PTHREAD_PROCESS_SHARED\n    // 4 enfants, 1000 incréments chacun → Counter: 4000\n    return 0;\n}",
     "#include <stdio.h>\n#include <sys/mman.h>\n\nint main(void) {\n    return 0;\n}"

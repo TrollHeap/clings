@@ -1239,4 +1239,26 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn test_timeout_kills_process() {
+        use std::os::unix::process::CommandExt;
+        // process_group(0) makes the child its own group leader so that
+        // kill_process_group (which sends SIGKILL to -pgid) actually reaches it.
+        let mut child = std::process::Command::new("sleep")
+            .arg("100")
+            .process_group(0)
+            .spawn()
+            .expect("sleep must be available on Linux");
+
+        let timeout = std::time::Duration::from_millis(100);
+        let result = wait_for_process_with_timeout(&mut child, timeout);
+
+        assert!(result.is_err(), "should return Err on timeout");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains(TIMEOUT_MSG_PREFIX),
+            "expected TIMEOUT_MSG_PREFIX in error, got: {msg}"
+        );
+    }
 }

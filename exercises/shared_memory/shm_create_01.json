@@ -22,41 +22,95 @@
     "steps": [
       {
         "label": "shm_open + ftruncate — création du segment",
-        "stack": [{"name": "fd", "value": "shm descriptor"}],
-        "heap": [{"name": "/kf_shm_create", "value": "4096 bytes (uninitialized)", "address": "0xSHM"}],
+        "stack": [
+          {
+            "name": "fd",
+            "value": "shm descriptor"
+          }
+        ],
+        "heap": [
+          {
+            "name": "/kf_shm_create",
+            "value": "4096 bytes (uninitialized)",
+            "address": "0xSHM"
+          }
+        ],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "shm_open crée un objet dans /dev/shm, ftruncate fixe sa taille à 4096 octets.",
         "step_label": "shm_open + ftruncate"
       },
       {
         "label": "mmap — mapping en espace utilisateur",
-        "stack": [{"name": "ptr (int*)", "value": "0xMMAP"}],
-        "heap": [{"name": "/kf_shm_create", "value": "*ptr = 42", "address": "0xMMAP"}],
-        "arrows": [{"from": "ptr (int*)", "to": "/kf_shm_create"}],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "ptr (int*)",
+            "value": "0xMMAP"
+          }
+        ],
+        "heap": [
+          {
+            "name": "/kf_shm_create",
+            "value": "*ptr = 42",
+            "address": "0xMMAP"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "ptr (int*)",
+            "to": "/kf_shm_create"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "mmap mappe le segment en mémoire du processus. On peut y accéder comme un pointeur normal.",
         "step_label": "mmap + write"
       },
       {
         "label": "munmap + shm_unlink — nettoyage",
-        "stack": [{"name": "ptr", "value": "invalid"}],
+        "stack": [
+          {
+            "name": "ptr",
+            "value": "invalid"
+          }
+        ],
         "heap": [],
         "arrows": [],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "munmap libère le mapping, shm_unlink supprime le nom de /dev/shm.",
         "step_label": "cleanup"
       }
     ]
   },
-  "prerequisites": ["shm-01"],
+  "prerequisites": [
+    "shm-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "shm_open crée, ftruncate dimensionne, mmap mappe, munmap+shm_unlink nettoie",
   "common_mistake": "Oublier ftruncate → le segment a une taille 0 et l'écriture provoque SIGBUS",
-  "kc_ids": ["KC-C13"],
+  "kc_ids": [
+    "KC-C13"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <unistd.h>\n\n/* == EXEMPLE =======================================\n * Creer un segment shm et y stocker un double\n * ================================================= */\nvoid example_shm_double(void) {\n    int fd = shm_open(\"/kf_ex_double\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, 4096);\n    double *p = (double *)mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    *p = 3.14;\n    printf(\"Shared: %.2f\\n\", *p);\n    munmap(p, 4096);\n    shm_unlink(\"/kf_ex_double\");\n}\n/* Resultat: Shared: 3.14 */\n\n/* == VOTRE EXERCICE ================================\n * Creer /kf_shm_create, stocker un int=42, afficher.\n * ================================================= */\nint main(void) {\n    /* TODO: shm_open, ftruncate, mmap, write 42, printf, cleanup */\n    return 0;\n}",
-    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <unistd.h>\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_create\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, 4096);\n    int *ptr = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    *ptr = 42;\n    printf(\"Shared value: %d\\n\", *ptr);\n    munmap(ptr, 4096);\n    ____(\"/kf_shm_create\");  // supprimer le segment\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <unistd.h>\n\nint main(void) {\n    int fd = ____(\"____\", O_CREAT | O_RDWR, 0644);\n    ____(fd, 4096);\n\n    int *ptr = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n\n    *ptr = 42;\n    printf(\"Shared value: %d\\n\", *ptr);\n\n    munmap(ptr, 4096);\n    ____(\"/kf_shm_create\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <unistd.h>\n\nint main(void) {\n    int fd = ____(\"____\", O_CREAT | O_RDWR, 0644);\n    ____(fd, 4096);\n\n    int *ptr = (int *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n\n    *ptr = 42;\n    printf(\"Shared value: %d\\n\", *ptr);\n\n    munmap(ptr, 4096);\n    ____(\"/kf_shm_create\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <unistd.h>\n\nint main(void) {\n    // Créez /kf_shm_create avec shm_open, ftruncate 4096\n    // Mappez avec mmap, écrivez 42, affichez\n    // Nettoyez: munmap + shm_unlink\n    return 0;\n}",
     "#include <stdio.h>\n#include <sys/mman.h>\n\nint main(void) {\n    return 0;\n}"

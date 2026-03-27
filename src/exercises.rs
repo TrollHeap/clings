@@ -185,9 +185,52 @@ pub fn find_exercise<'a>(exercises: &'a [Exercise], id: &str) -> Option<&'a Exer
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::RwLock;
+
+    // RwLock guards CLINGS_EXERCISES access across parallel tests.
+    // Tests that read exercises: shared read lock (parallel-safe).
+    // Tests that mutate the env var: exclusive write lock.
+    static ENV_LOCK: RwLock<()> = RwLock::new(());
+
+    #[test]
+    fn test_resolve_exercises_dir_env_invalid_path() {
+        let _guard = ENV_LOCK.write().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var("CLINGS_EXERCISES").ok();
+
+        std::env::set_var("CLINGS_EXERCISES", "/nonexistent/clings/exercises/xyz");
+        let result = resolve_exercises_dir();
+
+        match prev {
+            Some(v) => std::env::set_var("CLINGS_EXERCISES", v),
+            None => std::env::remove_var("CLINGS_EXERCISES"),
+        }
+
+        assert!(result.is_err(), "non-existent path must return Err");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("does not exist"), "message: {msg}");
+    }
+
+    #[test]
+    fn test_resolve_exercises_dir_env_valid_path() {
+        let _guard = ENV_LOCK.write().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var("CLINGS_EXERCISES").ok();
+
+        let tmpdir = tempfile::TempDir::new().expect("tmpdir");
+        std::env::set_var("CLINGS_EXERCISES", tmpdir.path());
+        let result = resolve_exercises_dir();
+
+        match prev {
+            Some(v) => std::env::set_var("CLINGS_EXERCISES", v),
+            None => std::env::remove_var("CLINGS_EXERCISES"),
+        }
+
+        assert!(result.is_ok(), "valid dir must return Ok");
+        assert_eq!(result.unwrap(), tmpdir.path());
+    }
 
     #[test]
     fn test_load_all_exercises_finds_files() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, by_subject) = load_all_exercises()?;
         assert!(!exercises.is_empty(), "Should load at least one exercise");
         assert!(!by_subject.is_empty(), "Should group by subject");
@@ -202,6 +245,7 @@ mod tests {
 
     #[test]
     fn test_find_exercise_exists() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         let first_id = &exercises[0].id;
         let found = find_exercise(&exercises, first_id);
@@ -213,6 +257,7 @@ mod tests {
 
     #[test]
     fn test_find_exercise_missing() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         assert!(find_exercise(&exercises, "nonexistent-id-999").is_none());
         Ok(())
@@ -220,6 +265,7 @@ mod tests {
 
     #[test]
     fn test_exercises_have_required_fields() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             assert!(!ex.id.is_empty(), "Exercise ID must not be empty");
@@ -235,6 +281,7 @@ mod tests {
 
     #[test]
     fn test_by_subject_consistency() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, by_subject) = load_all_exercises()?;
         let total_in_map: usize = by_subject.values().map(|v| v.len()).sum();
         assert_eq!(exercises.len(), total_in_map);
@@ -249,6 +296,7 @@ mod tests {
 
     #[test]
     fn test_exercise_ids_unique() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         let ids: std::collections::HashSet<&str> =
             exercises.iter().map(|e| e.id.as_str()).collect();
@@ -264,6 +312,7 @@ mod tests {
 
     #[test]
     fn test_exercises_fields_complete() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             assert!(!ex.title.is_empty(), "Exercise {} has empty title", ex.id);
@@ -289,6 +338,7 @@ mod tests {
 
     #[test]
     fn test_starter_code_stages_count() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             if !ex.starter_code_stages.is_empty() {
@@ -314,6 +364,7 @@ mod tests {
 
     #[test]
     fn test_output_validation_has_expected() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         use crate::models::ValidationMode;
         let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
@@ -342,6 +393,7 @@ mod tests {
 
     #[test]
     fn test_difficulty_range() -> crate::error::Result<()> {
+        let _guard = ENV_LOCK.read().unwrap_or_else(|p| p.into_inner());
         let (exercises, _) = load_all_exercises()?;
         for ex in &exercises {
             let d = ex.difficulty as u8;

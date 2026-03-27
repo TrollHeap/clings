@@ -106,7 +106,7 @@
   },
   "prerequisites": [],
   "exercise_type": "complete",
-  "key_concept": "L'opérateur & prend une adresse, * déréférence",
+  "key_concept": "L'opérateur & retourne l'adresse d'une variable ; * déréférence un pointeur pour lire ou écrire la valeur pointée",
   "common_mistake": "Oublier * dans la déclaration du type pointeur (int p vs int *p)",
   "kc_ids": [
     "KC-C01"

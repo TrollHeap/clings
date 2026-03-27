@@ -22,41 +22,111 @@
     "steps": [
       {
         "label": "Tableau mappé en mémoire partagée",
-        "stack": [{"name": "arr (int*)", "value": "0xSHM"}],
-        "heap": [{"name": "int[4]", "value": "[0, 0, 0, 0]", "address": "0xSHM"}],
-        "arrows": [{"from": "arr (int*)", "to": "int[4]"}],
-        "call_frames": [{"function_name": "main", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "arr (int*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "int[4]",
+            "value": "[0, 0, 0, 0]",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "arr (int*)",
+            "to": "int[4]"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Le tableau de 4 entiers est mappé via mmap MAP_SHARED.",
         "step_label": "init"
       },
       {
         "label": "4 enfants écrivent chacun dans leur index",
-        "stack": [{"name": "arr (int*)", "value": "0xSHM"}],
-        "heap": [{"name": "int[4]", "value": "[0, 10, 20, 30]", "address": "0xSHM"}],
-        "arrows": [{"from": "arr (int*)", "to": "int[4]"}],
-        "call_frames": [{"function_name": "main (children)", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "arr (int*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "int[4]",
+            "value": "[0, 10, 20, 30]",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "arr (int*)",
+            "to": "int[4]"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main (children)",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Chaque enfant i ecrit arr[i] = i*10. Pas de conflit car indices distincts.",
         "step_label": "children write"
       },
       {
         "label": "Parent lit le tableau après wait()",
-        "stack": [{"name": "arr (int*)", "value": "0xSHM"}],
-        "heap": [{"name": "int[4]", "value": "[0, 10, 20, 30]", "address": "0xSHM"}],
-        "arrows": [{"from": "arr (int*)", "to": "int[4]"}],
-        "call_frames": [{"function_name": "main (parent)", "args": "void", "is_active": true}],
+        "stack": [
+          {
+            "name": "arr (int*)",
+            "value": "0xSHM"
+          }
+        ],
+        "heap": [
+          {
+            "name": "int[4]",
+            "value": "[0, 10, 20, 30]",
+            "address": "0xSHM"
+          }
+        ],
+        "arrows": [
+          {
+            "from": "arr (int*)",
+            "to": "int[4]"
+          }
+        ],
+        "call_frames": [
+          {
+            "function_name": "main (parent)",
+            "args": "void",
+            "is_active": true
+          }
+        ],
         "explanation": "Parent parcourt le tableau et affiche les valeurs écrites par les enfants.",
         "step_label": "parent reads"
       }
     ]
   },
-  "prerequisites": ["shm-struct-01"],
+  "prerequisites": [
+    "shm-struct-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "Tableau partagé sans synchronisation possible si chaque processus écrit dans un index distinct",
   "common_mistake": "Oublier _exit(0) → l'enfant continue la boucle et fork à nouveau",
-  "kc_ids": ["KC-C13"],
+  "kc_ids": [
+    "KC-C13"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <string.h>\n\n#define N 4\n\n/* == EXEMPLE =======================================\n * 2 enfants ecrivent dans un tableau partage\n * ================================================= */\nvoid example_shm_arr(void) {\n    int fd = shm_open(\"/kf_ex_arr\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, 2*sizeof(int));\n    int *a = (int *)mmap(NULL, 2*sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd);\n    for (int i = 0; i < 2; i++) {\n        if (fork() == 0) { a[i] = (i+1)*5; _exit(0); }\n    }\n    wait(NULL); wait(NULL);\n    printf(\"[%d, %d]\\n\", a[0], a[1]);\n    munmap(a, 2*sizeof(int)); shm_unlink(\"/kf_ex_arr\");\n}\n/* Resultat: [5, 10] */\n\n/* == VOTRE EXERCICE ================================\n * 4 enfants, arr[i] = i*10.\n * ================================================= */\nint main(void) {\n    int fd = shm_open(\"/kf_shm_array\", O_CREAT|O_RDWR, 0644);\n    ftruncate(fd, N*sizeof(int));\n    int *arr = (int *)mmap(NULL, N*sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd); memset(arr, 0, N*sizeof(int));\n    /* TODO: fork 4 children, each writes arr[i]=i*10, parent reads */\n    munmap(arr, N*sizeof(int)); shm_unlink(\"/kf_shm_array\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <string.h>\n\n#define N 4\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_array\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, N * sizeof(int));\n    int *arr = (int *)mmap(NULL, N*sizeof(int), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);\n    close(fd); memset(arr, 0, N*sizeof(int));\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            arr[i] = i * 10;\n            ____(0);  // comment quitter l'enfant ?\n        }\n    }\n    for (int i = 0; i < N; i++) wait(NULL);\n    for (int i = 0; i < N; i++) printf(\"arr[%d]=%d\\n\", i, arr[i]);\n    munmap(arr, N*sizeof(int)); shm_unlink(\"/kf_shm_array\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <string.h>\n\n#define N 4\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_array\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, N * sizeof(int));\n    int *arr = (int *)mmap(NULL, N * sizeof(int),\n        PROT_READ | PROT_WRITE, ____, fd, 0);\n    close(fd);\n    memset(arr, 0, N * sizeof(int));\n\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            arr[____] = i * 10;\n            ____(0);\n        }\n    }\n    for (int i = 0; i < N; i++)\n        wait(NULL);\n\n    for (int i = 0; i < N; i++)\n        printf(\"arr[%d]=%d\\n\", i, arr[i]);\n\n    munmap(arr, N * sizeof(int));\n    shm_unlink(\"/kf_shm_array\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n#include <string.h>\n\n#define N 4\n\nint main(void) {\n    int fd = shm_open(\"/kf_shm_array\", O_CREAT | O_RDWR, 0644);\n    ftruncate(fd, N * sizeof(int));\n    int *arr = (int *)mmap(NULL, N * sizeof(int),\n        PROT_READ | PROT_WRITE, ____, fd, 0);\n    close(fd);\n    memset(arr, 0, N * sizeof(int));\n\n    for (int i = 0; i < N; i++) {\n        if (fork() == 0) {\n            arr[____] = i * 10;\n            ____(0);\n        }\n    }\n    for (int i = 0; i < N; i++)\n        wait(NULL);\n\n    for (int i = 0; i < N; i++)\n        printf(\"arr[%d]=%d\\n\", i, arr[i]);\n\n    munmap(arr, N * sizeof(int));\n    shm_unlink(\"/kf_shm_array\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <fcntl.h>\n#include <sys/mman.h>\n#include <sys/stat.h>\n#include <sys/wait.h>\n#include <unistd.h>\n\n#define N 4\n\nint main(void) {\n    // Créez /kf_shm_array de taille N*sizeof(int)\n    // 4 enfants: arr[i] = i*10\n    // Parent: wait tous, affiche arr[0..3]\n    return 0;\n}",
     "#include <stdio.h>\n#include <sys/mman.h>\n\nint main(void) {\n    return 0;\n}"

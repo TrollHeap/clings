@@ -45,6 +45,8 @@ cargo install --path .
 | `clings new`                | Generate an exercise skeleton or validate an existing JSON file               |
 | `clings search <query>`     | Fuzzy search over exercises (title, ID, subject, key concepts)                |
 | `clings sync`               | Sync progress between machines via Git (`init`, `status`, `now`)              |
+| `clings completions`        | Generate shell completions (bash/zsh/fish)                                    |
+| `clings schema`             | Export the exercise JSON Schema format                                        |
 
 ### Keyboard shortcuts (watch mode)
 

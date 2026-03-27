@@ -76,7 +76,7 @@
     "struct-point-01"
   ],
   "exercise_type": "complete",
-  "key_concept": "ptr->champ == (*ptr).champ",
+  "key_concept": "L'opérateur -> est du sucre syntaxique : ptr->champ équivaut à (*ptr).champ — déréférence et accès au membre en une seule étape",
   "common_mistake": "Utiliser . au lieu de -> sur un pointeur",
   "kc_ids": [
     "KC-C03"

@@ -23,7 +23,10 @@
       {
         "label": "File vide : curmsgs=0",
         "nodes": [
-          {"id": "mq", "label": "/kf_mq_attrs\ncurmsgs=0"}
+          {
+            "id": "mq",
+            "label": "/kf_mq_attrs\ncurmsgs=0"
+          }
         ],
         "edges": [],
         "explanation": "mq_getattr() interroge le noyau pour l'état initial de la file. mq_curmsgs=0 confirme que la file est vide. Cet appel est non-destructif et peut être appelé à tout moment pour observer l'occupation de la file, utile pour implémenter un backpressure ou un monitoring.",
@@ -32,13 +35,30 @@
       {
         "label": "Après 2 sends : curmsgs=2",
         "nodes": [
-          {"id": "mq", "label": "/kf_mq_attrs\ncurmsgs=2"},
-          {"id": "m1", "label": "msg1"},
-          {"id": "m2", "label": "msg2"}
+          {
+            "id": "mq",
+            "label": "/kf_mq_attrs\ncurmsgs=2"
+          },
+          {
+            "id": "m1",
+            "label": "msg1"
+          },
+          {
+            "id": "m2",
+            "label": "msg2"
+          }
         ],
         "edges": [
-          {"source": "m1", "target": "mq", "label": "send"},
-          {"source": "m2", "target": "mq", "label": "send"}
+          {
+            "source": "m1",
+            "target": "mq",
+            "label": "send"
+          },
+          {
+            "source": "m2",
+            "target": "mq",
+            "label": "send"
+          }
         ],
         "explanation": "Après deux mq_send(), mq_getattr() reflète mq_curmsgs=2 : le noyau maintient ce compteur en temps réel. La différence entre mq_maxmsg (capacité max, 10) et mq_curmsgs (occupation actuelle, 2) indique l'espace disponible. Quand mq_curmsgs == mq_maxmsg, le prochain mq_send() bloque.",
         "step_label": "Étape 2 — Après 2 envois : curmsgs=2"
@@ -46,25 +66,39 @@
       {
         "label": "Après 1 recv : curmsgs=1",
         "nodes": [
-          {"id": "mq", "label": "/kf_mq_attrs\ncurmsgs=1"},
-          {"id": "out", "label": "msg1 reçu"}
+          {
+            "id": "mq",
+            "label": "/kf_mq_attrs\ncurmsgs=1"
+          },
+          {
+            "id": "out",
+            "label": "msg1 reçu"
+          }
         ],
         "edges": [
-          {"source": "mq", "target": "out", "label": "receive"}
+          {
+            "source": "mq",
+            "target": "out",
+            "label": "receive"
+          }
         ],
         "explanation": "Après un mq_receive(), mq_curmsgs passe de 2 à 1. Le noyau décrémente ce compteur atomiquement lors de chaque réception. Observer curmsgs évoluer dynamiquement est essentiel pour déboguer les interblocages (file pleine/vide) et implémenter un contrôle de flux entre producteurs et consommateurs.",
         "step_label": "Étape 3 — Après 1 réception : curmsgs=1"
       }
     ]
   },
-  "prerequisites": ["mq-priority-01"],
+  "prerequisites": [
+    "mq-priority-01"
+  ],
   "exercise_type": "complete",
   "key_concept": "mq_getattr observe l'état dynamique de la file ; curmsgs reflète le remplissage",
   "common_mistake": "Confondre mq_maxmsg (capacité) et mq_curmsgs (occupation actuelle)",
-  "kc_ids": ["KC-C12"],
+  "kc_ids": [
+    "KC-C12"
+  ],
   "starter_code_stages": [
     "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\n/* == EXEMPLE =======================================\n * Observer curmsgs evoluer avec send/receive\n * ================================================= */\nvoid example_attrs(void) {\n    struct mq_attr a = { .mq_maxmsg = 5, .mq_msgsize = 64 };\n    mqd_t q = mq_open(\"/kf_ex_attr\", O_CREAT|O_RDWR, 0644, &a);\n    struct mq_attr c;\n    mq_send(q, \"a\", 1, 0);\n    mq_getattr(q, &c);\n    printf(\"curmsgs=%ld\\n\", c.mq_curmsgs);\n    char buf[64]; mq_receive(q, buf, sizeof(buf), NULL);\n    mq_getattr(q, &c);\n    printf(\"curmsgs=%ld\\n\", c.mq_curmsgs);\n    mq_close(q); mq_unlink(\"/kf_ex_attr\");\n}\n/* Resultat: curmsgs=1, curmsgs=0 */\n\n/* == VOTRE EXERCICE ================================\n * Observer curmsgs: 0 → 2 (2 sends) → 1 (1 recv)\n * ================================================= */\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_attrs\", O_CREAT|O_RDWR, 0644, &attr);\n    /* TODO: getattr, 2 sends, getattr, 1 recv, getattr */\n    mq_close(mq); mq_unlink(\"/kf_mq_attrs\");\n    return 0;\n}",
-    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_attrs\", O_CREAT | O_RDWR, 0644, &attr);\n    struct mq_attr cur;\n    mq_getattr(mq, &cur);\n    printf(\"Start: curmsgs=%ld\\n\", cur.mq_curmsgs);\n    mq_send(mq, \"msg1\", 4, 0);\n    mq_send(mq, \"msg2\", 4, 0);\n    mq_getattr(mq, &cur);\n    printf(\"After 2 sends: curmsgs=%ld\\n\", cur.____);\n    char buf[128]; mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_getattr(mq, &cur);\n    printf(\"After 1 recv: curmsgs=%ld\\n\", cur.mq_curmsgs);\n    mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_close(mq); mq_unlink(\"/kf_mq_attrs\");\n    return 0;\n}",
+    "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_attrs\", O_CREAT | O_RDWR, 0644, &attr);\n\n    struct mq_attr cur;\n    ____(mq, &cur);\n    printf(\"Start: curmsgs=%ld\\n\", cur.mq_curmsgs);\n\n    mq_send(mq, \"msg1\", 4, 0);\n    mq_send(mq, \"msg2\", 4, 0);\n    ____(mq, &cur);\n    printf(\"After 2 sends: curmsgs=%ld\\n\", cur.____);\n\n    char buf[128];\n    mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_getattr(mq, &cur);\n    printf(\"After 1 recv: curmsgs=%ld\\n\", cur.mq_curmsgs);\n\n    mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_close(mq);\n    mq_unlink(\"/kf_mq_attrs\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    struct mq_attr attr = { .mq_maxmsg = 10, .mq_msgsize = 128 };\n    mqd_t mq = mq_open(\"/kf_mq_attrs\", O_CREAT | O_RDWR, 0644, &attr);\n\n    struct mq_attr cur;\n    ____(mq, &cur);\n    printf(\"Start: curmsgs=%ld\\n\", cur.mq_curmsgs);\n\n    mq_send(mq, \"msg1\", 4, 0);\n    mq_send(mq, \"msg2\", 4, 0);\n    ____(mq, &cur);\n    printf(\"After 2 sends: curmsgs=%ld\\n\", cur.____);\n\n    char buf[128];\n    mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_getattr(mq, &cur);\n    printf(\"After 1 recv: curmsgs=%ld\\n\", cur.mq_curmsgs);\n\n    mq_receive(mq, buf, sizeof(buf), NULL);\n    mq_close(mq);\n    mq_unlink(\"/kf_mq_attrs\");\n    return 0;\n}",
     "#include <stdio.h>\n#include <string.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n\nint main(void) {\n    // Créez /kf_mq_attrs, affichez curmsgs (0)\n    // Envoyez 2 messages, affichez curmsgs (2)\n    // Recevez 1, affichez curmsgs (1)\n    // Nettoyez\n    return 0;\n}",
     "#include <stdio.h>\n#include <mqueue.h>\n\nint main(void) {\n    return 0;\n}"

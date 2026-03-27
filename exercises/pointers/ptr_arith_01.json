@@ -120,7 +120,7 @@
     "ptr-deref-01"
   ],
   "exercise_type": "complete",
-  "key_concept": "p+i == &arr[i], *(p+i) == arr[i]",
+  "key_concept": "Ajouter i à un pointeur avance de i×sizeof(*p) octets : p+i == &arr[i] et *(p+i) == arr[i]",
   "common_mistake": "Confondre p++ (modifie p) avec *(p+i) (lit sans modifier)",
   "kc_ids": [
     "KC-C01"

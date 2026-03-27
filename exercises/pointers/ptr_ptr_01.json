@@ -112,7 +112,7 @@
     "ptr-deref-01"
   ],
   "exercise_type": "complete",
-  "key_concept": "int **pp : pointe vers un pointeur vers int",
+  "key_concept": "int **pp : pointeur vers pointeur vers int — indispensable pour modifier un pointeur depuis une fonction (passage par adresse de pointeur)",
   "common_mistake": "Passer int* au lieu de int** : la valeur du pointeur ne peut pas être modifiée depuis la fonction",
   "kc_ids": [
     "KC-C01"
