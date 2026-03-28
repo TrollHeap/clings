@@ -31,7 +31,7 @@ rust-embed = { version = "8", features = ["include-exclude"] }
 nucleo-matcher = "0.3"
 ratatui = "0.30"
 ratatui-macros = "0.7"
-schemars = "0.8"
+schemars = "1"
 
 [dev-dependencies]
 insta = "1"
