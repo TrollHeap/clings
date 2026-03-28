@@ -1,247 +1,6 @@
-//! User configuration loaded from `~/.clings/clings.toml`.
-//!
-//! At startup, `init()` is called once. All code reads config via `get()`.
-//! Missing fields fall back to the compile-time constants in `constants.rs`.
-
-use std::sync::OnceLock;
-
-use serde::{Deserialize, Serialize};
-
-use crate::constants;
-use crate::error::KfError;
-
-static CONFIG: OnceLock<ClingConfig> = OnceLock::new();
-
-// ── Top-level struct ──────────────────────────────────────────────────────────
-
-/// Configuration utilisateur top-level chargée depuis ~/.clings/clings.toml.
-/// Les sections manquantes utilisent les défauts de constants.rs.
-#[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub struct ClingConfig {
-    /// Configuration SRS : decay, intervals, multiplier.
-    pub srs: SrsConfig,
-    /// Configuration UI : éditeur par défaut, largeur pane tmux.
-    pub ui: UiConfig,
-    /// Configuration tmux : auto-open editor pane dans tmux.
-    pub tmux: TmuxConfig,
-    /// Configuration sync Git : remote URL, branch, enabled flag.
-    pub sync: SyncConfig,
-    /// Chemin vers le repo libsys pour exports (défaut : $HOME/Developer/TOOLS/libsys).
-    #[serde(default)]
-    pub libsys_path: Option<std::path::PathBuf>,
-}
-
-// ── [srs] section ─────────────────────────────────────────────────────────────
-
-/// Configuration SRS (Spaced Repetition System).
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub struct SrsConfig {
-    /// Jours d'inactivité avant que le score décroisse de 0.5.
-    pub decay_days: i64,
-    /// Intervalle de révision minimal après succès (jours).
-    pub base_interval_days: i64,
-    /// Intervalle de révision maximal après succès répétés (jours).
-    pub max_interval_days: i64,
-    /// Multiplicateur d'intervalle appliqué après succès (ex. 2.5x).
-    pub interval_multiplier: f64,
-}
-
-impl Default for SrsConfig {
-    fn default() -> Self {
-        SrsConfig {
-            decay_days: constants::MASTERY_DECAY_DAYS,
-            base_interval_days: constants::SRS_BASE_INTERVAL_DAYS,
-            max_interval_days: constants::SRS_MAX_INTERVAL_DAYS,
-            interval_multiplier: constants::SRS_INTERVAL_MULTIPLIER,
-        }
-    }
-}
-
-// ── [ui] section ──────────────────────────────────────────────────────────────
-
-/// Configuration UI et éditeur.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub struct UiConfig {
-    /// Commande éditeur par défaut (ex. 'nvim', 'vim'). Utilisé dans tmux split.
-    pub editor: String,
-    /// Largeur du pane tmux éditeur (caractères). Défaut : 50.
-    pub tmux_pane_width: u8,
-}
-
-impl Default for UiConfig {
-    fn default() -> Self {
-        UiConfig {
-            editor: constants::TMUX_EDITOR.to_string(),
-            tmux_pane_width: 50,
-        }
-    }
-}
-
-// ── [tmux] section ────────────────────────────────────────────────────────────
-
-/// Configuration intégration tmux.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub struct TmuxConfig {
-    /// Activer/désactiver la création automatique d'un pane tmux pour l'éditeur.
-    pub enabled: bool,
-}
-
-impl Default for TmuxConfig {
-    fn default() -> Self {
-        TmuxConfig { enabled: true }
-    }
-}
-
-// ── [sync] section ────────────────────────────────────────────────────────────
-
-/// Configuration synchronisation Git pour progès cross-machines.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
-pub struct SyncConfig {
-    /// Activer/désactiver la sync Git des snapshots de progression.
-    pub enabled: bool,
-    /// URL remote Git (ex. 'https://github.com/user/clings-progress.git').
-    pub remote: String,
-    /// Branche Git pour les snapshots. Défaut : 'main'.
-    pub branch: String,
-    /// Hostname machine pour les commits sync. Si vide, utilise hostname système.
-    pub hostname: String,
-}
-
-impl Default for SyncConfig {
-    fn default() -> Self {
-        SyncConfig {
-            enabled: false,
-            remote: String::new(),
-            branch: constants::SYNC_DEFAULT_BRANCH.to_string(),
-            hostname: String::new(),
-        }
-    }
-}
-
-// ── Load / access ─────────────────────────────────────────────────────────────
-
-/// Charge la configuration depuis ~/.clings/clings.toml avec fallback aux défauts.
-/// Ignore silencieusement les fichiers manquants ou mal formés.
-pub fn load() -> ClingConfig {
-    let path = constants::clings_data_dir().join(constants::CONFIG_TOML_FILENAME);
-
-    if !path.exists() {
-        return ClingConfig::default();
-    }
-
-    match std::fs::read_to_string(&path) {
-        Ok(content) => toml::from_str::<ClingConfig>(&content).unwrap_or_else(|e| {
-            eprintln!("  [clings] erreur config TOML: {e}");
-            ClingConfig::default()
-        }),
-        Err(e) => {
-            eprintln!("  [clings] impossible de lire clings.toml: {e}");
-            ClingConfig::default()
-        }
-    }
-}
-
-/// Initialise la configuration globale. Doit être appelée une fois au démarrage.
-/// Double-init est un no-op (OnceLock garantit une seule initialisation).
-pub fn init(cfg: ClingConfig) {
-    CONFIG.set(cfg).ok();
-}
-
-/// Accède à la configuration globale. Retourne le défaut si `init()` n'a pas été appelée.
-pub fn get() -> &'static ClingConfig {
-    CONFIG.get_or_init(ClingConfig::default)
-}
-
-/// Écrit une seule clé `section.key = value` dans ~/.clings/clings.toml.
-/// Crée le fichier s'il n'existe pas.
-pub fn set_value(section: &str, key: &str, value: &str) -> crate::error::Result<()> {
-    const ALLOWED: &[(&str, &str)] = &[
-        ("srs", "decay_days"),
-        ("srs", "base_interval_days"),
-        ("ui", "editor"),
-        ("tmux", "enabled"),
-        ("ui", "tmux_pane_width"),
-        ("sync", "enabled"),
-        ("sync", "remote"),
-        ("sync", "branch"),
-        ("sync", "hostname"),
-    ];
-    if !ALLOWED.iter().any(|(s, k)| *s == section && *k == key) {
-        return Err(KfError::Config(format!(
-            "clé inconnue '{section}.{key}' — valeurs autorisées : {}",
-            ALLOWED
-                .iter()
-                .map(|(s, k)| format!("{s}.{k}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )));
-    }
-
-    let path = constants::clings_data_dir().join(constants::CONFIG_TOML_FILENAME);
-
-    // Load current TOML as a Value so we preserve unknown fields
-    let mut doc: toml::Value = if path.exists() {
-        std::fs::read_to_string(&path)
-            .map_err(|e| KfError::Config(e.to_string()))
-            .and_then(|s| toml::from_str(&s).map_err(|e| KfError::Config(e.to_string())))
-            .unwrap_or(toml::Value::Table(toml::map::Map::new()))
-    } else {
-        toml::Value::Table(toml::map::Map::new())
-    };
-
-    // Parse value: try i64 → f64 → bool → string
-    let parsed: toml::Value = if let Ok(i) = value.parse::<i64>() {
-        toml::Value::Integer(i)
-    } else if let Ok(f) = value.parse::<f64>() {
-        toml::Value::Float(f)
-    } else if let Ok(b) = value.parse::<bool>() {
-        toml::Value::Boolean(b)
-    } else {
-        toml::Value::String(value.to_string())
-    };
-
-    let table = doc
-        .as_table_mut()
-        .ok_or_else(|| KfError::Config("format TOML invalide".to_string()))?;
-
-    let section_table = table
-        .entry(section)
-        .or_insert_with(|| toml::Value::Table(toml::map::Map::new()))
-        .as_table_mut()
-        .ok_or_else(|| KfError::Config(format!("section '{section}' n'est pas une table")))?;
-
-    section_table.insert(key.to_string(), parsed);
-
-    // Ensure parent directory exists
-    if let Some(parent) = path.parent() {
-        #[cfg(unix)]
-        {
-            use std::fs::DirBuilder;
-            use std::os::unix::fs::DirBuilderExt;
-            DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(parent)
-                .map_err(|e: std::io::Error| KfError::Config(e.to_string()))?;
-        }
-        #[cfg(not(unix))]
-        std::fs::create_dir_all(parent).map_err(|e| KfError::Config(e.to_string()))?;
-    }
-
-    let serialized = toml::to_string_pretty(&doc).map_err(|e| KfError::Config(e.to_string()))?;
-    std::fs::write(&path, serialized).map_err(|e| KfError::Config(e.to_string()))?;
-
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod unit_tests {
+    use super::super::*;
     use std::sync::Mutex;
 
     // Mutex to serialize tests that modify CLINGS_HOME env var
@@ -251,29 +10,38 @@ mod tests {
 
     #[test]
     fn test_srs_config_default_decay_days() {
-        let cfg = SrsConfig::default();
-        assert_eq!(cfg.decay_days, constants::MASTERY_DECAY_DAYS);
+        let cfg = srs::SrsConfig::default();
+        assert_eq!(cfg.decay_days, crate::constants::MASTERY_DECAY_DAYS);
         assert_eq!(cfg.decay_days, 14);
     }
 
     #[test]
     fn test_srs_config_default_base_interval() {
-        let cfg = SrsConfig::default();
-        assert_eq!(cfg.base_interval_days, constants::SRS_BASE_INTERVAL_DAYS);
+        let cfg = srs::SrsConfig::default();
+        assert_eq!(
+            cfg.base_interval_days,
+            crate::constants::SRS_BASE_INTERVAL_DAYS
+        );
         assert_eq!(cfg.base_interval_days, 1);
     }
 
     #[test]
     fn test_srs_config_default_max_interval() {
-        let cfg = SrsConfig::default();
-        assert_eq!(cfg.max_interval_days, constants::SRS_MAX_INTERVAL_DAYS);
+        let cfg = srs::SrsConfig::default();
+        assert_eq!(
+            cfg.max_interval_days,
+            crate::constants::SRS_MAX_INTERVAL_DAYS
+        );
         assert_eq!(cfg.max_interval_days, 60);
     }
 
     #[test]
     fn test_srs_config_default_multiplier() {
-        let cfg = SrsConfig::default();
-        assert_eq!(cfg.interval_multiplier, constants::SRS_INTERVAL_MULTIPLIER);
+        let cfg = srs::SrsConfig::default();
+        assert_eq!(
+            cfg.interval_multiplier,
+            crate::constants::SRS_INTERVAL_MULTIPLIER
+        );
         assert_eq!(cfg.interval_multiplier, 2.5);
     }
 
@@ -281,14 +49,14 @@ mod tests {
 
     #[test]
     fn test_ui_config_default_editor() {
-        let cfg = UiConfig::default();
-        assert_eq!(cfg.editor, constants::TMUX_EDITOR);
+        let cfg = ui::UiConfig::default();
+        assert_eq!(cfg.editor, crate::constants::TMUX_EDITOR);
         assert_eq!(cfg.editor, "nvim");
     }
 
     #[test]
     fn test_ui_config_default_pane_width() {
-        let cfg = UiConfig::default();
+        let cfg = ui::UiConfig::default();
         assert_eq!(cfg.tmux_pane_width, 50);
     }
 
@@ -296,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_tmux_config_default_enabled() {
-        let cfg = TmuxConfig::default();
+        let cfg = tmux::TmuxConfig::default();
         assert!(cfg.enabled);
     }
 
@@ -304,26 +72,26 @@ mod tests {
 
     #[test]
     fn test_sync_config_default_disabled() {
-        let cfg = SyncConfig::default();
+        let cfg = sync::SyncConfig::default();
         assert!(!cfg.enabled);
     }
 
     #[test]
     fn test_sync_config_default_empty_remote() {
-        let cfg = SyncConfig::default();
+        let cfg = sync::SyncConfig::default();
         assert_eq!(cfg.remote, "");
     }
 
     #[test]
     fn test_sync_config_default_branch() {
-        let cfg = SyncConfig::default();
-        assert_eq!(cfg.branch, constants::SYNC_DEFAULT_BRANCH);
+        let cfg = sync::SyncConfig::default();
+        assert_eq!(cfg.branch, crate::constants::SYNC_DEFAULT_BRANCH);
         assert_eq!(cfg.branch, "main");
     }
 
     #[test]
     fn test_sync_config_default_empty_hostname() {
-        let cfg = SyncConfig::default();
+        let cfg = sync::SyncConfig::default();
         assert_eq!(cfg.hostname, "");
     }
 
@@ -441,7 +209,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("srs", "decay_days", "21");
+        let result = loader::set_value("srs", "decay_days", "21");
         assert!(result.is_ok());
     }
 
@@ -450,7 +218,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("srs", "base_interval_days", "3");
+        let result = loader::set_value("srs", "base_interval_days", "3");
         assert!(result.is_ok());
     }
 
@@ -459,7 +227,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("ui", "editor", "emacs");
+        let result = loader::set_value("ui", "editor", "emacs");
         assert!(result.is_ok());
     }
 
@@ -468,7 +236,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("ui", "tmux_pane_width", "100");
+        let result = loader::set_value("ui", "tmux_pane_width", "100");
         assert!(result.is_ok());
     }
 
@@ -477,7 +245,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("tmux", "enabled", "false");
+        let result = loader::set_value("tmux", "enabled", "false");
         assert!(result.is_ok());
     }
 
@@ -486,7 +254,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("sync", "enabled", "true");
+        let result = loader::set_value("sync", "enabled", "true");
         assert!(result.is_ok());
     }
 
@@ -495,7 +263,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("sync", "remote", "https://github.com/user/repo.git");
+        let result = loader::set_value("sync", "remote", "https://github.com/user/repo.git");
         assert!(result.is_ok());
     }
 
@@ -504,7 +272,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("sync", "branch", "development");
+        let result = loader::set_value("sync", "branch", "development");
         assert!(result.is_ok());
     }
 
@@ -513,7 +281,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("sync", "hostname", "machine-01");
+        let result = loader::set_value("sync", "hostname", "machine-01");
         assert!(result.is_ok());
     }
 
@@ -524,7 +292,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("unknown", "key", "value");
+        let result = loader::set_value("unknown", "key", "value");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("clé inconnue"));
     }
@@ -534,7 +302,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("srs", "unknown_key", "42");
+        let result = loader::set_value("srs", "unknown_key", "42");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("clé inconnue"));
     }
@@ -544,7 +312,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("tmux", "decay_days", "7");
+        let result = loader::set_value("tmux", "decay_days", "7");
         assert!(result.is_err());
     }
 
@@ -556,7 +324,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("srs", "decay_days", "42");
+        let result = loader::set_value("srs", "decay_days", "42");
         assert!(result.is_ok());
     }
 
@@ -566,7 +334,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("srs", "base_interval_days", "3");
+        let result = loader::set_value("srs", "base_interval_days", "3");
         assert!(result.is_ok());
     }
 
@@ -576,7 +344,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("tmux", "enabled", "true");
+        let result = loader::set_value("tmux", "enabled", "true");
         assert!(result.is_ok());
     }
 
@@ -586,7 +354,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("sync", "enabled", "false");
+        let result = loader::set_value("sync", "enabled", "false");
         assert!(result.is_ok());
     }
 
@@ -596,7 +364,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("ui", "editor", "code --wait");
+        let result = loader::set_value("ui", "editor", "code --wait");
         assert!(result.is_ok());
     }
 
@@ -608,7 +376,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        set_value("srs", "decay_days", "28").unwrap();
+        loader::set_value("srs", "decay_days", "28").unwrap();
         let path = clings_home.join("clings.toml");
         assert!(path.exists());
     }
@@ -619,7 +387,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let nested = tmp.path().join("nested").join("dir");
         std::env::set_var("CLINGS_HOME", &nested);
-        let result = set_value("srs", "decay_days", "7");
+        let result = loader::set_value("srs", "decay_days", "7");
         assert!(result.is_ok());
         assert!(nested.exists());
     }
@@ -630,8 +398,8 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let r1 = set_value("srs", "decay_days", "14");
-        let r2 = set_value("srs", "base_interval_days", "2");
+        let r1 = loader::set_value("srs", "decay_days", "14");
+        let r2 = loader::set_value("srs", "base_interval_days", "2");
         assert!(r1.is_ok());
         assert!(r2.is_ok());
         // Verify file was created
@@ -645,8 +413,8 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let r1 = set_value("srs", "decay_days", "14");
-        let r2 = set_value("srs", "decay_days", "21");
+        let r1 = loader::set_value("srs", "decay_days", "14");
+        let r2 = loader::set_value("srs", "decay_days", "21");
         assert!(r1.is_ok());
         assert!(r2.is_ok());
     }
@@ -657,9 +425,9 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let r1 = set_value("srs", "decay_days", "21");
-        let r2 = set_value("ui", "editor", "vim");
-        let r3 = set_value("tmux", "enabled", "false");
+        let r1 = loader::set_value("srs", "decay_days", "21");
+        let r2 = loader::set_value("ui", "editor", "vim");
+        let r3 = loader::set_value("tmux", "enabled", "false");
         assert!(r1.is_ok());
         assert!(r2.is_ok());
         assert!(r3.is_ok());
@@ -672,7 +440,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("", "key", "value");
+        let result = loader::set_value("", "key", "value");
         assert!(result.is_err());
     }
 
@@ -681,7 +449,7 @@ decay_days = 28
         let _guard = ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("CLINGS_HOME", tmp.path());
-        let result = set_value("srs", "", "value");
+        let result = loader::set_value("srs", "", "value");
         assert!(result.is_err());
     }
 
@@ -692,7 +460,7 @@ decay_days = 28
         std::env::set_var("CLINGS_HOME", tmp.path());
         // 300 is valid i64 but won't fit u8; it will be stored as i64
         let clings_home = tmp.path().to_path_buf();
-        set_value("ui", "tmux_pane_width", "300").unwrap();
+        loader::set_value("ui", "tmux_pane_width", "300").unwrap();
         let path = clings_home.join("clings.toml");
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("tmux_pane_width = 300"));
@@ -704,7 +472,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        set_value("sync", "remote", "https://github.com/user/repo.git").unwrap();
+        loader::set_value("sync", "remote", "https://github.com/user/repo.git").unwrap();
         let path = clings_home.join("clings.toml");
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("https://github.com/user/repo.git"));
@@ -716,7 +484,7 @@ decay_days = 28
         let tmp = tempfile::tempdir().unwrap();
         let clings_home = tmp.path().to_path_buf();
         std::env::set_var("CLINGS_HOME", &clings_home);
-        let result = set_value("srs", "decay_days", "-5");
+        let result = loader::set_value("srs", "decay_days", "-5");
         assert!(result.is_ok());
     }
 

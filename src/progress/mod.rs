@@ -27,6 +27,7 @@ pub use subjects::{
 use progress_db::{add_practice_log_columns_if_missing, SCHEMA, SCHEMA_V1};
 
 /// Open an in-memory database for testing (used only by integration/unit tests).
+#[allow(dead_code)]
 pub fn open_db_for_test() -> crate::error::Result<rusqlite::Connection> {
     let conn = rusqlite::Connection::open_in_memory()?;
     conn.execute_batch(SCHEMA)?;
@@ -36,6 +37,7 @@ pub fn open_db_for_test() -> crate::error::Result<rusqlite::Connection> {
 }
 
 /// Ensure a subject exists in the database (used only by tests).
+#[allow(dead_code)]
 pub fn ensure_subject_for_test(
     conn: &rusqlite::Connection,
     name: &str,
@@ -48,6 +50,7 @@ pub fn ensure_subject_for_test(
 }
 
 /// Migrate to v1 schema (used only by tests).
+#[allow(dead_code)]
 pub fn migrate_v1_for_test(conn: &rusqlite::Connection) -> crate::error::Result<()> {
     progress_db::migrate_v1(conn)
 }
