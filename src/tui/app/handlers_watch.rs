@@ -31,6 +31,10 @@ impl App {
                     Command::CompileRun => self.handle_compile(conn),
                     Command::ShowHint => self.reveal_next_hint(),
                     Command::ToggleSolution => {
+                        // NOTE: ToggleSolution toggle logic mirrors handlers_piscine.rs but uses
+                        // can_reveal_solution() instead of can_reveal_solution_piscine(). Not extracted
+                        // due to semantic difference in unlock criteria (watch has failure threshold gate,
+                        // piscine has unrestricted access).
                         if self.can_reveal_solution(CONSECUTIVE_FAILURE_THRESHOLD) {
                             self.state.overlay.active =
                                 if self.state.overlay.active == ActiveOverlay::Solution {
@@ -54,6 +58,9 @@ impl App {
                         self.state.overlay.nav_confirm_next = false;
                     }
                     Command::ScrollDown => {
+                        // NOTE: Scroll logic is identical to handlers_piscine.rs. Not extracted to avoid
+                        // unnecessary indirection; handlers are small and domain-specific enough to tolerate
+                        // duplication for clarity.
                         self.state.ex.description_scroll =
                             self.state.ex.description_scroll.saturating_add(3);
                     }
@@ -163,6 +170,9 @@ impl App {
             return;
         };
         let fn_name = function.clone();
+        // NOTE: If file cannot be read (missing, permission denied, etc.), silently use empty string.
+        // This is acceptable because TUI cannot propagate errors; libsys export will proceed with
+        // empty code string and the user will see a message on success or error.
         let c_code = std::fs::read_to_string(path).unwrap_or_default();
         let libsys_export = crate::libsys::LibsysExport {
             module,

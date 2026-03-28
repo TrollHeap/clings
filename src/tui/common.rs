@@ -1,8 +1,8 @@
 //! Fonctions TUI partagées entre ui_watch, ui_piscine, ui_list et ui_stats.
 //!
-//! Le sous-module `style` est re-exporté ici pour compatibilité des importeurs existants
-//! (`use crate::tui::common::*`). Overlay helpers doivent être importés directement depuis
-//! `crate::tui::overlays`.
+//! Style constants et fonctions sont re-exportées depuis `crate::tui::style` pour usage
+//! dans ce module et par d'autres modules TUI (ui_watch, ui_piscine, etc.).
+//! Overlay helpers doivent être importés directement depuis `crate::tui::overlays`.
 
 pub use crate::tui::style::{
     difficulty_color, difficulty_stars, exercise_type_badge, mastery_bar_string, mastery_color,

@@ -154,3 +154,154 @@ pub fn import_progress(
     tx.commit()?;
     Ok((count, warnings))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn open_test_db() -> Result<Connection> {
+        crate::progress::open_db_for_test()
+    }
+
+    #[test]
+    fn test_export_empty_db() -> Result<()> {
+        let conn = open_test_db()?;
+        let json = export_progress(&conn)?;
+        assert!(json.contains("subjects") && json.contains("[]"));
+        assert!(json.contains("version") && json.contains("1"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_export_with_subjects() -> Result<()> {
+        let conn = open_test_db()?;
+        crate::progress::ensure_subject_for_test(&conn, "pointers")?;
+        crate::progress::record_attempt(&conn, "pointers", "ptr-01", true)?;
+
+        let json = export_progress(&conn)?;
+        assert!(json.contains("pointers"));
+        assert!(json.contains("version"));
+
+        // Validate it's valid JSON
+        let _: serde_json::Value = serde_json::from_str(&json)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_roundtrip_export_import() -> Result<()> {
+        let mut conn = open_test_db()?;
+        crate::progress::ensure_subject_for_test(&conn, "structs")?;
+        crate::progress::record_attempt(&conn, "structs", "struct-01", true)?;
+        crate::progress::record_attempt(&conn, "structs", "struct-02", false)?;
+
+        // Export
+        let json = export_progress(&conn)?;
+
+        // Import into fresh DB (overwrite mode)
+        let mut conn2 = open_test_db()?;
+        let (count, warnings) = import_progress(&mut conn2, &json, true)?;
+
+        assert_eq!(count, 1, "should import 1 subject");
+        assert!(warnings.is_empty(), "no warnings for valid data");
+
+        // Verify the imported subject
+        let sub = crate::progress::get_subject(&conn2, "structs")?;
+        assert!(sub.is_some());
+        let sub = sub.unwrap();
+        assert_eq!(sub.name, "structs");
+        assert_eq!(sub.mastery_score.get(), 0.5); // 1 success, 1 failure
+        assert_eq!(sub.attempts_total, 2);
+        assert_eq!(sub.attempts_success, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_malformed_json_error() -> Result<()> {
+        let mut conn = open_test_db()?;
+        let invalid_json = r#"{ "subjects": [not valid json ] }"#;
+
+        let result = import_progress(&mut conn, invalid_json, false);
+        assert!(result.is_err(), "should reject malformed JSON");
+
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid JSON"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_missing_subjects_field() -> Result<()> {
+        let mut conn = open_test_db()?;
+        let no_subjects = r#"{ "version": 1 }"#;
+
+        let result = import_progress(&mut conn, no_subjects, false);
+        assert!(result.is_err(), "should reject JSON without subjects field");
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_clamping_warnings() -> Result<()> {
+        let mut conn = open_test_db()?;
+
+        // Manually construct a Subject with out-of-bounds values
+        let json = r#"{
+            "subjects": [
+                {
+                    "name": "test_clamp",
+                    "mastery_score": 2.5,
+                    "last_practiced_at": null,
+                    "attempts_total": -10,
+                    "attempts_success": 20,
+                    "difficulty_unlocked": 100,
+                    "next_review_at": null,
+                    "srs_interval_days": 999999
+                }
+            ]
+        }"#;
+
+        let (_count, warnings) = import_progress(&mut conn, json, false)?;
+        // Should warn about clamped values
+        let warnings_str = format!("{:?}", warnings);
+        assert!(
+            warnings_str.contains("difficulty_unlocked") || warnings_str.contains("attempts"),
+            "should warn about out-of-bounds values: {}",
+            warnings_str
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_no_overwrite_merges_mastery() -> Result<()> {
+        let mut conn = open_test_db()?;
+
+        // Insert initial subject with mastery 2.0
+        crate::progress::ensure_subject_for_test(&conn, "merge_test")?;
+        {
+            let mut stmt =
+                conn.prepare("UPDATE subjects SET mastery_score = ?1 WHERE name = ?2")?;
+            stmt.execute(rusqlite::params![2.0, "merge_test"])?;
+        } // Drop statement before mutable borrow
+
+        // Import with lower mastery (1.0), no overwrite
+        let json = r#"{
+            "subjects": [
+                {
+                    "name": "merge_test",
+                    "mastery_score": 1.0,
+                    "last_practiced_at": null,
+                    "attempts_total": 0,
+                    "attempts_success": 0,
+                    "difficulty_unlocked": 1,
+                    "next_review_at": null,
+                    "srs_interval_days": 1
+                }
+            ]
+        }"#;
+
+        import_progress(&mut conn, json, false)?;
+
+        // Should keep max (2.0)
+        let sub = crate::progress::get_subject(&conn, "merge_test")?.expect("subject should exist");
+        assert_eq!(sub.mastery_score.get(), 2.0);
+        Ok(())
+    }
+}
