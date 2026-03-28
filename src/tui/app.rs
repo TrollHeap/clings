@@ -425,7 +425,10 @@ impl App {
             self.state.update_due_count_cache();
             terminal
                 .draw(|f| crate::tui::ui_watch::view(f, &mut self.state))
-                .inspect_err(|_| ratatui::restore())?;
+                .inspect_err(|e| {
+                    eprintln!("[clings] draw error: {e}");
+                    ratatui::restore();
+                })?;
 
             match rx.recv_timeout(Duration::from_millis(
                 crate::constants::RENDER_RECV_TIMEOUT_MS,
@@ -1321,7 +1324,10 @@ impl App {
         loop {
             terminal
                 .draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))
-                .inspect_err(|_| ratatui::restore())?;
+                .inspect_err(|e| {
+                    eprintln!("[clings] draw error: {e}");
+                    ratatui::restore();
+                })?;
 
             match rx.recv_timeout(Duration::from_millis(
                 crate::constants::RENDER_RECV_TIMEOUT_MS,

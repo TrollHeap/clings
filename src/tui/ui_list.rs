@@ -44,7 +44,7 @@ pub fn run_list(
 
     loop {
         terminal.draw(|f| {
-            draw_list(f, &filtered, &subject_map, due_subjects);
+            draw_list(f, &filtered, &subject_map, due_subjects, &mut list_state);
         })?;
 
         // Update selection position
@@ -86,6 +86,7 @@ fn draw_list(
     filtered: &[&Exercise],
     subject_map: &std::collections::HashMap<&str, &Subject>,
     due_subjects: Option<&[String]>,
+    list_state: &mut ratatui::widgets::ListState,
 ) {
     let area = f.area();
 
@@ -149,7 +150,7 @@ fn draw_list(
         )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-    f.render_widget(list, list_area);
+    f.render_stateful_widget(list, list_area, list_state);
 
     // ── Footer ────────────────────────────────────────────────────────
     let footer_text = "[↑↓/jk] naviguer  [q] quitter";

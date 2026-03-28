@@ -47,7 +47,7 @@ fn run_selector_loop(
 
     loop {
         terminal.draw(|f| {
-            draw_selector(f, sessions, *cursor);
+            draw_selector(f, sessions, *cursor, list_state);
         })?;
 
         if event::poll(Duration::from_millis(100)).unwrap_or_else(|e| {
@@ -81,7 +81,12 @@ fn run_selector_loop(
     }
 }
 
-fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
+fn draw_selector(
+    f: &mut Frame,
+    sessions: &[AnnaleSession],
+    cursor: usize,
+    list_state: &mut ratatui::widgets::ListState,
+) {
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
     f.render_widget(
         Block::default().style(Style::default().bg(common::C_BG)),
@@ -132,7 +137,7 @@ fn draw_selector(f: &mut Frame, sessions: &[AnnaleSession], cursor: usize) {
                 .title("Sessions"),
         )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-    f.render_widget(list, chunks[1]);
+    f.render_stateful_widget(list, chunks[1], list_state);
 
     // Footer
     let footer = Paragraph::new("[↑↓/jk] naviguer  [Entrée] lancer  [q] annuler")

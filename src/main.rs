@@ -199,6 +199,13 @@ enum SyncCommand {
 }
 
 fn main() {
+    // Panic hook : restaure le terminal avant d'afficher le backtrace.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        ratatui::restore();
+        default_hook(info);
+    }));
+
     config::init(config::load());
 
     let cli = Cli::parse();

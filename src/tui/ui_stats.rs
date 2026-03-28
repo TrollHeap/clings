@@ -209,7 +209,7 @@ fn draw_stats(
                         .title("Tentatives par sujet"),
                 );
 
-                f.render_widget(table, body_area);
+                f.render_stateful_widget(table, body_area, table_state);
                 return;
             }
         }
@@ -269,7 +269,6 @@ fn draw_stats(
             .data(group);
 
         f.render_widget(bar_chart, chart_area);
-        let _ = table_state; // unused in this branch
     }
 
     // ── Footer ────────────────────────────────────────────────────────
