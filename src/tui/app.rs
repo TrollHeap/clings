@@ -1,6 +1,7 @@
 //! Application state and event handling (TEA/Elm architecture).
 
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -32,6 +33,16 @@ pub enum Msg {
     Key(ratatui::crossterm::event::KeyEvent),
     FileChanged,
     Tick,
+}
+
+impl fmt::Display for Msg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Msg::Key(ke) => write!(f, "Key({:?})", ke.code),
+            Msg::FileChanged => write!(f, "FileChanged"),
+            Msg::Tick => write!(f, "Tick"),
+        }
+    }
 }
 
 /// État des overlays (help, list, search, solution, visualizer).
@@ -74,6 +85,48 @@ pub struct HeaderCache {
     last_cached_index: usize,
     last_cached_total: usize,
     last_cached_mastery: f64,
+}
+
+impl HeaderCache {
+    /// Invalidate cache based on current state.
+    /// Detects changes in exercise index, total count, and mastery,
+    /// and recomputes cached strings accordingly.
+    fn invalidate(
+        &mut self,
+        idx: usize,
+        total: usize,
+        mastery: f64,
+        exercises: &[Exercise],
+        completed: &[bool],
+    ) {
+        // Check if exercise counter needs recompute
+        if self.last_cached_index != idx || self.last_cached_total != total {
+            self.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
+            self.last_cached_index = idx;
+            self.last_cached_total = total;
+        }
+
+        // Check if mastery display needs recompute
+        if (self.last_cached_mastery - mastery).abs() > 0.01 {
+            self.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+            self.last_cached_mastery = mastery;
+        }
+
+        // Mini map always needs recompute (completion status changes)
+        self.cached_mini_map = crate::tui::common::mini_map(completed, idx);
+        self.cached_mini_map_len = self.cached_mini_map.chars().count();
+
+        // Exercise type
+        self.cached_exercise_type = exercises
+            .get(idx)
+            .map(|e| e.exercise_type.to_string())
+            .unwrap_or_default();
+
+        // Cache the left header width: "[N/total] " + title chars count
+        let title = exercises.get(idx).map(|e| e.title.as_str()).unwrap_or("");
+        self.cached_header_left_len =
+            self.cached_exercise_counter.chars().count() + title.chars().count();
+    }
 }
 
 /// Cache du timer piscine — mis à jour dans Tick quand la seconde change.
@@ -227,40 +280,9 @@ impl App {
             .copied()
             .unwrap_or(0.0);
 
-        // Check if exercise counter needs recompute
-        if state.header_cache.last_cached_index != idx
-            || state.header_cache.last_cached_total != total
-        {
-            state.header_cache.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
-            state.header_cache.last_cached_index = idx;
-            state.header_cache.last_cached_total = total;
-        }
-
-        // Check if mastery display needs recompute
-        if (state.header_cache.last_cached_mastery - mastery).abs() > 0.01 {
-            state.header_cache.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
-            state.header_cache.last_cached_mastery = mastery;
-        }
-
-        // Mini map always needs recompute (completion status changes)
-        state.header_cache.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
-        state.header_cache.cached_mini_map_len = state.header_cache.cached_mini_map.chars().count();
-
-        // Exercise type
-        state.header_cache.cached_exercise_type = state
-            .exercises
-            .get(idx)
-            .map(|e| e.exercise_type.to_string())
-            .unwrap_or_default();
-
-        // Cache the left header width: "[N/total] " + title chars count
-        let title = state
-            .exercises
-            .get(idx)
-            .map(|e| e.title.as_str())
-            .unwrap_or("");
-        state.header_cache.cached_header_left_len =
-            state.header_cache.cached_exercise_counter.chars().count() + title.chars().count();
+        state
+            .header_cache
+            .invalidate(idx, total, mastery, &state.exercises, &state.completed);
     }
 
     /// Boucle principale watch avec Ratatui.
@@ -293,7 +315,9 @@ impl App {
                     e
                 })?;
 
-            match rx.recv_timeout(Duration::from_millis(50)) {
+            match rx.recv_timeout(Duration::from_millis(
+                crate::constants::RENDER_RECV_TIMEOUT_MS,
+            )) {
                 Ok(msg) => self.update_watch(msg, conn),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
@@ -1116,7 +1140,9 @@ impl App {
                     e
                 })?;
 
-            match rx.recv_timeout(Duration::from_millis(50)) {
+            match rx.recv_timeout(Duration::from_millis(
+                crate::constants::RENDER_RECV_TIMEOUT_MS,
+            )) {
                 Ok(msg) => self.update_piscine(msg, conn, session_id),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     // Check deadline on timeout
