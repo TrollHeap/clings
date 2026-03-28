@@ -14,7 +14,8 @@ mod commands;
 pub mod config;
 /// Global constants (timing, thresholds, UI dimensions, compiler settings).
 pub mod constants;
-mod error;
+/// Error types and Result alias.
+pub mod error;
 mod exam;
 /// Exercise loading and parsing from TOML.
 pub mod exercises;
@@ -25,7 +26,8 @@ pub mod mastery;
 /// Core data types (Exercise, Subject, ValidationMode, Difficulty, etc.).
 pub mod models;
 mod piscine;
-mod progress;
+/// SQLite persistence layer — mastery tracking, SRS state, and practice history.
+pub mod progress;
 mod reporting;
 /// C code compilation and execution engine (runner.rs).
 pub mod runner;
