@@ -109,33 +109,10 @@ subject = "pointers"
 title = "Déclarer et déréférencer un pointeur"
 
 [validation]
-mode = "test"
-test_code = """
-void test_deref_value(void) {
-    int x = 42;
-    int *p = &x;
-    TEST_ASSERT_EQUAL_INT(42, *p);
-    x = -1;
-    TEST_ASSERT_EQUAL_INT(-1, *p);
-    int zero = 0;
-    int *pz = &zero;
-    TEST_ASSERT_EQUAL_INT(0, *pz);
-}
-
-void test_deref_address(void) {
-    int x = 42;
-    int *p = &x;
-    TEST_ASSERT_EQUAL_PTR(&x, p);
-    TEST_ASSERT_TRUE(p == &x);
-}
-
-int main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_deref_value);
-    RUN_TEST(test_deref_address);
-    return UNITY_END();
-}
-"""
+mode = "output"
+expected_output = """Valeur de x : 42
+Valeur via *p : 42
+Adresses egales : 1"""
 
 [visualizer]
 type = "stack_heap"
