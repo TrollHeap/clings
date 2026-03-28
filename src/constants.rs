@@ -11,6 +11,7 @@ pub const DB_BUSY_TIMEOUT_MS: i32 = 5000;
 pub const SUCCESS_PAUSE_SECS: u64 = 2;
 pub const STATUS_MSG_TIMEOUT_SECS: u64 = 3;
 pub const EVENT_POLL_MS: u64 = 100;
+pub const RENDER_RECV_TIMEOUT_MS: u64 = 50;
 pub const EXAM_NSY103_DURATION_MINS: u64 = 150;
 pub const EXAM_UTC502_DURATION_MINS: u64 = 180;
 
