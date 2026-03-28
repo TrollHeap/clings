@@ -1,101 +1,11 @@
-//! Commandes de gestion des données — export, import, reset, config, new.
-
-use std::io;
-use std::io::Write;
+//! Exercise authoring commands — new, schema, config.
 
 use colored::Colorize;
 use schemars::schema_for;
 
-use crate::constants::clings_data_dir;
 use crate::error::{KfError, Result};
 use crate::models::Exercise;
-use crate::{authoring, config, exercises, progress, sync};
-
-/// Prompt user for confirmation. Returns true if input equals "yes".
-pub fn confirm_prompt(msg: &str) -> Result<bool> {
-    print!("{}", msg);
-    io::stdout().flush().ok(); // best-effort flush — non-critique
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(input.trim() == "yes")
-}
-
-/// Export progress data (subjects + SRS state) to JSON. Outputs to file or stdout.
-pub fn cmd_export(output: Option<&std::path::Path>) -> Result<()> {
-    let conn = progress::open_db()?;
-    let subjects = progress::get_all_subjects(&conn)?;
-    let count = subjects.len();
-    let json = progress::export_progress(&conn)?;
-    match output {
-        Some(path) => {
-            std::fs::write(path, &json)?;
-            println!(
-                "  {} {count} sujet(s) exporté(s) vers {}",
-                "✓".bold().green(),
-                path.display()
-            );
-        }
-        None => {
-            print!("{json}");
-            println!("  {} {count} sujet(s) affiché(s).", "✓".bold().green());
-        }
-    }
-    Ok(())
-}
-
-/// Import progress data from JSON file. If overwrite=true, replaces all subjects; else merges.
-pub fn cmd_import(input: &std::path::Path, overwrite: bool) -> Result<()> {
-    let json = std::fs::read_to_string(input)?;
-    let mut conn = progress::open_db()?;
-    let (count, warnings) = progress::import_progress(&mut conn, &json, overwrite)?;
-    for w in &warnings {
-        eprintln!("  {} {}", "⚠".yellow(), w);
-    }
-    if overwrite {
-        println!(
-            "  {} {count} sujet(s) importé(s) (mode remplacement).",
-            "✓".bold().green()
-        );
-    } else {
-        println!(
-            "  {} {count} sujet(s) importé(s) (mode fusion).",
-            "✓".bold().green()
-        );
-    }
-    Ok(())
-}
-
-/// Reset progress data. If subject is provided, resets only that subject; else resets all.
-/// Requires user confirmation (type 'yes').
-pub fn cmd_reset(subject: Option<&str>) -> Result<()> {
-    if let Some(name) = subject {
-        let confirmed = confirm_prompt(&format!(
-            "  {} Supprimer la progression de '{}'. Taper 'yes' pour confirmer : ",
-            "Attention !".bold().red(),
-            name
-        ))?;
-        if confirmed {
-            let conn = progress::open_db()?;
-            progress::reset_subject(&conn, name)?;
-            println!("  {} Progression de '{}' réinitialisée.", "✓".green(), name);
-        } else {
-            println!("  {}", "Annulé.".dimmed());
-        }
-    } else {
-        let confirmed = confirm_prompt(&format!(
-            "  {} Ceci supprimera TOUTE la progression. Tapez 'yes' pour confirmer : ",
-            "Attention !".bold().red()
-        ))?;
-        if confirmed {
-            let conn = progress::open_db()?;
-            progress::reset_progress(&conn)?;
-            println!("  {}", "Progression réinitialisée.".green());
-        } else {
-            println!("  {}", "Annulé.".dimmed());
-        }
-    }
-    Ok(())
-}
+use crate::{authoring, config, exercises};
 
 /// Write a single config key-value pair to ~/.clings/clings.toml (format: 'section.field').
 pub fn cmd_config(key: &str, value: &str) -> Result<()> {
@@ -109,73 +19,6 @@ pub fn cmd_config(key: &str, value: &str) -> Result<()> {
         "  {} {key} = {value}",
         "Config mise à jour :".bold().green()
     );
-    Ok(())
-}
-
-/// Initialize sync: clone or create a git repository and save remote + branch to config.
-pub fn cmd_sync_init(remote: &str) -> Result<()> {
-    let clings_dir = clings_data_dir();
-    sync::init(remote, &clings_dir)?;
-    println!(
-        "  {} Sync activé — progression sauvegardée vers {}",
-        "✓".bold().green(),
-        remote
-    );
-    println!(
-        "  {} Lancez `clings sync init <remote>` sur vos autres machines.",
-        "→".bold()
-    );
-    Ok(())
-}
-
-/// Display sync status: enabled/disabled, remote, branch, last commit, and subject count.
-pub fn cmd_sync_status() -> Result<()> {
-    let cfg = config::get();
-    let clings_dir = clings_data_dir();
-    let status = sync::status(&clings_dir, &cfg.sync)?;
-
-    println!();
-    println!(
-        "  Sync : {}",
-        if status.enabled {
-            "activé".bold().green().to_string()
-        } else {
-            "désactivé".dimmed().to_string()
-        }
-    );
-    if !status.remote.is_empty() {
-        println!("  Remote  : {}", status.remote.bold());
-        println!("  Branche : {}", status.branch);
-    }
-    if let Some(commit) = &status.last_commit {
-        println!("  Dernier commit : {commit}");
-    }
-    println!("  Sujets dans le snapshot : {}", status.subject_count);
-    println!();
-    Ok(())
-}
-
-/// Perform a sync now: pull from remote (merge), push local progress snapshot. Requires sync enabled.
-pub fn cmd_sync_now() -> Result<()> {
-    let cfg = config::get();
-    if !cfg.sync.enabled {
-        return Err(KfError::Config(
-            "Sync non activé — lancez d'abord `clings sync init <remote>`".to_string(),
-        ));
-    }
-    let clings_dir = clings_data_dir();
-    let mut conn = progress::open_db()?;
-
-    // Pull
-    match sync::pull_and_merge(&clings_dir, &mut conn) {
-        Ok(Some(n)) => println!("  {} {n} sujet(s) mis à jour depuis le remote.", "↪".bold()),
-        Ok(None) => println!("  {} Déjà à jour.", "✓".bold().green()),
-        Err(e) => eprintln!("  {} pull: {e}", "⚠".yellow()),
-    }
-
-    // Push
-    sync::export_and_push(&clings_dir, &conn, &cfg.sync)?;
-    println!("  {} Progression synchronisée.", "✓".bold().green());
     Ok(())
 }
 
@@ -311,67 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cmd_reset_cancellation() {
-        use std::io::{Cursor, Read};
-
-        // Simulating a user input of "no" (not "yes") should exit silently.
-        // Since cmd_reset reads from stdin interactively, we can't easily mock it here.
-        // This test documents the expected behavior: if user doesn't type "yes", nothing changes.
-        // In a real integration test, stdin would be redirected.
-
-        // For now, just verify the function signature is correct
-        let _ = cmd_reset(None);
-    }
-
-    #[test]
-    fn test_cmd_export_nonexistent_db() {
-        use tempfile::TempDir;
-
-        // Create a temp directory and attempt to export
-        let tmp = TempDir::new().expect("temp dir");
-        let output_path = tmp.path().join("export.json");
-
-        // This may succeed or fail depending on whether progress DB exists.
-        // We're testing that the function handles it gracefully.
-        let result = cmd_export(Some(&output_path));
-
-        // If it succeeds, the file should exist; if it errors, it should be a valid error.
-        match result {
-            Ok(_) => {
-                // Check that output was written
-                assert!(output_path.exists() || !output_path.exists()); // File may or may not exist
-            }
-            Err(e) => {
-                // Valid error cases: database or IO errors
-                let _ = e;
-            }
-        }
-    }
-
-    #[test]
-    fn test_cmd_import_malformed_json() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        let mut tmp = NamedTempFile::new().expect("temp file");
-        writeln!(tmp, "{{ invalid json").expect("write");
-        tmp.flush().expect("flush");
-
-        let result = cmd_import(tmp.path(), false);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_cmd_import_empty_file() {
-        use tempfile::NamedTempFile;
-
-        let tmp = NamedTempFile::new().expect("temp file");
-        let result = cmd_import(tmp.path(), false);
-        // Empty file is invalid JSON, should error
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_cmd_config_valid_srs_interval() {
         let result = cmd_config("srs.base_interval_days", "7");
         // Valid key that should be accepted
@@ -424,48 +206,5 @@ mod tests {
                 assert!(!e.to_string().contains("Format de clé invalide"));
             }
         }
-    }
-
-    #[test]
-    fn test_cmd_export_stdout() {
-        // Export with None (stdout) should not error on format
-        let result = cmd_export(None);
-        match result {
-            Ok(_) => {
-                // Success
-            }
-            Err(e) => {
-                // May fail if no DB, but should be a valid error
-                let _ = e;
-            }
-        }
-    }
-
-    #[test]
-    fn test_cmd_import_valid_json_no_subjects() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        let mut tmp = NamedTempFile::new().expect("temp file");
-        writeln!(tmp, r#"{{"subjects": []}}"#).expect("write");
-        tmp.flush().expect("flush");
-
-        let result = cmd_import(tmp.path(), false);
-        // Valid JSON with empty subjects should succeed
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_cmd_import_overwrite_mode() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        let mut tmp = NamedTempFile::new().expect("temp file");
-        writeln!(tmp, r#"{{"subjects": []}}"#).expect("write");
-        tmp.flush().expect("flush");
-
-        let result = cmd_import(tmp.path(), true);
-        // Overwrite mode should also work with empty subjects
-        assert!(result.is_ok());
     }
 }
