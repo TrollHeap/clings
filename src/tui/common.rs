@@ -229,7 +229,9 @@ fn parse_inline_code(line: &str) -> Line<'static> {
 /// Panneau description/indices — partagé entre watch et piscine.
 /// Affiche description, key_concept, common_mistake, fichiers, et indices révélés.
 pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
+    let Some(exercise) = state.exercises.get(state.current_index) else {
+        return;
+    };
     let mut lines: Vec<Line> = Vec::with_capacity(16);
 
     for line in exercise.description.lines() {
@@ -399,7 +401,9 @@ pub fn render_body_with_sidebar(
     };
 
     let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
-        let exercise = &state.exercises[state.current_index];
+        let Some(exercise) = state.exercises.get(state.current_index) else {
+            return;
+        };
         let expected = exercise.validation.expected_output.as_deref();
         let h = run_result_height(result, expected);
         let [desc, res] =
@@ -413,8 +417,9 @@ pub fn render_body_with_sidebar(
 
     if let Some(result_area) = result_area_opt {
         if let Some(result) = &state.run_result {
-            let exercise = &state.exercises[state.current_index];
-            render_run_result(f, result_area, result, exercise);
+            if let Some(exercise) = state.exercises.get(state.current_index) {
+                render_run_result(f, result_area, result, exercise);
+            }
         }
     }
 
@@ -741,7 +746,9 @@ pub(crate) fn vis_col_widths(vars: &[crate::models::VisVar]) -> (usize, usize) {
 pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     use crate::tui::ui_visualizer::MemVisualizer;
 
-    let exercise = &state.exercises[state.current_index];
+    let Some(exercise) = state.exercises.get(state.current_index) else {
+        return;
+    };
     let steps = &exercise.visualizer.steps;
 
     if steps.is_empty() {
@@ -768,7 +775,7 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 /// Overlay de recherche fuzzy (touche `/` depuis watch).
-pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
+pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     let popup = centered_popup(area, 15, 10);
     f.render_widget(Clear, popup);
 
@@ -840,11 +847,9 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
         format!(" {count} résultats ")
     };
 
+    let mut search_list_state = state.overlay.search_list_state.clone();
     if !state.overlay.search_results.is_empty() {
-        state
-            .overlay
-            .search_list_state
-            .select(Some(state.overlay.search_selected));
+        search_list_state.select(Some(state.overlay.search_selected));
     }
 
     f.render_stateful_widget(
@@ -858,7 +863,7 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
             )
             .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
         results_area,
-        &mut state.overlay.search_list_state,
+        &mut search_list_state,
     );
 
     // Hint bar
@@ -892,7 +897,7 @@ pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::mode
 }
 
 /// Overlay liste d'exercices — navigation j/k, Tab/Shift-Tab chapitres, Enter pour jump.
-pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
+pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     use crate::tui::app::ListDisplayItem;
 
     let popup = centered_popup(area, 10, 8);
@@ -918,7 +923,9 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
             ]),
             ListDisplayItem::Exercise { exercise_index } => {
                 let i = *exercise_index;
-                let ex = &state.exercises[i];
+                let Some(ex) = state.exercises.get(i) else {
+                    return ListItem::new(Line::raw(""));
+                };
                 let stars = difficulty_stars(ex.difficulty);
                 let color = difficulty_color(ex.difficulty);
                 let done_marker = if state.completed.get(i).copied().unwrap_or(false) {
@@ -956,10 +963,8 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
     let done = state.completed.iter().filter(|&&c| c).count();
     let list_title = format!(" Exercices [{}/{}] ", done, total);
 
-    state
-        .overlay
-        .list_list_state
-        .select(Some(state.overlay.list_selected));
+    let mut list_list_state = state.overlay.list_list_state.clone();
+    list_list_state.select(Some(state.overlay.list_selected));
 
     f.render_stateful_widget(
         List::new(items)
@@ -972,7 +977,7 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &mut AppState) {
             )
             .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
         list_area,
-        &mut state.overlay.list_list_state,
+        &mut list_list_state,
     );
 
     // Hint bar
