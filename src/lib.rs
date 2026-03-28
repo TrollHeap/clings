@@ -1,6 +1,5 @@
 //! clings library — re-exports for integration tests and public API.
 #![allow(
-    unused_imports,
     dead_code,
     clippy::new_without_default,
     clippy::items_after_test_module

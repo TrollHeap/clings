@@ -9,10 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::constants::{
-    CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, GCC_BINARY, GCC_FLAGS, MAX_OUTPUT_BYTES,
-    REGEX_PREFIX,
-};
+use crate::constants::{CURRENT_C_FILENAME, EXECUTION_TIMEOUT_SECS, REGEX_PREFIX};
 use crate::error::KfError;
 use crate::models::{Exercise, ValidationMode};
 
@@ -20,14 +17,12 @@ use crate::models::{Exercise, ValidationMode};
 pub mod exec;
 pub mod unity;
 
-// Re-export public items from submodules for backward compatibility
-pub use exec::{
-    drain_stdio, spawn_drain_threads, spawn_gcc_and_collect, wait_for_process_with_timeout,
-};
-pub use unity::{
-    compose_test_source, evaluate_test_result, parse_test_summary, run_tests, validate_test_code,
-    write_unity_files,
-};
+#[cfg(test)]
+use exec::wait_for_process_with_timeout;
+
+// Re-export submodule items used by other modules in this crate
+pub use exec::spawn_gcc_and_collect;
+pub use unity::run_tests;
 
 /// Résultat de la compilation et de l'exécution d'un exercice C.
 #[derive(Clone, Debug)]

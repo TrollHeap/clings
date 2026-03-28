@@ -1,4 +1,6 @@
 //! Command handlers — grouped by domain (data, info, progress, report, run, watch).
+//! Re-exports are consumed by the binary (main.rs) but not referenced from the library target.
+#![allow(unused_imports)]
 
 mod data;
 mod info;

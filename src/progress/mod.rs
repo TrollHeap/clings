@@ -8,19 +8,25 @@ use rusqlite::{params, Connection, OptionalExtension};
 /// Monotonic counter for unique practice_log IDs within a process.
 static LOG_SEQ: AtomicU64 = AtomicU64::new(0);
 
-use serde::Deserialize;
-
-use crate::constants::{
-    EXAM_CHECKPOINT_KEY, LAST_EXAM_SESSION_KEY, PISCINE_CHECKPOINT_KEY, SECS_PER_DAY,
-};
+use crate::constants::SECS_PER_DAY;
 use crate::error::Result;
 use crate::mastery;
 use crate::models::{MasteryScore, SrsIntervalDays, Subject};
 
+mod checkpoints;
+mod import_export;
 mod progress_db;
+mod session;
+
+pub use checkpoints::{
+    clear_exam_checkpoint, clear_piscine_checkpoint, load_exam_checkpoint, load_last_exam_session,
+    load_piscine_checkpoint, save_exam_checkpoint, save_last_exam_session, save_piscine_checkpoint,
+};
+pub use import_export::{export_progress, import_progress};
 pub use progress_db::open_db;
 #[cfg(test)]
 use progress_db::{add_practice_log_columns_if_missing, migrate_v1, SCHEMA, SCHEMA_V1};
+pub use session::{load_last_session, save_last_session};
 
 const PRACTICE_LOG_MAX_ENTRIES: usize = 10_000;
 
@@ -342,86 +348,6 @@ fn open_test_db() -> Result<Connection> {
     Ok(conn)
 }
 
-/// Upsert a key-value pair in the `kv` table.
-fn kv_set(conn: &Connection, key: &str, value: &str) -> Result<()> {
-    let mut stmt = conn.prepare_cached("INSERT OR REPLACE INTO kv (key, value) VALUES (?1, ?2)")?;
-    stmt.execute(params![key, value])?;
-    Ok(())
-}
-
-/// Retrieve a value from the `kv` table. Returns `None` if the key does not exist.
-fn kv_get(conn: &Connection, key: &str) -> Result<Option<String>> {
-    let mut stmt = conn.prepare_cached("SELECT value FROM kv WHERE key = ?1")?;
-    Ok(stmt.query_row(params![key], |row| row.get(0)).optional()?)
-}
-
-/// Delete a key from the `kv` table. Succeeds silently if the key does not exist.
-fn kv_del(conn: &Connection, key: &str) -> Result<()> {
-    let mut stmt = conn.prepare_cached("DELETE FROM kv WHERE key = ?1")?;
-    stmt.execute(params![key])?;
-    Ok(())
-}
-
-/// Save piscine checkpoint (current exercise index).
-pub fn save_piscine_checkpoint(conn: &Connection, index: usize) -> Result<()> {
-    kv_set(conn, PISCINE_CHECKPOINT_KEY, &index.to_string())
-}
-
-/// Load piscine checkpoint, returns None if no checkpoint saved.
-pub fn load_piscine_checkpoint(conn: &Connection) -> Result<Option<usize>> {
-    Ok(
-        kv_get(conn, PISCINE_CHECKPOINT_KEY)?.and_then(|s| match s.parse::<usize>() {
-            Ok(idx) => Some(idx),
-            Err(_) => {
-                eprintln!("[clings/progress] checkpoint piscine invalide : {s:?}");
-                None
-            }
-        }),
-    )
-}
-
-/// Clear piscine checkpoint (called when piscine is fully completed).
-pub fn clear_piscine_checkpoint(conn: &Connection) -> Result<()> {
-    kv_del(conn, PISCINE_CHECKPOINT_KEY)
-}
-
-/// Save exam checkpoint: stores "{session_id}:{index}" under exam_checkpoint key.
-/// `session_id` is an annale ID (e.g. "nsy103_2023_juin") — no colons allowed, parsed with `rsplit_once(':')`.
-pub fn save_exam_checkpoint(conn: &Connection, session_id: &str, index: usize) -> Result<()> {
-    kv_set(conn, EXAM_CHECKPOINT_KEY, &format!("{session_id}:{index}"))
-}
-
-/// Load exam checkpoint for the given session_id. Returns None if no checkpoint exists or if the
-/// stored session differs (i.e. the user switched to a different exam session).
-pub fn load_exam_checkpoint(conn: &Connection, session_id: &str) -> Result<Option<usize>> {
-    Ok(kv_get(conn, EXAM_CHECKPOINT_KEY)?.and_then(|s| {
-        s.rsplit_once(':')
-            .filter(|(sid, _)| *sid == session_id)
-            .and_then(|(_, rest)| match rest.parse::<usize>() {
-                Ok(idx) => Some(idx),
-                Err(_) => {
-                    eprintln!("[clings/progress] checkpoint exam invalide : {s:?}");
-                    None
-                }
-            })
-    }))
-}
-
-/// Clear exam checkpoint (called when exam session is fully completed).
-pub fn clear_exam_checkpoint(conn: &Connection) -> Result<()> {
-    kv_del(conn, EXAM_CHECKPOINT_KEY)
-}
-
-/// Save the ID of the last selected exam session (for TUI sélecteur).
-pub fn save_last_exam_session(conn: &Connection, session_id: &str) -> Result<()> {
-    kv_set(conn, LAST_EXAM_SESSION_KEY, session_id)
-}
-
-/// Load the ID of the last selected exam session. Returns None if never set.
-pub fn load_last_exam_session(conn: &Connection) -> Result<Option<String>> {
-    kv_get(conn, LAST_EXAM_SESSION_KEY)
-}
-
 /// Get the number of days until the next SRS review for a subject.
 /// Get subjects whose SRS review is due (next_review_at <= now).
 pub fn get_due_subjects(conn: &Connection) -> Result<Vec<String>> {
@@ -555,186 +481,6 @@ pub fn apply_all_decay(conn: &mut Connection) -> Result<()> {
     }
     tx.commit()?;
     Ok(())
-}
-
-/// Sérialise tous les sujets + métadonnées en JSON (pour sauvegarde/transfert).
-pub fn export_progress(conn: &Connection) -> Result<String> {
-    let subjects = get_all_subjects(conn)?;
-
-    #[derive(serde::Serialize)]
-    struct ExportData<'a> {
-        version: u32,
-        exported_at: String,
-        subjects: &'a [Subject],
-    }
-
-    let data = ExportData {
-        version: 1,
-        exported_at: chrono::Utc::now().to_rfc3339(),
-        subjects: &subjects,
-    };
-
-    serde_json::to_string_pretty(&data)
-        .map_err(|e| crate::error::KfError::Config(format!("serialization error: {e}")))
-}
-
-/// Valide et clamp un sujet importé, retournant les valeurs clamped et les avertissements.
-fn clamp_and_warn_import_subject(sub: &Subject) -> (f64, i32, i64, i64, i64, Vec<String>) {
-    let clamped_score = sub.mastery_score.get();
-    let clamped_difficulty = sub.difficulty_unlocked.clamp(1, 5);
-    let clamped_interval = sub.srs_interval_days.get().clamp(
-        crate::constants::SRS_BASE_INTERVAL_DAYS,
-        crate::constants::SRS_MAX_INTERVAL_DAYS,
-    );
-    let clamped_total = sub.attempts_total.max(0);
-    let clamped_success = sub.attempts_success.max(0).min(clamped_total);
-
-    let mut warnings: Vec<String> = Vec::new();
-
-    if clamped_difficulty != sub.difficulty_unlocked {
-        warnings.push(format!(
-            "'{}': difficulty_unlocked {} → {} (clamped)",
-            sub.name, sub.difficulty_unlocked, clamped_difficulty
-        ));
-    }
-    if clamped_interval != sub.srs_interval_days.get() {
-        warnings.push(format!(
-            "'{}': srs_interval_days {} → {} (clamped)",
-            sub.name,
-            sub.srs_interval_days.get(),
-            clamped_interval
-        ));
-    }
-    if clamped_total != sub.attempts_total {
-        warnings.push(format!(
-            "'{}': attempts_total {} → {} (clamped)",
-            sub.name, sub.attempts_total, clamped_total
-        ));
-    }
-    if clamped_success != sub.attempts_success {
-        warnings.push(format!(
-            "'{}': attempts_success {} → {} (clamped)",
-            sub.name, sub.attempts_success, clamped_success
-        ));
-    }
-
-    (
-        clamped_score,
-        clamped_difficulty,
-        clamped_total,
-        clamped_success,
-        clamped_interval,
-        warnings,
-    )
-}
-
-/// Importe les sujets depuis un JSON exporté.
-/// Si `overwrite` est true, remplace les valeurs existantes.
-/// Si false, prend le max(mastery existant, mastery importé).
-/// Retourne `(count, warnings)` — le nombre de sujets importés et les avertissements de clamp.
-pub fn import_progress(
-    conn: &mut Connection,
-    json: &str,
-    overwrite: bool,
-) -> Result<(usize, Vec<String>)> {
-    #[derive(Deserialize)]
-    struct ImportData {
-        subjects: Vec<Subject>,
-    }
-
-    let data: ImportData = serde_json::from_str(json)
-        .map_err(|e| crate::error::KfError::Config(format!("invalid JSON: {e}")))?;
-
-    let tx = conn.transaction()?;
-    let mut count = 0usize;
-    let mut warnings: Vec<String> = Vec::new();
-
-    for sub in &data.subjects {
-        let (
-            clamped_score,
-            clamped_difficulty,
-            clamped_total,
-            clamped_success,
-            clamped_interval,
-            sub_warnings,
-        ) = clamp_and_warn_import_subject(sub);
-        warnings.extend(sub_warnings);
-
-        if overwrite {
-            tx.execute(
-                "INSERT OR REPLACE INTO subjects
-                 (name, mastery_score, last_practiced_at, attempts_total, attempts_success,
-                  difficulty_unlocked, next_review_at, srs_interval_days)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![
-                    sub.name,
-                    clamped_score,
-                    sub.last_practiced_at,
-                    clamped_total,
-                    clamped_success,
-                    clamped_difficulty,
-                    sub.next_review_at,
-                    clamped_interval,
-                ],
-            )?;
-        } else {
-            tx.execute(
-                "INSERT INTO subjects
-                 (name, mastery_score, last_practiced_at, attempts_total, attempts_success,
-                  difficulty_unlocked, next_review_at, srs_interval_days)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                 ON CONFLICT(name) DO UPDATE SET
-                   mastery_score = MAX(mastery_score, excluded.mastery_score),
-                   difficulty_unlocked = MAX(difficulty_unlocked, excluded.difficulty_unlocked)",
-                params![
-                    sub.name,
-                    clamped_score,
-                    sub.last_practiced_at,
-                    clamped_total,
-                    clamped_success,
-                    clamped_difficulty,
-                    sub.next_review_at,
-                    clamped_interval,
-                ],
-            )?;
-        }
-        count += 1;
-    }
-
-    tx.commit()?;
-    Ok((count, warnings))
-}
-
-/// Save last session state (mode + chapter + exercise index) for the launcher "Continue" option.
-pub fn save_last_session(
-    conn: &Connection,
-    mode: &str,
-    chapter: Option<u8>,
-    index: usize,
-) -> Result<()> {
-    kv_set(conn, "last_mode", mode)?;
-    kv_set(
-        conn,
-        "last_chapter",
-        &chapter.map_or("0".to_string(), |c| c.to_string()),
-    )?;
-    kv_set(conn, "last_exercise_index", &index.to_string())?;
-    Ok(())
-}
-
-/// Load last session state. Returns None if no session was saved.
-pub fn load_last_session(conn: &Connection) -> Result<Option<(String, Option<u8>, usize)>> {
-    let mode = kv_get(conn, "last_mode")?;
-    let chapter = kv_get(conn, "last_chapter")?;
-    let index = kv_get(conn, "last_exercise_index")?;
-    match (mode, chapter, index) {
-        (Some(m), Some(c), Some(i)) => {
-            let ch = c.parse::<u8>().ok().filter(|&n| n > 0);
-            let idx = i.parse::<usize>().unwrap_or(0);
-            Ok(Some((m, ch, idx)))
-        }
-        _ => Ok(None),
-    }
 }
 
 #[cfg(test)]
