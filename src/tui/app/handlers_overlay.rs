@@ -388,6 +388,9 @@ impl App {
     /// Portfolio libsys overlay `[b]`.
     pub(crate) fn open_libsys_overlay(&mut self) {
         let path = crate::libsys::libsys_path();
+        // NOTE: If portfolio_status fails (missing repo, git error, etc.), silently use default empty portfolio.
+        // This is acceptable in TUI context where errors cannot be easily propagated; overlay displays
+        // empty state and user can reinvoke or fix the libsys repo.
         self.state.overlay.libsys_portfolio =
             crate::libsys::portfolio_status(&path).unwrap_or_default();
         self.state.overlay.active = ActiveOverlay::Libsys;
