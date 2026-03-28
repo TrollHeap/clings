@@ -15,9 +15,9 @@ use ratatui::{
 
 use crate::models::{VisStep, VisVar};
 use crate::tui::common::{
-    is_pointer_value, vis_col_widths, C_ACCENT, C_BORDER, C_SUBTEXT, C_SUCCESS, C_SURFACE, C_TEAL,
-    C_TEXT, C_TEXT_DIM, C_WARNING,
+    C_ACCENT, C_BORDER, C_SUBTEXT, C_SUCCESS, C_SURFACE, C_TEAL, C_TEXT, C_TEXT_DIM, C_WARNING,
 };
+use crate::tui::overlays::{is_pointer_value, vis_col_widths};
 
 /// Widget principal du visualiseur mémoire.
 pub struct MemVisualizer<'a> {

@@ -9,13 +9,18 @@ use ratatui_macros::{line, span, vertical};
 
 use crate::tui::app::{ActiveOverlay, AppState};
 use crate::tui::common;
+use crate::tui::overlays::{
+    render_help_overlay, render_list_overlay, render_nav_confirm_overlay, render_opaque_background,
+    render_quit_confirm_overlay, render_search_overlay, render_solution_overlay,
+    render_success_overlay, render_visualizer_overlay,
+};
 
 /// Point d'entrée du rendu watch (appelé par App::run_watch).
 pub fn view(f: &mut Frame, state: &mut AppState) {
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
-    common::render_opaque_background(f, area);
+    render_opaque_background(f, area);
 
     if state.ex.exercises.is_empty() {
         f.render_widget(
@@ -31,34 +36,30 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     render_header(f, header_area, state);
 
     match &state.overlay.active {
-        ActiveOverlay::Help => common::render_help_overlay(f, body_area),
-        ActiveOverlay::List => common::render_list_overlay(f, body_area, state),
-        ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_area, state),
+        ActiveOverlay::Help => render_help_overlay(f, body_area),
+        ActiveOverlay::List => render_list_overlay(f, body_area, state),
+        ActiveOverlay::Visualizer => render_visualizer_overlay(f, body_area, state),
         ActiveOverlay::Solution => {
-            common::render_solution_overlay(
-                f,
-                body_area,
-                &state.ex.exercises[state.ex.current_index],
-            );
+            render_solution_overlay(f, body_area, &state.ex.exercises[state.ex.current_index]);
         }
-        ActiveOverlay::Search => common::render_search_overlay(f, body_area, state),
+        ActiveOverlay::Search => render_search_overlay(f, body_area, state),
         ActiveOverlay::Libsys => {
             crate::tui::ui_libsys::render_libsys_overlay(f, body_area, state);
         }
         ActiveOverlay::None => render_body(f, body_area, state),
     }
     if state.overlay.success_overlay {
-        common::render_success_overlay(f, body_area);
+        render_success_overlay(f, body_area);
     }
 
     // Nav confirm s'affiche par-dessus tout (y compris les autres overlays).
     if state.overlay.nav_confirm_active {
-        common::render_nav_confirm_overlay(f, body_area, state.overlay.nav_confirm_next);
+        render_nav_confirm_overlay(f, body_area, state.overlay.nav_confirm_next);
     }
 
     // Quit confirm s'affiche en dernier — au-dessus de nav_confirm.
     if state.overlay.quit_confirm_active {
-        common::render_quit_confirm_overlay(f, body_area);
+        render_quit_confirm_overlay(f, body_area);
     }
 
     render_status_bar(f, status_area, state);

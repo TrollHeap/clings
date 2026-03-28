@@ -9,13 +9,18 @@ use ratatui_macros::{span, vertical};
 
 use crate::tui::app::{ActiveOverlay, AppState};
 use crate::tui::common;
+use crate::tui::overlays::{
+    render_list_overlay, render_opaque_background, render_quit_confirm_overlay,
+    render_search_overlay, render_solution_overlay, render_success_overlay,
+    render_visualizer_overlay,
+};
 
 /// Point d'entrée du rendu piscine (appelé par App::run_piscine).
 pub fn view(f: &mut Frame, state: &mut AppState) {
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
-    common::render_opaque_background(f, area);
+    render_opaque_background(f, area);
 
     if state.ex.exercises.is_empty() {
         f.render_widget(
@@ -47,28 +52,24 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     }
 
     match &state.overlay.active {
-        ActiveOverlay::List => common::render_list_overlay(f, body_rest, state),
-        ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_rest, state),
+        ActiveOverlay::List => render_list_overlay(f, body_rest, state),
+        ActiveOverlay::Visualizer => render_visualizer_overlay(f, body_rest, state),
         ActiveOverlay::Solution => {
-            common::render_solution_overlay(
-                f,
-                body_rest,
-                &state.ex.exercises[state.ex.current_index],
-            );
+            render_solution_overlay(f, body_rest, &state.ex.exercises[state.ex.current_index]);
         }
-        ActiveOverlay::Search => common::render_search_overlay(f, body_rest, state),
+        ActiveOverlay::Search => render_search_overlay(f, body_rest, state),
         ActiveOverlay::Libsys => {
             crate::tui::ui_libsys::render_libsys_overlay(f, body_rest, state);
         }
         ActiveOverlay::Help | ActiveOverlay::None => render_piscine_body(f, body_rest, state),
     }
     if state.overlay.success_overlay {
-        common::render_success_overlay(f, body_rest);
+        render_success_overlay(f, body_rest);
     }
 
     // Quit confirm s'affiche en dernier — au-dessus de tout.
     if state.overlay.quit_confirm_active {
-        common::render_quit_confirm_overlay(f, body_rest);
+        render_quit_confirm_overlay(f, body_rest);
     }
 
     render_piscine_status_bar(f, status_area, state);

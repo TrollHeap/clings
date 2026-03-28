@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::error::Result;
 use crate::models::{Exercise, Subject};
 use crate::tui::common;
+use crate::tui::overlays::render_opaque_background;
 
 /// Lance une vue Ratatui autonome pour afficher la liste d'exercices.
 pub fn run_list(
@@ -91,7 +92,7 @@ fn draw_list(
     let area = f.area();
 
     // Fond global opaque — évite la transparence terminal
-    common::render_opaque_background(f, area);
+    render_opaque_background(f, area);
 
     // Layout: header (3) | list (fill) | footer (1)
     let [header_area, list_area, footer_area] = vertical![==3, *=1, ==1].areas(area);

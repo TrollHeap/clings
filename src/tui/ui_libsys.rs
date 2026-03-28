@@ -8,9 +8,8 @@ use ratatui::Frame;
 use ratatui_macros::{line, span};
 
 use crate::tui::app::AppState;
-use crate::tui::common::{
-    centered_popup, C_ACCENT, C_BORDER, C_SUCCESS, C_SURFACE, C_TEXT, C_TEXT_DIM, C_WARNING,
-};
+use crate::tui::common::{C_ACCENT, C_BORDER, C_SUCCESS, C_SURFACE, C_TEXT, C_TEXT_DIM, C_WARNING};
+use crate::tui::overlays::centered_popup;
 
 /// Rendu de l'overlay portfolio libsys.
 pub fn render_libsys_overlay(f: &mut Frame, area: Rect, state: &AppState) {

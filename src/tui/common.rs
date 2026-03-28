@@ -1,14 +1,9 @@
 //! Fonctions TUI partagées entre ui_watch, ui_piscine, ui_list et ui_stats.
 //!
-//! Les sous-modules `style` et `overlays` sont re-exportés ici pour compatibilité
-//! des importeurs existants (`use crate::tui::common::*`).
+//! Le sous-module `style` est re-exporté ici pour compatibilité des importeurs existants
+//! (`use crate::tui::common::*`). Overlay helpers doivent être importés directement depuis
+//! `crate::tui::overlays`.
 
-pub use crate::tui::overlays::{
-    centered_popup, is_pointer_value, render_help_overlay, render_list_overlay,
-    render_nav_confirm_overlay, render_opaque_background, render_quit_confirm_overlay,
-    render_search_overlay, render_solution_overlay, render_success_overlay,
-    render_visualizer_overlay, vis_col_widths,
-};
 pub use crate::tui::style::{
     difficulty_color, difficulty_stars, exercise_type_badge, mastery_bar_string, mastery_color,
     mini_map, next_stage_threshold, stage_badge, BODY_SIDEBAR_THRESHOLD, C_ACCENT, C_BG, C_BORDER,
