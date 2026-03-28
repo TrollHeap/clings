@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 
+use super::mastery_calc;
 use crate::constants::SECS_PER_DAY;
 use crate::error::Result;
 use crate::mastery;
@@ -150,13 +151,7 @@ fn apply_mastery_update(
     now: i64,
 ) -> Result<f64> {
     let mut sub = get_subject(tx, subject)?.unwrap_or_else(|| Subject::new(subject.to_string()));
-    mastery::update_mastery(&mut sub, success);
-
-    let (next_review, new_interval) =
-        mastery::compute_next_review(sub.srs_interval_days.get(), success, now);
-    sub.next_review_at = Some(next_review);
-    sub.srs_interval_days = SrsIntervalDays::clamped(new_interval);
-
+    mastery_calc::apply_mastery_attempt(&mut sub, success, now);
     upsert_subject_mastery(tx, &sub)?;
     Ok(sub.mastery_score.get())
 }

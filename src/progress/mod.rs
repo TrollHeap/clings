@@ -2,6 +2,7 @@
 
 mod checkpoints;
 mod import_export;
+mod mastery_calc;
 mod progress_db;
 mod session;
 mod subjects;
