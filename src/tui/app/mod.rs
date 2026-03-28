@@ -7,7 +7,9 @@ use crate::error::Result;
 use crate::search;
 
 mod app_state;
-pub use app_state::*;
+pub use app_state::{
+    ExerciseCtx, HeaderCache, OverlayState, PiscineCtx, PiscineTimerCache, ProgressCtx, SessionCtx,
+};
 
 pub use crate::tui::ui_keymap::key_to_cmd;
 pub use crate::tui::ui_messages::{ActiveOverlay, Command, ListDisplayItem, Msg};
@@ -55,6 +57,11 @@ impl AppState {
             .values()
             .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
             .count()
+    }
+
+    /// Returns the current exercise, or None if the index is out of bounds.
+    pub fn current_ex(&self) -> Option<&crate::models::Exercise> {
+        self.ex.exercises.get(self.ex.current_index)
     }
 
     /// Cache due_count calculation (call once per frame in dispatch loop).
@@ -525,13 +532,9 @@ impl App {
             // Vim : l / → = step suivant ; h / ← = step précédent ; j/k aussi intuitifs
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Char('j') => {
                 let total = state
-                    .ex
-                    .exercises
-                    .get(state.ex.current_index)
-                    .expect("current_index in bounds")
-                    .visualizer
-                    .steps
-                    .len();
+                    .current_ex()
+                    .map(|ex| ex.visualizer.steps.len())
+                    .unwrap_or(0);
                 state.overlay.vis_step = (state.overlay.vis_step + 1).min(total.saturating_sub(1));
             }
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('k') => {
@@ -685,12 +688,9 @@ impl App {
         use crate::constants::HINT_MIN_ATTEMPTS;
         let hints_len = self
             .state
-            .ex
-            .exercises
-            .get(self.state.ex.current_index)
-            .expect("current_index in bounds")
-            .hints
-            .len();
+            .current_ex()
+            .map(|ex| ex.hints.len())
+            .unwrap_or(0);
         if hints_len == 0 {
             return;
         }
@@ -787,12 +787,9 @@ impl App {
 
     /// Check if solution can be revealed (all hints shown OR enough failures).
     fn can_reveal_solution(&self, failure_threshold: usize) -> bool {
-        let exercise = self
-            .state
-            .ex
-            .exercises
-            .get(self.state.ex.current_index)
-            .expect("current_index in bounds");
+        let Some(exercise) = self.state.current_ex() else {
+            return false;
+        };
         let all_shown =
             exercise.hints.is_empty() || self.state.ex.hint_index >= exercise.hints.len();
         all_shown || self.state.ex.consecutive_failures as usize >= failure_threshold
@@ -800,12 +797,9 @@ impl App {
 
     /// Check if piscine solution can be revealed (fail_count-based threshold).
     fn can_reveal_solution_piscine(&self) -> bool {
-        let exercise = self
-            .state
-            .ex
-            .exercises
-            .get(self.state.ex.current_index)
-            .expect("current_index in bounds");
+        let Some(exercise) = self.state.current_ex() else {
+            return false;
+        };
         let all_shown =
             exercise.hints.is_empty() || self.state.ex.hint_index >= exercise.hints.len();
         all_shown || self.state.piscine.fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
@@ -820,12 +814,10 @@ impl App {
             return;
         };
         self.state.session.compile_pending = true;
-        let exercise = self
-            .state
-            .ex
-            .exercises
-            .get(self.state.ex.current_index)
-            .expect("current_index in bounds");
+        let Some(exercise) = self.state.ex.exercises.get(self.state.ex.current_index) else {
+            self.state.session.compile_pending = false;
+            return;
+        };
         let result = crate::runner::compile_and_run(path, exercise);
         self.state.session.compile_pending = false;
         let success = result.success;
@@ -835,62 +827,23 @@ impl App {
             self.state.ex.consecutive_failures = 0;
             if !self.state.ex.already_recorded {
                 self.state.ex.already_recorded = true;
-                // Clone avant tout borrow mutable
                 let subject = exercise.subject.clone();
                 let exercise_id = exercise.id.clone();
+                // Clone libsys fields before releasing exercise borrow
+                let libsys_info = (
+                    exercise.exercise_type,
+                    exercise.libsys_module.clone(),
+                    exercise.libsys_function.clone(),
+                    exercise.header_code.clone(),
+                );
                 if let Err(e) = crate::progress::record_attempt(conn, &subject, &exercise_id, true)
                 {
                     eprintln!("[clings] erreur enregistrement tentative: {e}");
                 }
-                // Export libsys si c'est un exercice library_export
-                if exercise.exercise_type == crate::models::ExerciseType::LibraryExport {
-                    if let (Some(module), Some(function), Some(h_decl)) = (
-                        exercise.libsys_module.clone(),
-                        exercise.libsys_function.clone(),
-                        exercise.header_code.clone(),
-                    ) {
-                        let fn_name = function.clone();
-                        let c_code = std::fs::read_to_string(path).unwrap_or_default();
-                        let libsys_export = crate::libsys::LibsysExport {
-                            module,
-                            function,
-                            c_code,
-                            h_decl,
-                        };
-                        let libsys_path = crate::libsys::libsys_path();
-                        match crate::libsys::export(&libsys_path, &libsys_export) {
-                            Ok(()) => {
-                                self.state.session.status_msg =
-                                    Some(format!("✓ {fn_name} ajouté à libsys !"));
-                                self.state.session.status_msg_at = Some(std::time::Instant::now());
-                            }
-                            Err(e) => eprintln!("[clings] erreur export libsys: {e}"),
-                        }
-                    }
-                }
+                let path_owned = path.to_path_buf();
+                self.try_export_libsys(&path_owned, libsys_info);
                 Self::invalidate_header_cache(&mut self.state);
-                // Interleaving nudge : suggérer de changer de sujet après N succès consécutifs
-                if self.state.ex.last_success_subject == subject {
-                    self.state.ex.consecutive_successes_on_subject = self
-                        .state
-                        .ex
-                        .consecutive_successes_on_subject
-                        .saturating_add(1);
-                } else {
-                    self.state.ex.consecutive_successes_on_subject = 1;
-                    self.state.ex.last_success_subject = subject.clone();
-                }
-                if self.state.ex.consecutive_successes_on_subject
-                    >= crate::constants::INTERLEAVING_NUDGE_THRESHOLD
-                {
-                    self.state.session.status_msg = Some(format!(
-                        "{} succès sur «{}» — explorer un autre sujet booste la mémoire !",
-                        crate::constants::INTERLEAVING_NUDGE_THRESHOLD,
-                        subject
-                    ));
-                    self.state.session.status_msg_at = Some(std::time::Instant::now());
-                    self.state.ex.consecutive_successes_on_subject = 0;
-                }
+                self.update_interleaving_nudge(subject);
             }
             self.state.ex.completed[self.state.ex.current_index] = true;
             self.state.overlay.success_overlay = true;
@@ -902,28 +855,85 @@ impl App {
             {
                 let hints_len = self
                     .state
-                    .ex
-                    .exercises
-                    .get(self.state.ex.current_index)
-                    .expect("current_index in bounds")
-                    .hints
-                    .len();
+                    .current_ex()
+                    .map(|ex| ex.hints.len())
+                    .unwrap_or(0);
                 if hints_len > 0 {
                     self.state.ex.hint_index = 1;
                 }
             }
-            let exercise = self
-                .state
-                .ex
-                .exercises
-                .get(self.state.ex.current_index)
-                .expect("current_index in bounds");
-            if let Err(e) =
-                crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
-            {
-                eprintln!("[clings] erreur enregistrement tentative: {e}");
+            if let Some(exercise) = self.state.ex.exercises.get(self.state.ex.current_index) {
+                if let Err(e) =
+                    crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
+                {
+                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                }
             }
             Self::invalidate_header_cache(&mut self.state);
+        }
+    }
+
+    /// Export libsys si l'exercice est de type LibraryExport et que tous les champs sont présents.
+    fn try_export_libsys(
+        &mut self,
+        path: &std::path::Path,
+        libsys_info: (
+            crate::models::ExerciseType,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ),
+    ) {
+        let (exercise_type, libsys_module, libsys_function, header_code) = libsys_info;
+        if exercise_type != crate::models::ExerciseType::LibraryExport {
+            return;
+        }
+        let (Some(module), Some(function), Some(h_decl)) =
+            (libsys_module, libsys_function, header_code)
+        else {
+            return;
+        };
+        let fn_name = function.clone();
+        let c_code = std::fs::read_to_string(path).unwrap_or_default();
+        let libsys_export = crate::libsys::LibsysExport {
+            module,
+            function,
+            c_code,
+            h_decl,
+        };
+        let libsys_path = crate::libsys::libsys_path();
+        match crate::libsys::export(&libsys_path, &libsys_export) {
+            Ok(()) => {
+                self.state.session.status_msg = Some(format!("✓ {fn_name} ajouté à libsys !"));
+                self.state.session.status_msg_at = Some(std::time::Instant::now());
+            }
+            Err(e) => eprintln!("[clings] erreur export libsys: {e}"),
+        }
+    }
+
+    /// Met à jour le compteur de succès consécutifs sur le même sujet et affiche le nudge
+    /// d'interleaving si le seuil est atteint.
+    fn update_interleaving_nudge(&mut self, subject: String) {
+        if self.state.ex.last_success_subject == subject {
+            self.state.ex.consecutive_successes_on_subject = self
+                .state
+                .ex
+                .consecutive_successes_on_subject
+                .saturating_add(1);
+        } else {
+            self.state.ex.consecutive_successes_on_subject = 1;
+            self.state.ex.last_success_subject = subject.clone();
+        }
+        if self.state.ex.consecutive_successes_on_subject
+            >= crate::constants::INTERLEAVING_NUDGE_THRESHOLD
+        {
+            self.state.session.status_msg = Some(format!(
+                "{} succès sur «{}» — explorer un autre sujet booste la mémoire !",
+                crate::constants::INTERLEAVING_NUDGE_THRESHOLD,
+                subject
+            ));
+            self.state.session.status_msg_at = Some(std::time::Instant::now());
+            self.state.ex.consecutive_successes_on_subject = 0;
         }
     }
 
@@ -1123,12 +1133,12 @@ impl App {
                             return;
                         };
                         self.state.session.compile_pending = true;
-                        let exercise = self
-                            .state
-                            .ex
-                            .exercises
-                            .get(self.state.ex.current_index)
-                            .expect("current_index in bounds");
+                        let Some(exercise) =
+                            self.state.ex.exercises.get(self.state.ex.current_index)
+                        else {
+                            self.state.session.compile_pending = false;
+                            return;
+                        };
                         let result = crate::runner::compile_and_run(path, exercise);
                         self.state.session.compile_pending = false;
                         let success = result.success;
@@ -1165,19 +1175,17 @@ impl App {
                                     }
                                 }
                             }
-                            let exercise = self
-                                .state
-                                .ex
-                                .exercises
-                                .get(self.state.ex.current_index)
-                                .expect("current_index in bounds");
-                            if let Err(e) = crate::progress::record_attempt(
-                                conn,
-                                &exercise.subject,
-                                &exercise.id,
-                                false,
-                            ) {
-                                eprintln!("[clings] erreur enregistrement tentative: {e}");
+                            if let Some(exercise) =
+                                self.state.ex.exercises.get(self.state.ex.current_index)
+                            {
+                                if let Err(e) = crate::progress::record_attempt(
+                                    conn,
+                                    &exercise.subject,
+                                    &exercise.id,
+                                    false,
+                                ) {
+                                    eprintln!("[clings] erreur enregistrement tentative: {e}");
+                                }
                             }
                             Self::invalidate_header_cache(&mut self.state);
                         }

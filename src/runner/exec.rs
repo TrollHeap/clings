@@ -163,3 +163,30 @@ pub fn kill_process_group(child: &std::process::Child) {
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// drain_stdio: threads produce expected strings, drain_stdio returns them correctly.
+    #[test]
+    fn test_drain_stdio_returns_thread_output() {
+        let stdout_thread = std::thread::spawn(|| "hello stdout".to_string());
+        let stderr_thread = std::thread::spawn(|| "hello stderr".to_string());
+        let result = drain_stdio(stdout_thread, stderr_thread);
+        assert!(result.is_ok(), "drain_stdio should succeed");
+        let (stdout, stderr) = result.unwrap();
+        assert_eq!(stdout, "hello stdout");
+        assert_eq!(stderr, "hello stderr");
+    }
+
+    /// drain_stdio: handles empty strings from both threads.
+    #[test]
+    fn test_drain_stdio_empty_output() {
+        let stdout_thread = std::thread::spawn(|| String::new());
+        let stderr_thread = std::thread::spawn(|| String::new());
+        let (stdout, stderr) = drain_stdio(stdout_thread, stderr_thread).unwrap();
+        assert!(stdout.is_empty());
+        assert!(stderr.is_empty());
+    }
+}

@@ -223,3 +223,131 @@ fn snapshot_libsys_overlay_with_modules() {
     let buffer = terminal.backend().buffer().clone();
     insta::assert_snapshot!("libsys_overlay_with_modules", format!("{buffer:#?}"));
 }
+
+// ── Piscine view ─────────────────────────────────────────────────────────────
+
+#[test]
+fn snapshot_piscine_view_initial() {
+    use clings::tui::ui_piscine;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut state = make_app_state();
+    state.piscine.start = Some(std::time::Instant::now());
+
+    terminal
+        .draw(|f| {
+            ui_piscine::view(f, &mut state);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("piscine_view_initial", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_piscine_view_with_success() {
+    use clings::tui::ui_piscine;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut state = make_app_state();
+    state.piscine.start = Some(std::time::Instant::now());
+    state.ex.run_result = Some(RunResult {
+        success: true,
+        stdout: "Hello".to_owned(),
+        stderr: String::new(),
+        duration_ms: 12,
+        compile_error: false,
+        timeout: false,
+        gcc_hint: None,
+    });
+    state.ex.completed[0] = true;
+
+    terminal
+        .draw(|f| {
+            ui_piscine::view(f, &mut state);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("piscine_view_success", format!("{buffer:#?}"));
+}
+
+// ── Overlays ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn snapshot_list_overlay() {
+    use clings::tui::overlays::render_list_overlay;
+    use ratatui::layout::Rect;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut state = make_app_state();
+    state.overlay.active = ActiveOverlay::List;
+    // Populate list display items for the overlay
+    state.overlay.list_selected = 0;
+
+    terminal
+        .draw(|f| {
+            render_list_overlay(f, Rect::new(0, 0, 120, 30), &state);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("list_overlay", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_quit_confirm_overlay() {
+    use clings::tui::overlays::render_quit_confirm_overlay;
+    use ratatui::layout::Rect;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|f| {
+            render_quit_confirm_overlay(f, Rect::new(0, 0, 120, 30));
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("quit_confirm_overlay", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_nav_confirm_overlay() {
+    use clings::tui::overlays::render_nav_confirm_overlay;
+    use ratatui::layout::Rect;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|f| {
+            render_nav_confirm_overlay(f, Rect::new(0, 0, 120, 30), true);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("nav_confirm_overlay_next", format!("{buffer:#?}"));
+}
+
+#[test]
+fn snapshot_success_overlay() {
+    use clings::tui::overlays::render_success_overlay;
+    use ratatui::layout::Rect;
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|f| {
+            render_success_overlay(f, Rect::new(0, 0, 120, 30));
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer().clone();
+    insta::assert_snapshot!("success_overlay", format!("{buffer:#?}"));
+}

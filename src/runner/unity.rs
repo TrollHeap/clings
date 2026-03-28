@@ -129,9 +129,9 @@ pub fn evaluate_test_result(
     stderr: &str,
     status: std::process::ExitStatus,
     expected_pass: Option<usize>,
-) -> super::RunResult {
+) -> super::compiler::RunResult {
     if !status.success() {
-        return super::RunResult {
+        return super::compiler::RunResult {
             success: false,
             stdout: stdout.to_string(),
             stderr: if stderr.is_empty() {
@@ -157,7 +157,7 @@ pub fn evaluate_test_result(
         }
         None => passed,
     };
-    super::RunResult {
+    super::compiler::RunResult {
         success: result_ok,
         stdout: stdout.to_string(),
         stderr: stderr.to_string(),
@@ -186,33 +186,37 @@ pub fn parse_test_summary(stdout: &str) -> (bool, usize) {
 }
 
 /// Run test-harness mode: write Unity assets + test_current.c, compile, run, parse summary.
-pub fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> super::RunResult {
+pub fn run_tests(
+    source_path: &Path,
+    work_dir: &Path,
+    exercise: &Exercise,
+) -> super::compiler::RunResult {
     let test_code = match &exercise.validation.test_code {
         Some(c) => c.as_str(),
         None => {
-            return super::make_compile_error(
+            return super::compiler::make_compile_error(
                 "Mode Test : champ 'test_code' manquant dans l'exercice".to_string(),
             );
         }
     };
 
     if let Some(forbidden) = validate_test_code(test_code) {
-        return super::make_compile_error(format!(
+        return super::compiler::make_compile_error(format!(
             "test_code invalide : pattern interdit détecté (`{forbidden}`)"
         ));
     }
 
     if let Err(e) = write_unity_files(work_dir) {
-        return super::make_compile_error(e);
+        return super::compiler::make_compile_error(e);
     }
 
     let test_c_path = match compose_test_source(source_path, test_code, work_dir) {
         Ok(path) => path,
-        Err(e) => return super::make_compile_error(e),
+        Err(e) => return super::compiler::make_compile_error(e),
     };
 
-    if let Err(e) = super::write_exercise_files(exercise, work_dir) {
-        return super::make_compile_error(format!(
+    if let Err(e) = super::files::write_exercise_files(exercise, work_dir) {
+        return super::compiler::make_compile_error(format!(
             "Impossible d'écrire les fichiers d'exercice : {e}"
         ));
     }
@@ -225,7 +229,7 @@ pub fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> su
         .to_string_lossy()
         .into_owned();
     let include_flag = format!("-I{}", work_dir.display());
-    let linker = super::linker_flags(&exercise.subject);
+    let linker = super::compiler::linker_flags(&exercise.subject);
 
     let mut extra_args: Vec<&str> = vec![
         "-o",
@@ -250,7 +254,7 @@ pub fn run_tests(source_path: &Path, work_dir: &Path, exercise: &Exercise) -> su
     let gcc_result = spawn_gcc_and_collect(&test_c_path, &extra_args, work_dir, timeout);
     let expected_pass = exercise.validation.expected_tests_pass;
 
-    super::dispatch_gcc_result(
+    super::compiler::dispatch_gcc_result(
         gcc_result,
         timeout,
         start,
