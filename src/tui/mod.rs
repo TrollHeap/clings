@@ -6,6 +6,10 @@ pub mod app;
 pub mod common;
 /// Event loop handling (keyboard input, file watcher, tick timer).
 pub mod events;
+/// Overlay render functions — all `render_*_overlay` variants and `centered_popup`.
+pub mod overlays;
+/// Catppuccin Mocha palette, dimension constants, and pure visual helpers.
+pub mod style;
 /// Annales exam session browser and selector.
 pub mod ui_annales;
 /// Exam session selection screen (NSY103/UTC502 simulator).

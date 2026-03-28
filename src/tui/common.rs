@@ -1,217 +1,23 @@
 //! Fonctions TUI partagées entre ui_watch, ui_piscine, ui_list et ui_stats.
+//!
+//! Les sous-modules `style` et `overlays` sont re-exportés ici pour compatibilité
+//! des importeurs existants (`use crate::tui::common::*`).
+
+pub use crate::tui::overlays::*;
+pub use crate::tui::style::*;
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
-    Block, BorderType, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
-    ScrollbarState, Wrap,
+    Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
 };
 use ratatui::Frame;
-use ratatui_macros::{line, span, vertical};
+use ratatui_macros::{line, span};
 
-use crate::models::{Difficulty, ExerciseType, ValidationMode};
+use crate::models::{Exercise, ValidationMode};
 use crate::runner::RunResult;
-use crate::tui::app::AppState;
-
-/// Largeur minimale du terminal pour afficher la sidebar de progression.
-pub const BODY_SIDEBAR_THRESHOLD: u16 = 110;
-/// Largeur fixe de la sidebar de progression (colonnes).
-pub const SIDEBAR_WIDTH: u16 = 38;
-/// Séparateur horizontal (36 × ─) — const str évite l'allocation par frame.
-pub const SEPARATOR: &str = "────────────────────────────────────";
-
-/// Barre pleine (10 × █) — tranche statique pour mastery_bar sans allocation.
-const FULL_BAR: &str = "██████████";
-/// Barre vide (10 × ░) — tranche statique pour mastery_bar sans allocation.
-const EMPTY_BAR: &str = "░░░░░░░░░░";
-
-// ── Palette Catppuccin Mocha ──────────────────────────────────────────────────
-pub const C_BG: Color = Color::Rgb(30, 30, 46); // Base
-pub const C_SURFACE: Color = Color::Rgb(24, 24, 37); // Mantle
-pub const C_BORDER: Color = Color::Rgb(69, 71, 90); // Surface1
-pub const C_TEXT_DIM: Color = Color::Rgb(147, 153, 178); // Overlay2
-pub const C_ACCENT: Color = Color::Rgb(137, 180, 250); // Blue
-pub const C_OVERLAY: Color = Color::Rgb(108, 112, 134); // Overlay0
-pub const C_SUBTEXT: Color = Color::Rgb(186, 194, 222); // Subtext1
-pub const C_TEXT: Color = Color::Rgb(205, 214, 244); // Text
-
-// ── Couleurs sémantiques ───────────────────────────────────────────────────────
-pub const C_SUCCESS: Color = Color::Rgb(166, 227, 161); // Green
-pub const C_WARNING: Color = Color::Rgb(250, 179, 135); // Peach
-pub const C_DANGER: Color = Color::Rgb(243, 139, 168); // Red
-pub const C_INFO: Color = Color::Rgb(137, 220, 235); // Sky
-pub const C_MAUVE: Color = Color::Rgb(203, 166, 247); // Mauve (Advanced)
-pub const C_TEAL: Color = Color::Rgb(148, 226, 213); // Teal (Expert, heap)
-pub const C_YELLOW: Color = Color::Rgb(249, 226, 175); // Yellow (streak)
-
-// ── Badge backgrounds ──────────────────────────────────────────────────
-const C_BADGE_COMPLETE: Color = Color::Rgb(30, 45, 30);
-const C_BADGE_FIXBUG: Color = Color::Rgb(45, 25, 30);
-const C_BADGE_FILLBLANK: Color = Color::Rgb(45, 35, 20);
-const C_BADGE_REFACTOR: Color = Color::Rgb(20, 40, 42);
-
-/// Badge coloré pour le stage d'échafaudage courant (S0–S4).
-/// Couleur croissante : S0 neutre → S4 mauve+bold.
-pub fn stage_badge(stage: u8) -> Span<'static> {
-    match stage {
-        0 => span!(C_TEXT_DIM; "[S0]"),
-        1 => span!(C_WARNING; "[S1]"),
-        2 => span!(C_INFO; "[S2]"),
-        3 => span!(C_SUCCESS; "[S3]"),
-        _ => span!(Style::default().fg(C_MAUVE).add_modifier(Modifier::BOLD); "[S4]"),
-    }
-}
-
-/// Retourne `(floor, threshold, next_stage)` pour afficher la progression vers le stage suivant.
-/// Retourne `None` si le score est déjà au stage maximum (S4, mastery ≥ 4.0).
-/// Seuils alignés avec `runner::mastery_to_stage` : S0<1.0 S1<2.0 S2<3.0 S3<4.0 S4≥4.0.
-pub fn next_stage_threshold(score: f64) -> Option<(f64, f64, u8)> {
-    if score < 1.0 {
-        Some((0.0, 1.0, 1))
-    } else if score < 2.0 {
-        Some((1.0, 2.0, 2))
-    } else if score < 3.0 {
-        Some((2.0, 3.0, 3))
-    } else if score < 4.0 {
-        Some((3.0, 4.0, 4))
-    } else {
-        None
-    }
-}
-
-/// Calcule la zone d'un popup centré avec des marges en pourcentage.
-pub fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
-    let content_v = 100u16.saturating_sub(margin_v_pct * 2);
-    let content_h = 100u16.saturating_sub(margin_h_pct * 2);
-    let [_, popup_v, _] = Layout::vertical([
-        Constraint::Percentage(margin_v_pct),
-        Constraint::Percentage(content_v),
-        Constraint::Percentage(margin_v_pct),
-    ])
-    .areas(area);
-    let [_, popup, _] = Layout::horizontal([
-        Constraint::Percentage(margin_h_pct),
-        Constraint::Percentage(content_h),
-        Constraint::Percentage(margin_h_pct),
-    ])
-    .areas(popup_v);
-    popup
-}
-
-/// Couleur associée à un niveau de difficulté.
-pub fn difficulty_color(d: Difficulty) -> Color {
-    match d {
-        Difficulty::Easy => C_SUCCESS,
-        Difficulty::Medium => C_WARNING,
-        Difficulty::Hard => C_DANGER,
-        Difficulty::Advanced => C_MAUVE,
-        Difficulty::Expert => C_TEAL,
-    }
-}
-
-/// Étoiles unicode associées à un niveau de difficulté.
-pub fn difficulty_stars(d: Difficulty) -> &'static str {
-    match d {
-        Difficulty::Easy => "★☆☆☆☆",
-        Difficulty::Medium => "★★☆☆☆",
-        Difficulty::Hard => "★★★☆☆",
-        Difficulty::Advanced => "★★★★☆",
-        Difficulty::Expert => "★★★★★",
-    }
-}
-
-/// Badge coloré pour le type d'exercice.
-pub fn exercise_type_badge(t: ExerciseType) -> Span<'static> {
-    match t {
-        ExerciseType::Complete => span!(
-            Style::default()
-                .fg(C_SUCCESS)
-                .bg(C_BADGE_COMPLETE)
-                .add_modifier(Modifier::BOLD);
-            " COMPLETE "
-        ),
-        ExerciseType::FixBug => span!(
-            Style::default()
-                .fg(C_DANGER)
-                .bg(C_BADGE_FIXBUG)
-                .add_modifier(Modifier::BOLD);
-            " FIX_BUG "
-        ),
-        ExerciseType::FillBlank => span!(
-            Style::default()
-                .fg(C_WARNING)
-                .bg(C_BADGE_FILLBLANK)
-                .add_modifier(Modifier::BOLD);
-            " FILL_BLANK "
-        ),
-        ExerciseType::Refactor => span!(
-            Style::default()
-                .fg(C_INFO)
-                .bg(C_BADGE_REFACTOR)
-                .add_modifier(Modifier::BOLD);
-            " REFACTOR "
-        ),
-        ExerciseType::LibraryExport => span!(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Rgb(166, 227, 161))
-                .add_modifier(Modifier::BOLD);
-            " LIBSYS "
-        ),
-    }
-}
-
-/// Couleur gradient pour un score de maîtrise (0.0–5.0).
-pub fn mastery_color(score: f64) -> Color {
-    if score < 1.0 {
-        C_DANGER
-    } else if score < 2.5 {
-        C_WARNING
-    } else if score < 4.0 {
-        C_SUCCESS
-    } else {
-        C_TEAL
-    }
-}
-
-/// Mini-map de 9 exercices autour du curseur (●=courant, ◉=complété, ○=pas encore).
-pub fn mini_map(completed: &[bool], current: usize) -> String {
-    let total = completed.len();
-    if total == 0 {
-        return String::new();
-    }
-    let half = 4usize;
-    let start = current.saturating_sub(half);
-    let end = (start + 9).min(total);
-    let start = end.saturating_sub(9).min(start);
-
-    // ●/◉/○ = 3 bytes UTF-8 chacun — allocation exacte, zéro Vec intermédiaire
-    let mut map = String::with_capacity((end - start) * 3);
-    for i in start..end {
-        map.push_str(if i == current {
-            "●"
-        } else if completed.get(i).copied().unwrap_or(false) {
-            "◉"
-        } else {
-            "○"
-        });
-    }
-    map
-}
-
-/// Génère la chaîne barre de maîtrise (█░ format) pour usage dans les cellules de table.
-/// Utilise des tranches statiques (max 10) — zéro allocation intermédiaire.
-pub fn mastery_bar_string(score: f64, width: usize) -> String {
-    debug_assert!(width <= 10, "mastery_bar_string: width > 10 non supporté");
-    let filled = (score.clamp(0.0, 5.0) / 5.0 * width as f64).round() as usize;
-    let empty = width - filled;
-    // Chaque █/░ = 3 octets UTF-8
-    let mut s = String::with_capacity(width * 3);
-    s.push_str(&FULL_BAR[..filled * 3]);
-    s.push_str(&EMPTY_BAR[..empty * 3]);
-    s
-}
+use crate::tui::app::{ActiveOverlay, AppState};
 
 /// Parse une ligne avec syntaxe backtick inline : `code` → C_ACCENT BOLD.
 fn parse_inline_code(line: &str) -> Line<'static> {
@@ -236,7 +42,7 @@ fn parse_inline_code(line: &str) -> Line<'static> {
 /// Panneau description/indices — partagé entre watch et piscine.
 /// Affiche description, key_concept, common_mistake, fichiers, et indices révélés.
 pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
-    let Some(exercise) = state.exercises.get(state.current_index) else {
+    let Some(exercise) = state.ex.exercises.get(state.ex.current_index) else {
         return;
     };
     let mut lines: Vec<Line> = Vec::with_capacity(16);
@@ -270,15 +76,15 @@ pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
         ]);
     }
 
-    if state.hint_index > 0 && !exercise.hints.is_empty() {
+    if state.ex.hint_index > 0 && !exercise.hints.is_empty() {
         lines.push(Line::raw(""));
         lines.push(Line::styled("── Indices ──", Style::default().fg(C_TEAL)));
-        for (i, hint) in exercise.hints[..state.hint_index].iter().enumerate() {
+        for (i, hint) in exercise.hints[..state.ex.hint_index].iter().enumerate() {
             lines.push(Line::from(format!("  {}. {}", i + 1, hint)));
         }
     }
 
-    let title = if let Some(path) = &state.source_path {
+    let title = if let Some(path) = &state.ex.source_path {
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -289,7 +95,7 @@ pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let content_length = lines.len();
-    let scroll = state.description_scroll;
+    let scroll = state.ex.description_scroll;
     let mut scroll_state = ScrollbarState::new(content_length).position(scroll as usize);
 
     f.render_widget(
@@ -320,28 +126,28 @@ pub fn render_description_panel(f: &mut Frame, area: Rect, state: &AppState) {
 /// `has_help` : true pour le mode watch (qui possède un overlay d'aide [?]).
 pub fn status_bar_prefix_line(state: &AppState, has_help: bool) -> Option<Line<'static>> {
     let dim = Style::default().fg(C_TEXT_DIM);
-    if state.compile_pending {
+    if state.session.compile_pending {
         return Some(Line::styled("⏳ Compilation en cours…", dim));
     }
-    if has_help && state.overlay.help_active {
+    if has_help && state.overlay.active == ActiveOverlay::Help {
         return Some(Line::styled("[Esc/?] fermer", dim));
     }
-    if state.overlay.solution_active {
+    if state.overlay.active == ActiveOverlay::Solution {
         return Some(Line::styled("[Esc/s] fermer solution", dim));
     }
-    if state.overlay.list_active {
+    if state.overlay.active == ActiveOverlay::List {
         return Some(Line::styled(
             "[↑↓/jk] nav  [Tab/S-Tab] chapitre  [Entrée] aller  [Esc/l/q] fermer",
             dim,
         ));
     }
-    if state.overlay.search_active {
+    if state.overlay.active == ActiveOverlay::Search {
         return Some(Line::styled(
             "[↑↓/jk] nav  [Entrée] aller  [Esc] fermer",
             dim,
         ));
     }
-    if let Some(status) = &state.status_msg {
+    if let Some(status) = &state.session.status_msg {
         return Some(Line::styled(status.clone(), dim));
     }
     None
@@ -407,8 +213,8 @@ pub fn render_body_with_sidebar(
         (area, None)
     };
 
-    let (desc_area, result_area_opt) = if let Some(result) = &state.run_result {
-        let Some(exercise) = state.exercises.get(state.current_index) else {
+    let (desc_area, result_area_opt) = if let Some(result) = &state.ex.run_result {
+        let Some(exercise) = state.ex.exercises.get(state.ex.current_index) else {
             return;
         };
         let expected = exercise.validation.expected_output.as_deref();
@@ -423,8 +229,8 @@ pub fn render_body_with_sidebar(
     render_description_panel(f, desc_area, state);
 
     if let Some(result_area) = result_area_opt {
-        if let Some(result) = &state.run_result {
-            if let Some(exercise) = state.exercises.get(state.current_index) {
+        if let Some(result) = &state.ex.run_result {
+            if let Some(exercise) = state.ex.exercises.get(state.ex.current_index) {
                 render_run_result(f, result_area, result, exercise);
             }
         }
@@ -543,12 +349,7 @@ fn parse_unity_output(stdout: &str) -> Option<UnityTestSummary> {
 }
 
 /// Rendu du panneau résultat de compilation/exécution.
-pub fn render_run_result(
-    f: &mut Frame,
-    area: Rect,
-    result: &RunResult,
-    exercise: &crate::models::Exercise,
-) {
+pub fn render_run_result(f: &mut Frame, area: Rect, result: &RunResult, exercise: &Exercise) {
     use crate::constants::{MSG_COMPILE_ERROR, MSG_TESTS_FAILED, MSG_TIMEOUT, MSG_WRONG_OUTPUT};
     let (title, title_color) = if result.success {
         (format!("✓ SUCCÈS ({}ms)", result.duration_ms), C_SUCCESS)
@@ -703,300 +504,6 @@ pub fn render_run_result(
     f.render_widget(Paragraph::new(lines).block(block), area);
 }
 
-/// Calcule la taille du popup visualiseur en fonction du contenu.
-pub fn popup_size_for_vis(step: &crate::models::VisStep) -> (u16, u16) {
-    let max_rows = step.stack.len().max(step.heap.len()).max(1) as u16;
-    // Table: n_rows + 3 lignes (border top + header + border bottom)
-    // Overhead overlay: ~12 lignes (dots, label, explication, nav, spacers)
-    let expl_lines: u16 = if step.explanation.is_empty() {
-        0
-    } else {
-        step.explanation
-            .split(". ")
-            .filter(|s| !s.is_empty())
-            .count() as u16
-    };
-    // inner_needed = fixed(7) + frame_h(max_rows+3) + expl(n+1 si n>0) + popup_border(2)
-    let inner_h = 12 + max_rows + if expl_lines > 0 { expl_lines + 1 } else { 0 };
-    // Échelle en %, référence ~32 lignes terminal
-    let h_pct = (inner_h * 100 / 32).clamp(45, 82);
-    let is_dual = !step.heap.is_empty() || (step.call_frames.len() >= 2 && !step.arrows.is_empty());
-    let w_pct = if is_dual { 82u16 } else { 65u16 };
-    (w_pct, h_pct)
-}
-
-// ── Helpers visualiseur mémoire ───────────────────────────────────────────────
-
-/// Détecte si une valeur représente un pointeur (pour le style C_ACCENT).
-pub(crate) fn is_pointer_value(val: &str) -> bool {
-    val.starts_with("──▶") || val.starts_with("→") || val.starts_with("0x")
-}
-
-/// Calcule les largeurs de colonnes nom/valeur. Min 4, cap valeur à 20.
-pub(crate) fn vis_col_widths(vars: &[crate::models::VisVar]) -> (usize, usize) {
-    let name_w = vars
-        .iter()
-        .map(|v| v.name.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(4);
-    let val_w = vars
-        .iter()
-        .map(|v| v.value.chars().count())
-        .max()
-        .unwrap_or(0)
-        .clamp(4, 20);
-    (name_w, val_w)
-}
-
-/// Overlay visualiseur mémoire (partagé entre watch et piscine).
-pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
-    use crate::tui::ui_visualizer::MemVisualizer;
-
-    let Some(exercise) = state.exercises.get(state.current_index) else {
-        return;
-    };
-    let steps = &exercise.visualizer.steps;
-
-    if steps.is_empty() {
-        return;
-    }
-
-    let step_idx = state.overlay.vis_step.min(steps.len() - 1);
-    let step = &steps[step_idx];
-
-    let (w_pct, h_pct) = popup_size_for_vis(step);
-    let margin_v = (100u16.saturating_sub(h_pct)) / 2;
-    let margin_h = (100u16.saturating_sub(w_pct)) / 2;
-    let popup = centered_popup(area, margin_v, margin_h);
-
-    f.render_widget(Clear, popup);
-    f.render_widget(
-        MemVisualizer {
-            step,
-            step_idx,
-            total_steps: steps.len(),
-        },
-        popup,
-    );
-}
-
-/// Overlay de recherche fuzzy (touche `/` depuis watch).
-pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
-    let popup = centered_popup(area, 15, 10);
-    f.render_widget(Clear, popup);
-
-    // Split: query input (3 lines) | results list (fill) | hint bar (1 line)
-    let [query_area, results_area, hint_area] = vertical![==3, *=1, ==1].areas(popup);
-
-    // Query input
-    let cursor = if (f.count() / 4).is_multiple_of(2) {
-        "█"
-    } else {
-        " "
-    };
-    let query_display = format!("{}{}", state.overlay.search_query, cursor);
-    let overlay_title = if state.overlay.search_subject_filter {
-        let subject = state
-            .exercises
-            .get(state.current_index)
-            .map(|ex| ex.subject.as_str())
-            .unwrap_or("?");
-        format!("/ Recherche (sujet: {})", subject)
-    } else {
-        "/ Recherche".to_string()
-    };
-    f.render_widget(
-        Paragraph::new(query_display).block(
-            Block::bordered()
-                .border_type(BorderType::Rounded)
-                .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", overlay_title))
-                .style(Style::default().bg(C_SURFACE))
-                .border_style(Style::default().fg(C_ACCENT)),
-        ),
-        query_area,
-    );
-
-    // Results list — iterate directly from indices, no intermediate Vec
-    let items: Vec<ListItem> = state
-        .overlay
-        .search_results
-        .iter()
-        .filter_map(|&idx| state.exercises.get(idx))
-        .map(|ex| {
-            let stars = difficulty_stars(ex.difficulty);
-            let color = difficulty_color(ex.difficulty);
-            // char_indices().nth(N) gives the byte boundary without allocating an intermediate String
-            let title_end = ex
-                .title
-                .char_indices()
-                .nth(28)
-                .map(|(i, _)| i)
-                .unwrap_or(ex.title.len());
-            let subj_end = ex
-                .subject
-                .char_indices()
-                .nth(16)
-                .map(|(i, _)| i)
-                .unwrap_or(ex.subject.len());
-            ListItem::new(line![
-                span!(C_TEXT; "{:<30}", &ex.title[..title_end]),
-                span!(C_SUBTEXT; "{:<18}", &ex.subject[..subj_end]),
-                span!(Style::default().fg(color); "{}", stars),
-            ])
-        })
-        .collect();
-
-    let count = state.overlay.search_results.len();
-    let list_title = if state.overlay.search_query.is_empty() {
-        format!(" {count} exercices ")
-    } else {
-        format!(" {count} résultats ")
-    };
-
-    let mut search_list_state = state.overlay.search_list_state.clone();
-    if !state.overlay.search_results.is_empty() {
-        search_list_state.select(Some(state.overlay.search_selected));
-    }
-
-    f.render_stateful_widget(
-        List::new(items)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(list_title)
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_BORDER)),
-            )
-            .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
-        results_area,
-        &mut search_list_state,
-    );
-
-    // Hint bar
-    f.render_widget(
-        Paragraph::new(
-            "[↑↓/jk] nav  [g/G] début/fin  [Entrée] aller  [Tab] filtre sujet  [Esc] fermer",
-        )
-        .style(Style::default().fg(C_TEXT_DIM)),
-        hint_area,
-    );
-}
-
-/// Overlay solution — affiche le code solution de l'exercice courant.
-pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &crate::models::Exercise) {
-    let popup = centered_popup(area, 10, 10);
-    f.render_widget(Clear, popup);
-
-    let lines: Vec<Line> = exercise.solution_code.lines().map(Line::raw).collect();
-    f.render_widget(
-        Paragraph::new(lines)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Solution — [Esc/s] fermer"))
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_BORDER)),
-            )
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
-}
-
-/// Overlay liste d'exercices — navigation j/k, Tab/Shift-Tab chapitres, Enter pour jump.
-pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
-    use crate::tui::app::ListDisplayItem;
-
-    let popup = centered_popup(area, 10, 8);
-    f.render_widget(Clear, popup);
-
-    // Split: list (fill) | hint bar (1 line)
-    let [list_area, hint_area] =
-        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(popup);
-
-    let items: Vec<ListItem> = state
-        .overlay
-        .list_display_items
-        .iter()
-        .map(|item| match item {
-            ListDisplayItem::ChapterHeader {
-                chapter_number,
-                title,
-                exercise_count,
-                done_count,
-            } => ListItem::new(line![
-                span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD);
-                    "── Ch.{} : {} [{}/{}] ──", chapter_number, title, done_count, exercise_count),
-            ]),
-            ListDisplayItem::Exercise { exercise_index } => {
-                let i = *exercise_index;
-                let Some(ex) = state.exercises.get(i) else {
-                    return ListItem::new(Line::raw(""));
-                };
-                let stars = difficulty_stars(ex.difficulty);
-                let color = difficulty_color(ex.difficulty);
-                let done_marker = if state.completed.get(i).copied().unwrap_or(false) {
-                    "✓"
-                } else {
-                    " "
-                };
-                let current_marker = if i == state.current_index { "►" } else { " " };
-                let mastery = state.mastery_map.get(&ex.subject).copied().unwrap_or(0.0);
-                let title_end = ex
-                    .title
-                    .char_indices()
-                    .nth(30)
-                    .map(|(bi, _)| bi)
-                    .unwrap_or(ex.title.len());
-                let subj_end = ex
-                    .subject
-                    .char_indices()
-                    .nth(16)
-                    .map(|(bi, _)| bi)
-                    .unwrap_or(ex.subject.len());
-                ListItem::new(line![
-                    span!(C_SUCCESS; "{}", done_marker),
-                    span!(C_ACCENT; "{}", current_marker),
-                    span!(C_TEXT; " {:<32}", &ex.title[..title_end]),
-                    span!(C_SUBTEXT; "{:<18}", &ex.subject[..subj_end]),
-                    span!(Style::default().fg(color); "{}", stars),
-                    span!(C_OVERLAY; " [{:.1}]", mastery),
-                ])
-            }
-        })
-        .collect();
-
-    let total = state.exercises.len();
-    let done = state.completed.iter().filter(|&&c| c).count();
-    let list_title = format!(" Exercices [{}/{}] ", done, total);
-
-    let mut list_list_state = state.overlay.list_list_state.clone();
-    list_list_state.select(Some(state.overlay.list_selected));
-
-    f.render_stateful_widget(
-        List::new(items)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "{}", list_title))
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_BORDER)),
-            )
-            .highlight_style(Style::default().bg(C_OVERLAY).add_modifier(Modifier::BOLD)),
-        list_area,
-        &mut list_list_state,
-    );
-
-    // Hint bar
-    f.render_widget(
-        Paragraph::new(
-            "[↑↓/jk] nav  [Tab/S-Tab] chapitre  [g/G] début/fin  [Entrée] aller  [Esc/l/q] fermer",
-        )
-        .style(Style::default().fg(C_TEXT_DIM)),
-        hint_area,
-    );
-}
-
 /// Construit un `Vec<Span>` pour une liste de keybinds `(key, desc)`.
 /// Espacement automatique entre chaque paire. Utilisé par les status bars watch et piscine.
 pub fn render_keybinds(
@@ -1018,9 +525,9 @@ pub fn render_keybinds(
 /// Construit le message droit de la status bar watch.
 /// Retourne `(message, style)`.
 pub fn render_status_right_watch(state: &AppState) -> (String, Style) {
-    if state.consecutive_failures > 0 {
+    if state.ex.consecutive_failures > 0 {
         (
-            format!("✗ {}", state.consecutive_failures),
+            format!("✗ {}", state.ex.consecutive_failures),
             Style::default().fg(C_DANGER),
         )
     } else {
@@ -1039,163 +546,12 @@ pub fn render_status_right_watch(state: &AppState) -> (String, Style) {
 /// Construit le message droit de la status bar piscine.
 /// Retourne `(message, style)`.
 pub fn render_status_right_piscine(state: &AppState) -> (String, Style) {
-    if state.piscine_fail_count > 0 {
+    if state.piscine.fail_count > 0 {
         (
-            format!("✗ {}", state.piscine_fail_count),
+            format!("✗ {}", state.piscine.fail_count),
             Style::default().fg(C_DANGER),
         )
     } else {
         (String::new(), Style::default())
-    }
-}
-
-/// Overlay d'aide — raccourcis clavier du mode watch.
-pub fn render_help_overlay(f: &mut Frame, area: Rect) {
-    let popup = centered_popup(area, 15, 20);
-    f.render_widget(Clear, popup);
-
-    let bindings: &[(&str, &str)] = &[
-        ("[j] / [n]", "Exercice suivant"),
-        ("[k]", "Exercice précédent"),
-        ("[r]", "Compiler et vérifier"),
-        ("[h]", "Afficher l'indice"),
-        ("[v]", "Visualiseur mémoire"),
-        ("[b]", "Portfolio libsys"),
-        ("[l]", "Liste des exercices"),
-        ("[/]", "Recherche fuzzy"),
-        ("[Tab]", "Filtrer par sujet (en recherche)"),
-        ("[←][→]", "Étape visualiseur"),
-        ("[q]", "Quitter"),
-        ("", ""),
-        ("[?]", "Afficher cette aide"),
-    ];
-
-    let mut lines: Vec<Line> = vec![Line::raw("")];
-    for (key, desc) in bindings {
-        if key.is_empty() {
-            lines.push(Line::raw(""));
-        } else {
-            lines.push(line![
-                span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  {:<10}", key),
-                Span::raw("  "),
-                span!(C_TEXT_DIM; "{}", *desc),
-            ]);
-        }
-    }
-    lines.push(Line::raw(""));
-    lines.push(Line::styled(
-        "  Appuyez sur n'importe quelle touche pour fermer",
-        Style::default().fg(C_TEXT_DIM),
-    ));
-
-    f.render_widget(
-        Paragraph::new(lines)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Aide — raccourcis"))
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_BORDER)),
-            )
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
-}
-
-/// Modal de succès — affiché après validation correcte, attend confirmation avant d'avancer.
-pub fn render_success_overlay(f: &mut Frame, area: Rect) {
-    let popup = centered_popup(area, 35, 28);
-    f.render_widget(Clear, popup);
-
-    let lines = vec![
-        Line::raw(""),
-        Line::from(
-            span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "  ✓  L'exercice est validé !"),
-        ),
-        Line::raw(""),
-        line![
-            span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  [Entrée]"),
-            span!(C_TEXT_DIM; "   Exercice suivant →"),
-        ],
-        line![
-            span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "  [Échap] "),
-            span!(C_TEXT_DIM; "   Rester ici"),
-        ],
-        Line::raw(""),
-    ];
-
-    f.render_widget(
-        Paragraph::new(lines).block(
-            Block::bordered()
-                .border_type(BorderType::Rounded)
-                .title(span!(Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD); "Succès"))
-                .style(Style::default().bg(C_SURFACE))
-                .border_style(Style::default().fg(C_SUCCESS)),
-        ),
-        popup,
-    );
-}
-
-/// Renders an opaque background to prevent terminal transparency.
-pub fn render_opaque_background(f: &mut Frame, area: Rect) {
-    f.render_widget(Block::default().style(Style::default().bg(C_BG)), area);
-}
-
-/// Modal de confirmation avant de changer d'exercice.
-///
-/// `going_next` : true = suivant, false = précédent.
-pub fn render_nav_confirm_overlay(f: &mut Frame, area: Rect, going_next: bool) {
-    let popup = centered_popup(area, 38, 32);
-    f.render_widget(Clear, popup);
-
-    let direction = if going_next { "suivant" } else { "précédent" };
-    let lines = vec![
-        Line::raw(""),
-        Line::styled(
-            format!("→ exercice {direction}"),
-            Style::default().fg(C_WARNING).add_modifier(Modifier::BOLD),
-        ),
-        Line::raw(""),
-        Line::styled(
-            "Votre code actuel sera remplacé.",
-            Style::default().fg(C_TEXT_DIM),
-        ),
-        Line::raw(""),
-        Line::from(vec![
-            Span::styled(
-                "[o] ",
-                Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("confirmer   ", Style::default().fg(C_TEXT)),
-            Span::styled(
-                "[autre] ",
-                Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("rester", Style::default().fg(C_TEXT)),
-        ]),
-    ];
-
-    f.render_widget(
-        Paragraph::new(lines)
-            .block(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Changer d'exercice ?"))
-                    .style(Style::default().bg(C_SURFACE))
-                    .border_style(Style::default().fg(C_WARNING)),
-            )
-            .alignment(ratatui::layout::Alignment::Center),
-        popup,
-    );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mastery_bar_string_width() {
-        let bar = mastery_bar_string(2.5, 10);
-        assert_eq!(bar.chars().count(), 10);
     }
 }
