@@ -15,6 +15,8 @@ use crate::tui::style::{
 };
 use crate::tui::ui_visualizer::MemVisualizer;
 
+// ── Popup utilities ────────────────────────────────────────────────────────
+
 /// Calcule la zone d'un popup centré avec des marges en pourcentage.
 pub fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
     let content_v = 100u16.saturating_sub(margin_v_pct * 2);
@@ -80,6 +82,8 @@ pub fn vis_col_widths(vars: &[VisVar]) -> (usize, usize) {
     (name_w, val_w)
 }
 
+// ── Background & Visualizer overlay ────────────────────────────────────────
+
 /// Fond opaque pour éviter la transparence du terminal.
 pub fn render_opaque_background(f: &mut Frame, area: Rect) {
     f.render_widget(Block::default().style(Style::default().bg(C_BG)), area);
@@ -114,6 +118,8 @@ pub fn render_visualizer_overlay(f: &mut Frame, area: Rect, state: &AppState) {
         popup,
     );
 }
+
+// ── Search overlay ─────────────────────────────────────────────────────────
 
 /// Overlay de recherche fuzzy (touche `/` depuis watch).
 pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
@@ -218,6 +224,8 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     );
 }
 
+// ── Solution overlay ───────────────────────────────────────────────────────
+
 /// Overlay solution — affiche le code solution de l'exercice courant.
 pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &Exercise) {
     let popup = centered_popup(area, 10, 10);
@@ -237,6 +245,8 @@ pub fn render_solution_overlay(f: &mut Frame, area: Rect, exercise: &Exercise) {
         popup,
     );
 }
+
+// ── List overlay ───────────────────────────────────────────────────────────
 
 /// Overlay liste d'exercices — navigation j/k, Tab/Shift-Tab chapitres, Enter pour jump.
 pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
@@ -339,6 +349,8 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     );
 }
 
+// ── Help overlay ───────────────────────────────────────────────────────────
+
 /// Overlay d'aide — raccourcis clavier du mode watch.
 pub fn render_help_overlay(f: &mut Frame, area: Rect) {
     let popup = centered_popup(area, 15, 20);
@@ -392,6 +404,8 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
     );
 }
 
+// ── Success overlay ────────────────────────────────────────────────────────
+
 /// Modal de succès — affiché après validation correcte, attend confirmation avant d'avancer.
 pub fn render_success_overlay(f: &mut Frame, area: Rect) {
     let popup = centered_popup(area, 35, 28);
@@ -425,6 +439,8 @@ pub fn render_success_overlay(f: &mut Frame, area: Rect) {
         popup,
     );
 }
+
+// ── Confirmation overlays ──────────────────────────────────────────────────
 
 /// Modal de confirmation avant de changer d'exercice.
 ///
