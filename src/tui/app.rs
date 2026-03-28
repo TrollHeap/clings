@@ -1,7 +1,6 @@
 //! Application state and event handling (TEA/Elm architecture).
 
 use std::collections::HashMap;
-use std::fmt;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -13,103 +12,8 @@ use crate::models::Exercise;
 use crate::runner::RunResult;
 use crate::search;
 
-/// Item dans la liste d'affichage de l'overlay `[l]` — header de chapitre ou exercice.
-#[derive(Debug, Clone)]
-pub enum ListDisplayItem {
-    ChapterHeader {
-        chapter_number: u8,
-        title: &'static str,
-        exercise_count: usize,
-        done_count: usize,
-    },
-    Exercise {
-        exercise_index: usize,
-    },
-}
-
-/// Messages du dispatching événementiel TEA (Terminal Event Architecture).
-/// Traités par `update_watch()` / `update_piscine()`.
-#[derive(Debug)]
-pub enum Msg {
-    /// Touche clavier pressée (modifiée, avec shift/ctrl/alt).
-    Key(ratatui::crossterm::event::KeyEvent),
-    /// Fichier utilisateur sauvegardé — compile+valide automatiquement en watch mode.
-    FileChanged,
-    /// Tick timer périodique (ex. pour les animations, mise à jour du timer piscine).
-    Tick,
-    /// Terminal redimensionné — layout sera recalculé au prochain dessin.
-    Resize(u16, u16),
-}
-
-impl fmt::Display for Msg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Msg::Key(ke) => write!(f, "Key({:?})", ke.code),
-            Msg::FileChanged => write!(f, "FileChanged"),
-            Msg::Tick => write!(f, "Tick"),
-            Msg::Resize(w, h) => write!(f, "Resize({w}x{h}"),
-        }
-    }
-}
-
-/// Commande sémantique produite par un `KeyEvent` hors overlay.
-/// Voir `key_to_cmd` pour le mapping KeyCode → Command.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Command {
-    Quit,
-    CompileRun,
-    ShowHint,
-    ToggleSolution,
-    OpenSearch,
-    OpenList,
-    OpenVisualizer,
-    OpenLibsys,
-    ShowHelp,
-    NavNext,
-    NavPrev,
-    ScrollDown,
-    ScrollUp,
-}
-
-/// Mappe un `KeyEvent` vers une `Command` sémantique.
-///
-/// `piscine` : `true` = mode piscine (désactive `OpenList`, `ShowHelp`, `OpenSearch`, défilement).
-pub fn key_to_cmd(key: &ratatui::crossterm::event::KeyEvent, piscine: bool) -> Option<Command> {
-    use ratatui::crossterm::event::{KeyCode, KeyModifiers};
-    Some(match key.code {
-        KeyCode::Char('q') | KeyCode::Char('Q') => Command::Quit,
-        KeyCode::Char('r') | KeyCode::Char('R') => Command::CompileRun,
-        KeyCode::Char('h') | KeyCode::Char('H') => Command::ShowHint,
-        KeyCode::Char('s') | KeyCode::Char('S') => Command::ToggleSolution,
-        KeyCode::Char('v') | KeyCode::Char('V') => Command::OpenVisualizer,
-        KeyCode::Char('b') | KeyCode::Char('B') => Command::OpenLibsys,
-        KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Char('n') | KeyCode::Char('N') => {
-            Command::NavNext
-        }
-        KeyCode::Char('k') | KeyCode::Char('K') => Command::NavPrev,
-        KeyCode::Char('/') => Command::OpenSearch,
-        KeyCode::Char('l') | KeyCode::Char('L') => Command::OpenList,
-        KeyCode::Char('?') if !piscine => Command::ShowHelp,
-        KeyCode::PageDown => Command::ScrollDown,
-        KeyCode::PageUp => Command::ScrollUp,
-        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Command::Quit,
-        KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => Command::Quit,
-        _ => return None,
-    })
-}
-
-/// Overlay exclusif actif — un seul à la fois (sauf modaux `nav_confirm` et `success`).
-#[derive(Default, Debug, Clone, PartialEq)]
-pub enum ActiveOverlay {
-    #[default]
-    None,
-    Help,
-    List,
-    Search,
-    Solution,
-    Visualizer,
-    Libsys,
-}
+pub use crate::tui::ui_keymap::key_to_cmd;
+pub use crate::tui::ui_messages::{ActiveOverlay, Command, ListDisplayItem, Msg};
 
 /// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
 #[derive(Default, Debug)]
