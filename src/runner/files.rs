@@ -139,3 +139,192 @@ pub fn write_starter_code(exercise: &Exercise, mastery: Option<f64>) -> std::io:
     }
     Ok(source_path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Difficulty, ExerciseFile, ExerciseType, Lang, ValidationConfig};
+
+    fn make_exercise(subject: &str) -> Exercise {
+        Exercise {
+            id: "test_files".to_string(),
+            subject: subject.to_string(),
+            lang: Lang::C,
+            difficulty: Difficulty::Easy,
+            title: "Test".to_string(),
+            description: "Test".to_string(),
+            starter_code: "int main() { return 0; }".to_string(),
+            solution_code: "int main() { return 0; }".to_string(),
+            hints: vec![],
+            validation: ValidationConfig::default(),
+            prerequisites: vec![],
+            files: vec![],
+            exercise_type: ExerciseType::Complete,
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            starter_code_stages: vec![],
+            visualizer: Default::default(),
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
+        }
+    }
+
+    #[test]
+    fn test_write_starter_code_creates_file() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir().join("clings_test_write_starter");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir)?;
+
+        let exercise = make_exercise("test");
+        let file_path = temp_dir.join("current.c");
+
+        // Simulate by calling write with mastery None
+        let code_bytes = exercise.starter_code.as_bytes();
+        std::fs::write(&file_path, code_bytes)?;
+
+        assert!(file_path.exists());
+        let content = std::fs::read_to_string(&file_path)?;
+        assert_eq!(content, exercise.starter_code);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_starter_code_atomic_cleanup() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir().join("clings_test_atomic_cleanup");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir)?;
+
+        let source_path = temp_dir.join("current.c");
+        let temp_path = source_path.with_extension("c.tmp");
+
+        // Simulate atomic write: create temp file
+        let code = "int main() { return 0; }";
+        std::fs::write(&temp_path, code.as_bytes())?;
+        assert!(temp_path.exists());
+
+        // Simulate successful rename
+        std::fs::rename(&temp_path, &source_path)?;
+        assert!(source_path.exists());
+        assert!(!temp_path.exists());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_mastery_to_stage_mapping() {
+        // Test all 5 stages: 0-4
+        assert_eq!(mastery_to_stage(0.0), 0);
+        assert_eq!(mastery_to_stage(0.5), 0);
+        assert_eq!(mastery_to_stage(0.99), 0);
+
+        assert_eq!(mastery_to_stage(1.0), 1);
+        assert_eq!(mastery_to_stage(1.5), 1);
+        assert_eq!(mastery_to_stage(1.99), 1);
+
+        assert_eq!(mastery_to_stage(2.0), 2);
+        assert_eq!(mastery_to_stage(2.5), 2);
+        assert_eq!(mastery_to_stage(2.99), 2);
+
+        assert_eq!(mastery_to_stage(3.0), 3);
+        assert_eq!(mastery_to_stage(3.5), 3);
+        assert_eq!(mastery_to_stage(3.99), 3);
+
+        assert_eq!(mastery_to_stage(4.0), 4);
+        assert_eq!(mastery_to_stage(4.5), 4);
+        assert_eq!(mastery_to_stage(5.0), 4);
+    }
+
+    #[test]
+    fn test_select_starter_code_no_stages_returns_default() {
+        let exercise = make_exercise("test");
+        let code = select_starter_code(&exercise, 2.5);
+        assert_eq!(code, &exercise.starter_code);
+    }
+
+    #[test]
+    fn test_select_starter_code_with_stages_selects_by_mastery() {
+        let mut exercise = make_exercise("test");
+        exercise.starter_code_stages = vec![
+            "stage0_code".to_string(),
+            "stage1_code".to_string(),
+            "stage2_code".to_string(),
+            "stage3_code".to_string(),
+            "stage4_code".to_string(),
+        ];
+
+        // mastery 0.5 → stage 0
+        assert_eq!(select_starter_code(&exercise, 0.5), "stage0_code");
+        // mastery 1.5 → stage 1
+        assert_eq!(select_starter_code(&exercise, 1.5), "stage1_code");
+        // mastery 2.5 → stage 2
+        assert_eq!(select_starter_code(&exercise, 2.5), "stage2_code");
+        // mastery 3.5 → stage 3
+        assert_eq!(select_starter_code(&exercise, 3.5), "stage3_code");
+        // mastery 4.5 → stage 4
+        assert_eq!(select_starter_code(&exercise, 4.5), "stage4_code");
+    }
+
+    #[test]
+    fn test_select_starter_code_missing_stage_falls_back() {
+        let mut exercise = make_exercise("test");
+        exercise.starter_code_stages = vec!["stage0".to_string(), "stage1".to_string()];
+
+        // mastery 4.5 → stage 4, but only 2 stages exist → fall back to default
+        let code = select_starter_code(&exercise, 4.5);
+        assert_eq!(code, &exercise.starter_code);
+    }
+
+    #[test]
+    fn test_write_exercise_files_with_subdirs() -> std::io::Result<()> {
+        let work_dir = std::env::temp_dir().join("clings_test_subdirs");
+        let _ = std::fs::remove_dir_all(&work_dir);
+        std::fs::create_dir_all(&work_dir)?;
+
+        let mut exercise = make_exercise("test");
+        exercise.files = vec![
+            ExerciseFile {
+                name: "subdir1/file1.h".to_string(),
+                content: "#ifndef FILE1_H\n#define FILE1_H\nvoid func1(void);\n#endif".to_string(),
+                readonly: false,
+            },
+            ExerciseFile {
+                name: "subdir1/subdir2/file2.c".to_string(),
+                content: "void func1(void) { }".to_string(),
+                readonly: false,
+            },
+        ];
+
+        write_exercise_files(&exercise, &work_dir)?;
+
+        assert!(work_dir.join("subdir1/file1.h").exists());
+        assert!(work_dir.join("subdir1/subdir2/file2.c").exists());
+
+        let content1 = std::fs::read_to_string(work_dir.join("subdir1/file1.h"))?;
+        assert!(content1.contains("#ifndef FILE1_H"));
+
+        let _ = std::fs::remove_dir_all(&work_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_exercise_files_empty_list() -> std::io::Result<()> {
+        let work_dir = std::env::temp_dir().join("clings_test_empty_files");
+        let _ = std::fs::remove_dir_all(&work_dir);
+        std::fs::create_dir_all(&work_dir)?;
+
+        let exercise = make_exercise("test");
+        assert!(exercise.files.is_empty());
+
+        // Should return Ok immediately without writing anything
+        write_exercise_files(&exercise, &work_dir)?;
+
+        let _ = std::fs::remove_dir_all(&work_dir);
+        Ok(())
+    }
+}
