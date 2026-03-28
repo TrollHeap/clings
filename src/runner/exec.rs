@@ -159,6 +159,9 @@ pub fn kill_process_group(child: &std::process::Child) {
     if pid == 0 {
         return;
     }
+    // SAFETY: libc::kill is called with a valid process group (negated PID, checked > 0 above)
+    // and a valid signal constant (SIGKILL). Return value is ignored as we can't meaningfully
+    // handle errors in a cleanup context. Process is already terminating.
     unsafe {
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
