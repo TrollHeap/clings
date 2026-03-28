@@ -18,7 +18,7 @@ impl Default for UiConfig {
     fn default() -> Self {
         UiConfig {
             editor: constants::TMUX_EDITOR.to_string(),
-            tmux_pane_width: 50,
+            tmux_pane_width: constants::TMUX_PANE_WIDTH_DEFAULT,
         }
     }
 }

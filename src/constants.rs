@@ -160,8 +160,8 @@ pub const LAST_EXAM_SESSION_KEY: &str = "last_exam_session";
 pub const DB_USER_VERSION_CURRENT: i32 = 1;
 
 // === tmux ===
-/// Largeur du pane tmux (pourcentage écran).
-pub const TMUX_PANE_WIDTH_PERCENT: &str = "50";
+/// Largeur par défaut du pane tmux éditeur (caractères).
+pub const TMUX_PANE_WIDTH_DEFAULT: u8 = 50;
 /// Éditeur par défaut pour tmux.
 pub const TMUX_EDITOR: &str = "nvim";
 
