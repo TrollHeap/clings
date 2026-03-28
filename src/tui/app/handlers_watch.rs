@@ -163,6 +163,9 @@ impl App {
             return;
         };
         let fn_name = function.clone();
+        // NOTE: If file cannot be read (missing, permission denied, etc.), silently use empty string.
+        // This is acceptable because TUI cannot propagate errors; libsys export will proceed with
+        // empty code string and the user will see a message on success or error.
         let c_code = std::fs::read_to_string(path).unwrap_or_default();
         let libsys_export = crate::libsys::LibsysExport {
             module,
