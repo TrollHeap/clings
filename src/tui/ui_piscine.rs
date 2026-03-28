@@ -50,7 +50,11 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
         ActiveOverlay::List => common::render_list_overlay(f, body_rest, state),
         ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_rest, state),
         ActiveOverlay::Solution => {
-            common::render_solution_overlay(f, body_rest, &state.ex.exercises[state.ex.current_index]);
+            common::render_solution_overlay(
+                f,
+                body_rest,
+                &state.ex.exercises[state.ex.current_index],
+            );
         }
         ActiveOverlay::Search => common::render_search_overlay(f, body_rest, state),
         ActiveOverlay::Libsys => {
@@ -60,6 +64,11 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     }
     if state.overlay.success_overlay {
         common::render_success_overlay(f, body_rest);
+    }
+
+    // Quit confirm s'affiche en dernier — au-dessus de tout.
+    if state.overlay.quit_confirm_active {
+        common::render_quit_confirm_overlay(f, body_rest);
     }
 
     render_piscine_status_bar(f, status_area, state);

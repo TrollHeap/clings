@@ -139,6 +139,8 @@ pub struct OverlayState {
     pub nav_confirm_active: bool,
     /// Direction du changement : `true` = next, `false` = prev.
     pub nav_confirm_next: bool,
+    /// Modal de confirmation avant de quitter la session.
+    pub quit_confirm_active: bool,
     /// ListState persistant pour l'overlay liste [l].
     pub list_list_state: ListState,
     /// ListState persistant pour l'overlay recherche [/].
@@ -900,6 +902,17 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) -> bool {
+        if self.state.overlay.quit_confirm_active {
+            use ratatui::crossterm::event::KeyCode;
+            self.state.overlay.quit_confirm_active = false;
+            if matches!(
+                key.code,
+                KeyCode::Char('o') | KeyCode::Char('O') | KeyCode::Enter
+            ) {
+                self.state.session.should_quit = true;
+            }
+            return true;
+        }
         if self.state.overlay.nav_confirm_active {
             use ratatui::crossterm::event::KeyCode;
             self.state.overlay.nav_confirm_active = false;
@@ -1215,7 +1228,14 @@ impl App {
                     return;
                 };
                 match cmd {
-                    Command::Quit => self.state.session.should_quit = true,
+                    Command::Quit => {
+                        if key.modifiers.is_empty() {
+                            self.state.overlay.quit_confirm_active = true;
+                        } else {
+                            // Ctrl+C / Ctrl+Z → quitter immédiatement sans modale
+                            self.state.session.should_quit = true;
+                        }
+                    }
                     Command::CompileRun => self.handle_compile(conn),
                     Command::ShowHint => self.reveal_next_hint(),
                     Command::ToggleSolution => {
@@ -1344,7 +1364,12 @@ impl App {
                     Command::Quit => {
                         let idx = self.state.ex.current_index;
                         self.save_checkpoint(conn, session_id, idx);
-                        self.state.session.should_quit = true;
+                        if key.modifiers.is_empty() {
+                            self.state.overlay.quit_confirm_active = true;
+                        } else {
+                            // Ctrl+C / Ctrl+Z → quitter immédiatement sans modale
+                            self.state.session.should_quit = true;
+                        }
                     }
                     Command::ShowHint => self.reveal_next_hint(),
                     Command::ToggleSolution => {

@@ -245,33 +245,36 @@ fn main() {
         Some(Commands::Schema { output }) => cmd_schema(&output),
         None => (|| {
             let conn = progress::open_db()?;
-            match tui::ui_launcher::select_launch(&conn)? {
-                tui::ui_launcher::LaunchChoice::Continue => {
-                    let (mode, chapter, _index) = progress::load_last_session(&conn)?
-                        .unwrap_or_else(|| ("watch".to_string(), None, 0));
-                    match mode.as_str() {
-                        "piscine" => piscine::cmd_piscine(chapter, None),
-                        _ => cmd_watch(chapter, false),
+            loop {
+                match tui::ui_launcher::select_launch(&conn)? {
+                    tui::ui_launcher::LaunchChoice::Continue => {
+                        let (mode, chapter, _index) = progress::load_last_session(&conn)?
+                            .unwrap_or_else(|| ("watch".to_string(), None, 0));
+                        match mode.as_str() {
+                            "piscine" => piscine::cmd_piscine(chapter, None)?,
+                            _ => cmd_watch(chapter, false)?,
+                        }
                     }
+                    tui::ui_launcher::LaunchChoice::Start {
+                        mode: tui::ui_launcher::LaunchMode::Watch,
+                        chapter,
+                    } => cmd_watch(chapter, false)?,
+                    tui::ui_launcher::LaunchChoice::Start {
+                        mode: tui::ui_launcher::LaunchMode::Piscine,
+                        chapter,
+                    } => piscine::cmd_piscine(chapter, None)?,
+                    tui::ui_launcher::LaunchChoice::Start {
+                        mode: tui::ui_launcher::LaunchMode::Nsy103,
+                        chapter: _,
+                    } => cmd_watch(None, true)?,
+                    tui::ui_launcher::LaunchChoice::Start {
+                        mode: tui::ui_launcher::LaunchMode::ExamNsy103,
+                        chapter: _,
+                    } => exam::cmd_exam(None, false)?,
+                    tui::ui_launcher::LaunchChoice::Quit => break,
                 }
-                tui::ui_launcher::LaunchChoice::Start {
-                    mode: tui::ui_launcher::LaunchMode::Watch,
-                    chapter,
-                } => cmd_watch(chapter, false),
-                tui::ui_launcher::LaunchChoice::Start {
-                    mode: tui::ui_launcher::LaunchMode::Piscine,
-                    chapter,
-                } => piscine::cmd_piscine(chapter, None),
-                tui::ui_launcher::LaunchChoice::Start {
-                    mode: tui::ui_launcher::LaunchMode::Nsy103,
-                    chapter: _,
-                } => cmd_watch(None, true),
-                tui::ui_launcher::LaunchChoice::Start {
-                    mode: tui::ui_launcher::LaunchMode::ExamNsy103,
-                    chapter: _,
-                } => exam::cmd_exam(None, false),
-                tui::ui_launcher::LaunchChoice::Quit => Ok(()),
             }
+            Ok(())
         })(),
     };
 

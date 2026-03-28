@@ -35,7 +35,11 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
         ActiveOverlay::List => common::render_list_overlay(f, body_area, state),
         ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_area, state),
         ActiveOverlay::Solution => {
-            common::render_solution_overlay(f, body_area, &state.ex.exercises[state.ex.current_index]);
+            common::render_solution_overlay(
+                f,
+                body_area,
+                &state.ex.exercises[state.ex.current_index],
+            );
         }
         ActiveOverlay::Search => common::render_search_overlay(f, body_area, state),
         ActiveOverlay::Libsys => {
@@ -50,6 +54,11 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     // Nav confirm s'affiche par-dessus tout (y compris les autres overlays).
     if state.overlay.nav_confirm_active {
         common::render_nav_confirm_overlay(f, body_area, state.overlay.nav_confirm_next);
+    }
+
+    // Quit confirm s'affiche en dernier — au-dessus de nav_confirm.
+    if state.overlay.quit_confirm_active {
+        common::render_quit_confirm_overlay(f, body_area);
     }
 
     render_status_bar(f, status_area, state);
@@ -80,7 +89,11 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── L2 : clings · N/total · subject · ★★★★★ · [S0]   ↻ N révision(s) ─
     let due_count = state.due_count();
-    let counter_str = format!("{}/{}", state.ex.current_index + 1, state.ex.exercises.len());
+    let counter_str = format!(
+        "{}/{}",
+        state.ex.current_index + 1,
+        state.ex.exercises.len()
+    );
     let right2 = if due_count > 0 {
         format!("↻ {} révision(s)", due_count)
     } else {
@@ -133,7 +146,8 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── L3 : ██████████ N.N/5.0  —  key_concept ─────────────────────────
     let mastery = state
-        .progress.mastery_map
+        .progress
+        .mastery_map
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
@@ -202,7 +216,8 @@ fn stage_progress_line(current: Option<u8>) -> Line<'static> {
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let exercise = &state.ex.exercises[state.ex.current_index];
     let mastery = state
-        .progress.mastery_map
+        .progress
+        .mastery_map
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
@@ -250,7 +265,8 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
         )));
     } else {
         let next_due_days = state
-            .progress.review_map
+            .progress
+            .review_map
             .values()
             .filter_map(|v| *v)
             .filter(|&d| d > 0)

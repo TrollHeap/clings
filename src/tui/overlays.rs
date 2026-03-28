@@ -132,7 +132,8 @@ pub fn render_search_overlay(f: &mut Frame, area: Rect, state: &AppState) {
     let query_display = format!("{}{}", state.overlay.search_query, cursor);
     let overlay_title = if state.overlay.search_subject_filter {
         let subject = state
-            .ex.exercises
+            .ex
+            .exercises
             .get(state.ex.current_index)
             .map(|ex| ex.subject.as_str())
             .unwrap_or("?");
@@ -272,8 +273,17 @@ pub fn render_list_overlay(f: &mut Frame, area: Rect, state: &AppState) {
                 } else {
                     " "
                 };
-                let current_marker = if i == state.ex.current_index { "►" } else { " " };
-                let mastery = state.progress.mastery_map.get(&ex.subject).copied().unwrap_or(0.0);
+                let current_marker = if i == state.ex.current_index {
+                    "►"
+                } else {
+                    " "
+                };
+                let mastery = state
+                    .progress
+                    .mastery_map
+                    .get(&ex.subject)
+                    .copied()
+                    .unwrap_or(0.0);
                 let title_end = ex
                     .title
                     .char_indices()
@@ -456,6 +466,48 @@ pub fn render_nav_confirm_overlay(f: &mut Frame, area: Rect, going_next: bool) {
                 Block::bordered()
                     .border_type(BorderType::Rounded)
                     .title(span!(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD); "Changer d'exercice ?"))
+                    .style(Style::default().bg(C_SURFACE))
+                    .border_style(Style::default().fg(C_WARNING)),
+            )
+            .alignment(Alignment::Center),
+        popup,
+    );
+}
+
+pub fn render_quit_confirm_overlay(f: &mut Frame, area: Rect) {
+    let popup = centered_popup(area, 38, 28);
+    f.render_widget(Clear, popup);
+
+    let lines = vec![
+        Line::raw(""),
+        Line::styled(
+            "La session sera interrompue.",
+            Style::default().fg(C_TEXT_DIM),
+        ),
+        Line::raw(""),
+        Line::from(vec![
+            Span::styled(
+                "[o] ",
+                Style::default().fg(C_SUCCESS).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("retour au menu   ", Style::default().fg(C_TEXT)),
+            Span::styled(
+                "[autre] ",
+                Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("continuer", Style::default().fg(C_TEXT)),
+        ]),
+    ];
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .title(span!(
+                        Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD);
+                        "Quitter la session ?"
+                    ))
                     .style(Style::default().bg(C_SURFACE))
                     .border_style(Style::default().fg(C_WARNING)),
             )
