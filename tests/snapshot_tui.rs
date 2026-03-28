@@ -8,6 +8,7 @@ use clings::models::{
     Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode, Visualizer,
 };
 use clings::runner::RunResult;
+use clings::tui::app::ActiveOverlay;
 use clings::tui::app::AppState;
 use clings::tui::ui_watch;
 
@@ -49,10 +50,10 @@ fn make_exercise(id: &str, subject: &str, difficulty: Difficulty) -> Exercise {
 fn make_app_state() -> AppState {
     let exercise = make_exercise("hello-01", "pointers", Difficulty::Easy);
     let mut state = AppState::new();
-    state.exercises = vec![exercise];
-    state.completed = vec![false];
-    state.current_index = 0;
-    state.mastery_map = HashMap::from([("pointers".to_owned(), 2.5)]);
+    state.ex.exercises = vec![exercise];
+    state.ex.completed = vec![false];
+    state.ex.current_index = 0;
+    state.progress.mastery_map = HashMap::from([("pointers".to_owned(), 2.5)]);
     state
 }
 
@@ -77,7 +78,7 @@ fn snapshot_watch_view_with_compile_error() {
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.run_result = Some(RunResult {
+    state.ex.run_result = Some(RunResult {
         success: false,
         stdout: String::new(),
         stderr: "error: expected ';' before '}' token".to_owned(),
@@ -102,7 +103,7 @@ fn snapshot_watch_view_success() {
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.run_result = Some(RunResult {
+    state.ex.run_result = Some(RunResult {
         success: true,
         stdout: "Hello".to_owned(),
         stderr: String::new(),
@@ -111,7 +112,7 @@ fn snapshot_watch_view_success() {
         timeout: false,
         gcc_hint: None,
     });
-    state.completed[0] = true;
+    state.ex.completed[0] = true;
 
     terminal
         .draw(|f| {
@@ -128,7 +129,7 @@ fn snapshot_watch_view_help_overlay() {
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.overlay.help_active = true;
+    state.overlay.active = ActiveOverlay::Help;
 
     terminal
         .draw(|f| {
@@ -145,7 +146,7 @@ fn snapshot_watch_view_solution_overlay() {
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.overlay.solution_active = true;
+    state.overlay.active = ActiveOverlay::Solution;
 
     terminal
         .draw(|f| {
@@ -164,7 +165,7 @@ fn snapshot_libsys_overlay_empty() {
     let backend = TestBackend::new(100, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.overlay.libsys_active = true;
+    state.overlay.active = ActiveOverlay::Libsys;
     state.overlay.libsys_portfolio = vec![]; // Empty portfolio
 
     terminal
@@ -185,7 +186,7 @@ fn snapshot_libsys_overlay_with_modules() {
     let backend = TestBackend::new(100, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut state = make_app_state();
-    state.overlay.libsys_active = true;
+    state.overlay.active = ActiveOverlay::Libsys;
 
     // Populate with sample modules and functions
     state.overlay.libsys_portfolio = vec![

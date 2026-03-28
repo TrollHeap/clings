@@ -104,16 +104,16 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
 
     // ── 2. Prépare AppState ────────────────────────────────────────────
     let mut app = App::new();
-    app.state.exercises = exercise_order.into_iter().cloned().collect();
-    app.state.completed = vec![false; total];
-    app.state.review_map = review_map;
-    app.state.mastery_map = mastery_map;
+    app.state.ex.exercises = exercise_order.into_iter().cloned().collect();
+    app.state.ex.completed = vec![false; total];
+    app.state.progress.review_map = review_map;
+    app.state.progress.mastery_map = mastery_map;
 
     // Build subject_order cache (unique subjects in appearance order)
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
-    app.state.subject_order = app
+    app.state.progress.subject_order = app
         .state
-        .exercises
+        .ex.exercises
         .iter()
         .filter_map(|ex| {
             if seen.insert(ex.subject.as_str()) {
@@ -131,7 +131,7 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
 
     // Save session state for "Continue" in launcher
     if let Err(e) =
-        progress::save_last_session(&conn, "watch", filter_chapter, app.state.current_index)
+        progress::save_last_session(&conn, "watch", filter_chapter, app.state.ex.current_index)
     {
         eprintln!("[clings] erreur sauvegarde session: {e}");
     }
@@ -139,7 +139,7 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
     ratatui::restore();
 
     // ── 4. Cleanup tmux ────────────────────────────────────────────────
-    if let Some(pane) = &app.state.editor_pane {
+    if let Some(pane) = &app.state.session.editor_pane {
         tmux::kill_pane(pane);
     }
 
@@ -167,7 +167,7 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
     }
 
     // ── 6. Summary post-session ────────────────────────────────────────
-    let done = app.state.completed.iter().filter(|&&c| c).count();
+    let done = app.state.ex.completed.iter().filter(|&&c| c).count();
     if done == total && total > 0 {
         println!(
             "\n  {} Tous les exercices complétés ! Lancez `clings progress` pour voir vos stats.",

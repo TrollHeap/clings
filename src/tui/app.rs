@@ -52,19 +52,75 @@ impl fmt::Display for Msg {
     }
 }
 
+/// Commande sémantique produite par un `KeyEvent` hors overlay.
+/// Voir `key_to_cmd` pour le mapping KeyCode → Command.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Command {
+    Quit,
+    CompileRun,
+    ShowHint,
+    ToggleSolution,
+    OpenSearch,
+    OpenList,
+    OpenVisualizer,
+    OpenLibsys,
+    ShowHelp,
+    NavNext,
+    NavPrev,
+    ScrollDown,
+    ScrollUp,
+}
+
+/// Mappe un `KeyEvent` vers une `Command` sémantique.
+///
+/// `piscine` : `true` = mode piscine (désactive `OpenList`, `ShowHelp`, `OpenSearch`, défilement).
+pub fn key_to_cmd(key: &ratatui::crossterm::event::KeyEvent, piscine: bool) -> Option<Command> {
+    use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+    Some(match key.code {
+        KeyCode::Char('q') | KeyCode::Char('Q') => Command::Quit,
+        KeyCode::Char('r') | KeyCode::Char('R') => Command::CompileRun,
+        KeyCode::Char('h') | KeyCode::Char('H') => Command::ShowHint,
+        KeyCode::Char('s') | KeyCode::Char('S') => Command::ToggleSolution,
+        KeyCode::Char('v') | KeyCode::Char('V') => Command::OpenVisualizer,
+        KeyCode::Char('b') | KeyCode::Char('B') => Command::OpenLibsys,
+        KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Char('n') | KeyCode::Char('N') => {
+            Command::NavNext
+        }
+        KeyCode::Char('k') | KeyCode::Char('K') => Command::NavPrev,
+        KeyCode::Char('/') => Command::OpenSearch,
+        KeyCode::Char('l') | KeyCode::Char('L') => Command::OpenList,
+        KeyCode::Char('?') if !piscine => Command::ShowHelp,
+        KeyCode::PageDown => Command::ScrollDown,
+        KeyCode::PageUp => Command::ScrollUp,
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Command::Quit,
+        KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => Command::Quit,
+        _ => return None,
+    })
+}
+
+/// Overlay exclusif actif — un seul à la fois (sauf modaux `nav_confirm` et `success`).
+#[derive(Default, Debug, Clone, PartialEq)]
+pub enum ActiveOverlay {
+    #[default]
+    None,
+    Help,
+    List,
+    Search,
+    Solution,
+    Visualizer,
+    Libsys,
+}
+
 /// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
 #[derive(Default, Debug)]
 pub struct OverlayState {
-    /// Overlay aide ([?]) — affiche les keybinds.
-    pub help_active: bool,
-    /// Overlay liste ([l]) — affiche les exercices par chapitre.
-    pub list_active: bool,
+    /// Overlay exclusif actif. Les modaux `nav_confirm_active` et `success_overlay`
+    /// se superposent par-dessus et restent des booléens indépendants.
+    pub active: ActiveOverlay,
     /// Exercice sélectionné dans la liste.
     pub list_selected: usize,
     /// Items à afficher dans la liste (headers de chapitre + exercises).
     pub list_display_items: Vec<ListDisplayItem>,
-    /// Overlay recherche ([/]) — fuzzy search sur les exercices.
-    pub search_active: bool,
     /// Requête de recherche actuelle.
     pub search_query: String,
     /// Résultats de recherche (indices dans exercises[]).
@@ -75,13 +131,9 @@ pub struct OverlayState {
     pub search_subject_filter: bool,
     /// Flag pour savoir si `g` est pressé (commande 2-chars attendue).
     pub search_g_pending: bool,
-    /// Overlay solution ([s]) — affiche le code corrigé.
-    pub solution_active: bool,
-    /// Overlay visualiseur ([v]) — memory visualization (stack/heap).
-    pub vis_active: bool,
     /// Étape actuelle du visualiseur.
     pub vis_step: usize,
-    /// Overlay succès — affiché brief après une réussite.
+    /// Overlay succès — affiché brief après une réussite (modal, se superpose à `active`).
     pub success_overlay: bool,
     /// Modal de confirmation avant changement d'exercice (évite reset accidentel).
     pub nav_confirm_active: bool,
@@ -91,8 +143,6 @@ pub struct OverlayState {
     pub list_list_state: ListState,
     /// ListState persistant pour l'overlay recherche [/].
     pub search_list_state: ListState,
-    /// Overlay portfolio libsys ([b]) — affiche les exports.
-    pub libsys_active: bool,
     /// Données du portfolio libsys (cache pour éviter I/O par frame).
     pub libsys_portfolio: Vec<crate::libsys::ModuleStatus>,
 }
@@ -177,12 +227,9 @@ impl Default for PiscineTimerCache {
     }
 }
 
-/// État centralisé TEA/Elm — gère tous les modes (watch/piscine/exam/run).
-/// Immutable rendering avec dérivation complète du state en View.
-#[derive(Debug)]
-pub struct AppState {
-    /// `true` si l'utilisateur a appuyé sur [q] ou fermé le terminal.
-    pub should_quit: bool,
+/// Contexte exercice — progression, résultats, indices.
+#[derive(Default, Debug)]
+pub struct ExerciseCtx {
     /// Tous les exercices chargés (filtrés par chapitre/mode).
     pub exercises: Vec<Exercise>,
     /// Bool par exercice : `true` si mastery >= seuil ou résolu en piscine.
@@ -195,46 +242,76 @@ pub struct AppState {
     pub source_path: Option<PathBuf>,
     /// Stage courant du code de départ (0–4) ou None si pas de stages.
     pub current_stage: Option<u8>,
-    /// Nom du pane tmux (ex. "pane-1:2") si intégration active.
-    pub editor_pane: Option<String>,
     /// Index du dernier indice révélé (0 = aucun).
     pub hint_index: usize,
-    /// `true` si compile est programmé (attend next Tick).
-    pub compile_pending: bool,
     /// Nombre d'échecs consécutifs sur l'exercice courant.
     pub consecutive_failures: u8,
     /// `true` si la tentative courante est enregistrée en DB (évite doublons).
     pub already_recorded: bool,
-    /// Subject → days_until_review (negatif = due). Calculé au démarrage.
-    pub review_map: HashMap<String, Option<i64>>,
-    /// Subject → mastery score courant (depuis DB). Calculé au démarrage.
-    pub mastery_map: HashMap<String, f64>,
+    /// Offset vertical de scroll de la description en watch mode.
+    pub description_scroll: u16,
+    /// Nombre de succès consécutifs sur le sujet courant (nudge interleaving).
+    pub consecutive_successes_on_subject: u8,
+    /// Dernier sujet avec succès (pour vérifier changement de sujet).
+    pub last_success_subject: String,
+}
+
+/// Contexte piscine/examen — timer, état de progression linéaire.
+#[derive(Default, Debug)]
+pub struct PiscineCtx {
     /// Deadline piscine (Instant du démarrage + durée limite).
-    pub piscine_deadline: Option<Instant>,
+    pub deadline: Option<Instant>,
     /// Timestamp du démarrage du mode piscine.
-    pub piscine_start: Option<Instant>,
+    pub start: Option<Instant>,
     /// Durée totale piscine en secondes (NSY103=9000, UTC502=10800).
-    pub piscine_timer_total: u64,
+    pub timer_total: u64,
     /// Nombre d'échecs accumulés en piscine.
-    pub piscine_fail_count: u32,
+    pub fail_count: u32,
+}
+
+/// Contexte session runtime — flags de contrôle, messages, éditeur.
+#[derive(Default, Debug)]
+pub struct SessionCtx {
+    /// `true` si l'utilisateur a appuyé sur [q] ou fermé le terminal.
+    pub should_quit: bool,
+    /// `true` si compile est programmé (attend next Tick).
+    pub compile_pending: bool,
+    /// `true` pour ignorer le prochain FileChanged (ex. après write_starter_code).
+    pub skip_file_changed: bool,
     /// Message status courant (ex. "Fichier sauvegardé").
     pub status_msg: Option<String>,
     /// Timestamp du message status (pour expiration après 3s).
     pub status_msg_at: Option<Instant>,
-    /// `true` pour ignorer le prochain FileChanged (ex. après write_starter_code).
-    pub skip_file_changed: bool,
+    /// Nom du pane tmux (ex. "pane-1:2") si intégration active.
+    pub editor_pane: Option<String>,
+}
+
+/// Contexte progression — mastery, révisions, ordre curriculum.
+#[derive(Default, Debug)]
+pub struct ProgressCtx {
+    /// Subject → days_until_review (négatif = due). Calculé au démarrage.
+    pub review_map: HashMap<String, Option<i64>>,
+    /// Subject → mastery score courant (depuis DB). Calculé au démarrage.
+    pub mastery_map: HashMap<String, f64>,
     /// Ordre des sujets (pour sidebar navigation).
     pub subject_order: Vec<String>,
-    /// Offset vertical de scroll de la description en watch mode.
-    pub description_scroll: u16,
-    /// Nombre de succès consécutifs sur le sujet courant (pour nudge interleaving).
-    pub consecutive_successes_on_subject: u8,
-    /// Dernier sujet avec succès (pour vérifier changement de sujet).
-    pub last_success_subject: String,
     /// Subject → chapter number (pour résumé par chapitre).
     pub subject_to_chapter: HashMap<String, usize>,
     /// Nombre de sujets en révision (cached, invalidé quand review_map change).
     pub cached_due_count: Option<usize>,
+}
+
+/// État centralisé TEA/Elm — gère tous les modes (watch/piscine/exam/run).
+#[derive(Debug)]
+pub struct AppState {
+    /// Contexte exercice (progression, résultats, indices).
+    pub ex: ExerciseCtx,
+    /// Contexte piscine/examen (timer, fail count).
+    pub piscine: PiscineCtx,
+    /// Contexte session runtime (flags, messages, éditeur).
+    pub session: SessionCtx,
+    /// Contexte progression (mastery, révisions, curriculum).
+    pub progress: ProgressCtx,
     /// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
     pub overlay: OverlayState,
     /// Cache du header (mini-map, counter, mastery display).
@@ -246,33 +323,10 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         Self {
-            should_quit: false,
-            exercises: Vec::new(),
-            completed: Vec::new(),
-            current_index: 0,
-            run_result: None,
-            source_path: None,
-            current_stage: None,
-            editor_pane: None,
-            hint_index: 0,
-            compile_pending: false,
-            consecutive_failures: 0,
-            already_recorded: false,
-            review_map: HashMap::new(),
-            mastery_map: HashMap::new(),
-            piscine_deadline: None,
-            piscine_start: None,
-            piscine_timer_total: 0,
-            piscine_fail_count: 0,
-            status_msg: None,
-            status_msg_at: None,
-            skip_file_changed: false,
-            subject_order: Vec::new(),
-            description_scroll: 0,
-            consecutive_successes_on_subject: 0,
-            last_success_subject: String::new(),
-            subject_to_chapter: HashMap::new(),
-            cached_due_count: None,
+            ex: ExerciseCtx::default(),
+            piscine: PiscineCtx::default(),
+            session: SessionCtx::default(),
+            progress: ProgressCtx::default(),
             overlay: OverlayState::default(),
             header_cache: HeaderCache::default(),
             timer_cache: PiscineTimerCache::default(),
@@ -282,10 +336,11 @@ impl AppState {
     /// Nombre de sujets dont la révision est due (days_until_due ≤ 0).
     /// Uses cached value if available.
     pub fn due_count(&self) -> usize {
-        if let Some(cached) = self.cached_due_count {
+        if let Some(cached) = self.progress.cached_due_count {
             return cached;
         }
-        self.review_map
+        self.progress
+            .review_map
             .values()
             .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
             .count()
@@ -294,11 +349,12 @@ impl AppState {
     /// Cache due_count calculation (call once per frame in dispatch loop).
     pub fn update_due_count_cache(&mut self) {
         let count = self
+            .progress
             .review_map
             .values()
             .filter(|v| v.map(|d| d <= 0).unwrap_or(false))
             .count();
-        self.cached_due_count = Some(count);
+        self.progress.cached_due_count = Some(count);
     }
 }
 
@@ -317,12 +373,14 @@ impl App {
     /// Invalide les caches de header. Appeler après changement d'exercice ou mise à jour mastery.
     /// Optimisé : ne recompute que si les valeurs de tracking ont changé.
     fn invalidate_header_cache(state: &mut AppState) {
-        let idx = state.current_index;
-        let total = state.exercises.len();
+        let idx = state.ex.current_index;
+        let total = state.ex.exercises.len();
         let mastery = state
+            .progress
             .mastery_map
             .get(
                 state
+                    .ex
                     .exercises
                     .get(idx)
                     .map(|e| e.subject.as_str())
@@ -331,9 +389,13 @@ impl App {
             .copied()
             .unwrap_or(0.0);
 
-        state
-            .header_cache
-            .invalidate(idx, total, mastery, &state.exercises, &state.completed);
+        state.header_cache.invalidate(
+            idx,
+            total,
+            mastery,
+            &state.ex.exercises,
+            &state.ex.completed,
+        );
     }
 
     /// Boucle principale watch avec Ratatui.
@@ -351,7 +413,7 @@ impl App {
         // Prépare le premier exercice
         self.reset_state_and_load_exercise(conn)?;
 
-        let rx = match &self.state.source_path {
+        let rx = match &self.state.ex.source_path {
             Some(p) => crate::tui::events::spawn_event_reader(p.clone()),
             None => return Ok(()),
         };
@@ -361,10 +423,7 @@ impl App {
             self.state.update_due_count_cache();
             terminal
                 .draw(|f| crate::tui::ui_watch::view(f, &mut self.state))
-                .map_err(|e| {
-                    ratatui::restore();
-                    e
-                })?;
+                .inspect_err(|_| ratatui::restore())?;
 
             match rx.recv_timeout(Duration::from_millis(
                 crate::constants::RENDER_RECV_TIMEOUT_MS,
@@ -374,7 +433,7 @@ impl App {
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
 
-            if self.state.should_quit {
+            if self.state.session.should_quit {
                 break;
             }
         }
@@ -385,53 +444,55 @@ impl App {
     /// Resets: hint_index, overlay states, status_msg, run_result, description_scroll,
     /// consecutive_failures, already_recorded, vis state, etc.
     pub fn reset_state_and_load_exercise(&mut self, conn: &rusqlite::Connection) -> Result<()> {
-        let idx = self.state.current_index;
-        if idx >= self.state.exercises.len() {
-            self.state.should_quit = true;
+        let idx = self.state.ex.current_index;
+        if idx >= self.state.ex.exercises.len() {
+            self.state.session.should_quit = true;
             return Ok(());
         }
-        let exercise = &self.state.exercises[idx];
-        self.state.skip_file_changed = true;
+        let exercise = &self.state.ex.exercises[idx];
+        self.state.session.skip_file_changed = true;
         let (source_path, stage) = crate::runner::prepare_exercise_source(conn, exercise)?;
 
         // Restart watcher if we change exercise
-        self.state.source_path = Some(source_path);
-        self.state.current_stage = stage;
-        self.state.run_result = None;
-        self.state.hint_index = 0;
-        self.state.overlay.solution_active = false;
-        self.state.compile_pending = false;
-        self.state.overlay.vis_active = false;
+        self.state.ex.source_path = Some(source_path);
+        self.state.ex.current_stage = stage;
+        self.state.ex.run_result = None;
+        self.state.ex.hint_index = 0;
+        self.state.overlay.active = ActiveOverlay::None;
+        self.state.session.compile_pending = false;
         self.state.overlay.vis_step = 0;
-        self.state.already_recorded = false;
-        self.state.consecutive_failures = 0;
-        self.state.status_msg = None;
-        self.state.description_scroll = 0;
+        self.state.ex.already_recorded = false;
+        self.state.ex.consecutive_failures = 0;
+        self.state.session.status_msg = None;
+        self.state.ex.description_scroll = 0;
 
         // Open/update neovim pane in tmux
-        if let Some(ref path) = self.state.source_path {
-            let pane = crate::tmux::update_editor_pane(self.state.editor_pane.as_deref(), path);
-            self.state.editor_pane = pane;
+        if let Some(ref path) = self.state.ex.source_path {
+            let pane =
+                crate::tmux::update_editor_pane(self.state.session.editor_pane.as_deref(), path);
+            self.state.session.editor_pane = pane;
         }
 
         Self::invalidate_header_cache(&mut self.state);
         Ok(())
     }
 
-    /// Recompute search results from current query (indices into state.exercises).
+    /// Recompute search results from current query (indices into state.ex.exercises).
     fn rebuild_search(state: &mut AppState) {
         let subject_filter = if state.overlay.search_subject_filter {
             state
+                .ex
                 .exercises
-                .get(state.current_index)
+                .get(state.ex.current_index)
                 .map(|ex| ex.subject.as_str())
         } else {
             None
         };
         if state.overlay.search_query.is_empty() && subject_filter.is_none() {
-            state.overlay.search_results = (0..state.exercises.len()).collect();
+            state.overlay.search_results = (0..state.ex.exercises.len()).collect();
         } else if state.overlay.search_query.is_empty() {
             state.overlay.search_results = state
+                .ex
                 .exercises
                 .iter()
                 .enumerate()
@@ -440,7 +501,7 @@ impl App {
                 .collect();
         } else {
             state.overlay.search_results = search::search_exercises(
-                &state.exercises,
+                &state.ex.exercises,
                 &state.overlay.search_query,
                 subject_filter,
             )
@@ -451,16 +512,20 @@ impl App {
         state.overlay.search_selected = 0;
     }
 
-    /// Reconstruit `list_display_items` depuis `state.exercises` et `CHAPTERS`.
+    /// Reconstruit `list_display_items` depuis `state.ex.exercises` et `CHAPTERS`.
     fn build_list_display_items(state: &mut AppState) {
         // Pass 1: count exercises per chapter
         let mut chapter_counts: std::collections::HashMap<Option<usize>, (usize, usize)> =
             std::collections::HashMap::new();
-        for (ex_idx, ex) in state.exercises.iter().enumerate() {
-            let ch_idx = state.subject_to_chapter.get(ex.subject.as_str()).copied();
+        for (ex_idx, ex) in state.ex.exercises.iter().enumerate() {
+            let ch_idx = state
+                .progress
+                .subject_to_chapter
+                .get(ex.subject.as_str())
+                .copied();
             let entry = chapter_counts.entry(ch_idx).or_insert((0, 0));
             entry.0 += 1;
-            if state.completed.get(ex_idx).copied().unwrap_or(false) {
+            if state.ex.completed.get(ex_idx).copied().unwrap_or(false) {
                 entry.1 += 1;
             }
         }
@@ -469,8 +534,12 @@ impl App {
         state.overlay.list_display_items.clear();
         let mut current_chapter: Option<usize> = None;
 
-        for (ex_idx, ex) in state.exercises.iter().enumerate() {
-            let ch_idx = state.subject_to_chapter.get(ex.subject.as_str()).copied();
+        for (ex_idx, ex) in state.ex.exercises.iter().enumerate() {
+            let ch_idx = state
+                .progress
+                .subject_to_chapter
+                .get(ex.subject.as_str())
+                .copied();
 
             if ch_idx != current_chapter {
                 current_chapter = ch_idx;
@@ -580,16 +649,16 @@ impl App {
                     | KeyCode::Char('q')
                     | KeyCode::Char('Q')
             ) {
-                state.overlay.list_active = false;
+                state.overlay.active = ActiveOverlay::None;
             }
             return false;
         }
         match key.code {
             KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('L') => {
-                state.overlay.list_active = false;
+                state.overlay.active = ActiveOverlay::None;
             }
             KeyCode::Char('q') | KeyCode::Char('Q') => {
-                state.overlay.list_active = false;
+                state.overlay.active = ActiveOverlay::None;
             }
             KeyCode::Enter => {
                 if let Some(ListDisplayItem::Exercise { exercise_index }) = state
@@ -597,8 +666,8 @@ impl App {
                     .list_display_items
                     .get(state.overlay.list_selected)
                 {
-                    state.current_index = *exercise_index;
-                    state.overlay.list_active = false;
+                    state.ex.current_index = *exercise_index;
+                    state.overlay.active = ActiveOverlay::None;
                     return true;
                 }
             }
@@ -667,7 +736,7 @@ impl App {
         use ratatui::crossterm::event::KeyCode;
         match key.code {
             KeyCode::Esc => {
-                state.overlay.search_active = false;
+                state.overlay.active = ActiveOverlay::None;
                 state.overlay.search_query.clear();
                 state.overlay.search_results.clear();
             }
@@ -678,8 +747,8 @@ impl App {
             KeyCode::Enter => {
                 if !state.overlay.search_results.is_empty() {
                     let idx = state.overlay.search_results[state.overlay.search_selected];
-                    state.current_index = idx;
-                    state.overlay.search_active = false;
+                    state.ex.current_index = idx;
+                    state.overlay.active = ActiveOverlay::None;
                     state.overlay.search_query.clear();
                     state.overlay.search_results.clear();
                     return true;
@@ -742,8 +811,9 @@ impl App {
             // Vim : l / → = step suivant ; h / ← = step précédent ; j/k aussi intuitifs
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Char('j') => {
                 let total = state
+                    .ex
                     .exercises
-                    .get(state.current_index)
+                    .get(state.ex.current_index)
                     .expect("current_index in bounds")
                     .visualizer
                     .steps
@@ -754,7 +824,7 @@ impl App {
                 state.overlay.vis_step = state.overlay.vis_step.saturating_sub(1);
             }
             _ => {
-                state.overlay.vis_active = false;
+                state.overlay.active = ActiveOverlay::None;
             }
         }
     }
@@ -765,7 +835,7 @@ impl App {
         state: &mut AppState,
         key: ratatui::crossterm::event::KeyEvent,
     ) -> bool {
-        if !state.overlay.solution_active {
+        if state.overlay.active != ActiveOverlay::Solution {
             return false;
         }
         if matches!(
@@ -774,7 +844,7 @@ impl App {
                 | ratatui::crossterm::event::KeyCode::Char('s')
                 | ratatui::crossterm::event::KeyCode::Char('S')
         ) {
-            state.overlay.solution_active = false;
+            state.overlay.active = ActiveOverlay::None;
         }
         true
     }
@@ -802,7 +872,7 @@ impl App {
             eprintln!("[clings] erreur chargement exercice: {e}");
         }
         if let Some(sid) = session_id {
-            let idx = self.state.current_index;
+            let idx = self.state.ex.current_index;
             self.save_checkpoint(conn, Some(sid), idx);
         }
     }
@@ -817,7 +887,7 @@ impl App {
         use ratatui::crossterm::event::KeyCode;
         self.state.overlay.success_overlay = false;
         if matches!(key.code, KeyCode::Enter) && !self.navigate_next(conn, session_id) {
-            self.state.should_quit = true;
+            self.state.session.should_quit = true;
         }
     }
 
@@ -839,7 +909,7 @@ impl App {
             ) {
                 if self.state.overlay.nav_confirm_next {
                     if !self.navigate_next(conn, session_id) {
-                        self.state.should_quit = true;
+                        self.state.session.should_quit = true;
                     }
                 } else {
                     self.navigate_prev(conn, session_id);
@@ -851,32 +921,36 @@ impl App {
             self.handle_success_overlay_key(key, conn, session_id);
             return true;
         }
-        if self.state.overlay.list_active {
-            if Self::dispatch_list_overlay_key(&mut self.state, key) {
-                self.load_exercise_and_checkpoint(conn, session_id);
+        match self.state.overlay.active {
+            ActiveOverlay::List => {
+                if Self::dispatch_list_overlay_key(&mut self.state, key) {
+                    self.load_exercise_and_checkpoint(conn, session_id);
+                }
+                return true;
             }
-            return true;
-        }
-        if self.state.overlay.search_active {
-            if Self::dispatch_search_overlay_key(&mut self.state, key) {
-                self.load_exercise_and_checkpoint(conn, session_id);
+            ActiveOverlay::Search => {
+                if Self::dispatch_search_overlay_key(&mut self.state, key) {
+                    self.load_exercise_and_checkpoint(conn, session_id);
+                }
+                return true;
             }
-            return true;
-        }
-        if Self::handle_solution_overlay(&mut self.state, key) {
-            return true;
-        }
-        if self.state.overlay.help_active {
-            self.state.overlay.help_active = false;
-            return true;
-        }
-        if self.state.overlay.vis_active {
-            Self::handle_vis_key(&mut self.state, key);
-            return true;
-        }
-        if self.state.overlay.libsys_active {
-            self.state.overlay.libsys_active = false;
-            return true;
+            ActiveOverlay::Solution => {
+                Self::handle_solution_overlay(&mut self.state, key);
+                return true;
+            }
+            ActiveOverlay::Help => {
+                self.state.overlay.active = ActiveOverlay::None;
+                return true;
+            }
+            ActiveOverlay::Visualizer => {
+                Self::handle_vis_key(&mut self.state, key);
+                return true;
+            }
+            ActiveOverlay::Libsys => {
+                self.state.overlay.active = ActiveOverlay::None;
+                return true;
+            }
+            ActiveOverlay::None => {}
         }
         false
     }
@@ -886,8 +960,9 @@ impl App {
         use crate::constants::HINT_MIN_ATTEMPTS;
         let hints_len = self
             .state
+            .ex
             .exercises
-            .get(self.state.current_index)
+            .get(self.state.ex.current_index)
             .expect("current_index in bounds")
             .hints
             .len();
@@ -895,24 +970,24 @@ impl App {
             return;
         }
         // Gate : le 1er indice nécessite HINT_MIN_ATTEMPTS tentatives préalables.
-        if self.state.hint_index == 0 && self.state.consecutive_failures < HINT_MIN_ATTEMPTS {
-            let remaining = HINT_MIN_ATTEMPTS - self.state.consecutive_failures;
-            self.state.status_msg = Some(format!(
+        if self.state.ex.hint_index == 0 && self.state.ex.consecutive_failures < HINT_MIN_ATTEMPTS {
+            let remaining = HINT_MIN_ATTEMPTS - self.state.ex.consecutive_failures;
+            self.state.session.status_msg = Some(format!(
                 "Essayez encore ({} tentative{} avant le 1er indice)",
                 remaining,
                 if remaining > 1 { "s" } else { "" }
             ));
-            self.state.status_msg_at = Some(std::time::Instant::now());
+            self.state.session.status_msg_at = Some(std::time::Instant::now());
             return;
         }
-        self.state.hint_index = (self.state.hint_index + 1).min(hints_len);
+        self.state.ex.hint_index = (self.state.ex.hint_index + 1).min(hints_len);
     }
 
     /// Shared visualizer toggle `[v]`.
     fn toggle_visualizer_overlay(&mut self) {
-        if let Some(exercise) = self.state.exercises.get(self.state.current_index) {
+        if let Some(exercise) = self.state.ex.exercises.get(self.state.ex.current_index) {
             if !exercise.visualizer.steps.is_empty() {
-                self.state.overlay.vis_active = true;
+                self.state.overlay.active = ActiveOverlay::Visualizer;
                 self.state.overlay.vis_step = 0;
             }
         }
@@ -921,8 +996,8 @@ impl App {
     /// Shared list overlay open `[l]`.
     fn open_list_overlay(&mut self) {
         Self::build_list_display_items(&mut self.state);
-        self.state.overlay.list_active = true;
-        let ci = self.state.current_index;
+        self.state.overlay.active = ActiveOverlay::List;
+        let ci = self.state.ex.current_index;
         self.state.overlay.list_selected = self
             .state
             .overlay
@@ -939,12 +1014,12 @@ impl App {
         let path = crate::libsys::libsys_path();
         self.state.overlay.libsys_portfolio =
             crate::libsys::portfolio_status(&path).unwrap_or_default();
-        self.state.overlay.libsys_active = true;
+        self.state.overlay.active = ActiveOverlay::Libsys;
     }
 
     /// Shared search overlay open `[/]`.
     fn open_search_overlay(&mut self) {
-        self.state.overlay.search_active = true;
+        self.state.overlay.active = ActiveOverlay::Search;
         self.state.overlay.search_subject_filter = false;
         self.state.overlay.search_query.clear();
         Self::rebuild_search(&mut self.state);
@@ -953,9 +1028,9 @@ impl App {
     /// Navigate to next exercise, optionally saving checkpoint.
     /// Returns `true` if navigation happened, `false` if at end.
     fn navigate_next(&mut self, conn: &rusqlite::Connection, session_id: Option<&str>) -> bool {
-        let next = self.state.current_index + 1;
-        if next < self.state.exercises.len() {
-            self.state.current_index = next;
+        let next = self.state.ex.current_index + 1;
+        if next < self.state.ex.exercises.len() {
+            self.state.ex.current_index = next;
             if let Err(e) = self.reset_state_and_load_exercise(conn) {
                 eprintln!("[clings] erreur chargement exercice: {e}");
             }
@@ -965,7 +1040,7 @@ impl App {
             true
         } else {
             if let Some(sid) = session_id {
-                self.save_checkpoint(conn, Some(sid), self.state.current_index);
+                self.save_checkpoint(conn, Some(sid), self.state.ex.current_index);
             }
             false
         }
@@ -973,13 +1048,13 @@ impl App {
 
     /// Navigate to previous exercise, optionally saving checkpoint.
     fn navigate_prev(&mut self, conn: &rusqlite::Connection, session_id: Option<&str>) {
-        if self.state.current_index > 0 {
-            self.state.current_index -= 1;
+        if self.state.ex.current_index > 0 {
+            self.state.ex.current_index -= 1;
             if let Err(e) = self.reset_state_and_load_exercise(conn) {
                 eprintln!("[clings] erreur chargement exercice: {e}");
             }
             if let Some(sid) = session_id {
-                let idx = self.state.current_index;
+                let idx = self.state.ex.current_index;
                 self.save_checkpoint(conn, Some(sid), idx);
             }
         }
@@ -989,22 +1064,26 @@ impl App {
     fn can_reveal_solution(&self, failure_threshold: usize) -> bool {
         let exercise = self
             .state
+            .ex
             .exercises
-            .get(self.state.current_index)
+            .get(self.state.ex.current_index)
             .expect("current_index in bounds");
-        let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
-        all_shown || self.state.consecutive_failures as usize >= failure_threshold
+        let all_shown =
+            exercise.hints.is_empty() || self.state.ex.hint_index >= exercise.hints.len();
+        all_shown || self.state.ex.consecutive_failures as usize >= failure_threshold
     }
 
     /// Check if piscine solution can be revealed (fail_count-based threshold).
     fn can_reveal_solution_piscine(&self) -> bool {
         let exercise = self
             .state
+            .ex
             .exercises
-            .get(self.state.current_index)
+            .get(self.state.ex.current_index)
             .expect("current_index in bounds");
-        let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
-        all_shown || self.state.piscine_fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
+        let all_shown =
+            exercise.hints.is_empty() || self.state.ex.hint_index >= exercise.hints.len();
+        all_shown || self.state.piscine.fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
     }
 
     /// Handle compilation and test of current exercise (triggered by 'r' key).
@@ -1012,24 +1091,25 @@ impl App {
     fn handle_compile(&mut self, conn: &rusqlite::Connection) {
         use crate::constants::CONSECUTIVE_FAILURE_THRESHOLD;
 
-        let Some(path) = self.state.source_path.as_deref() else {
+        let Some(path) = self.state.ex.source_path.as_deref() else {
             return;
         };
-        self.state.compile_pending = true;
+        self.state.session.compile_pending = true;
         let exercise = self
             .state
+            .ex
             .exercises
-            .get(self.state.current_index)
+            .get(self.state.ex.current_index)
             .expect("current_index in bounds");
         let result = crate::runner::compile_and_run(path, exercise);
-        self.state.compile_pending = false;
+        self.state.session.compile_pending = false;
         let success = result.success;
-        self.state.run_result = Some(result);
+        self.state.ex.run_result = Some(result);
 
         if success {
-            self.state.consecutive_failures = 0;
-            if !self.state.already_recorded {
-                self.state.already_recorded = true;
+            self.state.ex.consecutive_failures = 0;
+            if !self.state.ex.already_recorded {
+                self.state.ex.already_recorded = true;
                 // Clone avant tout borrow mutable
                 let subject = exercise.subject.clone();
                 let exercise_id = exercise.id.clone();
@@ -1055,9 +1135,9 @@ impl App {
                         let libsys_path = crate::libsys::libsys_path();
                         match crate::libsys::export(&libsys_path, &libsys_export) {
                             Ok(()) => {
-                                self.state.status_msg =
+                                self.state.session.status_msg =
                                     Some(format!("✓ {fn_name} ajouté à libsys !"));
-                                self.state.status_msg_at = Some(std::time::Instant::now());
+                                self.state.session.status_msg_at = Some(std::time::Instant::now());
                             }
                             Err(e) => eprintln!("[clings] erreur export libsys: {e}"),
                         }
@@ -1065,49 +1145,53 @@ impl App {
                 }
                 Self::invalidate_header_cache(&mut self.state);
                 // Interleaving nudge : suggérer de changer de sujet après N succès consécutifs
-                if self.state.last_success_subject == subject {
-                    self.state.consecutive_successes_on_subject = self
+                if self.state.ex.last_success_subject == subject {
+                    self.state.ex.consecutive_successes_on_subject = self
                         .state
+                        .ex
                         .consecutive_successes_on_subject
                         .saturating_add(1);
                 } else {
-                    self.state.consecutive_successes_on_subject = 1;
-                    self.state.last_success_subject = subject.clone();
+                    self.state.ex.consecutive_successes_on_subject = 1;
+                    self.state.ex.last_success_subject = subject.clone();
                 }
-                if self.state.consecutive_successes_on_subject
+                if self.state.ex.consecutive_successes_on_subject
                     >= crate::constants::INTERLEAVING_NUDGE_THRESHOLD
                 {
-                    self.state.status_msg = Some(format!(
+                    self.state.session.status_msg = Some(format!(
                         "{} succès sur «{}» — explorer un autre sujet booste la mémoire !",
                         crate::constants::INTERLEAVING_NUDGE_THRESHOLD,
                         subject
                     ));
-                    self.state.status_msg_at = Some(std::time::Instant::now());
-                    self.state.consecutive_successes_on_subject = 0;
+                    self.state.session.status_msg_at = Some(std::time::Instant::now());
+                    self.state.ex.consecutive_successes_on_subject = 0;
                 }
             }
-            self.state.completed[self.state.current_index] = true;
+            self.state.ex.completed[self.state.ex.current_index] = true;
             self.state.overlay.success_overlay = true;
         } else {
-            self.state.consecutive_failures = self.state.consecutive_failures.saturating_add(1);
-            if (self.state.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
-                && self.state.hint_index == 0
+            self.state.ex.consecutive_failures =
+                self.state.ex.consecutive_failures.saturating_add(1);
+            if (self.state.ex.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
+                && self.state.ex.hint_index == 0
             {
                 let hints_len = self
                     .state
+                    .ex
                     .exercises
-                    .get(self.state.current_index)
+                    .get(self.state.ex.current_index)
                     .expect("current_index in bounds")
                     .hints
                     .len();
                 if hints_len > 0 {
-                    self.state.hint_index = 1;
+                    self.state.ex.hint_index = 1;
                 }
             }
             let exercise = self
                 .state
+                .ex
                 .exercises
-                .get(self.state.current_index)
+                .get(self.state.ex.current_index)
                 .expect("current_index in bounds");
             if let Err(e) =
                 crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
@@ -1121,61 +1205,50 @@ impl App {
     /// Dispatch Watch messages → état
     pub fn update_watch(&mut self, msg: Msg, conn: &rusqlite::Connection) {
         use crate::constants::CONSECUTIVE_FAILURE_THRESHOLD;
-        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 
         match msg {
             Msg::Key(key) => {
                 if self.handle_overlay_dispatch(key, conn, None) {
                     return;
                 }
-
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Char('Q') => {
-                        self.state.should_quit = true;
-                    }
-                    KeyCode::Char('h') | KeyCode::Char('H') => self.reveal_next_hint(),
-                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                let Some(cmd) = key_to_cmd(&key, false) else {
+                    return;
+                };
+                match cmd {
+                    Command::Quit => self.state.session.should_quit = true,
+                    Command::CompileRun => self.handle_compile(conn),
+                    Command::ShowHint => self.reveal_next_hint(),
+                    Command::ToggleSolution => {
                         if self.can_reveal_solution(CONSECUTIVE_FAILURE_THRESHOLD) {
-                            self.state.overlay.solution_active =
-                                !self.state.overlay.solution_active;
+                            self.state.overlay.active =
+                                if self.state.overlay.active == ActiveOverlay::Solution {
+                                    ActiveOverlay::None
+                                } else {
+                                    ActiveOverlay::Solution
+                                };
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
-                    KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
-                    KeyCode::Char('/') => self.open_search_overlay(),
-                    KeyCode::Char('b') | KeyCode::Char('B') => self.open_libsys_overlay(),
-                    KeyCode::Char('?') => {
-                        self.state.overlay.help_active = true;
-                    }
-                    KeyCode::Char('j')
-                    | KeyCode::Char('J')
-                    | KeyCode::Char('n')
-                    | KeyCode::Char('N') => {
+                    Command::OpenVisualizer => self.toggle_visualizer_overlay(),
+                    Command::OpenList => self.open_list_overlay(),
+                    Command::OpenSearch => self.open_search_overlay(),
+                    Command::OpenLibsys => self.open_libsys_overlay(),
+                    Command::ShowHelp => self.state.overlay.active = ActiveOverlay::Help,
+                    Command::NavNext => {
                         self.state.overlay.nav_confirm_active = true;
                         self.state.overlay.nav_confirm_next = true;
                     }
-                    KeyCode::Char('k') | KeyCode::Char('K') => {
+                    Command::NavPrev => {
                         self.state.overlay.nav_confirm_active = true;
                         self.state.overlay.nav_confirm_next = false;
                     }
-                    KeyCode::Char('r') | KeyCode::Char('R') => {
-                        self.handle_compile(conn);
+                    Command::ScrollDown => {
+                        self.state.ex.description_scroll =
+                            self.state.ex.description_scroll.saturating_add(3);
                     }
-                    KeyCode::PageDown => {
-                        self.state.description_scroll =
-                            self.state.description_scroll.saturating_add(3);
+                    Command::ScrollUp => {
+                        self.state.ex.description_scroll =
+                            self.state.ex.description_scroll.saturating_sub(3);
                     }
-                    KeyCode::PageUp => {
-                        self.state.description_scroll =
-                            self.state.description_scroll.saturating_sub(3);
-                    }
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        self.state.should_quit = true;
-                    }
-                    KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        self.state.should_quit = true;
-                    }
-                    _ => {}
                 }
             }
             Msg::FileChanged => self.handle_file_changed(),
@@ -1201,13 +1274,13 @@ impl App {
         use std::time::Duration;
 
         // Initialise le cache timer piscine pour le premier frame
-        if let Some(start) = self.state.piscine_start {
+        if let Some(start) = self.state.piscine.start {
             let elapsed = start.elapsed().as_secs();
             self.state.timer_cache.piscine_last_elapsed_secs = elapsed;
             self.state.timer_cache.cached_piscine_elapsed_str =
                 format!("⏱ {}m{:02}s", elapsed / 60, elapsed % 60);
         }
-        if let Some(deadline) = self.state.piscine_deadline {
+        if let Some(deadline) = self.state.piscine.deadline {
             let remaining = deadline
                 .checked_duration_since(std::time::Instant::now())
                 .map(|d| d.as_secs())
@@ -1219,7 +1292,7 @@ impl App {
         // Prépare le premier exercice
         self.reset_state_and_load_exercise(conn)?;
 
-        let rx = match &self.state.source_path {
+        let rx = match &self.state.ex.source_path {
             Some(p) => crate::tui::events::spawn_event_reader(p.clone()),
             None => return Ok(()),
         };
@@ -1228,10 +1301,7 @@ impl App {
         loop {
             terminal
                 .draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))
-                .map_err(|e| {
-                    ratatui::restore();
-                    e
-                })?;
+                .inspect_err(|_| ratatui::restore())?;
 
             match rx.recv_timeout(Duration::from_millis(
                 crate::constants::RENDER_RECV_TIMEOUT_MS,
@@ -1239,16 +1309,16 @@ impl App {
                 Ok(msg) => self.update_piscine(msg, conn, session_id),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     // Check deadline on timeout
-                    if let Some(deadline) = self.state.piscine_deadline {
+                    if let Some(deadline) = self.state.piscine.deadline {
                         if std::time::Instant::now() >= deadline {
-                            self.state.should_quit = true;
+                            self.state.session.should_quit = true;
                         }
                     }
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
 
-            if self.state.should_quit {
+            if self.state.session.should_quit {
                 break;
             }
         }
@@ -1262,60 +1332,73 @@ impl App {
         conn: &rusqlite::Connection,
         session_id: Option<&str>,
     ) {
-        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
-
         match msg {
             Msg::Key(key) => {
                 if self.handle_overlay_dispatch(key, conn, session_id) {
                     return;
                 }
-
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Char('Q') => {
-                        let idx = self.state.current_index;
+                let Some(cmd) = key_to_cmd(&key, true) else {
+                    return;
+                };
+                match cmd {
+                    Command::Quit => {
+                        let idx = self.state.ex.current_index;
                         self.save_checkpoint(conn, session_id, idx);
-                        self.state.should_quit = true;
+                        self.state.session.should_quit = true;
                     }
-                    KeyCode::Char('h') | KeyCode::Char('H') => self.reveal_next_hint(),
-                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                    Command::ShowHint => self.reveal_next_hint(),
+                    Command::ToggleSolution => {
                         if self.can_reveal_solution_piscine() {
-                            self.state.overlay.solution_active =
-                                !self.state.overlay.solution_active;
+                            self.state.overlay.active =
+                                if self.state.overlay.active == ActiveOverlay::Solution {
+                                    ActiveOverlay::None
+                                } else {
+                                    ActiveOverlay::Solution
+                                };
                         }
                     }
-                    KeyCode::Char('v') | KeyCode::Char('V') => self.toggle_visualizer_overlay(),
-                    KeyCode::Char('b') | KeyCode::Char('B') => self.open_libsys_overlay(),
-                    KeyCode::Char('n')
-                    | KeyCode::Char('N')
-                    | KeyCode::Char('j')
-                    | KeyCode::Char('J') => {
+                    Command::OpenVisualizer => self.toggle_visualizer_overlay(),
+                    Command::OpenLibsys => self.open_libsys_overlay(),
+                    Command::OpenList => self.open_list_overlay(),
+                    Command::OpenSearch => self.open_search_overlay(),
+                    Command::ScrollDown => {
+                        self.state.ex.description_scroll =
+                            self.state.ex.description_scroll.saturating_add(3);
+                    }
+                    Command::ScrollUp => {
+                        self.state.ex.description_scroll =
+                            self.state.ex.description_scroll.saturating_sub(3);
+                    }
+                    Command::NavNext => {
                         if !self.navigate_next(conn, session_id) {
-                            self.state.should_quit = true;
+                            self.state.session.should_quit = true;
                         }
                     }
-                    KeyCode::Char('k') | KeyCode::Char('K') => {
+                    Command::NavPrev => {
                         self.navigate_prev(conn, session_id);
                     }
-                    KeyCode::Char('r') | KeyCode::Char('R') => {
-                        let Some(path) = self.state.source_path.as_deref() else {
+                    Command::ShowHelp => {} // non disponible en piscine (filtré par key_to_cmd)
+                    Command::CompileRun => {
+                        let Some(path) = self.state.ex.source_path.as_deref() else {
                             return;
                         };
-                        self.state.compile_pending = true;
+                        self.state.session.compile_pending = true;
                         let exercise = self
                             .state
+                            .ex
                             .exercises
-                            .get(self.state.current_index)
+                            .get(self.state.ex.current_index)
                             .expect("current_index in bounds");
                         let result = crate::runner::compile_and_run(path, exercise);
-                        self.state.compile_pending = false;
+                        self.state.session.compile_pending = false;
                         let success = result.success;
                         let compile_error = result.compile_error;
-                        self.state.run_result = Some(result);
+                        self.state.ex.run_result = Some(result);
 
                         if success {
-                            self.state.piscine_fail_count = 0;
-                            if !self.state.already_recorded {
-                                self.state.already_recorded = true;
+                            self.state.piscine.fail_count = 0;
+                            if !self.state.ex.already_recorded {
+                                self.state.ex.already_recorded = true;
                                 if let Err(e) = crate::progress::record_attempt(
                                     conn,
                                     &exercise.subject,
@@ -1326,25 +1409,27 @@ impl App {
                                 }
                                 Self::invalidate_header_cache(&mut self.state);
                             }
-                            self.state.completed[self.state.current_index] = true;
+                            self.state.ex.completed[self.state.ex.current_index] = true;
                             self.state.overlay.success_overlay = true;
                         } else {
                             if !compile_error {
-                                self.state.piscine_fail_count =
-                                    self.state.piscine_fail_count.saturating_add(1);
-                                if self.state.piscine_fail_count
+                                self.state.piscine.fail_count =
+                                    self.state.piscine.fail_count.saturating_add(1);
+                                if self.state.piscine.fail_count
                                     >= crate::constants::PISCINE_FAILURE_THRESHOLD
                                 {
                                     if let Some(cm) = &exercise.common_mistake {
-                                        self.state.status_msg = Some(format!("⚠ Piège : {}", cm));
-                                        self.state.status_msg_at = Some(Instant::now());
+                                        self.state.session.status_msg =
+                                            Some(format!("⚠ Piège : {}", cm));
+                                        self.state.session.status_msg_at = Some(Instant::now());
                                     }
                                 }
                             }
                             let exercise = self
                                 .state
+                                .ex
                                 .exercises
-                                .get(self.state.current_index)
+                                .get(self.state.ex.current_index)
                                 .expect("current_index in bounds");
                             if let Err(e) = crate::progress::record_attempt(
                                 conn,
@@ -1357,27 +1442,6 @@ impl App {
                             Self::invalidate_header_cache(&mut self.state);
                         }
                     }
-                    KeyCode::Char('l') | KeyCode::Char('L') => self.open_list_overlay(),
-                    KeyCode::Char('/') => self.open_search_overlay(),
-                    KeyCode::PageDown => {
-                        self.state.description_scroll =
-                            self.state.description_scroll.saturating_add(3);
-                    }
-                    KeyCode::PageUp => {
-                        self.state.description_scroll =
-                            self.state.description_scroll.saturating_sub(3);
-                    }
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        let idx = self.state.current_index;
-                        self.save_checkpoint(conn, session_id, idx);
-                        self.state.should_quit = true;
-                    }
-                    KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        let idx = self.state.current_index;
-                        self.save_checkpoint(conn, session_id, idx);
-                        self.state.should_quit = true;
-                    }
-                    _ => {}
                 }
             }
             Msg::FileChanged => self.handle_file_changed(),
@@ -1387,7 +1451,7 @@ impl App {
             Msg::Tick => {
                 self.handle_tick_status_clear();
                 // Mise à jour du cache timer elapsed (1 allocation/seconde max)
-                if let Some(start) = self.state.piscine_start {
+                if let Some(start) = self.state.piscine.start {
                     let elapsed = start.elapsed().as_secs();
                     if elapsed != self.state.timer_cache.piscine_last_elapsed_secs {
                         self.state.timer_cache.piscine_last_elapsed_secs = elapsed;
@@ -1396,7 +1460,7 @@ impl App {
                     }
                 }
                 // Mise à jour du cache timer restant (1 allocation/seconde max)
-                if let Some(deadline) = self.state.piscine_deadline {
+                if let Some(deadline) = self.state.piscine.deadline {
                     let now = std::time::Instant::now();
                     let remaining = deadline
                         .checked_duration_since(now)
@@ -1409,9 +1473,9 @@ impl App {
                     }
                     // Check deadline on tick (réutilise `now` — évite un second syscall)
                     if now >= deadline {
-                        let idx = self.state.current_index;
+                        let idx = self.state.ex.current_index;
                         self.save_checkpoint(conn, session_id, idx);
-                        self.state.should_quit = true;
+                        self.state.session.should_quit = true;
                     }
                 }
             }
@@ -1420,22 +1484,22 @@ impl App {
 
     /// Mise à jour commune FileChanged — enregistre le message de status.
     fn handle_file_changed(&mut self) {
-        if self.state.skip_file_changed {
-            self.state.skip_file_changed = false;
+        if self.state.session.skip_file_changed {
+            self.state.session.skip_file_changed = false;
             return;
         }
-        self.state.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
-        self.state.status_msg_at = Some(Instant::now());
+        self.state.session.status_msg = Some("fichier sauvegardé — [r] pour compiler".to_string());
+        self.state.session.status_msg_at = Some(Instant::now());
     }
 
     /// Mise à jour commune Tick — expire le message de status après timeout.
     fn handle_tick_status_clear(&mut self) {
-        if let Some(at) = self.state.status_msg_at {
+        if let Some(at) = self.state.session.status_msg_at {
             if at.elapsed()
                 > std::time::Duration::from_secs(crate::constants::STATUS_MSG_TIMEOUT_SECS)
             {
-                self.state.status_msg = None;
-                self.state.status_msg_at = None;
+                self.state.session.status_msg = None;
+                self.state.session.status_msg_at = None;
             }
         }
     }
@@ -1509,11 +1573,7 @@ mod tests {
     #[test]
     fn overlay_state_defaults_inactive() {
         let o = OverlayState::default();
-        assert!(!o.help_active);
-        assert!(!o.list_active);
-        assert!(!o.search_active);
-        assert!(!o.solution_active);
-        assert!(!o.vis_active);
+        assert_eq!(o.active, ActiveOverlay::None);
         assert_eq!(o.vis_step, 0);
         assert!(o.search_query.is_empty());
         assert!(o.search_results.is_empty());
@@ -1537,10 +1597,10 @@ mod tests {
     fn can_reveal_solution_all_hints_shown() {
         let mut app = App::new();
         let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        app.state.hint_index = 2; // all shown
-        app.state.consecutive_failures = 0;
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        app.state.ex.hint_index = 2; // all shown
+        app.state.ex.consecutive_failures = 0;
         assert!(app.can_reveal_solution(3));
     }
 
@@ -1548,10 +1608,10 @@ mod tests {
     fn can_reveal_solution_enough_failures() {
         let mut app = App::new();
         let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        app.state.hint_index = 0; // none shown
-        app.state.consecutive_failures = 3;
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        app.state.ex.hint_index = 0; // none shown
+        app.state.ex.consecutive_failures = 3;
         assert!(app.can_reveal_solution(3));
     }
 
@@ -1559,10 +1619,10 @@ mod tests {
     fn can_reveal_solution_not_enough() {
         let mut app = App::new();
         let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        app.state.hint_index = 1; // partial
-        app.state.consecutive_failures = 1;
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        app.state.ex.hint_index = 1; // partial
+        app.state.ex.consecutive_failures = 1;
         assert!(!app.can_reveal_solution(3));
     }
 
@@ -1570,10 +1630,10 @@ mod tests {
     fn can_reveal_solution_no_hints() {
         let mut app = App::new();
         let ex = make_exercise(vec![], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        app.state.hint_index = 0;
-        app.state.consecutive_failures = 0;
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        app.state.ex.hint_index = 0;
+        app.state.ex.consecutive_failures = 0;
         assert!(app.can_reveal_solution(3));
     }
 
@@ -1581,34 +1641,34 @@ mod tests {
     fn reveal_next_hint_increments() {
         let mut app = App::new();
         let ex = make_exercise(vec!["h1".into(), "h2".into()], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        assert_eq!(app.state.hint_index, 0);
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        assert_eq!(app.state.ex.hint_index, 0);
 
         // Gate : hint 1 nécessite HINT_MIN_ATTEMPTS tentatives — sans tentatives, bloqué
         app.reveal_next_hint();
-        assert_eq!(app.state.hint_index, 0, "gate bloque sans tentatives");
+        assert_eq!(app.state.ex.hint_index, 0, "gate bloque sans tentatives");
 
         // Simuler HINT_MIN_ATTEMPTS échecs pour débloquer
-        app.state.consecutive_failures = crate::constants::HINT_MIN_ATTEMPTS;
+        app.state.ex.consecutive_failures = crate::constants::HINT_MIN_ATTEMPTS;
         app.reveal_next_hint();
-        assert_eq!(app.state.hint_index, 1);
+        assert_eq!(app.state.ex.hint_index, 1);
         app.reveal_next_hint();
-        assert_eq!(app.state.hint_index, 2);
+        assert_eq!(app.state.ex.hint_index, 2);
         // Should not exceed hints length
         app.reveal_next_hint();
-        assert_eq!(app.state.hint_index, 2);
+        assert_eq!(app.state.ex.hint_index, 2);
     }
 
     #[test]
     fn toggle_visualizer_overlay_activates() {
         let mut app = App::new();
         let ex = make_exercise(vec![], true);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
-        assert!(!app.state.overlay.vis_active);
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
+        assert_eq!(app.state.overlay.active, ActiveOverlay::None);
         app.toggle_visualizer_overlay();
-        assert!(app.state.overlay.vis_active);
+        assert_eq!(app.state.overlay.active, ActiveOverlay::Visualizer);
         assert_eq!(app.state.overlay.vis_step, 0);
     }
 
@@ -1616,10 +1676,10 @@ mod tests {
     fn toggle_visualizer_overlay_noop_without_steps() {
         let mut app = App::new();
         let ex = make_exercise(vec![], false);
-        app.state.exercises = vec![ex];
-        app.state.completed = vec![false];
+        app.state.ex.exercises = vec![ex];
+        app.state.ex.completed = vec![false];
         app.toggle_visualizer_overlay();
-        assert!(!app.state.overlay.vis_active);
+        assert_eq!(app.state.overlay.active, ActiveOverlay::None);
     }
 
     #[test]
@@ -1642,19 +1702,19 @@ mod tests {
     #[test]
     fn open_list_overlay_sets_flag() {
         let mut app = App::new();
-        app.state.exercises = vec![make_exercise(vec![], false)];
-        app.state.completed = vec![false];
-        assert!(!app.state.overlay.list_active);
+        app.state.ex.exercises = vec![make_exercise(vec![], false)];
+        app.state.ex.completed = vec![false];
+        assert_eq!(app.state.overlay.active, ActiveOverlay::None);
         app.open_list_overlay();
-        assert!(app.state.overlay.list_active);
+        assert_eq!(app.state.overlay.active, ActiveOverlay::List);
     }
 
     #[test]
     fn open_list_overlay_positions_cursor_on_current() {
         let mut app = App::new();
-        app.state.exercises = vec![make_exercise(vec![], false), make_exercise(vec![], false)];
-        app.state.completed = vec![false, false];
-        app.state.current_index = 1;
+        app.state.ex.exercises = vec![make_exercise(vec![], false), make_exercise(vec![], false)];
+        app.state.ex.completed = vec![false, false];
+        app.state.ex.current_index = 1;
         app.open_list_overlay();
         // list_selected doit pointer sur l'item correspondant à current_index
         let selected = app.state.overlay.list_selected;
@@ -1670,7 +1730,7 @@ mod tests {
         app.state.overlay.search_query = "ancien".to_string();
         app.state.overlay.search_subject_filter = true;
         app.open_search_overlay();
-        assert!(app.state.overlay.search_active);
+        assert_eq!(app.state.overlay.active, ActiveOverlay::Search);
         assert!(app.state.overlay.search_query.is_empty());
         assert!(!app.state.overlay.search_subject_filter);
     }
@@ -1678,9 +1738,9 @@ mod tests {
     #[test]
     fn help_overlay_activates_via_overlay_flag() {
         let mut app = App::new();
-        assert!(!app.state.overlay.help_active);
-        app.state.overlay.help_active = true;
-        assert!(app.state.overlay.help_active);
+        assert_eq!(app.state.overlay.active, ActiveOverlay::None);
+        app.state.overlay.active = ActiveOverlay::Help;
+        assert_eq!(app.state.overlay.active, ActiveOverlay::Help);
     }
 
     #[test]

@@ -63,19 +63,19 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
         .unwrap_or(0);
 
     let mut app = App::new();
-    app.state.exercises = exercise_order.into_iter().cloned().collect();
-    app.state.completed = vec![false; total];
-    app.state.current_index = start_index;
-    app.state.piscine_deadline = deadline;
-    app.state.piscine_timer_total = timer_total;
-    app.state.piscine_start = Some(std::time::Instant::now());
+    app.state.ex.exercises = exercise_order.into_iter().cloned().collect();
+    app.state.ex.completed = vec![false; total];
+    app.state.ex.current_index = start_index;
+    app.state.piscine.deadline = deadline;
+    app.state.piscine.timer_total = timer_total;
+    app.state.piscine.start = Some(std::time::Instant::now());
 
     let mut terminal = ratatui::init();
     let result = app.run_piscine(&mut terminal, &conn, None);
 
     // Save session state for "Continue" in launcher
     if let Err(e) =
-        progress::save_last_session(&conn, "piscine", filter_chapter, app.state.current_index)
+        progress::save_last_session(&conn, "piscine", filter_chapter, app.state.ex.current_index)
     {
         eprintln!("[clings] erreur sauvegarde session: {e}");
     }
@@ -83,15 +83,15 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     ratatui::restore();
 
     // Cleanup tmux editor pane
-    if let Some(pane) = &app.state.editor_pane {
+    if let Some(pane) = &app.state.session.editor_pane {
         tmux::kill_pane(pane);
     }
 
     // Post-run stats
-    let done = app.state.completed.iter().filter(|&&c| c).count();
+    let done = app.state.ex.completed.iter().filter(|&&c| c).count();
     let elapsed = app
         .state
-        .piscine_start
+        .piscine.start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
     let (hours, mins, secs) = decompose_elapsed(elapsed);
@@ -170,27 +170,27 @@ pub fn run_exam_piscine(
     };
 
     let mut app = App::new();
-    app.state.exercises = exercises;
-    app.state.completed = vec![false; total];
-    app.state.current_index = start_index;
-    app.state.piscine_deadline = deadline;
-    app.state.piscine_timer_total = timer_total;
-    app.state.piscine_start = Some(std::time::Instant::now());
+    app.state.ex.exercises = exercises;
+    app.state.ex.completed = vec![false; total];
+    app.state.ex.current_index = start_index;
+    app.state.piscine.deadline = deadline;
+    app.state.piscine.timer_total = timer_total;
+    app.state.piscine.start = Some(std::time::Instant::now());
 
     let mut terminal = ratatui::init();
     let result = app.run_piscine(&mut terminal, &conn, session_id);
     ratatui::restore();
 
     // Cleanup tmux editor pane
-    if let Some(pane) = &app.state.editor_pane {
+    if let Some(pane) = &app.state.session.editor_pane {
         tmux::kill_pane(pane);
     }
 
     // Post-run stats
-    let done = app.state.completed.iter().filter(|&&c| c).count();
+    let done = app.state.ex.completed.iter().filter(|&&c| c).count();
     let elapsed = app
         .state
-        .piscine_start
+        .piscine.start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
     let (hours, mins, secs) = decompose_elapsed(elapsed);

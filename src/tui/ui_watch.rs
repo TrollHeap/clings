@@ -7,7 +7,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use ratatui::Frame;
 use ratatui_macros::{line, span, vertical};
 
-use crate::tui::app::AppState;
+use crate::tui::app::{ActiveOverlay, AppState};
 use crate::tui::common;
 
 /// Point d'entrée du rendu watch (appelé par App::run_watch).
@@ -17,7 +17,7 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
     common::render_opaque_background(f, area);
 
-    if state.exercises.is_empty() {
+    if state.ex.exercises.is_empty() {
         f.render_widget(
             Paragraph::new("Aucun exercice disponible.").block(Block::bordered()),
             area,
@@ -30,23 +30,21 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
 
     render_header(f, header_area, state);
 
+    match &state.overlay.active {
+        ActiveOverlay::Help => common::render_help_overlay(f, body_area),
+        ActiveOverlay::List => common::render_list_overlay(f, body_area, state),
+        ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_area, state),
+        ActiveOverlay::Solution => {
+            common::render_solution_overlay(f, body_area, &state.ex.exercises[state.ex.current_index]);
+        }
+        ActiveOverlay::Search => common::render_search_overlay(f, body_area, state),
+        ActiveOverlay::Libsys => {
+            crate::tui::ui_libsys::render_libsys_overlay(f, body_area, state);
+        }
+        ActiveOverlay::None => render_body(f, body_area, state),
+    }
     if state.overlay.success_overlay {
-        render_body(f, body_area, state);
         common::render_success_overlay(f, body_area);
-    } else if state.overlay.help_active {
-        common::render_help_overlay(f, body_area);
-    } else if state.overlay.list_active {
-        common::render_list_overlay(f, body_area, state);
-    } else if state.overlay.vis_active {
-        common::render_visualizer_overlay(f, body_area, state);
-    } else if state.overlay.solution_active {
-        common::render_solution_overlay(f, body_area, &state.exercises[state.current_index]);
-    } else if state.overlay.search_active {
-        common::render_search_overlay(f, body_area, state);
-    } else if state.overlay.libsys_active {
-        crate::tui::ui_libsys::render_libsys_overlay(f, body_area, state);
-    } else {
-        render_body(f, body_area, state);
     }
 
     // Nav confirm s'affiche par-dessus tout (y compris les autres overlays).
@@ -58,13 +56,13 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
 }
 
 fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
+    let exercise = &state.ex.exercises[state.ex.current_index];
     let width = area.width as usize;
 
     let stars = common::difficulty_stars(exercise.difficulty);
     let stars_color = common::difficulty_color(exercise.difficulty);
     let type_badge = common::exercise_type_badge(exercise.exercise_type);
-    let stage_badge = state.current_stage.map(common::stage_badge);
+    let stage_badge = state.ex.current_stage.map(common::stage_badge);
 
     // ── L1 : Titre (plein gauche)   TYPE_BADGE (droit) ───────────────────
     let title_len = exercise.title.chars().count();
@@ -82,7 +80,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── L2 : clings · N/total · subject · ★★★★★ · [S0]   ↻ N révision(s) ─
     let due_count = state.due_count();
-    let counter_str = format!("{}/{}", state.current_index + 1, state.exercises.len());
+    let counter_str = format!("{}/{}", state.ex.current_index + 1, state.ex.exercises.len());
     let right2 = if due_count > 0 {
         format!("↻ {} révision(s)", due_count)
     } else {
@@ -135,7 +133,7 @@ fn render_header(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ── L3 : ██████████ N.N/5.0  —  key_concept ─────────────────────────
     let mastery = state
-        .mastery_map
+        .progress.mastery_map
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
@@ -202,9 +200,9 @@ fn stage_progress_line(current: Option<u8>) -> Line<'static> {
 }
 
 fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
+    let exercise = &state.ex.exercises[state.ex.current_index];
     let mastery = state
-        .mastery_map
+        .progress.mastery_map
         .get(&exercise.subject)
         .copied()
         .unwrap_or(0.0);
@@ -221,7 +219,7 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     let mut lines: Vec<Line<'_>> = vec![
         title_line,
         Line::raw(""),
-        stage_progress_line(state.current_stage),
+        stage_progress_line(state.ex.current_stage),
         sep_line,
     ];
 
@@ -252,7 +250,7 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
         )));
     } else {
         let next_due_days = state
-            .review_map
+            .progress.review_map
             .values()
             .filter_map(|v| *v)
             .filter(|&d| d > 0)
@@ -266,9 +264,9 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     }
 
     // Erreurs consécutives
-    if state.consecutive_failures > 0 {
+    if state.ex.consecutive_failures > 0 {
         lines.push(Line::from(Span::styled(
-            format!("✗ {} erreurs consec.", state.consecutive_failures),
+            format!("✗ {} erreurs consec.", state.ex.consecutive_failures),
             Style::default().fg(common::C_DANGER),
         )));
     }
@@ -311,7 +309,7 @@ fn render_mastery_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     use crate::constants::STATUS_BAR_KEY_MIN_WIDTH;
 
-    let exercise = &state.exercises[state.current_index];
+    let exercise = &state.ex.exercises[state.ex.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
     let has_hints = !exercise.hints.is_empty();
 
@@ -345,7 +343,7 @@ fn render_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
         common::append_hint_counter_if_visible(
             &mut spans,
             " hint",
-            state.hint_index,
+            state.ex.hint_index,
             exercise.hints.len(),
         );
         Line::from(spans)

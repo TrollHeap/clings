@@ -7,7 +7,7 @@ use ratatui::widgets::{Block, BorderType, Gauge, Paragraph};
 use ratatui::Frame;
 use ratatui_macros::{span, vertical};
 
-use crate::tui::app::AppState;
+use crate::tui::app::{ActiveOverlay, AppState};
 use crate::tui::common;
 
 /// Point d'entrée du rendu piscine (appelé par App::run_piscine).
@@ -17,7 +17,7 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     // Fond global opaque — évite la transparence terminal (Kitty/Alacritty)
     common::render_opaque_background(f, area);
 
-    if state.exercises.is_empty() {
+    if state.ex.exercises.is_empty() {
         f.render_widget(
             Paragraph::new("Aucun exercice disponible.").block(Block::bordered()),
             area,
@@ -26,7 +26,7 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
     }
 
     // Layout : header (3) | timer (3 si timed) | body (fill) | status (1)
-    let timer_constraint = if state.piscine_deadline.is_some() {
+    let timer_constraint = if state.piscine.deadline.is_some() {
         Constraint::Length(3)
     } else {
         Constraint::Length(0)
@@ -42,38 +42,37 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
 
     render_piscine_header(f, header_area, state);
 
-    if state.piscine_deadline.is_some() {
+    if state.piscine.deadline.is_some() {
         render_piscine_timer(f, timer_area, state);
     }
 
+    match &state.overlay.active {
+        ActiveOverlay::List => common::render_list_overlay(f, body_rest, state),
+        ActiveOverlay::Visualizer => common::render_visualizer_overlay(f, body_rest, state),
+        ActiveOverlay::Solution => {
+            common::render_solution_overlay(f, body_rest, &state.ex.exercises[state.ex.current_index]);
+        }
+        ActiveOverlay::Search => common::render_search_overlay(f, body_rest, state),
+        ActiveOverlay::Libsys => {
+            crate::tui::ui_libsys::render_libsys_overlay(f, body_rest, state);
+        }
+        ActiveOverlay::Help | ActiveOverlay::None => render_piscine_body(f, body_rest, state),
+    }
     if state.overlay.success_overlay {
-        render_piscine_body(f, body_rest, state);
         common::render_success_overlay(f, body_rest);
-    } else if state.overlay.list_active {
-        common::render_list_overlay(f, body_rest, state);
-    } else if state.overlay.vis_active {
-        common::render_visualizer_overlay(f, body_rest, state);
-    } else if state.overlay.solution_active {
-        common::render_solution_overlay(f, body_rest, &state.exercises[state.current_index]);
-    } else if state.overlay.search_active {
-        common::render_search_overlay(f, body_rest, state);
-    } else if state.overlay.libsys_active {
-        crate::tui::ui_libsys::render_libsys_overlay(f, body_rest, state);
-    } else {
-        render_piscine_body(f, body_rest, state);
     }
 
     render_piscine_status_bar(f, status_area, state);
 }
 
 fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
-    let exercise = &state.exercises[state.current_index];
+    let exercise = &state.ex.exercises[state.ex.current_index];
     let width = area.width as usize;
 
     // ── L1 : clings ─ piscine  [N/total] Titre   ★diff  subject  [S2] ──
     let stars = common::difficulty_stars(exercise.difficulty);
     let stars_color = common::difficulty_color(exercise.difficulty);
-    let stage_badge = state.current_stage.map(common::stage_badge);
+    let stage_badge = state.ex.current_stage.map(common::stage_badge);
 
     // "clings ─ piscine  " = 18 chars display
     let prefix_len = 18usize;
@@ -121,12 +120,12 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let line1 = Line::from(line1_spans);
 
     // ── L2 : mini_map  elapsed              ✗ N échec(s) ─────────────────
-    let right2 = if state.piscine_fail_count > 0 {
-        format!("✗ {} échec(s)", state.piscine_fail_count)
+    let right2 = if state.piscine.fail_count > 0 {
+        format!("✗ {} échec(s)", state.piscine.fail_count)
     } else {
         String::new()
     };
-    let elapsed = if state.piscine_start.is_some()
+    let elapsed = if state.piscine.start.is_some()
         && !state.timer_cache.cached_piscine_elapsed_str.is_empty()
     {
         state.timer_cache.cached_piscine_elapsed_str.as_str()
@@ -163,8 +162,8 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
     let line2 = Line::from(line2_spans);
 
     // ── L3 : progression piscine [done/total] ────────────────────────────
-    let total = state.exercises.len();
-    let done = state.completed.iter().filter(|&&c| c).count();
+    let total = state.ex.exercises.len();
+    let done = state.ex.completed.iter().filter(|&&c| c).count();
     let line3 = if done > 0 {
         Line::from(Span::styled(
             format!("✓ {}/{} exercices complétés", done, total),
@@ -182,8 +181,8 @@ fn render_piscine_header(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_piscine_timer(f: &mut Frame, area: Rect, state: &AppState) {
-    if let (Some(_start), Some(deadline)) = (state.piscine_start, state.piscine_deadline) {
-        let total_secs = state.piscine_timer_total as f64;
+    if let (Some(_start), Some(deadline)) = (state.piscine.start, state.piscine.deadline) {
+        let total_secs = state.piscine.timer_total as f64;
         let remaining_secs = (deadline - std::time::Instant::now())
             .as_secs_f64()
             .max(0.0);
@@ -223,16 +222,16 @@ fn render_piscine_body(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
-    let total = state.exercises.len();
-    let done = state.completed.iter().filter(|&&c| c).count();
+    let total = state.ex.exercises.len();
+    let done = state.ex.completed.iter().filter(|&&c| c).count();
     let ratio = if total > 0 {
         done as f64 / total as f64
     } else {
         0.0
     };
 
-    let idx = state.current_index;
-    let map = common::mini_map(&state.completed, idx);
+    let idx = state.ex.current_index;
+    let map = common::mini_map(&state.ex.completed, idx);
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -266,7 +265,7 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     lines.push(Line::raw(""));
 
     // Timer restant si timed
-    if let Some(deadline) = state.piscine_deadline {
+    if let Some(deadline) = state.piscine.deadline {
         let remaining = (deadline - std::time::Instant::now())
             .as_secs_f64()
             .max(0.0) as u64;
@@ -290,9 +289,9 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
     }
 
     // Échecs cumulés
-    if state.piscine_fail_count > 0 {
+    if state.piscine.fail_count > 0 {
         lines.push(Line::from(Span::styled(
-            format!("✗ {} échec(s)", state.piscine_fail_count),
+            format!("✗ {} échec(s)", state.piscine.fail_count),
             Style::default().fg(common::C_DANGER),
         )));
     }
@@ -303,7 +302,7 @@ fn render_piscine_sidebar(f: &mut Frame, area: Rect, state: &AppState) {
 fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
     use crate::constants::STATUS_BAR_SPACING;
 
-    let exercise = &state.exercises[state.current_index];
+    let exercise = &state.ex.exercises[state.ex.current_index];
     let has_vis = !exercise.visualizer.steps.is_empty();
     let has_hints = !exercise.hints.is_empty();
 
@@ -335,7 +334,7 @@ fn render_piscine_status_bar(f: &mut Frame, area: Rect, state: &AppState) {
             common::append_hint_counter_if_visible(
                 &mut spans,
                 " indice",
-                state.hint_index,
+                state.ex.hint_index,
                 exercise.hints.len(),
             );
             Line::from(spans)
