@@ -277,6 +277,7 @@ fn main() {
 
     if let Err(e) = result {
         eprintln!("{} {e}", "Erreur:".bold().red());
+        let _ = ratatui::restore();
         std::process::exit(1);
     }
 }

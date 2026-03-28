@@ -1,6 +1,7 @@
 //! Application state and event handling (TEA/Elm architecture).
 
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -40,8 +41,19 @@ pub enum Msg {
     Resize(u16, u16),
 }
 
+impl fmt::Display for Msg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Msg::Key(ke) => write!(f, "Key({:?})", ke.code),
+            Msg::FileChanged => write!(f, "FileChanged"),
+            Msg::Tick => write!(f, "Tick"),
+            Msg::Resize(w, h) => write!(f, "Resize({w}x{h}"),
+        }
+    }
+}
+
 /// État des overlays (help, list, search, solution, visualizer, libsys, nav_confirm).
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct OverlayState {
     /// Overlay aide ([?]) — affiche les keybinds.
     pub help_active: bool,
@@ -87,7 +99,7 @@ pub struct OverlayState {
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
 /// Réduit les allocations string par frame en cachant les chaînes pré-formatées.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HeaderCache {
     /// String pré-formatée de la minimap d'achèvement.
     pub cached_mini_map: String,
@@ -109,8 +121,40 @@ pub struct HeaderCache {
     last_cached_mastery: f64,
 }
 
+impl HeaderCache {
+    /// Invalide le cache si index/total/mastery ont changé et recompute les strings.
+    fn invalidate(
+        &mut self,
+        idx: usize,
+        total: usize,
+        mastery: f64,
+        exercises: &[Exercise],
+        completed: &[bool],
+    ) {
+        if self.last_cached_index != idx || self.last_cached_total != total {
+            self.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
+            self.last_cached_index = idx;
+            self.last_cached_total = total;
+        }
+        if (self.last_cached_mastery - mastery).abs() > 0.01 {
+            self.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
+            self.last_cached_mastery = mastery;
+        }
+        self.cached_mini_map = crate::tui::common::mini_map(completed, idx);
+        self.cached_mini_map_len = self.cached_mini_map.chars().count();
+        self.cached_exercise_type = exercises
+            .get(idx)
+            .map(|e| e.exercise_type.to_string())
+            .unwrap_or_default();
+        let title = exercises.get(idx).map(|e| e.title.as_str()).unwrap_or("");
+        self.cached_header_left_len =
+            self.cached_exercise_counter.chars().count() + title.chars().count();
+    }
+}
+
 /// Cache du timer piscine/exam — mis à jour dans Tick quand la seconde change.
 /// Évite les allocations string à chaque rendu.
+#[derive(Debug)]
 pub struct PiscineTimerCache {
     /// Temps écoulé pré-formaté.
     pub cached_piscine_elapsed_str: String,
@@ -135,6 +179,7 @@ impl Default for PiscineTimerCache {
 
 /// État centralisé TEA/Elm — gère tous les modes (watch/piscine/exam/run).
 /// Immutable rendering avec dérivation complète du state en View.
+#[derive(Debug)]
 pub struct AppState {
     /// `true` si l'utilisateur a appuyé sur [q] ou fermé le terminal.
     pub should_quit: bool,
@@ -257,6 +302,7 @@ impl AppState {
     }
 }
 
+#[derive(Debug)]
 pub struct App {
     pub state: AppState,
 }
@@ -285,40 +331,9 @@ impl App {
             .copied()
             .unwrap_or(0.0);
 
-        // Check if exercise counter needs recompute
-        if state.header_cache.last_cached_index != idx
-            || state.header_cache.last_cached_total != total
-        {
-            state.header_cache.cached_exercise_counter = format!("[{}/{}] ", idx + 1, total);
-            state.header_cache.last_cached_index = idx;
-            state.header_cache.last_cached_total = total;
-        }
-
-        // Check if mastery display needs recompute
-        if (state.header_cache.last_cached_mastery - mastery).abs() > 0.01 {
-            state.header_cache.cached_mastery_display = format!("mastery: {:.1}  ", mastery);
-            state.header_cache.last_cached_mastery = mastery;
-        }
-
-        // Mini map always needs recompute (completion status changes)
-        state.header_cache.cached_mini_map = crate::tui::common::mini_map(&state.completed, idx);
-        state.header_cache.cached_mini_map_len = state.header_cache.cached_mini_map.chars().count();
-
-        // Exercise type
-        state.header_cache.cached_exercise_type = state
-            .exercises
-            .get(idx)
-            .map(|e| e.exercise_type.to_string())
-            .unwrap_or_default();
-
-        // Cache the left header width: "[N/total] " + title chars count
-        let title = state
-            .exercises
-            .get(idx)
-            .map(|e| e.title.as_str())
-            .unwrap_or("");
-        state.header_cache.cached_header_left_len =
-            state.header_cache.cached_exercise_counter.chars().count() + title.chars().count();
+        state
+            .header_cache
+            .invalidate(idx, total, mastery, &state.exercises, &state.completed);
     }
 
     /// Boucle principale watch avec Ratatui.
@@ -344,9 +359,16 @@ impl App {
         // Boucle TEA
         loop {
             self.state.update_due_count_cache();
-            terminal.draw(|f| crate::tui::ui_watch::view(f, &mut self.state))?;
+            terminal
+                .draw(|f| crate::tui::ui_watch::view(f, &mut self.state))
+                .map_err(|e| {
+                    ratatui::restore();
+                    e
+                })?;
 
-            match rx.recv_timeout(Duration::from_millis(50)) {
+            match rx.recv_timeout(Duration::from_millis(
+                crate::constants::RENDER_RECV_TIMEOUT_MS,
+            )) {
                 Ok(msg) => self.update_watch(msg, conn),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
@@ -719,7 +741,13 @@ impl App {
         match key.code {
             // Vim : l / → = step suivant ; h / ← = step précédent ; j/k aussi intuitifs
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Char('j') => {
-                let total = state.exercises[state.current_index].visualizer.steps.len();
+                let total = state
+                    .exercises
+                    .get(state.current_index)
+                    .expect("current_index in bounds")
+                    .visualizer
+                    .steps
+                    .len();
                 state.overlay.vis_step = (state.overlay.vis_step + 1).min(total.saturating_sub(1));
             }
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('k') => {
@@ -856,7 +884,13 @@ impl App {
     /// Shared hint reveal handler `[h]`.
     fn reveal_next_hint(&mut self) {
         use crate::constants::HINT_MIN_ATTEMPTS;
-        let hints_len = self.state.exercises[self.state.current_index].hints.len();
+        let hints_len = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds")
+            .hints
+            .len();
         if hints_len == 0 {
             return;
         }
@@ -876,13 +910,11 @@ impl App {
 
     /// Shared visualizer toggle `[v]`.
     fn toggle_visualizer_overlay(&mut self) {
-        if !self.state.exercises[self.state.current_index]
-            .visualizer
-            .steps
-            .is_empty()
-        {
-            self.state.overlay.vis_active = true;
-            self.state.overlay.vis_step = 0;
+        if let Some(exercise) = self.state.exercises.get(self.state.current_index) {
+            if !exercise.visualizer.steps.is_empty() {
+                self.state.overlay.vis_active = true;
+                self.state.overlay.vis_step = 0;
+            }
         }
     }
 
@@ -955,14 +987,22 @@ impl App {
 
     /// Check if solution can be revealed (all hints shown OR enough failures).
     fn can_reveal_solution(&self, failure_threshold: usize) -> bool {
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
         all_shown || self.state.consecutive_failures as usize >= failure_threshold
     }
 
     /// Check if piscine solution can be revealed (fail_count-based threshold).
     fn can_reveal_solution_piscine(&self) -> bool {
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
         all_shown || self.state.piscine_fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
     }
@@ -976,7 +1016,11 @@ impl App {
             return;
         };
         self.state.compile_pending = true;
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let result = crate::runner::compile_and_run(path, exercise);
         self.state.compile_pending = false;
         let success = result.success;
@@ -1049,12 +1093,22 @@ impl App {
             if (self.state.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
                 && self.state.hint_index == 0
             {
-                let hints_len = self.state.exercises[self.state.current_index].hints.len();
+                let hints_len = self
+                    .state
+                    .exercises
+                    .get(self.state.current_index)
+                    .expect("current_index in bounds")
+                    .hints
+                    .len();
                 if hints_len > 0 {
                     self.state.hint_index = 1;
                 }
             }
-            let exercise = &self.state.exercises[self.state.current_index];
+            let exercise = self
+                .state
+                .exercises
+                .get(self.state.current_index)
+                .expect("current_index in bounds");
             if let Err(e) =
                 crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
             {
@@ -1172,9 +1226,16 @@ impl App {
 
         // Boucle TEA
         loop {
-            terminal.draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))?;
+            terminal
+                .draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))
+                .map_err(|e| {
+                    ratatui::restore();
+                    e
+                })?;
 
-            match rx.recv_timeout(Duration::from_millis(50)) {
+            match rx.recv_timeout(Duration::from_millis(
+                crate::constants::RENDER_RECV_TIMEOUT_MS,
+            )) {
                 Ok(msg) => self.update_piscine(msg, conn, session_id),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     // Check deadline on timeout
@@ -1240,7 +1301,11 @@ impl App {
                             return;
                         };
                         self.state.compile_pending = true;
-                        let exercise = &self.state.exercises[self.state.current_index];
+                        let exercise = self
+                            .state
+                            .exercises
+                            .get(self.state.current_index)
+                            .expect("current_index in bounds");
                         let result = crate::runner::compile_and_run(path, exercise);
                         self.state.compile_pending = false;
                         let success = result.success;
@@ -1276,7 +1341,11 @@ impl App {
                                     }
                                 }
                             }
-                            let exercise = &self.state.exercises[self.state.current_index];
+                            let exercise = self
+                                .state
+                                .exercises
+                                .get(self.state.current_index)
+                                .expect("current_index in bounds");
                             if let Err(e) = crate::progress::record_attempt(
                                 conn,
                                 &exercise.subject,
