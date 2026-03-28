@@ -19,6 +19,7 @@ use crate::models::{MasteryScore, SrsIntervalDays, Subject};
 
 mod progress_db;
 pub use progress_db::open_db;
+#[cfg(test)]
 use progress_db::{add_practice_log_columns_if_missing, migrate_v1, SCHEMA, SCHEMA_V1};
 
 const PRACTICE_LOG_MAX_ENTRIES: usize = 10_000;
