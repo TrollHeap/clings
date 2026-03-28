@@ -113,7 +113,8 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     app.state.progress.subject_order = app
         .state
-        .ex.exercises
+        .ex
+        .exercises
         .iter()
         .filter_map(|ex| {
             if seen.insert(ex.subject.as_str()) {

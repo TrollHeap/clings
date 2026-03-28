@@ -91,7 +91,8 @@ pub fn cmd_piscine(filter_chapter: Option<u8>, timed_minutes: Option<u64>) -> Re
     let done = app.state.ex.completed.iter().filter(|&&c| c).count();
     let elapsed = app
         .state
-        .piscine.start
+        .piscine
+        .start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
     let (hours, mins, secs) = decompose_elapsed(elapsed);
@@ -190,7 +191,8 @@ pub fn run_exam_piscine(
     let done = app.state.ex.completed.iter().filter(|&&c| c).count();
     let elapsed = app
         .state
-        .piscine.start
+        .piscine
+        .start
         .unwrap_or(std::time::Instant::now())
         .elapsed();
     let (hours, mins, secs) = decompose_elapsed(elapsed);
