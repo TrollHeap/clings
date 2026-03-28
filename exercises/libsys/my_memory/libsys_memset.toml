@@ -1,0 +1,120 @@
+id = "libsys-memset-01"
+subject = "memory_allocation"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_memory"
+libsys_function = "my_memset"
+libsys_unlock = "standalone"
+title = "libsys : my_memset"
+key_concept = "remplissage mémoire octet par octet"
+common_mistake = "Confondre le paramètre c (int) avec un char — cast en unsigned char obligatoire"
+prerequisites = []
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_memset` : remplit les `n` premiers octets de la zone mémoire `s`
+avec la valeur `c` (convertie en unsigned char).
+Cette fonction sera exportée vers ton repo libsys après validation.
+
+Signature imposée :
+    void *my_memset(void *s, int c, size_t n);
+
+Contraintes :
+- Ne pas utiliser memset de la stdlib
+- Retourner `s`
+"""
+
+header_code = "void *my_memset(void *s, int c, size_t n);"
+
+starter_code = '''
+#include <stddef.h>
+
+/**
+ * my_memset - Remplit n octets de s avec la valeur c.
+ * @s: pointeur sur la zone mémoire cible
+ * @c: valeur de remplissage (castée en unsigned char)
+ * @n: nombre d'octets à remplir
+ * Return: s
+ */
+void *my_memset(void *s, int c, size_t n)
+{
+    /* À implémenter */
+    (void)s;
+    (void)c;
+    (void)n;
+    return s;
+}
+'''
+
+solution_code = '''
+#include <stddef.h>
+
+void *my_memset(void *s, int c, size_t n)
+{
+    unsigned char   *p;
+    size_t          i;
+
+    p = (unsigned char *)s;
+    i = 0;
+    while (i < n)
+    {
+        p[i] = (unsigned char)c;
+        i++;
+    }
+    return s;
+}
+'''
+
+hints = [
+    "Cast `s` en `unsigned char *` pour itérer octet par octet",
+    "Le paramètre `c` est un int mais doit être casté en `unsigned char` à l'écriture",
+    "N'oublie pas de retourner `s` (le pointeur original, pas `p`)",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stddef.h>
+#include <string.h>
+
+void *my_memset(void *s, int c, size_t n);
+
+void test_basic_fill(void) {
+    char buf[8] = {0};
+    my_memset(buf, 'A', 4);
+    TEST_ASSERT_EQUAL_INT('A', buf[0]);
+    TEST_ASSERT_EQUAL_INT('A', buf[3]);
+    TEST_ASSERT_EQUAL_INT(0,   buf[4]);
+}
+
+void test_full_fill(void) {
+    char buf[4];
+    my_memset(buf, 0xFF, 4);
+    TEST_ASSERT_EQUAL_INT((char)0xFF, buf[0]);
+    TEST_ASSERT_EQUAL_INT((char)0xFF, buf[3]);
+}
+
+void test_zero_fill(void) {
+    char buf[4] = {1, 2, 3, 4};
+    my_memset(buf, 0, 4);
+    TEST_ASSERT_EQUAL_INT(0, buf[0]);
+    TEST_ASSERT_EQUAL_INT(0, buf[3]);
+}
+
+void test_returns_s(void) {
+    char buf[4];
+    void *ret = my_memset(buf, 0, 4);
+    TEST_ASSERT_EQUAL_PTR(buf, ret);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_basic_fill);
+    RUN_TEST(test_full_fill);
+    RUN_TEST(test_zero_fill);
+    RUN_TEST(test_returns_s);
+    return UNITY_END();
+}
+'''

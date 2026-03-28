@@ -1,0 +1,137 @@
+id = "libsys-memmove-01"
+subject = "memory_allocation"
+lang = "c"
+difficulty = 3
+exercise_type = "library_export"
+libsys_module = "my_memory"
+libsys_function = "my_memmove"
+libsys_unlock = "standalone"
+title = "libsys : my_memmove"
+key_concept = "copie sécurisée avec gestion du chevauchement"
+common_mistake = "Toujours copier de gauche à droite — bug si dest > src dans une zone chevauchante"
+prerequisites = ["libsys-memcpy-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_memmove` : copie `n` octets de `src` vers `dest`.
+Contrairement à memcpy, les zones PEUVENT se chevaucher.
+
+Signature imposée :
+    void *my_memmove(void *dest, const void *src, size_t n);
+
+Stratégie :
+- Si dest < src (ou pas de chevauchement) → copie de gauche à droite (comme memcpy)
+- Si dest > src (chevauchement avant) → copie de droite à gauche pour éviter l'écrasement
+"""
+
+header_code = "void *my_memmove(void *dest, const void *src, size_t n);"
+
+starter_code = '''
+#include <stddef.h>
+
+/**
+ * my_memmove - Copie n octets de src vers dest (zones chevauchantes OK).
+ * @dest: zone destination
+ * @src:  zone source
+ * @n:    nombre d'octets à copier
+ * Return: dest
+ */
+void *my_memmove(void *dest, const void *src, size_t n)
+{
+    /* À implémenter */
+    (void)dest;
+    (void)src;
+    (void)n;
+    return dest;
+}
+'''
+
+solution_code = '''
+#include <stddef.h>
+
+void *my_memmove(void *dest, const void *src, size_t n)
+{
+    unsigned char       *d;
+    const unsigned char *s;
+
+    d = (unsigned char *)dest;
+    s = (const unsigned char *)src;
+    if (d < s)
+    {
+        size_t i = 0;
+        while (i < n)
+        {
+            d[i] = s[i];
+            i++;
+        }
+    }
+    else if (d > s)
+    {
+        size_t i = n;
+        while (i > 0)
+        {
+            i--;
+            d[i] = s[i];
+        }
+    }
+    return dest;
+}
+'''
+
+hints = [
+    "Compare les adresses dest et src pour choisir la direction de copie",
+    "Si dest > src : copie de l'indice n-1 jusqu'à 0 (droite à gauche) pour éviter l'écrasement",
+    "Si dest == src : rien à faire, retourne dest directement",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stddef.h>
+#include <string.h>
+
+void *my_memmove(void *dest, const void *src, size_t n);
+
+void test_no_overlap(void) {
+    char src[8] = "hello";
+    char dst[8] = {0};
+    my_memmove(dst, src, 6);
+    TEST_ASSERT_EQUAL_STRING("hello", dst);
+}
+
+void test_overlap_forward(void) {
+    char buf[10] = "ABCDE";
+    /* Copie buf+1 → buf (chevauchement, dest < src) */
+    my_memmove(buf, buf + 1, 4);
+    TEST_ASSERT_EQUAL_INT('B', buf[0]);
+    TEST_ASSERT_EQUAL_INT('C', buf[1]);
+    TEST_ASSERT_EQUAL_INT('D', buf[2]);
+    TEST_ASSERT_EQUAL_INT('E', buf[3]);
+}
+
+void test_overlap_backward(void) {
+    char buf[10] = "ABCDE";
+    /* Copie buf → buf+1 (chevauchement, dest > src) */
+    my_memmove(buf + 1, buf, 4);
+    TEST_ASSERT_EQUAL_INT('A', buf[1]);
+    TEST_ASSERT_EQUAL_INT('B', buf[2]);
+    TEST_ASSERT_EQUAL_INT('C', buf[3]);
+    TEST_ASSERT_EQUAL_INT('D', buf[4]);
+}
+
+void test_returns_dest(void) {
+    char buf[8] = "test";
+    void *ret = my_memmove(buf + 2, buf, 3);
+    TEST_ASSERT_EQUAL_PTR(buf + 2, ret);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_no_overlap);
+    RUN_TEST(test_overlap_forward);
+    RUN_TEST(test_overlap_backward);
+    RUN_TEST(test_returns_dest);
+    return UNITY_END();
+}
+'''

@@ -81,6 +81,10 @@ pub fn generate_skeleton(subject: &str, difficulty: u8, mode: &str) -> Result<Ex
         kc_ids: vec![],
         starter_code_stages: vec![],
         visualizer: Default::default(),
+        libsys_module: None,
+        libsys_function: None,
+        libsys_unlock: None,
+        header_code: None,
     };
 
     Ok(exercise)

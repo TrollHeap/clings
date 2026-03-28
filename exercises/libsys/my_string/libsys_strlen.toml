@@ -1,0 +1,92 @@
+id = "libsys-strlen-01"
+subject = "string_formatting"
+lang = "c"
+difficulty = 1
+exercise_type = "library_export"
+libsys_module = "my_string"
+libsys_function = "my_strlen"
+libsys_unlock = "standalone"
+title = "libsys : my_strlen"
+key_concept = "parcours de chaîne jusqu'au caractère nul"
+common_mistake = "Compter le '\\0' terminal dans la longueur retournée"
+prerequisites = []
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_strlen` : retourne la longueur d'une chaîne (sans le '\\0').
+Cette fonction sera exportée vers ton repo libsys après validation.
+
+Signature imposée :
+    size_t my_strlen(const char *s);
+
+Contraintes :
+- Ne pas utiliser strlen de la stdlib
+- Comportement indéfini si s == NULL (idem que la vraie strlen)
+"""
+
+header_code = "size_t my_strlen(const char *s);"
+
+starter_code = '''
+#include <stddef.h>
+
+/**
+ * my_strlen - Calcule la longueur de la chaîne s.
+ * @s: chaîne source (ne doit pas être NULL)
+ * Return: nombre de caractères avant le '\\0'
+ */
+size_t my_strlen(const char *s)
+{
+    /* À implémenter */
+    (void)s;
+    return 0;
+}
+'''
+
+solution_code = '''
+#include <stddef.h>
+
+size_t my_strlen(const char *s)
+{
+    size_t len = 0;
+
+    while (s[len])
+        len++;
+    return len;
+}
+'''
+
+hints = [
+    "Utilise un compteur que tu incrémentes tant que s[i] != '\\0'",
+    "La condition de la boucle peut être écrite simplement : while (*s++)",
+    "size_t est le bon type de retour — il est non signé et adapté aux tailles mémoire",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stddef.h>
+#include <string.h>
+
+size_t my_strlen(const char *s);
+
+void test_normal(void) {
+    TEST_ASSERT_EQUAL_INT(5, (int)my_strlen("hello"));
+}
+
+void test_empty(void) {
+    TEST_ASSERT_EQUAL_INT(0, (int)my_strlen(""));
+}
+
+void test_single_char(void) {
+    TEST_ASSERT_EQUAL_INT(1, (int)my_strlen("x"));
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_normal);
+    RUN_TEST(test_empty);
+    RUN_TEST(test_single_char);
+    return UNITY_END();
+}
+'''

@@ -81,7 +81,7 @@ pub fn next_stage_threshold(score: f64) -> Option<(f64, f64, u8)> {
 }
 
 /// Calcule la zone d'un popup centré avec des marges en pourcentage.
-fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
+pub fn centered_popup(area: Rect, margin_v_pct: u16, margin_h_pct: u16) -> Rect {
     let content_v = 100u16.saturating_sub(margin_v_pct * 2);
     let content_h = 100u16.saturating_sub(margin_h_pct * 2);
     let [_, popup_v, _] = Layout::vertical([
@@ -151,6 +151,13 @@ pub fn exercise_type_badge(t: ExerciseType) -> Span<'static> {
                 .bg(C_BADGE_REFACTOR)
                 .add_modifier(Modifier::BOLD);
             " REFACTOR "
+        ),
+        ExerciseType::LibraryExport => span!(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(166, 227, 161))
+                .add_modifier(Modifier::BOLD);
+            " LIBSYS "
         ),
     }
 }
@@ -1048,6 +1055,7 @@ pub fn render_help_overlay(f: &mut Frame, area: Rect) {
         ("[r]", "Compiler et vérifier"),
         ("[h]", "Afficher l'indice"),
         ("[v]", "Visualiseur mémoire"),
+        ("[b]", "Portfolio libsys"),
         ("[l]", "Liste des exercices"),
         ("[/]", "Recherche fuzzy"),
         ("[Tab]", "Filtrer par sujet (en recherche)"),

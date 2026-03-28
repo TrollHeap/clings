@@ -1,18 +1,18 @@
-common_mistake = "Utiliser p <= end au lieu de p < end : end pointe après le dernier élément"
+common_mistake = "Confondre le résultat de end - begin (en nombre d'éléments) avec une différence d'octets : le compilateur divise automatiquement par sizeof(*p)"
 description = """
-NSY103 — Un tableau se décompose en pointeur vers son premier élément. On peut parcourir le tableau en incrémentant un pointeur au lieu d'utiliser un indice.
+NSY103 — La soustraction de deux pointeurs de même type donne directement le nombre d'éléments qui les séparent (et non une différence en octets).
 
-Parcourez un tableau de 5 entiers avec un pointeur `p` qui avance à chaque itération, et affichez chaque élément."""
+Implémentez `count_elements(int *begin, int *end)` qui retourne le nombre d'entiers entre `begin` et `end` en utilisant uniquement l'arithmétique de pointeurs."""
 difficulty = 1
 exercise_type = "complete"
 hints = [
-    "Initialisez `p = arr` pour pointer vers le premier élément",
-    "La borne de fin est `end = arr + n` (un élément après le dernier)",
-    "Avancez le pointeur avec `p++` et lisez avec `*p`",
+    "`end - begin` retourne une valeur de type `ptrdiff_t` — castez-la en `(int)`",
+    "Si begin == end, il n'y a aucun élément — la soustraction donne 0",
+    "end pointe après le dernier élément : `arr + n` est valide même si on ne déréférence pas end",
 ]
 id = "ptr-deref-03"
 kc_ids = ["KC-C01"]
-key_concept = "p++ avance un pointeur de sizeof(*p) octets — parcours sans indice"
+key_concept = "end - begin donne le nombre d'éléments (ptrdiff_t) — le compilateur divise par sizeof(*begin) automatiquement"
 lang = "c"
 prerequisites = ["ptr-deref-02"]
 solution_code = '''
@@ -46,12 +46,12 @@ starter_code = """
 #include <stdio.h>
 
 int count_elements(int *begin, int *end) {
-    return 0;
+    return 0; /* TODO: utiliser end - begin */
 }
 
 int main(void) {
     int nums[] = {3, 7, 1, 9, 4};
-    print_array(nums, 5);
+    printf("%d\n", count_elements(nums, nums + 5));
     return 0;
 }
 """
@@ -60,56 +60,47 @@ starter_code_stages = [
 #include <stdio.h>
 
 /* == EXEMPLE ================================================
- * Trouver le min d'un tableau via pointeur qui avance
- * p++ deplace le pointeur de sizeof(int) octets.
+ * Parcours de tableau via pointeur qui avance (p++)
+ * La distance end - begin donne le nombre d'elements.
  * =========================================================== */
-int example_min(const int *arr, int n) {
+void example_print(const int *arr, int n) {
     const int *p = arr;
     const int *end = arr + n;
-    int min = *p;
-    p++;
-    while (p < end) {
-        if (*p < min) min = *p;
-        p++;
-    }
-    return min;
+    while (p < end) { printf("%d ", *p); p++; }
+    printf("\n");
 }
 void example_demo(void) {
-    int data[] = {8, 3, 5, 1, 9};
-    printf("Min : %d\n", example_min(data, 5));
+    int data[] = {1, 2, 3};
+    example_print(data, 3);
+    /* Distance : end - begin donne le nombre d'elements */
+    printf("distance : %d\n", (int)(data + 3 - data));
 }
-/* Resultat: Min : 1 */
+/* Resultat: 1 2 3 \ndistance : 3 */
 
 /* == VOTRE EXERCICE =========================================
- * Parcourir un tableau et afficher chaque element via pointeur
- * Inspirez-vous de example_min ci-dessus.
- * Utilisez p/end et p++ au lieu d'indices.
+ * count_elements retourne le nombre d'elements entre begin et end
+ * Indice : end - begin donne directement la reponse.
  * =========================================================== */
-void print_array(const int *arr, int n) {
-    (void)arr; (void)n; /* TODO */
+int count_elements(int *begin, int *end) {
+    (void)begin; (void)end;
+    return 0; /* TODO */
 }
 
 int main(void) {
     int nums[] = {3, 7, 1, 9, 4};
-    print_array(nums, 5);
+    printf("%d\n", count_elements(nums, nums + 5));
     return 0;
 }''',
     '''
 #include <stdio.h>
 
-void print_array(const int *arr, int n) {
-    const int *p = arr;
-    const int *end = arr + n;
-    while (p < end) {
-        printf("%d ", ____);
-        ____; // avancer le pointeur
-    }
-    printf("\n");
+int count_elements(int *begin, int *end) {
+    return (int)(____ - ____); /* soustraction de pointeurs */
 }
 
 int main(void) {
     int nums[] = {3, 7, 1, 9, 4};
-    print_array(nums, 5);
+    printf("%d\n", count_elements(nums, nums + 5));
     return 0;
 }''',
     """
@@ -121,7 +112,7 @@ int count_elements(int *begin, int *end) {
 
 int main(void) {
     int nums[] = {3, 7, 1, 9, 4};
-    print_array(nums, 5);
+    printf("%d\n", count_elements(nums, nums + 5));
     return 0;
 }
 """,

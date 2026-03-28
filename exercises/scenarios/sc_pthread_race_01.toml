@@ -1,0 +1,89 @@
+common_mistake = "Déclarer le mutex mais oublier pthread_mutex_lock/unlock autour de l'incrément — le compilateur ne signale rien, le bug est silencieux"
+description = """
+NSY103 — Scénario exam : race condition sur compteur partagé, corriger avec pthread_mutex.
+
+4 threads incrémentent chacun un compteur global g_counter 10 000 fois.
+Sans protection, les incréments se chevauchent (read-modify-write non atomique) → résultat inférieur à 40 000.
+
+Le mutex est déclaré et initialisé. Il manque les appels pthread_mutex_lock/unlock autour de la section critique.
+
+⚠ Pattern direct des examens NSY103 : race condition + correction mutex testée en session 2 2022-2023 Q1.2 (horloge multi-thread) et session 1 2022-2023 Q2.1."""
+difficulty = 3
+exercise_type = "fix_bug"
+hints = [
+    "La section critique est g_counter++ — une seule ligne, mais elle se décompose en 3 opérations CPU (load, add, store) que deux threads peuvent interleaver",
+    "pthread_mutex_lock(&mtx) avant g_counter++, pthread_mutex_unlock(&mtx) après — encadrer exactement et uniquement l'accès à la variable partagée",
+    "PTHREAD_MUTEX_INITIALIZER initialise statiquement — pas besoin de pthread_mutex_init() ici. Le mutex est déjà prêt, il manque juste son utilisation",
+]
+id = "sc-pthread-race-01"
+kc_ids = ["KC-CAP"]
+key_concept = "g_counter++ n'est pas atomique (3 instructions CPU) — pthread_mutex_lock/unlock transforme la section critique en opération exclusive"
+lang = "c"
+prerequisites = [
+    "pthread-create-01",
+    "mutex-basic-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define N_THREADS 4
+#define N_ITER    10000
+
+static int g_counter = 0;
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+static void *thread_fn(void *arg) {
+    (void)arg;
+    for (int i = 0; i < N_ITER; i++) {
+        pthread_mutex_lock(&mtx);    /* FIX: protéger la section critique */
+        g_counter++;
+        pthread_mutex_unlock(&mtx); /* FIX: libérer après l\'accès */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[N_THREADS];
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_create(&threads[i], NULL, thread_fn, NULL);
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_join(threads[i], NULL);
+    printf("counter = %d\n", g_counter);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <pthread.h>
+
+#define N_THREADS 4
+#define N_ITER    10000
+
+static int g_counter = 0;
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+static void *thread_fn(void *arg) {
+    (void)arg;
+    for (int i = 0; i < N_ITER; i++) {
+        /* BUG: manque pthread_mutex_lock(&mtx) */
+        g_counter++;
+        /* BUG: manque pthread_mutex_unlock(&mtx) */
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[N_THREADS];
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_create(&threads[i], NULL, thread_fn, NULL);
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_join(threads[i], NULL);
+    printf("counter = %d\n", g_counter);
+    return 0;
+}'''
+subject = "scenarios"
+title = "Race condition pthread — mutex manquant sur compteur partagé"
+
+[validation]
+expected_output = "counter = 40000\n"
+mode = "output"

@@ -1,0 +1,128 @@
+id = "libsys-memcpy-01"
+subject = "memory_allocation"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_memory"
+libsys_function = "my_memcpy"
+libsys_unlock = "standalone"
+title = "libsys : my_memcpy"
+key_concept = "copie de blocs mémoire non chevauchants"
+common_mistake = "Utiliser my_memcpy sur des zones qui se chevauchent — utiliser memmove dans ce cas"
+prerequisites = ["libsys-memset-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_memcpy` : copie `n` octets de la zone mémoire `src` vers `dest`.
+Les zones ne doivent pas se chevaucher (comportement indéfini sinon).
+Cette fonction sera exportée vers ton repo libsys après validation.
+
+Signature imposée :
+    void *my_memcpy(void *dest, const void *src, size_t n);
+
+Contraintes :
+- Ne pas utiliser memcpy de la stdlib
+- Retourner `dest`
+- Comportement indéfini si les zones se chevauchent (c'est normal)
+"""
+
+header_code = "void *my_memcpy(void *dest, const void *src, size_t n);"
+
+starter_code = '''
+#include <stddef.h>
+
+/**
+ * my_memcpy - Copie n octets de src vers dest (zones non chevauchantes).
+ * @dest: zone destination
+ * @src:  zone source
+ * @n:    nombre d'octets à copier
+ * Return: dest
+ */
+void *my_memcpy(void *dest, const void *src, size_t n)
+{
+    /* À implémenter */
+    (void)dest;
+    (void)src;
+    (void)n;
+    return dest;
+}
+'''
+
+solution_code = '''
+#include <stddef.h>
+
+void *my_memcpy(void *dest, const void *src, size_t n)
+{
+    unsigned char       *d;
+    const unsigned char *s;
+    size_t              i;
+
+    d = (unsigned char *)dest;
+    s = (const unsigned char *)src;
+    i = 0;
+    while (i < n)
+    {
+        d[i] = s[i];
+        i++;
+    }
+    return dest;
+}
+'''
+
+hints = [
+    "Cast `dest` en `unsigned char *` et `src` en `const unsigned char *`",
+    "Copie octet par octet avec un index, pas avec des pointeurs décrémentés",
+    "N'oublie pas de retourner `dest` (pas `d`)",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stddef.h>
+#include <string.h>
+
+void *my_memcpy(void *dest, const void *src, size_t n);
+
+void test_basic_copy(void) {
+    char src[8] = "hello";
+    char dst[8] = {0};
+    my_memcpy(dst, src, 6);
+    TEST_ASSERT_EQUAL_STRING("hello", dst);
+}
+
+void test_partial_copy(void) {
+    char src[8] = "ABCDEF";
+    char dst[8] = {0};
+    my_memcpy(dst, src, 3);
+    TEST_ASSERT_EQUAL_INT('A', dst[0]);
+    TEST_ASSERT_EQUAL_INT('B', dst[1]);
+    TEST_ASSERT_EQUAL_INT('C', dst[2]);
+    TEST_ASSERT_EQUAL_INT(0,   dst[3]);
+}
+
+void test_returns_dest(void) {
+    char src[4] = "abc";
+    char dst[4];
+    void *ret = my_memcpy(dst, src, 4);
+    TEST_ASSERT_EQUAL_PTR(dst, ret);
+}
+
+void test_binary_data(void) {
+    unsigned char src[4] = {0x00, 0xFF, 0x42, 0x01};
+    unsigned char dst[4] = {0};
+    my_memcpy(dst, src, 4);
+    TEST_ASSERT_EQUAL_INT(0x00, dst[0]);
+    TEST_ASSERT_EQUAL_INT(0xFF, dst[1]);
+    TEST_ASSERT_EQUAL_INT(0x42, dst[2]);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_basic_copy);
+    RUN_TEST(test_partial_copy);
+    RUN_TEST(test_returns_dest);
+    RUN_TEST(test_binary_data);
+    return UNITY_END();
+}
+'''

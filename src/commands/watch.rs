@@ -69,14 +69,8 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
         .cloned()
         .collect();
 
-    let gated_exercises: Vec<crate::models::Exercise> = if nsy103_only {
-        gated_exercises
-            .into_iter()
-            .filter(|ex| !NSY103_EXCLUDED.contains(&ex.subject.as_str()))
-            .collect()
-    } else {
-        gated_exercises
-    };
+    let gated_exercises: Vec<crate::models::Exercise> =
+        apply_nsy103_filter(gated_exercises, nsy103_only);
 
     let mut chapter_blocks = chapters::order_by_chapters(&gated_exercises, &subjects);
     if !chapters::filter_by_chapter(&mut chapter_blocks, filter_chapter) {
@@ -189,4 +183,117 @@ pub fn cmd_watch(filter_chapter: Option<u8>, nsy103_only: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Applique le filtre NSY103 si `nsy103_only` est activé :
+/// supprime les sujets exclusifs UTC502 (`scheduling`, `virtual_memory`).
+pub(crate) fn apply_nsy103_filter(
+    exercises: Vec<crate::models::Exercise>,
+    nsy103_only: bool,
+) -> Vec<crate::models::Exercise> {
+    if nsy103_only {
+        exercises
+            .into_iter()
+            .filter(|ex| !NSY103_EXCLUDED.contains(&ex.subject.as_str()))
+            .collect()
+    } else {
+        exercises
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        Difficulty, Exercise, ExerciseType, Lang, ValidationConfig, ValidationMode,
+    };
+
+    fn make_exercise(subject: &str) -> Exercise {
+        Exercise {
+            id: format!("{subject}-test-01"),
+            subject: subject.to_string(),
+            lang: Lang::C,
+            difficulty: Difficulty::Easy,
+            title: format!("Test {subject}"),
+            description: String::new(),
+            starter_code: String::new(),
+            starter_code_stages: vec![],
+            solution_code: String::new(),
+            hints: vec![],
+            validation: ValidationConfig {
+                mode: ValidationMode::Output,
+                expected_output: Some("ok".to_string()),
+                test_code: None,
+                expected_tests_pass: None,
+                max_duration_ms: None,
+            },
+            exercise_type: ExerciseType::Complete,
+            key_concept: None,
+            common_mistake: None,
+            kc_ids: vec![],
+            files: vec![],
+            visualizer: Default::default(),
+            prerequisites: vec![],
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
+        }
+    }
+
+    #[test]
+    fn test_nsy103_filter_removes_excluded_subjects() {
+        let exercises = vec![
+            make_exercise("scheduling"),
+            make_exercise("virtual_memory"),
+            make_exercise("processes"),
+            make_exercise("pthreads"),
+        ];
+        let result = apply_nsy103_filter(exercises, true);
+        let subjects: Vec<&str> = result.iter().map(|e| e.subject.as_str()).collect();
+        assert!(
+            !subjects.contains(&"scheduling"),
+            "scheduling doit être exclu"
+        );
+        assert!(
+            !subjects.contains(&"virtual_memory"),
+            "virtual_memory doit être exclu"
+        );
+        assert!(
+            subjects.contains(&"processes"),
+            "processes doit être conservé"
+        );
+        assert!(
+            subjects.contains(&"pthreads"),
+            "pthreads doit être conservé"
+        );
+    }
+
+    #[test]
+    fn test_nsy103_filter_disabled_preserves_all() {
+        let exercises = vec![
+            make_exercise("scheduling"),
+            make_exercise("virtual_memory"),
+            make_exercise("processes"),
+        ];
+        let result = apply_nsy103_filter(exercises, false);
+        assert_eq!(result.len(), 3, "nsy103_only=false ne doit rien filtrer");
+    }
+
+    #[test]
+    fn test_nsy103_filter_empty_input() {
+        let result = apply_nsy103_filter(vec![], true);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_nsy103_excluded_constant_covers_both_utc502_subjects() {
+        assert!(NSY103_EXCLUDED.contains(&"scheduling"));
+        assert!(NSY103_EXCLUDED.contains(&"virtual_memory"));
+        assert_eq!(
+            NSY103_EXCLUDED.len(),
+            2,
+            "exactement 2 sujets UTC502 exclus"
+        );
+    }
 }

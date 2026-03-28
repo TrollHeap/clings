@@ -151,7 +151,6 @@ void vec_push(Vec *v, int val) {
         int *tmp = realloc(v->data, new_cap * sizeof(int));
         if (!tmp) return;
         v->data = tmp;
-        printf("  realloc: %d -> %d\n", v->cap, new_cap);
         v->cap = new_cap;
     }
     v->data[v->len] = val;
@@ -190,7 +189,6 @@ void vec_push(Vec *v, int val) {
         int *tmp = realloc(v->data, new_cap * sizeof(int));
         if (!tmp) return;
         v->data = ____;
-        printf("  realloc: %d -> %d\n", v->cap, new_cap);
         v->cap = ____;
     }
     v->data[v->____] = val;

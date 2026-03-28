@@ -43,6 +43,8 @@ pub fn view(f: &mut Frame, state: &mut AppState) {
         common::render_solution_overlay(f, body_area, &state.exercises[state.current_index]);
     } else if state.overlay.search_active {
         common::render_search_overlay(f, body_area, state);
+    } else if state.overlay.libsys_active {
+        crate::tui::ui_libsys::render_libsys_overlay(f, body_area, state);
     } else {
         render_body(f, body_area, state);
     }

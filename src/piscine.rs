@@ -275,6 +275,10 @@ mod tests {
             kc_ids: vec![],
             starter_code_stages: vec![],
             visualizer: Visualizer::default(),
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
         }
     }
 

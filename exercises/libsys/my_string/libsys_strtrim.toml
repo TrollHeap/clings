@@ -1,0 +1,133 @@
+id = "libsys-strtrim-01"
+subject = "string_formatting"
+lang = "c"
+difficulty = 3
+exercise_type = "library_export"
+libsys_module = "my_string"
+libsys_function = "my_strtrim"
+libsys_unlock = "standalone"
+title = "libsys : my_strtrim"
+key_concept = "suppression de caractères en début et fin de chaîne"
+common_mistake = "Modifier la chaîne en place au lieu d'allouer une copie"
+prerequisites = ["libsys-strdup-01", "libsys-strlen-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_strtrim` : retourne une copie de la chaîne s sans les
+caractères du set en début et fin de chaîne. Alloue la mémoire avec malloc.
+
+Signature imposée :
+    char *my_strtrim(const char *s, const char *set);
+
+Exemples :
+    my_strtrim("  hello  ", " ")  → "hello"
+    my_strtrim("xxhelloxx", "x")  → "hello"
+    my_strtrim("abc", "")         → "abc" (copie intacte)
+
+Contraintes :
+- Retourner NULL si s ou set == NULL, ou si malloc échoue
+- Ne pas modifier s en place
+"""
+
+header_code = "char *my_strtrim(const char *s, const char *set);"
+
+starter_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+/**
+ * my_strtrim - Alloue une copie de s sans les caractères de set aux extrémités.
+ * @s:   chaîne source
+ * @set: ensemble de caractères à supprimer
+ * Return: nouvelle chaîne allouée, ou NULL en cas d'erreur
+ */
+char *my_strtrim(const char *s, const char *set)
+{
+    /* À implémenter */
+    (void)s;
+    (void)set;
+    return NULL;
+}
+'''
+
+solution_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+static int in_set(char c, const char *set)
+{
+    while (*set)
+        if (*set++ == c)
+            return 1;
+    return 0;
+}
+
+char *my_strtrim(const char *s, const char *set)
+{
+    size_t      start;
+    size_t      end;
+    size_t      len;
+    char        *result;
+
+    if (!s || !set)
+        return NULL;
+    start = 0;
+    len = strlen(s);
+    end = len;
+    while (start < end && in_set(s[start], set))
+        start++;
+    while (end > start && in_set(s[end - 1], set))
+        end--;
+    result = malloc(end - start + 1);
+    if (!result)
+        return NULL;
+    memcpy(result, s + start, end - start);
+    result[end - start] = \'\\0\';
+    return result;
+}
+'''
+
+hints = [
+    "Trouve d'abord l'index de début (avance tant que s[start] est dans set)",
+    "Puis trouve l'index de fin (recule depuis la fin tant que s[end-1] est dans set)",
+    "Alloue (end - start + 1) octets et copie avec memcpy",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+char *my_strtrim(const char *s, const char *set);
+
+void test_spaces(void) {
+    char *r = my_strtrim("  hello  ", " ");
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_STRING("hello", r);
+    free(r);
+}
+
+void test_custom_set(void) {
+    char *r = my_strtrim("xxhelloxx", "x");
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_STRING("hello", r);
+    free(r);
+}
+
+void test_empty_set(void) {
+    char *r = my_strtrim("hello", "");
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_STRING("hello", r);
+    free(r);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_spaces);
+    RUN_TEST(test_custom_set);
+    RUN_TEST(test_empty_set);
+    return UNITY_END();
+}
+'''

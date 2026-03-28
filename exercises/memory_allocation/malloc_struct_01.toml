@@ -87,13 +87,44 @@ void free_student(Student *s) {
     /* TODO: free name, then free s */
 }
 
+void print_student(const Student *s) {
+    /* Bonus : affiche "name : grade" — non testé */
+    (void)s;
+}
+
 int main(void) {
-    Student *alice = make_student("Alice", 18);
-    Student *bob   = make_student("Bob",   15);
-    print_student(alice);
-    print_student(bob);
-    free_student(alice);
-    free_student(bob);
+    {
+        Student *s = make_student("Alice", 18);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        free_student(s);
+    }
+    {
+        Student *s = make_student("Bob", 15);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        printf("%s\n", s->name);
+        free_student(s);
+    }
+    {
+        Student *s = make_student("Charlie", 20);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        printf("%d\n", (int)(s->grade));
+        free_student(s);
+    }
+    {
+        Student *alice = make_student("Alice", 18);
+        Student *bob = make_student("Bob", 15);
+        printf("%d\n", (alice) != NULL ? 1 : 0);
+        printf("%d\n", (bob) != NULL ? 1 : 0);
+        printf("%s\n", alice->name);
+        printf("%s\n", bob->name);
+        free_student(alice);
+        free_student(bob);
+    }
+    {
+        Student *s = make_student("Test", 10);
+        printf("%d\n", (s) != NULL ? 1 : 0);
+        free_student(s);
+    }
     return 0;
 }
 """

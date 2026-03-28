@@ -8,4 +8,7 @@ output.txt
 .superpowers/
 *_AUDIT.md
 AUDIT_*.md
+AUDIT_*.txt
 PERFORMANCE_AUDIT.md
+*_REMEDIATION.md
+data/

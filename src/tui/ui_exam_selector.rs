@@ -8,6 +8,7 @@ use ratatui::{
     Frame,
 };
 
+use crate::error::Result;
 use crate::models::AnnaleSession;
 use crate::tui::common;
 
@@ -16,9 +17,9 @@ use crate::tui::common;
 pub fn select_exam_session(
     sessions: &[AnnaleSession],
     last_session_id: Option<&str>,
-) -> Option<String> {
+) -> Result<Option<String>> {
     if sessions.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     let initial_cursor = last_session_id
@@ -40,16 +41,14 @@ fn run_selector_loop(
     sessions: &[AnnaleSession],
     cursor: &mut usize,
     list_state: &mut ListState,
-) -> Option<String> {
+) -> Result<Option<String>> {
     use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
     use std::time::Duration;
 
     loop {
-        terminal
-            .draw(|f| {
-                draw_selector(f, sessions, *cursor);
-            })
-            .expect("render failed");
+        terminal.draw(|f| {
+            draw_selector(f, sessions, *cursor);
+        })?;
 
         if event::poll(Duration::from_millis(100)).unwrap_or_else(|e| {
             eprintln!("[clings/exam] erreur poll clavier: {e}");
@@ -69,10 +68,10 @@ fn run_selector_loop(
                             list_state.select(Some(*cursor));
                         }
                         KeyCode::Enter => {
-                            return Some(sessions[*cursor].id.clone());
+                            return Ok(Some(sessions[*cursor].id.clone()));
                         }
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
-                            return None;
+                            return Ok(None);
                         }
                         _ => {}
                     }
@@ -147,7 +146,7 @@ mod tests {
 
     #[test]
     fn select_exam_session_returns_none_on_empty_list() {
-        assert_eq!(select_exam_session(&[], None), None);
-        assert_eq!(select_exam_session(&[], Some("nsy103-2023")), None);
+        assert_eq!(select_exam_session(&[], None).unwrap(), None);
+        assert_eq!(select_exam_session(&[], Some("nsy103-2023")).unwrap(), None);
     }
 }

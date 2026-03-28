@@ -1,0 +1,90 @@
+common_mistake = "dup2(pipefd[0], STDOUT_FILENO) au lieu de pipefd[1] — l'enfant redirige stdout vers le fd de lecture, echo ne peut rien écrire"
+description = """
+NSY103 — Scénario exam : fork + dup2 + execl + pipe, 3 bugs à corriger.
+
+Le code est censé : forker un enfant, rediriger son stdout vers un pipe via dup2, puis le faire exécuter /bin/echo via execl. Le parent lit la sortie du pipe et l'affiche.
+
+Il contient 3 bugs classiques du pattern fork+exec+pipe :
+1. dup2 utilise le mauvais descripteur → stdout redirigé vers le fd de lecture
+2. pipefd[0] non fermé dans l'enfant avant execl → fuite de descripteur
+3. pipefd[1] non fermé dans le parent → read() attend EOF qui n'arrive jamais
+
+⚠ Pattern direct des examens NSY103 : combinaison fork + dup2 + execl testée en session 1 2023-2024 Q1.2."""
+difficulty = 4
+exercise_type = "fix_bug"
+hints = [
+    "Bug 1 : dup2(pipefd[X], STDOUT_FILENO) — X doit être 1 (fd d'écriture), pas 0 (fd de lecture). echo écrit sur stdout, qui doit pointer vers le côté écriture du pipe",
+    "Bug 2 : dans l'enfant, fermer pipefd[0] (lecture) avant execl — l'enfant n'en a pas besoin et execl hérite tous les fd ouverts",
+    "Bug 3 (critique) : dans le parent, fermer pipefd[1] après fork() — sinon le dernier fd d'écriture ouvert n'est jamais fermé et read() ne reçoit jamais EOF",
+]
+id = "sc-fork-exec-pipe-01"
+kc_ids = ["KC-CAP"]
+key_concept = "dup2(pipefd[1], STDOUT_FILENO) redirige stdout vers le pipe — execl hérite la redirection. Le parent DOIT fermer pipefd[1] pour signaler EOF"
+lang = "c"
+prerequisites = [
+    "fork-exec-01",
+    "pipe-basic-01",
+]
+solution_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[0]);                       /* FIX 2: fermer le fd de lecture inutilisé */
+        dup2(pipefd[1], STDOUT_FILENO);         /* FIX 1: rediriger stdout vers fd d\'écriture */
+        close(pipefd[1]);                       /* fermer l\'original après dup2 */
+        execl("/bin/echo", "echo", "NSY103", NULL);
+        _exit(1);
+    }
+
+    close(pipefd[1]);                           /* FIX 3: fermer fd écriture dans le parent */
+    char buf[64] = {0};
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    (void)n;
+    close(pipefd[0]);
+    waitpid(pid, NULL, 0);
+    printf("sortie: %s", buf);
+    return 0;
+}'''
+starter_code = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int pipefd[2];
+    pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* BUG 2: manque close(pipefd[0]) — fd de lecture non fermé avant execl */
+        dup2(pipefd[0], STDOUT_FILENO);         /* BUG 1: mauvais fd — devrait être pipefd[1] */
+        close(pipefd[1]);
+        execl("/bin/echo", "echo", "NSY103", NULL);
+        _exit(1);
+    }
+
+    /* BUG 3: manque close(pipefd[1]) — read() bloquera indéfiniment */
+    char buf[64] = {0};
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    (void)n;
+    close(pipefd[0]);
+    waitpid(pid, NULL, 0);
+    printf("sortie: %s", buf);
+    return 0;
+}'''
+subject = "scenarios"
+title = "Bugs fork + dup2 + execl — stdout redirigé vers pipe"
+
+[validation]
+expected_output = "sortie: NSY103\n"
+max_duration_ms = 3000
+mode = "output"

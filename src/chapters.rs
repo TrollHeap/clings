@@ -230,6 +230,10 @@ mod tests {
             kc_ids: vec![],
             starter_code_stages: vec![],
             visualizer: Default::default(),
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
         }
     }
 
@@ -334,6 +338,10 @@ mod tests {
             kc_ids: vec![],
             starter_code_stages: vec![],
             visualizer: Default::default(),
+            libsys_module: None,
+            libsys_function: None,
+            libsys_unlock: None,
+            header_code: None,
         };
 
         let ex2 = Exercise {

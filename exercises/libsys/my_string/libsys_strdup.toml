@@ -1,0 +1,107 @@
+id = "libsys-strdup-01"
+subject = "string_formatting"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_string"
+libsys_function = "my_strdup"
+libsys_unlock = "standalone"
+title = "libsys : my_strdup"
+key_concept = "allocation dynamique + copie mémoire"
+common_mistake = "Oublier le +1 pour le caractère nul terminal"
+prerequisites = []
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_strdup` : duplique une chaîne en allouant la mémoire nécessaire.
+Cette fonction sera exportée vers ton repo libsys après validation.
+
+Signature imposée :
+    char *my_strdup(const char *s);
+
+Contraintes :
+- Utiliser malloc (pas strdup de la stdlib)
+- Retourner NULL si l'allocation échoue ou si s == NULL
+"""
+
+header_code = "char *my_strdup(const char *s);"
+
+starter_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+/**
+ * my_strdup - Duplique la chaîne pointée par s.
+ * @s: chaîne source (peut être NULL)
+ * Return: pointeur vers la copie allouée, ou NULL en cas d'échec/NULL en entrée
+ */
+char *my_strdup(const char *s)
+{
+    /* À implémenter */
+    (void)s;
+    return NULL;
+}
+'''
+
+solution_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+char *my_strdup(const char *s)
+{
+    size_t  len;
+    char    *copy;
+
+    if (!s)
+        return NULL;
+    len = strlen(s) + 1;
+    copy = malloc(len);
+    if (!copy)
+        return NULL;
+    memcpy(copy, s, len);
+    return copy;
+}
+'''
+
+hints = [
+    "Calcule d'abord la longueur avec strlen, puis ajoute 1 pour le '\\0'",
+    "malloc(len) puis memcpy est plus robuste que strcpy pour une implémentation propre",
+    "Pense à gérer le cas NULL en entrée avant toute chose",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stdlib.h>
+#include <string.h>
+
+char *my_strdup(const char *s);
+
+void test_basic(void) {
+    char *r = my_strdup("hello");
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_STRING("hello", r);
+    free(r);
+}
+
+void test_empty_string(void) {
+    char *r = my_strdup("");
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_STRING("", r);
+    free(r);
+}
+
+void test_null_input(void) {
+    char *r = my_strdup(NULL);
+    TEST_ASSERT_NULL(r);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_basic);
+    RUN_TEST(test_empty_string);
+    RUN_TEST(test_null_input);
+    return UNITY_END();
+}
+'''

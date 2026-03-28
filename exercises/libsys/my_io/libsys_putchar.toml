@@ -1,0 +1,103 @@
+id = "libsys-putchar-01"
+subject = "fd_basics"
+lang = "c"
+difficulty = 1
+exercise_type = "library_export"
+libsys_module = "my_io"
+libsys_function = "my_putchar"
+libsys_unlock = "standalone"
+title = "libsys : my_putchar"
+key_concept = "écriture d'un octet sur stdout via write(2)"
+common_mistake = "Utiliser printf ou putchar — l'objectif est d'utiliser l'appel système write(2) directement"
+prerequisites = []
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_putchar` : affiche le caractère `c` sur la sortie standard (fd 1)
+en utilisant l'appel système `write(2)` directement — pas printf ni putchar.
+
+Signature imposée :
+    void my_putchar(char c);
+
+C'est la brique de base de my_io : tout passe par write().
+"""
+
+header_code = "void my_putchar(char c);"
+
+starter_code = '''
+#include <unistd.h>
+
+/**
+ * my_putchar - Affiche le caractère c sur stdout (fd 1).
+ * @c: caractère à afficher
+ */
+void my_putchar(char c)
+{
+    /* À implémenter */
+    (void)c;
+}
+'''
+
+solution_code = '''
+#include <unistd.h>
+
+void my_putchar(char c)
+{
+    write(1, &c, 1);
+}
+'''
+
+hints = [
+    "write(fd, buf, count) — fd=1 pour stdout, buf=adresse du char, count=1",
+    "Prends l'adresse de `c` avec &c pour passer un pointeur à write",
+    "Pas besoin de #include <stdio.h> — seulement <unistd.h>",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <unistd.h>
+#include <string.h>
+
+void my_putchar(char c);
+
+/* Redirige stdout vers un pipe, appelle f(ch), restaure stdout, lit l'octet reçu. */
+static char capture_putchar(char ch)
+{
+    int  pfd[2];
+    char buf = 0;
+
+    if (pipe(pfd) != 0)
+        return 0;
+    int saved = dup(1);
+    dup2(pfd[1], 1);
+    my_putchar(ch);
+    dup2(saved, 1);
+    close(saved);
+    close(pfd[1]);
+    read(pfd[0], &buf, 1);
+    close(pfd[0]);
+    return buf;
+}
+
+void test_putchar_A(void) {
+    TEST_ASSERT_EQUAL_INT('A', capture_putchar('A'));
+}
+
+void test_putchar_newline(void) {
+    TEST_ASSERT_EQUAL_INT('\n', capture_putchar('\n'));
+}
+
+void test_putchar_zero(void) {
+    TEST_ASSERT_EQUAL_INT(0, capture_putchar(0));
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_putchar_A);
+    RUN_TEST(test_putchar_newline);
+    RUN_TEST(test_putchar_zero);
+    return UNITY_END();
+}
+'''

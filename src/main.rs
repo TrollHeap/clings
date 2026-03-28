@@ -8,6 +8,7 @@ pub mod constants;
 mod error;
 mod exam;
 mod exercises;
+mod libsys;
 mod mastery;
 mod models;
 mod piscine;
@@ -244,7 +245,7 @@ fn main() {
         Some(Commands::Schema { output }) => cmd_schema(&output),
         None => (|| {
             let conn = progress::open_db()?;
-            match tui::ui_launcher::select_launch(&conn) {
+            match tui::ui_launcher::select_launch(&conn)? {
                 tui::ui_launcher::LaunchChoice::Continue => {
                     let (mode, chapter, _index) = progress::load_last_session(&conn)?
                         .unwrap_or_else(|| ("watch".to_string(), None, 0));

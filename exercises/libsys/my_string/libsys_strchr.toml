@@ -1,0 +1,97 @@
+id = "libsys-strchr-01"
+subject = "string_formatting"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_string"
+libsys_function = "my_strchr"
+libsys_unlock = "standalone"
+title = "libsys : my_strchr"
+key_concept = "recherche de caractère dans une chaîne"
+common_mistake = "Ne pas retourner un pointeur sur le '\\0' quand c == 0"
+prerequisites = ["libsys-strlen-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_strchr` : retourne un pointeur sur la première occurrence
+du caractère c dans la chaîne s (ou NULL si absent).
+
+Signature imposée :
+    char *my_strchr(const char *s, int c);
+
+Contraintes :
+- Ne pas utiliser strchr de la stdlib
+- Si c == '\\0', retourner un pointeur sur le '\\0' terminal de s
+"""
+
+header_code = "char *my_strchr(const char *s, int c);"
+
+starter_code = '''
+/**
+ * my_strchr - Cherche la première occurrence du caractère c dans s.
+ * @s: chaîne dans laquelle chercher (ne doit pas être NULL)
+ * @c: caractère recherché (passé comme int, converti en char)
+ * Return: pointeur sur la première occurrence, ou NULL si absent
+ */
+char *my_strchr(const char *s, int c)
+{
+    /* À implémenter */
+    (void)s;
+    (void)c;
+    return NULL;
+}
+'''
+
+solution_code = '''
+char *my_strchr(const char *s, int c)
+{
+    char ch = (char)c;
+
+    while (*s != ch) {
+        if (*s == '\0')
+            return NULL;
+        s++;
+    }
+    return (char *)s;
+}
+'''
+
+hints = [
+    "Parcours s caractère par caractère et compare chaque octet avec (char)c",
+    "Attention au cas spécial : si c == 0, la fonction doit retourner un pointeur sur le '\\0' terminal",
+    "La boucle doit s'arrêter soit quand on trouve c, soit quand on atteint '\\0'",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+char *my_strchr(const char *s, int c);
+
+void test_found(void) {
+    const char *s = "hello";
+    char *r = my_strchr(s, 'l');
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_INT('l', *r);
+}
+
+void test_not_found(void) {
+    char *r = my_strchr("hello", 'z');
+    TEST_ASSERT_NULL(r);
+}
+
+void test_nul_char(void) {
+    const char *s = "hello";
+    char *r = my_strchr(s, '\0');
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_EQUAL_INT('\0', *r);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_found);
+    RUN_TEST(test_not_found);
+    RUN_TEST(test_nul_char);
+    return UNITY_END();
+}
+'''

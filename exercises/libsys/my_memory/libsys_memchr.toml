@@ -1,0 +1,118 @@
+id = "libsys-memchr-01"
+subject = "memory_allocation"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_memory"
+libsys_function = "my_memchr"
+libsys_unlock = "standalone"
+title = "libsys : my_memchr"
+key_concept = "recherche d'octet dans un bloc mémoire"
+common_mistake = "Comparer avec char au lieu de unsigned char — problème avec les valeurs > 127"
+prerequisites = ["libsys-memset-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_memchr` : cherche la première occurrence de l'octet `c`
+dans les `n` premiers octets de `s`.
+
+Signature imposée :
+    void *my_memchr(const void *s, int c, size_t n);
+
+Retourne un pointeur vers l'octet trouvé, ou NULL si non trouvé.
+"""
+
+header_code = "void *my_memchr(const void *s, int c, size_t n);"
+
+starter_code = '''
+#include <stddef.h>
+
+/**
+ * my_memchr - Cherche l'octet c dans les n premiers octets de s.
+ * @s: zone mémoire à scanner
+ * @c: valeur cherchée (cast en unsigned char)
+ * @n: nombre d'octets à inspecter
+ * Return: pointeur vers l'octet trouvé, ou NULL
+ */
+void *my_memchr(const void *s, int c, size_t n)
+{
+    /* À implémenter */
+    (void)s;
+    (void)c;
+    (void)n;
+    return NULL;
+}
+'''
+
+solution_code = '''
+#include <stddef.h>
+
+void *my_memchr(const void *s, int c, size_t n)
+{
+    const unsigned char *p;
+    unsigned char        uc;
+    size_t               i;
+
+    p  = (const unsigned char *)s;
+    uc = (unsigned char)c;
+    i  = 0;
+    while (i < n)
+    {
+        if (p[i] == uc)
+            return (void *)(p + i);
+        i++;
+    }
+    return NULL;
+}
+'''
+
+hints = [
+    "Cast `s` en `const unsigned char *` et `c` en `unsigned char` pour la comparaison",
+    "Retourne un pointeur `(void *)` vers l'élément trouvé — pas juste un booléen",
+    "Si non trouvé après `n` octets, retourne NULL",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <stddef.h>
+
+void *my_memchr(const void *s, int c, size_t n);
+
+void test_found_first(void) {
+    char buf[8] = "ABCDEF";
+    void *p = my_memchr(buf, 'C', 6);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_PTR(buf + 2, p);
+}
+
+void test_not_found(void) {
+    char buf[6] = "ABCDE";
+    void *p = my_memchr(buf, 'Z', 5);
+    TEST_ASSERT_NULL(p);
+}
+
+void test_outside_n(void) {
+    char buf[8] = "ABCDEF";
+    /* 'F' est à l'index 5, mais n=4 — ne doit pas être trouvé */
+    void *p = my_memchr(buf, 'F', 4);
+    TEST_ASSERT_NULL(p);
+}
+
+void test_binary_value(void) {
+    unsigned char buf[4] = {0x00, 0xFF, 0x42, 0x01};
+    void *p = my_memchr(buf, 0xFF, 4);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_PTR(buf + 1, p);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_found_first);
+    RUN_TEST(test_not_found);
+    RUN_TEST(test_outside_n);
+    RUN_TEST(test_binary_value);
+    return UNITY_END();
+}
+'''

@@ -11,10 +11,12 @@ use crate::tui::app::Msg;
 
 /// Lance un thread keyboard + file watcher, retourne le Receiver<Msg>.
 ///
-/// Le keyboard thread envoie Msg::Key sur chaque touche pressée et Msg::Tick sinon.
-/// Le file watcher envoie Msg::FileChanged(path) sur chaque modification.
+/// Le keyboard thread envoie Msg::Key/Resize sur chaque event clavier/resize,
+/// et Msg::Tick toutes les ~100ms (abandonné silencieusement si le buffer est plein).
+/// Le file watcher envoie Msg::FileChanged sur chaque modification.
 pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
-    let (tx, rx) = mpsc::channel::<Msg>();
+    // Canal borné : évite l'accumulation illimitée de Tick si le render ralentit.
+    let (tx, rx) = mpsc::sync_channel::<Msg>(64);
 
     // ── Thread keyboard ────────────────────────────────────────────────
     let tx_key = tx.clone();
@@ -28,13 +30,26 @@ pub fn spawn_event_reader(watch_path: PathBuf) -> mpsc::Receiver<Msg> {
                 eprintln!("[clings/events] erreur poll clavier: {e}");
                 false
             }) {
-                if let Ok(Event::Key(k)) = event::read() {
-                    if k.kind == KeyEventKind::Press && tx_key.send(Msg::Key(k)).is_err() {
-                        break;
+                match event::read() {
+                    Ok(Event::Key(k)) => {
+                        if k.kind == KeyEventKind::Press && tx_key.send(Msg::Key(k)).is_err() {
+                            break;
+                        }
                     }
+                    Ok(Event::Resize(w, h)) => {
+                        if tx_key.send(Msg::Resize(w, h)).is_err() {
+                            break;
+                        }
+                    }
+                    _ => {}
                 }
-            } else if tx_key.send(Msg::Tick).is_err() {
-                break;
+            } else {
+                // Tick : on abandonne silencieusement si le buffer est plein.
+                use std::sync::mpsc::TrySendError;
+                match tx_key.try_send(Msg::Tick) {
+                    Ok(_) | Err(TrySendError::Full(_)) => {}
+                    Err(TrySendError::Disconnected(_)) => break,
+                }
             }
         }
     });

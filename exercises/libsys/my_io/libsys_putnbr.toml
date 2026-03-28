@@ -1,0 +1,143 @@
+id = "libsys-putnbr-01"
+subject = "fd_basics"
+lang = "c"
+difficulty = 2
+exercise_type = "library_export"
+libsys_module = "my_io"
+libsys_function = "my_putnbr"
+libsys_unlock = "standalone"
+title = "libsys : my_putnbr"
+key_concept = "conversion d'entier en chaîne et affichage sans printf"
+common_mistake = "Oublier le cas n == INT_MIN — n = -n provoque un overflow car INT_MIN n'a pas d'équivalent positif"
+prerequisites = ["libsys-putstr-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_putnbr` : affiche l'entier `n` sur la sortie standard (fd 1)
+sans utiliser printf ni itoa — seulement write(2) et la division entière.
+
+Signature imposée :
+    void my_putnbr(int n);
+
+Cas à gérer :
+- Nombre positif : afficher les chiffres
+- Nombre négatif : afficher '-' puis la valeur absolue
+- INT_MIN (-2147483648) : cas particulier — n = -n overflow !
+"""
+
+header_code = "void my_putnbr(int n);"
+
+starter_code = '''
+#include <unistd.h>
+#include <limits.h>
+
+/**
+ * my_putnbr - Affiche l'entier n sur stdout.
+ * @n: entier à afficher (peut être INT_MIN)
+ */
+void my_putnbr(int n)
+{
+    /* À implémenter */
+    (void)n;
+}
+'''
+
+solution_code = '''
+#include <unistd.h>
+#include <limits.h>
+
+static void putnbr_rec(long n)
+{
+    char c;
+
+    if (n < 0)
+    {
+        write(1, "-", 1);
+        n = -n;
+    }
+    if (n >= 10)
+        putnbr_rec(n / 10);
+    c = (char)('0' + n % 10);
+    write(1, &c, 1);
+}
+
+void my_putnbr(int n)
+{
+    putnbr_rec((long)n);
+}
+'''
+
+hints = [
+    "Utilise la récursion : affiche d'abord n/10, puis le chiffre des unités n%10",
+    "Convertis n en long dès le début pour gérer INT_MIN sans overflow",
+    "Le chiffre à afficher = '0' + (n % 10)",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <unistd.h>
+#include <string.h>
+#include <limits.h>
+
+void my_putnbr(int n);
+
+static int capture_putnbr(int n, char *out, int maxlen)
+{
+    int pfd[2];
+    if (pipe(pfd) != 0)
+        return -1;
+    int saved = dup(1);
+    dup2(pfd[1], 1);
+    my_putnbr(n);
+    dup2(saved, 1);
+    close(saved);
+    close(pfd[1]);
+    int bytes = (int)read(pfd[0], out, maxlen);
+    close(pfd[0]);
+    if (bytes >= 0)
+        out[bytes] = '\0';
+    return bytes;
+}
+
+void test_zero(void) {
+    char buf[16];
+    capture_putnbr(0, buf, 15);
+    TEST_ASSERT_EQUAL_STRING("0", buf);
+}
+
+void test_positive(void) {
+    char buf[16];
+    capture_putnbr(42, buf, 15);
+    TEST_ASSERT_EQUAL_STRING("42", buf);
+}
+
+void test_negative(void) {
+    char buf[16];
+    capture_putnbr(-7, buf, 15);
+    TEST_ASSERT_EQUAL_STRING("-7", buf);
+}
+
+void test_int_min(void) {
+    char buf[24];
+    capture_putnbr(INT_MIN, buf, 23);
+    TEST_ASSERT_EQUAL_STRING("-2147483648", buf);
+}
+
+void test_int_max(void) {
+    char buf[24];
+    capture_putnbr(INT_MAX, buf, 23);
+    TEST_ASSERT_EQUAL_STRING("2147483647", buf);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_zero);
+    RUN_TEST(test_positive);
+    RUN_TEST(test_negative);
+    RUN_TEST(test_int_min);
+    RUN_TEST(test_int_max);
+    return UNITY_END();
+}
+'''

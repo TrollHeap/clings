@@ -1,0 +1,121 @@
+id = "libsys-putstr-01"
+subject = "fd_basics"
+lang = "c"
+difficulty = 1
+exercise_type = "library_export"
+libsys_module = "my_io"
+libsys_function = "my_putstr"
+libsys_unlock = "standalone"
+title = "libsys : my_putstr"
+key_concept = "affichage d'une chaîne sans printf via write(2)"
+common_mistake = "Passer directement strlen(s) à write sans calculer la longueur — NUL terminal non inclus"
+prerequisites = ["libsys-putchar-01"]
+
+description = """
+libsys — Construis ta librairie C personnelle.
+
+Implémente `my_putstr` : affiche la chaîne `s` sur la sortie standard (fd 1)
+en utilisant `write(2)`. Ne pas utiliser printf ni puts.
+
+Signature imposée :
+    void my_putstr(const char *s);
+
+Si s est NULL, ne rien afficher (pas de segfault).
+"""
+
+header_code = "void my_putstr(const char *s);"
+
+starter_code = '''
+#include <unistd.h>
+#include <string.h>
+
+/**
+ * my_putstr - Affiche la chaîne s sur stdout.
+ * @s: chaîne à afficher (peut être NULL)
+ */
+void my_putstr(const char *s)
+{
+    /* À implémenter */
+    (void)s;
+}
+'''
+
+solution_code = '''
+#include <unistd.h>
+#include <string.h>
+
+void my_putstr(const char *s)
+{
+    if (!s)
+        return;
+    write(1, s, strlen(s));
+}
+'''
+
+hints = [
+    "Calcule la longueur avec strlen(s) puis passe-la à write(1, s, len)",
+    "write() n'est pas sensible au NUL terminal — pas besoin de +1",
+    "Vérifie que s != NULL avant toute opération pour éviter le segfault",
+]
+
+[validation]
+mode = "test"
+test_code = '''
+#include <unistd.h>
+#include <string.h>
+
+void my_putstr(const char *s);
+
+static int capture_putstr(const char *str, char *out, int maxlen)
+{
+    int  pfd[2];
+    if (pipe(pfd) != 0)
+        return -1;
+    int saved = dup(1);
+    dup2(pfd[1], 1);
+    my_putstr(str);
+    dup2(saved, 1);
+    close(saved);
+    close(pfd[1]);
+    int n = (int)read(pfd[0], out, maxlen);
+    close(pfd[0]);
+    if (n >= 0)
+        out[n] = '\0';
+    return n;
+}
+
+void test_basic_string(void) {
+    char buf[32];
+    int n = capture_putstr("hello", buf, 31);
+    TEST_ASSERT_EQUAL_INT(5, n);
+    TEST_ASSERT_EQUAL_STRING("hello", buf);
+}
+
+void test_empty_string(void) {
+    char buf[8];
+    int n = capture_putstr("", buf, 7);
+    TEST_ASSERT_EQUAL_INT(0, n);
+}
+
+void test_null_no_crash(void) {
+    char buf[8];
+    int n = capture_putstr(NULL, buf, 7);
+    TEST_ASSERT_EQUAL_INT(0, n);
+}
+
+void test_with_newline(void) {
+    char buf[16];
+    int n = capture_putstr("ok\n", buf, 15);
+    TEST_ASSERT_EQUAL_INT(3, n);
+    TEST_ASSERT_EQUAL_STRING("ok\n", buf);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_basic_string);
+    RUN_TEST(test_empty_string);
+    RUN_TEST(test_null_no_crash);
+    RUN_TEST(test_with_newline);
+    return UNITY_END();
+}
+'''

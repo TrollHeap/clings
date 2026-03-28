@@ -1,5 +1,6 @@
 //! Ratatui launch mode and chapter selector.
 
+use crate::error::Result;
 use ratatui::{
     layout::{Constraint, Direction, HorizontalAlignment, Layout},
     style::{Modifier, Style},
@@ -46,7 +47,7 @@ enum Screen {
 }
 
 /// Ratatui-based launch selector. Shows mode selection, then chapter selection.
-pub fn select_launch(conn: &Connection) -> LaunchChoice {
+pub fn select_launch(conn: &Connection) -> Result<LaunchChoice> {
     let last_session = progress::load_last_session(conn).ok().flatten();
 
     let mut screen = Screen::Mode;
@@ -62,11 +63,9 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 let has_continue = last_session.is_some();
                 let item_count = if has_continue { 5 } else { 4 };
 
-                terminal
-                    .draw(|f| {
-                        draw_mode_screen(f, cursor, &last_session);
-                    })
-                    .expect("render failed");
+                terminal.draw(|f| {
+                    draw_mode_screen(f, cursor, &last_session);
+                })?;
 
                 match read_key() {
                     Some(Action::Up) => {
@@ -118,7 +117,7 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 }
             }
             Screen::Help => {
-                terminal.draw(draw_help_screen).expect("render failed");
+                terminal.draw(draw_help_screen)?;
                 if read_key().is_some() {
                     screen = Screen::Mode;
                 }
@@ -128,11 +127,9 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
                 // "Tous les chapitres" + 16 chapters
                 let item_count = 1 + CHAPTERS.len();
 
-                terminal
-                    .draw(|f| {
-                        draw_chapter_screen(f, cursor, mode);
-                    })
-                    .expect("render failed");
+                terminal.draw(|f| {
+                    draw_chapter_screen(f, cursor, mode);
+                })?;
 
                 match read_key() {
                     Some(Action::Up) => {
@@ -169,7 +166,7 @@ pub fn select_launch(conn: &Connection) -> LaunchChoice {
     };
 
     ratatui::restore();
-    result
+    Ok(result)
 }
 
 enum Action {

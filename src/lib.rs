@@ -5,6 +5,8 @@
     clippy::new_without_default,
     clippy::items_after_test_module
 )]
+// TODO: enable #![warn(missing_docs)] once documentation coverage is complete.
+// Currently ~51 public items lack documentation (cf. quality scan 2026-03-27).
 
 mod authoring;
 mod chapters;
