@@ -135,3 +135,123 @@ pub(crate) fn add_practice_log_columns_if_missing(conn: &Connection) -> Result<(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_open_db_in_memory_creates_schema() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(SCHEMA)?;
+        conn.execute_batch(SCHEMA_V1)?;
+        add_practice_log_columns_if_missing(&conn)?;
+
+        // Verify subjects table exists
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='subjects'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 1);
+
+        // Verify practice_log table exists
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='practice_log'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_migrate_v1_idempotent() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(SCHEMA)?;
+        conn.execute_batch(SCHEMA_V1)?;
+
+        // Call migrate_v1 multiple times
+        migrate_v1(&conn)?;
+        migrate_v1(&conn)?;
+        migrate_v1(&conn)?;
+
+        // Should not panic and queries should still work
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='exercise_scores'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_practice_log_columns_idempotent() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(SCHEMA)?;
+
+        // Call add_practice_log_columns_if_missing multiple times
+        add_practice_log_columns_if_missing(&conn)?;
+        add_practice_log_columns_if_missing(&conn)?;
+        add_practice_log_columns_if_missing(&conn)?;
+
+        // Verify all columns exist
+        let col_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('practice_log')",
+            [],
+            |row| row.get(0),
+        )?;
+        assert!(
+            col_count >= 8,
+            "practice_log should have at least 8 columns"
+        );
+
+        // Verify specific columns
+        let has_error_type: bool = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'error_type'",
+            [],
+            |row| row.get::<_, i64>(0).map(|c| c > 0),
+        )?;
+        assert!(has_error_type);
+
+        let has_duration_ms: bool = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'duration_ms'",
+            [],
+            |row| row.get::<_, i64>(0).map(|c| c > 0),
+        )?;
+        assert!(has_duration_ms);
+
+        let has_hint_count: bool = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('practice_log') WHERE name = 'hint_count_used'",
+            [],
+            |row| row.get::<_, i64>(0).map(|c| c > 0),
+        )?;
+        assert!(has_hint_count);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_schema_v1_creates_exercise_scores() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(SCHEMA_V1)?;
+
+        // Insert a row to verify table is writable
+        conn.execute(
+            "INSERT INTO exercise_scores (exercise_id, subject) VALUES (?1, ?2)",
+            rusqlite::params!["ex-001", "pointers"],
+        )?;
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM exercise_scores WHERE exercise_id = 'ex-001'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 1);
+
+        Ok(())
+    }
+}
