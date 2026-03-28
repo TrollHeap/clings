@@ -206,10 +206,9 @@ impl App {
     pub(crate) fn handle_file_changed(&mut self) {
         if self.state.session.skip_file_changed {
             self.state.session.skip_file_changed = false;
-            return;
+            // Skip this file change notification (debounce).
         }
         // Auto-compile could happen here, but currently disabled.
-        // Leave logic for future enhancement.
     }
 
     /// Handle tick — clear status message if expired (3 seconds).

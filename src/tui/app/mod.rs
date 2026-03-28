@@ -13,8 +13,7 @@ mod handlers_overlay;
 mod handlers_piscine;
 mod handlers_watch;
 
-pub use crate::tui::ui_keymap::key_to_cmd;
-pub use crate::tui::ui_messages::{ActiveOverlay, Command, ListDisplayItem, Msg};
+pub use crate::tui::ui_messages::{ActiveOverlay, ListDisplayItem, Msg};
 pub use handlers_piscine::format_remaining_secs;
 
 /// État centralisé TEA/Elm — gère tous les modes (watch/piscine/exam/run).
@@ -355,56 +354,6 @@ impl App {
         }
         None
     }
-
-    /// Gère les touches de l'overlay liste.
-    /// Retourne `true` si Enter a été pressé (jump-to-exercise).
-    /// Retourne `true` si Enter a été pressé avec un résultat sélectionné
-    /// (l'appelant doit alors charger l'exercice et/ou sauvegarder le checkpoint).
-
-    /// Gère les touches de l'overlay visualiseur.
-
-    /// Gère les touches de l'overlay solution.
-    /// Retourne `true` si l'overlay était actif (l'appelant doit `return`).
-
-    /// Sauvegarde le checkpoint piscine et exam (si session_id présent).
-    /// Logue les erreurs sans les propager — contexte event loop.
-
-    /// Load exercise and save checkpoint if needed (shared between overlays).
-
-    /// Handle success overlay key press (any key closes, Enter navigates to next).
-
-    /// Dispatch overlay keys shared between watch and piscine.
-    /// Returns `true` if the key was handled by an overlay (caller should `return`).
-    /// If an overlay navigation triggers a jump, calls `reset_state_and_load_exercise`.
-
-    /// Shared hint reveal handler `[h]`.
-
-    /// Shared visualizer toggle `[v]`.
-
-    /// Shared list overlay open `[l]`.
-
-    /// Portfolio libsys overlay `[b]`.
-
-    /// Shared search overlay open `[/]`.
-
-    /// Navigate to next exercise, optionally saving checkpoint.
-    /// Returns `true` if navigation happened, `false` if at end.
-
-    /// Navigate to previous exercise, optionally saving checkpoint.
-
-    /// Check if solution can be revealed (all hints shown OR enough failures).
-
-    /// Check if piscine solution can be revealed (fail_count-based threshold).
-
-    /// Handle compilation and test of current exercise (triggered by 'r' key).
-    /// Compiles the code, runs it, records attempt, and navigates on success.
-
-    /// Export libsys si l'exercice est de type LibraryExport et que tous les champs sont présents.
-
-    /// Met à jour le compteur de succès consécutifs sur le même sujet et affiche le nudge
-    /// d'interleaving si le seuil est atteint.
-
-    /// Dispatch Watch messages → état
 
     /// Boucle principale piscine avec Ratatui.
     ///
