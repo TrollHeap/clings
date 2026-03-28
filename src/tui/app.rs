@@ -35,7 +35,7 @@ pub enum Msg {
 }
 
 /// État des overlays (help, list, search, solution, visualizer).
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct OverlayState {
     pub help_active: bool,
     pub list_active: bool,
@@ -62,7 +62,7 @@ pub struct OverlayState {
 }
 
 /// Cache du header — invalidé sur changement d'exercice ou mise à jour mastery.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HeaderCache {
     pub cached_mini_map: String,
     pub cached_exercise_counter: String,
@@ -77,6 +77,7 @@ pub struct HeaderCache {
 }
 
 /// Cache du timer piscine — mis à jour dans Tick quand la seconde change.
+#[derive(Debug)]
 pub struct PiscineTimerCache {
     pub cached_piscine_elapsed_str: String,
     pub piscine_last_elapsed_secs: u64,
@@ -96,6 +97,7 @@ impl Default for PiscineTimerCache {
 }
 
 /// État centralisé — mode watch
+#[derive(Debug)]
 pub struct AppState {
     pub should_quit: bool,
     // Watch data
@@ -196,6 +198,7 @@ impl AppState {
     }
 }
 
+#[derive(Debug)]
 pub struct App {
     pub state: AppState,
 }
@@ -283,7 +286,12 @@ impl App {
         // Boucle TEA
         loop {
             self.state.update_due_count_cache();
-            terminal.draw(|f| crate::tui::ui_watch::view(f, &mut self.state))?;
+            terminal
+                .draw(|f| crate::tui::ui_watch::view(f, &mut self.state))
+                .map_err(|e| {
+                    ratatui::restore();
+                    e
+                })?;
 
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(msg) => self.update_watch(msg, conn),
@@ -658,7 +666,13 @@ impl App {
         match key.code {
             // Vim : l / → = step suivant ; h / ← = step précédent ; j/k aussi intuitifs
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Char('j') => {
-                let total = state.exercises[state.current_index].visualizer.steps.len();
+                let total = state
+                    .exercises
+                    .get(state.current_index)
+                    .expect("current_index in bounds")
+                    .visualizer
+                    .steps
+                    .len();
                 state.overlay.vis_step = (state.overlay.vis_step + 1).min(total.saturating_sub(1));
             }
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('k') => {
@@ -791,7 +805,13 @@ impl App {
     /// Shared hint reveal handler `[h]`.
     fn reveal_next_hint(&mut self) {
         use crate::constants::HINT_MIN_ATTEMPTS;
-        let hints_len = self.state.exercises[self.state.current_index].hints.len();
+        let hints_len = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds")
+            .hints
+            .len();
         if hints_len == 0 {
             return;
         }
@@ -811,13 +831,11 @@ impl App {
 
     /// Shared visualizer toggle `[v]`.
     fn toggle_visualizer_overlay(&mut self) {
-        if !self.state.exercises[self.state.current_index]
-            .visualizer
-            .steps
-            .is_empty()
-        {
-            self.state.overlay.vis_active = true;
-            self.state.overlay.vis_step = 0;
+        if let Some(exercise) = self.state.exercises.get(self.state.current_index) {
+            if !exercise.visualizer.steps.is_empty() {
+                self.state.overlay.vis_active = true;
+                self.state.overlay.vis_step = 0;
+            }
         }
     }
 
@@ -882,14 +900,22 @@ impl App {
 
     /// Check if solution can be revealed (all hints shown OR enough failures).
     fn can_reveal_solution(&self, failure_threshold: usize) -> bool {
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
         all_shown || self.state.consecutive_failures as usize >= failure_threshold
     }
 
     /// Check if piscine solution can be revealed (fail_count-based threshold).
     fn can_reveal_solution_piscine(&self) -> bool {
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let all_shown = exercise.hints.is_empty() || self.state.hint_index >= exercise.hints.len();
         all_shown || self.state.piscine_fail_count >= crate::constants::PISCINE_FAILURE_THRESHOLD
     }
@@ -903,7 +929,11 @@ impl App {
             return;
         };
         self.state.compile_pending = true;
-        let exercise = &self.state.exercises[self.state.current_index];
+        let exercise = self
+            .state
+            .exercises
+            .get(self.state.current_index)
+            .expect("current_index in bounds");
         let result = crate::runner::compile_and_run(path, exercise);
         self.state.compile_pending = false;
         let success = result.success;
@@ -950,12 +980,22 @@ impl App {
             if (self.state.consecutive_failures as usize) >= CONSECUTIVE_FAILURE_THRESHOLD
                 && self.state.hint_index == 0
             {
-                let hints_len = self.state.exercises[self.state.current_index].hints.len();
+                let hints_len = self
+                    .state
+                    .exercises
+                    .get(self.state.current_index)
+                    .expect("current_index in bounds")
+                    .hints
+                    .len();
                 if hints_len > 0 {
                     self.state.hint_index = 1;
                 }
             }
-            let exercise = &self.state.exercises[self.state.current_index];
+            let exercise = self
+                .state
+                .exercises
+                .get(self.state.current_index)
+                .expect("current_index in bounds");
             if let Err(e) =
                 crate::progress::record_attempt(conn, &exercise.subject, &exercise.id, false)
             {
@@ -1069,7 +1109,12 @@ impl App {
 
         // Boucle TEA
         loop {
-            terminal.draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))?;
+            terminal
+                .draw(|f| crate::tui::ui_piscine::view(f, &mut self.state))
+                .map_err(|e| {
+                    ratatui::restore();
+                    e
+                })?;
 
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(msg) => self.update_piscine(msg, conn, session_id),
@@ -1136,7 +1181,11 @@ impl App {
                             return;
                         };
                         self.state.compile_pending = true;
-                        let exercise = &self.state.exercises[self.state.current_index];
+                        let exercise = self
+                            .state
+                            .exercises
+                            .get(self.state.current_index)
+                            .expect("current_index in bounds");
                         let result = crate::runner::compile_and_run(path, exercise);
                         self.state.compile_pending = false;
                         let success = result.success;
@@ -1172,7 +1221,11 @@ impl App {
                                     }
                                 }
                             }
-                            let exercise = &self.state.exercises[self.state.current_index];
+                            let exercise = self
+                                .state
+                                .exercises
+                                .get(self.state.current_index)
+                                .expect("current_index in bounds");
                             if let Err(e) = crate::progress::record_attempt(
                                 conn,
                                 &exercise.subject,
